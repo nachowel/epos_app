@@ -1,0 +1,108 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'app.dart';
+import 'core/bootstrap/bootstrap_policy.dart';
+import 'core/config/app_config.dart';
+import 'core/logging/app_logger.dart';
+import 'core/ops/app_crash_guard.dart';
+import 'data/database/app_database.dart';
+import 'data/database/seed_data.dart';
+
+Future<void> main() async {
+  AppLogger logger = const NoopAppLogger();
+  late final AppConfig config;
+
+  await AppCrashGuard.runGuarded(
+    logger: () => logger,
+    body: () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      config = AppConfig.fromEnvironment();
+      logger = await StructuredAppLogger.create(
+        enableInfoLogs: config.featureFlags.debugLoggingEnabled,
+      );
+      AppCrashGuard.installFlutterErrorHandler(logger);
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final SupabaseClient? supabaseClient =
+          await _initialiseSupabaseIfConfigured(config, logger);
+      final AppDatabase database = AppDatabase();
+      if (BootstrapPolicy.shouldAutoSeed) {
+        await SeedData.insertIfEmpty(database);
+      }
+      logger.audit(
+        eventType: 'app_bootstrap_completed',
+        message: 'Application bootstrap completed.',
+        metadata: <String, Object?>{
+          'environment': config.environment,
+          'app_version': config.appVersion,
+          'sync_enabled': config.featureFlags.syncEnabled,
+        },
+      );
+      runApp(
+        EposApp(
+          database: database,
+          supabaseClient: supabaseClient,
+          appConfig: config,
+          appLogger: logger,
+          sharedPreferences: prefs,
+        ),
+      );
+    },
+  );
+}
+
+Future<SupabaseClient?> _initialiseSupabaseIfConfigured(
+  AppConfig config,
+  AppLogger logger,
+) async {
+  switch (config.supabaseConfigurationStatus) {
+    case SupabaseConfigurationStatus.disabled:
+      logger.audit(
+        eventType: 'sync_bootstrap_skipped',
+        message: 'Supabase bootstrap skipped because sync is disabled.',
+      );
+      return null;
+    case SupabaseConfigurationStatus.missing:
+    case SupabaseConfigurationStatus.invalidUrl:
+    case SupabaseConfigurationStatus.rejectedServiceRoleKey:
+      logger.warn(
+        eventType: 'sync_misconfigured',
+        message:
+            config.supabaseConfigurationIssue ??
+            'Supabase sync is not configured.',
+        metadata: <String, Object?>{
+          'configuration_status': config.supabaseConfigurationStatus.name,
+        },
+      );
+      return null;
+    case SupabaseConfigurationStatus.valid:
+      break;
+  }
+
+  try {
+    await Supabase.initialize(
+      url: config.supabaseUrl!,
+      anonKey: config.supabaseAnonKey!,
+    );
+    logger.audit(
+      eventType: 'supabase_initialized',
+      message: 'Supabase client initialized for sync.',
+      metadata: <String, Object?>{
+        'configuration_status': config.supabaseConfigurationStatus.name,
+      },
+    );
+    return Supabase.instance.client;
+  } catch (error, stackTrace) {
+    logger.error(
+      eventType: 'supabase_initialization_failed',
+      message: 'Supabase initialization failed; app will continue degraded.',
+      metadata: <String, Object?>{
+        'configuration_status': config.supabaseConfigurationStatus.name,
+      },
+      error: error,
+      stackTrace: stackTrace,
+    );
+    return null;
+  }
+}
