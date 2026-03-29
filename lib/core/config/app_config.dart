@@ -12,6 +12,27 @@ enum SupabaseConfigurationStatus {
   valid,
 }
 
+enum MirrorWriteMode {
+  directMirrorWrite('direct_mirror_write'),
+  trustedSyncBoundary('trusted_sync_boundary');
+
+  const MirrorWriteMode(this.value);
+
+  final String value;
+
+  static MirrorWriteMode fromRaw(String rawValue) {
+    switch (rawValue.trim()) {
+      case '':
+      case 'trusted_sync_boundary':
+        return MirrorWriteMode.trustedSyncBoundary;
+      case 'direct_mirror_write':
+        return MirrorWriteMode.directMirrorWrite;
+      default:
+        return MirrorWriteMode.trustedSyncBoundary;
+    }
+  }
+}
+
 class FeatureFlags {
   const FeatureFlags({
     required this.syncEnabled,
@@ -30,6 +51,7 @@ class AppConfig {
     required this.appVersion,
     required this.supabaseUrl,
     required this.supabaseAnonKey,
+    this.mirrorWriteMode = MirrorWriteMode.directMirrorWrite,
     required this.syncIntervalSeconds,
     required this.featureFlags,
   });
@@ -48,6 +70,9 @@ class AppConfig {
       supabaseAnonKey: resolvedEnv.supabaseAnonKey.trim().isEmpty
           ? null
           : resolvedEnv.supabaseAnonKey,
+      mirrorWriteMode: MirrorWriteMode.fromRaw(
+        resolvedEnv.syncMirrorWriteMode,
+      ),
       syncIntervalSeconds: int.tryParse(resolvedEnv.syncIntervalSeconds) ?? 10,
       featureFlags: FeatureFlags(
         syncEnabled: _readBoolFlag(resolvedEnv.syncEnabled, fallback: true),
@@ -68,6 +93,7 @@ class AppConfig {
     required String appVersion,
     String? supabaseUrl,
     String? supabaseAnonKey,
+    MirrorWriteMode mirrorWriteMode = MirrorWriteMode.trustedSyncBoundary,
     int syncIntervalSeconds = 10,
     FeatureFlags featureFlags = const FeatureFlags(
       syncEnabled: true,
@@ -80,6 +106,7 @@ class AppConfig {
       appVersion: appVersion,
       supabaseUrl: supabaseUrl,
       supabaseAnonKey: supabaseAnonKey,
+      mirrorWriteMode: mirrorWriteMode,
       syncIntervalSeconds: syncIntervalSeconds,
       featureFlags: featureFlags,
     );
@@ -89,8 +116,21 @@ class AppConfig {
   final String appVersion;
   final String? supabaseUrl;
   final String? supabaseAnonKey;
+  final MirrorWriteMode mirrorWriteMode;
   final int syncIntervalSeconds;
   final FeatureFlags featureFlags;
+
+  bool get isProductionEnvironment => environment.trim().toLowerCase() == 'prod';
+
+  bool get allowsDirectMirrorWrite => !isProductionEnvironment;
+
+  String? get mirrorWriteModeIssue {
+    if (mirrorWriteMode == MirrorWriteMode.directMirrorWrite &&
+        !allowsDirectMirrorWrite) {
+      return 'Direct client mirror write is disabled in production. Use trusted_sync_boundary.';
+    }
+    return null;
+  }
 
   bool get hasSupabaseConfig =>
       (supabaseUrl?.trim().isNotEmpty ?? false) &&
@@ -113,7 +153,8 @@ class AppConfig {
   }
 
   bool get isSupabaseReadyForSync =>
-      supabaseConfigurationStatus == SupabaseConfigurationStatus.valid;
+      supabaseConfigurationStatus == SupabaseConfigurationStatus.valid &&
+      mirrorWriteModeIssue == null;
 
   String get supabaseConfigurationLabel {
     switch (supabaseConfigurationStatus) {

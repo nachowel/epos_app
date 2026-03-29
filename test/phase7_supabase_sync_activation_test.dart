@@ -7,10 +7,12 @@ import 'package:epos_app/data/repositories/shift_repository.dart';
 import 'package:epos_app/data/repositories/sync_queue_repository.dart';
 import 'package:epos_app/data/repositories/transaction_repository.dart';
 import 'package:epos_app/data/repositories/transaction_state_repository.dart';
+import 'package:epos_app/data/sync/supabase_mirror_writer.dart';
 import 'package:epos_app/data/sync/supabase_sync_service.dart';
 import 'package:epos_app/data/sync/sync_connectivity_service.dart';
 import 'package:epos_app/data/sync/sync_payload_repository.dart';
 import 'package:epos_app/data/sync/sync_remote_gateway.dart';
+import 'package:epos_app/data/sync/sync_transaction_graph.dart';
 import 'package:epos_app/data/sync/sync_worker.dart';
 import 'package:epos_app/domain/models/order_modifier.dart';
 import 'package:epos_app/domain/models/payment.dart';
@@ -84,12 +86,12 @@ void main() {
           syncQueueRepository: queueRepository,
           withModifier: true,
         );
-        final _RecordingSupabaseSyncClient syncClient =
-            _RecordingSupabaseSyncClient();
+        final _RecordingSupabaseMirrorWriter syncClient =
+            _RecordingSupabaseMirrorWriter();
         final SyncWorker worker = SyncWorker(
           syncQueueRepository: queueRepository,
           syncPayloadRepository: SyncPayloadRepository(db),
-          remoteGateway: SupabaseSyncService(syncClient: syncClient),
+          remoteGateway: SupabaseSyncService(mirrorWriter: syncClient),
           connectivityService: _FakeConnectivityService(initialOnline: true),
           pollInterval: const Duration(days: 1),
         );
@@ -116,6 +118,7 @@ void main() {
           transactionUpsert.payload,
           containsPair('cancelled_by_local_id', isNull),
         );
+        expect(transactionUpsert.payload, containsPair('status', 'paid'));
         expect(transactionUpsert.payload.containsKey('id'), isFalse);
         expect(transactionUpsert.payload.containsKey('shift_id'), isFalse);
         expect(transactionUpsert.payload.containsKey('user_id'), isFalse);
@@ -181,13 +184,13 @@ void main() {
           recordUuid: 'open-should-not-sync',
         );
 
-        final _RecordingSupabaseSyncClient syncClient =
-            _RecordingSupabaseSyncClient();
+        final _RecordingSupabaseMirrorWriter syncClient =
+            _RecordingSupabaseMirrorWriter();
         final SyncQueueRepository queueRepository = SyncQueueRepository(db);
         final SyncWorker worker = SyncWorker(
           syncQueueRepository: queueRepository,
           syncPayloadRepository: SyncPayloadRepository(db),
-          remoteGateway: SupabaseSyncService(syncClient: syncClient),
+          remoteGateway: SupabaseSyncService(mirrorWriter: syncClient),
           connectivityService: _FakeConnectivityService(initialOnline: true),
           pollInterval: const Duration(days: 1),
         );
@@ -209,7 +212,7 @@ void main() {
         expect(SupabaseSyncService().isConfigured, isFalse);
         expect(
           SupabaseSyncService(
-            syncClient: _RecordingSupabaseSyncClient(),
+            mirrorWriter: _RecordingSupabaseMirrorWriter(),
           ).isConfigured,
           isTrue,
         );
@@ -250,11 +253,10 @@ class _UnconfiguredRemoteGateway implements SyncRemoteGateway {
   bool get isConfigured => false;
 
   @override
-  Future<void> upsertRecord({
-    required String tableName,
-    required Map<String, Object?> payload,
-    required String idempotencyKey,
-  }) {
+  String? get configurationIssue => 'Supabase sync is not configured.';
+
+  @override
+  Future<void> syncTransactionGraph(SyncTransactionGraph graph) {
     throw UnimplementedError(
       'Should never be called when gateway is unconfigured.',
     );
@@ -273,22 +275,20 @@ class _RecordedUpsert {
   final String onConflict;
 }
 
-class _RecordingSupabaseSyncClient implements SupabaseSyncClient {
+class _RecordingSupabaseMirrorWriter implements SupabaseMirrorWriter {
   final List<_RecordedUpsert> upserts = <_RecordedUpsert>[];
 
   @override
-  Future<void> upsert({
-    required String tableName,
-    required Map<String, Object?> payload,
-    required String onConflict,
-  }) async {
-    upserts.add(
-      _RecordedUpsert(
-        tableName: tableName,
-        payload: Map<String, Object?>.from(payload),
-        onConflict: onConflict,
-      ),
-    );
+  Future<void> writeTransactionGraph(SyncTransactionGraph graph) async {
+    for (final SyncGraphRecord record in graph.records) {
+      upserts.add(
+        _RecordedUpsert(
+          tableName: record.tableName,
+          payload: Map<String, Object?>.from(record.payload),
+          onConflict: 'uuid',
+        ),
+      );
+    }
   }
 
   _RecordedUpsert find(String tableName, String uuid) {

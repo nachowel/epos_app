@@ -14,6 +14,7 @@ import 'package:epos_app/data/repositories/transaction_repository.dart';
 import 'package:epos_app/data/sync/sync_connectivity_service.dart';
 import 'package:epos_app/data/sync/sync_payload_repository.dart';
 import 'package:epos_app/data/sync/sync_remote_gateway.dart';
+import 'package:epos_app/data/sync/sync_transaction_graph.dart';
 import 'package:epos_app/data/sync/sync_worker.dart';
 import 'package:epos_app/domain/models/app_log_entry.dart';
 import 'package:epos_app/domain/models/database_export_result.dart';
@@ -602,11 +603,10 @@ class _UnconfiguredRemoteGateway implements SyncRemoteGateway {
   bool get isConfigured => false;
 
   @override
-  Future<void> upsertRecord({
-    required String tableName,
-    required Map<String, Object?> payload,
-    required String idempotencyKey,
-  }) async {
+  String? get configurationIssue => 'Supabase sync is not configured.';
+
+  @override
+  Future<void> syncTransactionGraph(SyncTransactionGraph graph) async {
     throw StateError('Not configured');
   }
 }

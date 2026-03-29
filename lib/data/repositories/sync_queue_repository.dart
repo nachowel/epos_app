@@ -413,6 +413,56 @@ class SyncQueueRepository {
     });
   }
 
+  Future<void> markRecordGraphFailedPermanently(
+    Iterable<({String tableName, String recordUuid})> records,
+    String error,
+    int claimedThroughId, {
+    required int targetAttemptCount,
+  }) async {
+    final List<({String tableName, String recordUuid})> uniqueRecords =
+        _dedupeRecords(records);
+    if (uniqueRecords.isEmpty) {
+      return;
+    }
+
+    final DateTime now = DateTime.now();
+    await _database.transaction(() async {
+      for (final ({String tableName, String recordUuid}) record
+          in uniqueRecords) {
+        final List<db.SyncQueueData> rows =
+            await (_database.select(_database.syncQueue)
+                  ..where((db.$SyncQueueTable t) {
+                    return t.queueTableName.equals(record.tableName) &
+                        t.recordUuid.equals(record.recordUuid) &
+                        t.id.isSmallerOrEqualValue(claimedThroughId) &
+                        t.status.isIn(const <String>[
+                          'pending',
+                          'processing',
+                          'failed',
+                        ]);
+                  }))
+                .get();
+
+        for (final db.SyncQueueData row in rows) {
+          await (_database.update(
+            _database.syncQueue,
+          )..where((db.$SyncQueueTable t) => t.id.equals(row.id))).write(
+            db.SyncQueueCompanion(
+              status: const Value<String>('failed'),
+              errorMessage: Value<String?>(error),
+              lastAttemptAt: Value<DateTime?>(now),
+              attemptCount: Value<int>(
+                row.attemptCount >= targetAttemptCount
+                    ? row.attemptCount
+                    : targetAttemptCount,
+              ),
+            ),
+          );
+        }
+      }
+    });
+  }
+
   bool _isDueForRetry(
     db.SyncQueueData row, {
     required DateTime now,

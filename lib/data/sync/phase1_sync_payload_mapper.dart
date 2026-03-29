@@ -1,4 +1,5 @@
 import '../database/app_database.dart' as db;
+import 'phase1_sync_contract.dart';
 
 class Phase1SyncPayloadMapper {
   const Phase1SyncPayloadMapper();
@@ -9,7 +10,9 @@ class Phase1SyncPayloadMapper {
       'shift_local_id': row.shiftId,
       'user_local_id': row.userId,
       'table_number': row.tableNumber,
-      'status': row.status,
+      // Remote status is reporting-oriented. Local draft/sent states never
+      // drive remote authority and collapse to `open` if mirrored.
+      'status': Phase1SyncContract.mapLocalTransactionStatusToRemote(row.status),
       'subtotal_minor': row.subtotalMinor,
       'modifier_total_minor': row.modifierTotalMinor,
       'total_amount_minor': row.totalAmountMinor,

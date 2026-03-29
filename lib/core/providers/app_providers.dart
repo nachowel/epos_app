@@ -172,8 +172,10 @@ final Provider<SyncConnectivityService> syncConnectivityServiceProvider =
 
 final Provider<SyncRemoteGateway> syncRemoteGatewayProvider =
     Provider<SyncRemoteGateway>(
-      (Ref ref) =>
-          SupabaseSyncService(client: ref.watch(supabaseClientProvider)),
+      (Ref ref) => SupabaseSyncService(
+        client: ref.watch(supabaseClientProvider),
+        config: ref.watch(appConfigProvider),
+      ),
     );
 
 final Provider<SupabaseConnectionService> supabaseConnectionServiceProvider =

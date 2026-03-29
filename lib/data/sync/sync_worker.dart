@@ -7,6 +7,8 @@ import '../../domain/models/sync_runtime_state.dart';
 import 'sync_connectivity_service.dart';
 import 'sync_payload_repository.dart';
 import 'sync_remote_gateway.dart';
+import 'sync_transaction_graph.dart';
+import 'trusted_mirror_boundary_contract.dart';
 
 class SyncWorker {
   SyncWorker({
@@ -139,11 +141,12 @@ class SyncWorker {
       return;
     }
     if (!_remoteGateway.isConfigured) {
-      _updateState(lastRuntimeError: 'Supabase sync is not configured.');
+      final String issue =
+          _remoteGateway.configurationIssue ?? 'Supabase sync is not configured.';
+      _updateState(lastRuntimeError: issue);
       _logger.warn(
         eventType: 'sync_misconfigured',
-        message:
-            'Supabase sync is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY.',
+        message: issue,
       );
       return;
     }
@@ -229,13 +232,7 @@ class SyncWorker {
         return;
       }
 
-      for (final SyncGraphRecord record in graph.records) {
-        await _remoteGateway.upsertRecord(
-          tableName: record.tableName,
-          payload: record.payload,
-          idempotencyKey: record.idempotencyKey,
-        );
-      }
+      await _remoteGateway.syncTransactionGraph(graph);
 
       await _syncQueueRepository
           .markRecordGraphSynced(<({String tableName, String recordUuid})>[
@@ -258,15 +255,28 @@ class SyncWorker {
       } catch (_) {
         graph = null;
       }
-      await _syncQueueRepository.markRecordGraphFailed(
-        <({String tableName, String recordUuid})>[
-          ...claimedRefs,
-          if (graph != null)
-            ...graph.records.map((SyncGraphRecord record) => record.queueRef),
-        ],
-        message,
-        claimedThroughId,
-      );
+      final Iterable<({String tableName, String recordUuid})> failedRefs =
+          <({String tableName, String recordUuid})>[
+            ...claimedRefs,
+            if (graph != null)
+              ...graph.records.map(
+                (SyncGraphRecord record) => record.queueRef,
+              ),
+          ];
+      if (error is MirrorWriteFailure && !error.retryable) {
+        await _syncQueueRepository.markRecordGraphFailedPermanently(
+          failedRefs,
+          message,
+          claimedThroughId,
+          targetAttemptCount: maxRetryAttempts,
+        );
+      } else {
+        await _syncQueueRepository.markRecordGraphFailed(
+          failedRefs,
+          message,
+          claimedThroughId,
+        );
+      }
       final bool maxRetryHit = claimedItems.any(
         (SyncQueueItem item) => item.attemptCount + 1 >= maxRetryAttempts,
       );

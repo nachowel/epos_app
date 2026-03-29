@@ -1,73 +1,111 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/config/app_config.dart';
 import 'phase1_sync_contract.dart';
+import 'supabase_mirror_writer.dart';
 import 'sync_remote_gateway.dart';
+import 'sync_transaction_graph.dart';
+import 'trusted_supabase_mirror_writer.dart';
 
 class SupabaseSyncService implements SyncRemoteGateway {
-  SupabaseSyncService({SupabaseClient? client, SupabaseSyncClient? syncClient})
-    : _syncClient = syncClient ?? _buildDefaultClient(client);
-
-  final SupabaseSyncClient? _syncClient;
-
-  @override
-  bool get isConfigured => _syncClient != null;
-
-  @override
-  Future<void> upsertRecord({
-    required String tableName,
-    required Map<String, Object?> payload,
-    required String idempotencyKey,
-  }) async {
-    final SupabaseSyncClient? syncClient = _syncClient;
-    if (syncClient == null) {
-      throw StateError('Supabase sync is not configured.');
-    }
-
-    if (tableName == Phase1SyncTable.transactions.tableName &&
-        payload['status'] is String &&
-        !Phase1SyncContract.isTerminalTransactionStatus(
-          payload['status']! as String,
-        )) {
-      throw StateError('Only terminal transactions may be synced to Supabase.');
-    }
-
-    await syncClient.upsert(
-      tableName: tableName,
-      payload: payload,
-      onConflict: 'uuid',
+  factory SupabaseSyncService({
+    SupabaseClient? client,
+    AppConfig? config,
+    SupabaseMirrorWriter? mirrorWriter,
+    TrustedMirrorBoundaryInvoker? trustedBoundaryInvoker,
+  }) {
+    final _MirrorWriterSelection selection = _selectMirrorWriter(
+      client,
+      config,
+      trustedBoundaryInvoker,
+    );
+    return SupabaseSyncService._(
+      mirrorWriter: mirrorWriter ?? selection.writer,
+      configurationIssue: mirrorWriter == null ? selection.issue : null,
     );
   }
 
-  static SupabaseSyncClient? _buildDefaultClient(SupabaseClient? client) {
-    if (client == null) {
-      return null;
-    }
-    return _SupabaseFlutterSyncClient(client);
-  }
-}
+  const SupabaseSyncService._({
+    required SupabaseMirrorWriter? mirrorWriter,
+    required String? configurationIssue,
+  }) : _mirrorWriter = mirrorWriter,
+       _configurationIssue = configurationIssue;
 
-abstract class SupabaseSyncClient {
-  Future<void> upsert({
-    required String tableName,
-    required Map<String, Object?> payload,
-    required String onConflict,
-  });
-}
-
-class _SupabaseFlutterSyncClient implements SupabaseSyncClient {
-  const _SupabaseFlutterSyncClient(this._client);
-
-  final SupabaseClient _client;
+  final SupabaseMirrorWriter? _mirrorWriter;
+  final String? _configurationIssue;
 
   @override
-  Future<void> upsert({
-    required String tableName,
-    required Map<String, Object?> payload,
-    required String onConflict,
-  }) async {
-    await _client
-        .from(tableName)
-        .upsert(payload, onConflict: onConflict)
-        .timeout(const Duration(seconds: 15));
+  bool get isConfigured => _mirrorWriter != null;
+
+  @override
+  String? get configurationIssue => _configurationIssue;
+
+  @override
+  Future<void> syncTransactionGraph(SyncTransactionGraph graph) async {
+    final SupabaseMirrorWriter? mirrorWriter = _mirrorWriter;
+    if (mirrorWriter == null) {
+      throw StateError('Supabase mirror writer is not configured.');
+    }
+
+    final SyncGraphRecord transactionRecord = graph.records.firstWhere(
+      (SyncGraphRecord record) =>
+          record.tableName == Phase1SyncTable.transactions.tableName,
+      orElse: () => throw StateError(
+        'Supabase mirror sync requires a transaction root payload.',
+      ),
+    );
+    final Object? status = transactionRecord.payload['status'];
+
+    // Supabase is a synchronized mirror/report target. It must never receive
+    // remote-driving lifecycle states for in-progress local orders.
+    if (status is! String ||
+        !Phase1SyncContract.isTerminalTransactionStatus(status)) {
+      throw StateError(
+        'Only finalized local transactions may be mirrored to Supabase.',
+      );
+    }
+
+    await mirrorWriter.writeTransactionGraph(graph);
   }
+
+  static _MirrorWriterSelection _selectMirrorWriter(
+    SupabaseClient? client,
+    AppConfig? config,
+    TrustedMirrorBoundaryInvoker? trustedBoundaryInvoker,
+  ) {
+    if (client == null) {
+      return const _MirrorWriterSelection(
+        writer: null,
+        issue: 'Supabase client is unavailable in this runtime.',
+      );
+    }
+    final MirrorWriteMode mode =
+        config?.mirrorWriteMode ?? MirrorWriteMode.trustedSyncBoundary;
+    switch (mode) {
+      case MirrorWriteMode.directMirrorWrite:
+        if (config?.mirrorWriteModeIssue case final String issue) {
+          return _MirrorWriterSelection(writer: null, issue: issue);
+        }
+        return _MirrorWriterSelection(
+          writer: DirectSupabaseMirrorWriter(client),
+          issue:
+              'Direct client mirror write is enabled. This path is for controlled non-production use only.',
+        );
+      case MirrorWriteMode.trustedSyncBoundary:
+        return _MirrorWriterSelection(
+          writer: TrustedSupabaseMirrorWriter(
+            trustedBoundaryInvoker ??
+                SupabaseTrustedMirrorBoundaryInvoker(client),
+          ),
+          issue: null,
+        );
+    }
+  }
+}
+
+class _MirrorWriterSelection {
+  const _MirrorWriterSelection({required this.writer, required this.issue});
+
+  final SupabaseMirrorWriter? writer;
+  final String? issue;
 }

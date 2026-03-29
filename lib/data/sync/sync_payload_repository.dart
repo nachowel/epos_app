@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../database/app_database.dart' as db;
 import 'phase1_sync_contract.dart';
 import 'phase1_sync_payload_mapper.dart';
+import 'sync_transaction_graph.dart';
 
 class SyncPayloadRepository {
   const SyncPayloadRepository(
@@ -99,8 +100,10 @@ class SyncPayloadRepository {
     if (transaction == null) {
       return null;
     }
+    // Local truth is created and finalized in Drift. The remote mirror accepts
+    // only finalized snapshots, never local in-progress order state.
     if (!Phase1SyncContract.isTerminalTransactionStatus(transaction.status)) {
-      throw StateError('Only terminal transactions may be synced.');
+      throw StateError('Only finalized local transactions may be mirrored.');
     }
 
     final Map<String, Object?> transactionPayload =
@@ -318,33 +321,4 @@ class SyncPayloadRepository {
       transactionUuid: transaction.uuid,
     );
   }
-}
-
-class SyncTransactionGraph {
-  const SyncTransactionGraph({
-    required this.transactionUuid,
-    required this.transactionIdempotencyKey,
-    required this.records,
-  });
-
-  final String transactionUuid;
-  final String transactionIdempotencyKey;
-  final List<SyncGraphRecord> records;
-}
-
-class SyncGraphRecord {
-  const SyncGraphRecord({
-    required this.tableName,
-    required this.recordUuid,
-    required this.payload,
-    required this.idempotencyKey,
-  });
-
-  final String tableName;
-  final String recordUuid;
-  final Map<String, Object?> payload;
-  final String idempotencyKey;
-
-  ({String tableName, String recordUuid}) get queueRef =>
-      (tableName: tableName, recordUuid: recordUuid);
 }

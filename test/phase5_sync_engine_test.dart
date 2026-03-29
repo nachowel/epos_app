@@ -10,6 +10,7 @@ import 'package:epos_app/data/repositories/transaction_state_repository.dart';
 import 'package:epos_app/data/sync/sync_connectivity_service.dart';
 import 'package:epos_app/data/sync/sync_payload_repository.dart';
 import 'package:epos_app/data/sync/sync_remote_gateway.dart';
+import 'package:epos_app/data/sync/sync_transaction_graph.dart';
 import 'package:epos_app/data/sync/sync_worker.dart';
 import 'package:epos_app/domain/models/order_modifier.dart';
 import 'package:epos_app/domain/models/payment.dart';
@@ -609,6 +610,9 @@ class _DeterministicFakeRemoteGateway implements SyncRemoteGateway {
   @override
   bool get isConfigured => true;
 
+  @override
+  String? get configurationIssue => null;
+
   Map<String, Object?>? snapshotFor(String tableName, String uuid) {
     final Map<String, Object?>? record = records['$tableName:$uuid'];
     if (record == null) {
@@ -618,40 +622,42 @@ class _DeterministicFakeRemoteGateway implements SyncRemoteGateway {
   }
 
   @override
-  Future<void> upsertRecord({
-    required String tableName,
-    required Map<String, Object?> payload,
-    required String idempotencyKey,
-  }) async {
-    callCount += 1;
-    receivedIdempotencyKeys.add(idempotencyKey);
+  Future<void> syncTransactionGraph(SyncTransactionGraph graph) async {
+    for (final SyncGraphRecord record in graph.records) {
+      callCount += 1;
+      receivedIdempotencyKeys.add(record.idempotencyKey);
 
-    final String uuid = payload['uuid']! as String;
-    final String key = '$tableName:$uuid';
+      final String uuid = record.payload['uuid']! as String;
+      final String key = '${record.tableName}:$uuid';
 
-    final Future<void> Function(
-      String key,
-      Map<String, Object?> payload,
-      String idempotencyKey,
-    )?
-    callback = beforeApply;
-    if (callback != null) {
-      await callback(key, Map<String, Object?>.from(payload), idempotencyKey);
-    }
+      final Future<void> Function(
+        String key,
+        Map<String, Object?> payload,
+        String idempotencyKey,
+      )?
+      callback = beforeApply;
+      if (callback != null) {
+        await callback(
+          key,
+          Map<String, Object?>.from(record.payload),
+          record.idempotencyKey,
+        );
+      }
 
-    if (_consumeFailure(_failuresBeforeApply, key)) {
-      throw StateError('Simulated remote failure before apply for $key');
-    }
+      if (_consumeFailure(_failuresBeforeApply, key)) {
+        throw StateError('Simulated remote failure before apply for $key');
+      }
 
-    final bool changed = tableName == 'transactions'
-        ? _applyTransactionSnapshot(key, payload)
-        : _applyImmutableSnapshot(key, payload);
-    if (changed) {
-      applyCount += 1;
-    }
+      final bool changed = record.tableName == 'transactions'
+          ? _applyTransactionSnapshot(key, record.payload)
+          : _applyImmutableSnapshot(key, record.payload);
+      if (changed) {
+        applyCount += 1;
+      }
 
-    if (_consumeFailure(_failuresAfterApply, key)) {
-      throw StateError('Simulated remote failure after apply for $key');
+      if (_consumeFailure(_failuresAfterApply, key)) {
+        throw StateError('Simulated remote failure after apply for $key');
+      }
     }
   }
 

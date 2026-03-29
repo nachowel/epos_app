@@ -21,6 +21,7 @@ import 'package:epos_app/data/repositories/transaction_repository.dart';
 import 'package:epos_app/data/sync/sync_connectivity_service.dart';
 import 'package:epos_app/data/sync/sync_payload_repository.dart';
 import 'package:epos_app/data/sync/sync_remote_gateway.dart';
+import 'package:epos_app/data/sync/sync_transaction_graph.dart';
 import 'package:epos_app/data/sync/sync_worker.dart';
 import 'package:epos_app/domain/models/app_log_entry.dart';
 import 'package:epos_app/domain/models/sync_runtime_state.dart';
@@ -392,12 +393,11 @@ class _RecordingRemoteGateway implements SyncRemoteGateway {
   bool get isConfigured => true;
 
   @override
-  Future<void> upsertRecord({
-    required String tableName,
-    required Map<String, Object?> payload,
-    required String idempotencyKey,
-  }) async {
-    callCount += 1;
+  String? get configurationIssue => null;
+
+  @override
+  Future<void> syncTransactionGraph(SyncTransactionGraph graph) async {
+    callCount += graph.records.length;
   }
 }
 
