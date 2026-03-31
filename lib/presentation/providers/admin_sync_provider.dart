@@ -7,6 +7,8 @@ import '../../core/errors/error_mapper.dart';
 import '../../core/providers/app_providers.dart';
 import '../../domain/models/sync_monitor_snapshot.dart';
 import '../../domain/models/sync_queue_item.dart';
+import '../../domain/models/sync_reset_blocked_result.dart';
+import '../../domain/models/sync_retry_all_result.dart';
 import '../../domain/models/sync_runtime_state.dart';
 import '../../domain/models/user.dart';
 import 'auth_provider.dart';
@@ -16,7 +18,16 @@ class AdminSyncState {
     required this.items,
     required this.pendingCount,
     required this.failedCount,
+    required this.syncedCount,
     required this.stuckCount,
+    required this.maxRetryAttempts,
+    required this.retryableFailedCount,
+    required this.nonRetryableFailedCount,
+    required this.driftBlockedCount,
+    required this.processingStuckCount,
+    required this.exhaustedRetryCount,
+    required this.stuckDefinition,
+    required this.lastFailedItem,
     required this.syncEnabled,
     required this.isSupabaseConfigured,
     required this.supabaseConfigurationLabel,
@@ -34,7 +45,17 @@ class AdminSyncState {
     : items = const <SyncQueueItem>[],
       pendingCount = 0,
       failedCount = 0,
+      syncedCount = 0,
       stuckCount = 0,
+      maxRetryAttempts = 5,
+      retryableFailedCount = 0,
+      nonRetryableFailedCount = 0,
+      driftBlockedCount = 0,
+      processingStuckCount = 0,
+      exhaustedRetryCount = 0,
+      stuckDefinition =
+          'Stuck = non-retryable failures, retry-limit exhaustion, or processing items older than the worker timeout.',
+      lastFailedItem = null,
       syncEnabled = true,
       isSupabaseConfigured = false,
       supabaseConfigurationLabel = 'Supabase config missing',
@@ -50,7 +71,16 @@ class AdminSyncState {
   final List<SyncQueueItem> items;
   final int pendingCount;
   final int failedCount;
+  final int syncedCount;
   final int stuckCount;
+  final int maxRetryAttempts;
+  final int retryableFailedCount;
+  final int nonRetryableFailedCount;
+  final int driftBlockedCount;
+  final int processingStuckCount;
+  final int exhaustedRetryCount;
+  final String stuckDefinition;
+  final SyncQueueItem? lastFailedItem;
   final bool syncEnabled;
   final bool isSupabaseConfigured;
   final String supabaseConfigurationLabel;
@@ -67,7 +97,16 @@ class AdminSyncState {
     List<SyncQueueItem>? items,
     int? pendingCount,
     int? failedCount,
+    int? syncedCount,
     int? stuckCount,
+    int? maxRetryAttempts,
+    int? retryableFailedCount,
+    int? nonRetryableFailedCount,
+    int? driftBlockedCount,
+    int? processingStuckCount,
+    int? exhaustedRetryCount,
+    String? stuckDefinition,
+    Object? lastFailedItem = _unset,
     bool? syncEnabled,
     bool? isSupabaseConfigured,
     String? supabaseConfigurationLabel,
@@ -84,7 +123,19 @@ class AdminSyncState {
       items: items ?? this.items,
       pendingCount: pendingCount ?? this.pendingCount,
       failedCount: failedCount ?? this.failedCount,
+      syncedCount: syncedCount ?? this.syncedCount,
       stuckCount: stuckCount ?? this.stuckCount,
+      maxRetryAttempts: maxRetryAttempts ?? this.maxRetryAttempts,
+      retryableFailedCount: retryableFailedCount ?? this.retryableFailedCount,
+      nonRetryableFailedCount:
+          nonRetryableFailedCount ?? this.nonRetryableFailedCount,
+      driftBlockedCount: driftBlockedCount ?? this.driftBlockedCount,
+      processingStuckCount: processingStuckCount ?? this.processingStuckCount,
+      exhaustedRetryCount: exhaustedRetryCount ?? this.exhaustedRetryCount,
+      stuckDefinition: stuckDefinition ?? this.stuckDefinition,
+      lastFailedItem: lastFailedItem == _unset
+          ? this.lastFailedItem
+          : lastFailedItem as SyncQueueItem?,
       syncEnabled: syncEnabled ?? this.syncEnabled,
       isSupabaseConfigured: isSupabaseConfigured ?? this.isSupabaseConfigured,
       supabaseConfigurationLabel:
@@ -148,7 +199,16 @@ class AdminSyncNotifier extends StateNotifier<AdminSyncState> {
         items: snapshot.items,
         pendingCount: snapshot.pendingCount,
         failedCount: snapshot.failedCount,
+        syncedCount: snapshot.syncedCount,
         stuckCount: snapshot.stuckCount,
+        maxRetryAttempts: snapshot.maxRetryAttempts,
+        retryableFailedCount: snapshot.retryableFailedCount,
+        nonRetryableFailedCount: snapshot.nonRetryableFailedCount,
+        driftBlockedCount: snapshot.driftBlockedCount,
+        processingStuckCount: snapshot.processingStuckCount,
+        exhaustedRetryCount: snapshot.exhaustedRetryCount,
+        stuckDefinition: snapshot.stuckDefinition,
+        lastFailedItem: snapshot.lastFailedItem,
         syncEnabled: snapshot.syncEnabled,
         isSupabaseConfigured: snapshot.isSupabaseConfigured,
         supabaseConfigurationLabel: snapshot.supabaseConfigurationLabel,
@@ -215,30 +275,30 @@ class AdminSyncNotifier extends StateNotifier<AdminSyncState> {
     }
   }
 
-  Future<bool> retryAll() async {
+  Future<SyncRetryAllResult?> retryAll() async {
     if (!mounted) {
-      return false;
+      return null;
     }
     final User? currentUser = _ref.read(authNotifierProvider).currentUser;
     if (currentUser == null) {
       if (mounted) {
         state = state.copyWith(errorMessage: AppStrings.accessDenied);
       }
-      return false;
+      return null;
     }
 
     state = state.copyWith(isRetrying: true, errorMessage: null);
     try {
-      await _ref
+      final SyncRetryAllResult result = await _ref
           .read(adminServiceProvider)
           .retryAllSyncItems(user: currentUser);
       await _ref.read(syncWorkerProvider).runOnce();
       await load();
       if (!mounted) {
-        return false;
+        return null;
       }
       state = state.copyWith(isRetrying: false, errorMessage: null);
-      return true;
+      return result;
     } catch (error, stackTrace) {
       if (mounted) {
         state = state.copyWith(
@@ -251,7 +311,47 @@ class AdminSyncNotifier extends StateNotifier<AdminSyncState> {
           ),
         );
       }
-      return false;
+      return null;
+    }
+  }
+
+  Future<SyncResetBlockedResult?> resetBlockedFailures() async {
+    if (!mounted) {
+      return null;
+    }
+    final User? currentUser = _ref.read(authNotifierProvider).currentUser;
+    if (currentUser == null) {
+      if (mounted) {
+        state = state.copyWith(errorMessage: AppStrings.accessDenied);
+      }
+      return null;
+    }
+
+    state = state.copyWith(isRetrying: true, errorMessage: null);
+    try {
+      final SyncResetBlockedResult result = await _ref
+          .read(adminServiceProvider)
+          .resetBlockedTrustedSyncFailures(user: currentUser);
+      await _ref.read(syncWorkerProvider).runOnce();
+      await load();
+      if (!mounted) {
+        return null;
+      }
+      state = state.copyWith(isRetrying: false, errorMessage: null);
+      return result;
+    } catch (error, stackTrace) {
+      if (mounted) {
+        state = state.copyWith(
+          isRetrying: false,
+          errorMessage: ErrorMapper.toUserMessageAndLog(
+            error,
+            logger: _ref.read(appLoggerProvider),
+            eventType: 'admin_sync_reset_blocked_failed',
+            stackTrace: stackTrace,
+          ),
+        );
+      }
+      return null;
     }
   }
 

@@ -44,18 +44,20 @@ void main() {
           now: DateTime(2026, 1, 1, 12, 30, 0),
         ),
         throwsA(
-            isA<ShiftCloseBlockedException>().having(
-              (ShiftCloseBlockedException error) =>
-                  error.readiness.blockingReason,
-              'blockingReason',
-              ShiftCloseBlockReason.freshDraftsPending,
-            ).having(
-              (ShiftCloseBlockedException error) => error.suggestedAction,
-              'suggestedAction',
-              ShiftCloseSuggestedAction.sendOrDiscardFreshDrafts,
-            ),
-          ),
-        );
+          isA<ShiftCloseBlockedException>()
+              .having(
+                (ShiftCloseBlockedException error) =>
+                    error.readiness.blockingReason,
+                'blockingReason',
+                ShiftCloseBlockReason.freshDraftsPending,
+              )
+              .having(
+                (ShiftCloseBlockedException error) => error.suggestedAction,
+                'suggestedAction',
+                ShiftCloseSuggestedAction.sendOrDiscardFreshDrafts,
+              ),
+        ),
+      );
     });
 
     test(
@@ -98,24 +100,24 @@ void main() {
         );
 
         await expectLater(
-          _makeReportService(
-            db,
-          ).runAdminFinalCloseWithCountedCash(
+          _makeReportService(db).runAdminFinalCloseWithCountedCash(
             user: _admin(adminId),
             countedCashMinor: 0,
             now: now,
           ),
           throwsA(
-            isA<ShiftCloseBlockedException>().having(
-              (ShiftCloseBlockedException error) =>
-                  error.readiness.blockingReason,
-              'blockingReason',
-              ShiftCloseBlockReason.staleDraftsPendingCleanup,
-            ).having(
-              (ShiftCloseBlockedException error) => error.suggestedAction,
-              'suggestedAction',
-              ShiftCloseSuggestedAction.discardStaleDrafts,
-            ),
+            isA<ShiftCloseBlockedException>()
+                .having(
+                  (ShiftCloseBlockedException error) =>
+                      error.readiness.blockingReason,
+                  'blockingReason',
+                  ShiftCloseBlockReason.staleDraftsPendingCleanup,
+                )
+                .having(
+                  (ShiftCloseBlockedException error) => error.suggestedAction,
+                  'suggestedAction',
+                  ShiftCloseSuggestedAction.discardStaleDrafts,
+                ),
           ),
         );
       },

@@ -36,7 +36,10 @@ void main() {
     expect(find.text('£30'), findsOneWidget);
     expect(find.text('£40'), findsOneWidget);
     expect(find.text('£50'), findsOneWidget);
-    expect(find.byKey(const ValueKey<String>('cash-helper-clear')), findsNothing);
+    expect(
+      find.byKey(const ValueKey<String>('cash-helper-clear')),
+      findsNothing,
+    );
   });
 
   testWidgets('card mode hides cash entry controls entirely', (
@@ -49,8 +52,14 @@ void main() {
     );
 
     expect(_receivedAmountFieldFinder, findsNothing);
-    expect(find.byKey(const ValueKey<String>('payment-keypad-1')), findsNothing);
-    expect(find.byKey(const ValueKey<String>('quick-cash-exact')), findsNothing);
+    expect(
+      find.byKey(const ValueKey<String>('payment-keypad-1')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('quick-cash-exact')),
+      findsNothing,
+    );
     expect(find.textContaining('Insufficient by'), findsNothing);
     expect(find.textContaining('${AppStrings.change}:'), findsNothing);
   });
@@ -65,30 +74,33 @@ void main() {
     );
 
     final Size paySize = tester.getSize(_payButtonFinder);
-    final Size cancelSize = tester.getSize(find.byKey(const ValueKey<String>('payment-cancel')));
+    final Size cancelSize = tester.getSize(
+      find.byKey(const ValueKey<String>('payment-cancel')),
+    );
 
     expect(paySize.height, 64);
     expect(cancelSize.height, 56);
     expect(find.byIcon(Icons.credit_card_rounded), findsOneWidget);
   });
 
-  testWidgets('cash keypad and helper actions update amount without text entry', (
-    WidgetTester tester,
-  ) async {
-    await _pumpPaymentDialog(tester: tester, totalAmountMinor: 1450);
+  testWidgets(
+    'cash keypad and helper actions update amount without text entry',
+    (WidgetTester tester) async {
+      await _pumpPaymentDialog(tester: tester, totalAmountMinor: 1450);
 
-    await _tapVisibleKey(tester, 'payment-keypad-2');
-    await _tapVisibleKey(tester, 'payment-keypad-0');
+      await _tapVisibleKey(tester, 'payment-keypad-2');
+      await _tapVisibleKey(tester, 'payment-keypad-0');
 
-    expect(_receivedAmountField(tester).controller!.text, '20');
-    expect(find.text('Change: £5.50'), findsOneWidget);
+      expect(_receivedAmountField(tester).controller!.text, '20');
+      expect(find.text('Change: £5.50'), findsOneWidget);
 
-    await tester.tap(find.text('£30'));
-    await tester.pump();
+      await tester.tap(find.text('£30'));
+      await tester.pump();
 
-    expect(_receivedAmountField(tester).controller!.text, '30.00');
-    expect(find.text('Change: £15.50'), findsOneWidget);
-  });
+      expect(_receivedAmountField(tester).controller!.text, '30.00');
+      expect(find.text('Change: £15.50'), findsOneWidget);
+    },
+  );
 
   testWidgets('insufficient cash state disables pay until enough is entered', (
     WidgetTester tester,

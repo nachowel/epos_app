@@ -32,15 +32,16 @@ class CashMovementService {
     _validateAmount(amountMinor);
     _validateActor(actorUserId);
 
-    final CashMovement movement = await _cashMovementRepository.createCashMovement(
-      shiftId: activeShift.id,
-      type: type,
-      category: category.trim(),
-      amountMinor: amountMinor,
-      paymentMethod: paymentMethod,
-      note: _normalizeNote(note),
-      createdByUserId: actorUserId,
-    );
+    final CashMovement movement = await _cashMovementRepository
+        .createCashMovement(
+          shiftId: activeShift.id,
+          type: type,
+          category: category.trim(),
+          amountMinor: amountMinor,
+          paymentMethod: paymentMethod,
+          note: _normalizeNote(note),
+          createdByUserId: actorUserId,
+        );
     await _auditLogService.logActionSafely(
       actorUserId: actorUserId,
       action: 'cash_movement_created',

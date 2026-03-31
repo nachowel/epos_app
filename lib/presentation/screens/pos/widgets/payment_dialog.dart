@@ -66,8 +66,14 @@ class _PaymentDialogState extends State<PaymentDialog> {
     final double verticalPadding = _isCashMode ? 16 : 22;
     final bool isInteractionBlocked = widget.isSubmissionBlocked;
     final int receivedMinor = _receivedMinor;
-    final int shortfallMinor = math.max(0, widget.totalAmountMinor - receivedMinor);
-    final int changeMinor = math.max(0, receivedMinor - widget.totalAmountMinor);
+    final int shortfallMinor = math.max(
+      0,
+      widget.totalAmountMinor - receivedMinor,
+    );
+    final int changeMinor = math.max(
+      0,
+      receivedMinor - widget.totalAmountMinor,
+    );
     final bool isPayEnabled =
         !_isSubmitting &&
         !isInteractionBlocked &&
@@ -424,7 +430,9 @@ class _PaymentDialogState extends State<PaymentDialog> {
     int amountMinor, {
     required bool replaceOnNextDigit,
   }) {
-    final String nextValue = CurrencyFormatter.toEditableMajorInput(amountMinor);
+    final String nextValue = CurrencyFormatter.toEditableMajorInput(
+      amountMinor,
+    );
     _receivedController.value = TextEditingValue(
       text: nextValue,
       selection: TextSelection.collapsed(offset: nextValue.length),
@@ -494,15 +502,10 @@ class _PaymentDialogState extends State<PaymentDialog> {
   }
 
   List<int> _buildQuickCashAmountsMinor() {
-    final int firstPreset =
-        ((widget.totalAmountMinor + 999) ~/ 1000) * 1000;
-    return <int>[
-      firstPreset,
-      firstPreset + 1000,
-      firstPreset + 2000,
-    ].where((int amountMinor) => amountMinor > widget.totalAmountMinor).toList(
-      growable: false,
-    );
+    final int firstPreset = ((widget.totalAmountMinor + 999) ~/ 1000) * 1000;
+    return <int>[firstPreset, firstPreset + 1000, firstPreset + 2000]
+        .where((int amountMinor) => amountMinor > widget.totalAmountMinor)
+        .toList(growable: false);
   }
 
   String _quickAmountLabel(int amountMinor) => '£${amountMinor ~/ 100}';

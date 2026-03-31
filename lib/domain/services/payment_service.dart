@@ -105,7 +105,10 @@ class PaymentService {
     required User currentUser,
     PaymentAdjustmentType type = PaymentAdjustmentType.refund,
   }) async {
-    AuthorizationPolicy.ensureAllowed(currentUser, OperatorPermission.refundPayment);
+    AuthorizationPolicy.ensureAllowed(
+      currentUser,
+      OperatorPermission.refundPayment,
+    );
 
     final String trimmedReason = reason.trim();
     if (trimmedReason.isEmpty) {
@@ -131,9 +134,8 @@ class PaymentService {
       );
     }
 
-    final Payment? payment = await _requiredPaymentRepository.getByTransactionId(
-      transactionId,
-    );
+    final Payment? payment = await _requiredPaymentRepository
+        .getByTransactionId(transactionId);
     if (payment == null) {
       throw PaymentRefundBlockedException(
         reason: RefundBlockReason.missingPayment,
@@ -189,7 +191,9 @@ class PaymentService {
   TransactionRepository get _requiredTransactionRepository {
     final TransactionRepository? transactionRepository = _transactionRepository;
     if (transactionRepository == null) {
-      throw StateError('TransactionRepository is required for refund operations.');
+      throw StateError(
+        'TransactionRepository is required for refund operations.',
+      );
     }
     return transactionRepository;
   }

@@ -14,7 +14,11 @@ void main() {
       final db = createTestDatabase();
       addTearDown(db.close);
 
-      final int actorUserId = await insertUser(db, name: 'Admin', role: 'admin');
+      final int actorUserId = await insertUser(
+        db,
+        name: 'Admin',
+        role: 'admin',
+      );
       final PersistedAuditLogService service = PersistedAuditLogService(
         auditLogRepository: AuditLogRepository(db),
         logger: const NoopAppLogger(),
@@ -39,7 +43,11 @@ void main() {
       final db = createTestDatabase();
       addTearDown(db.close);
 
-      final int actorUserId = await insertUser(db, name: 'Admin', role: 'admin');
+      final int actorUserId = await insertUser(
+        db,
+        name: 'Admin',
+        role: 'admin',
+      );
       final PersistedAuditLogService service = PersistedAuditLogService(
         auditLogRepository: AuditLogRepository(db),
         logger: const NoopAppLogger(),
@@ -66,7 +74,11 @@ void main() {
       final db = createTestDatabase();
       addTearDown(db.close);
 
-      final int actorUserId = await insertUser(db, name: 'Admin', role: 'admin');
+      final int actorUserId = await insertUser(
+        db,
+        name: 'Admin',
+        role: 'admin',
+      );
       final PersistedAuditLogService service = PersistedAuditLogService(
         auditLogRepository: AuditLogRepository(db),
         logger: const NoopAppLogger(),
@@ -93,7 +105,11 @@ void main() {
       final db = createTestDatabase();
       addTearDown(db.close);
 
-      final int actorUserId = await insertUser(db, name: 'Admin', role: 'admin');
+      final int actorUserId = await insertUser(
+        db,
+        name: 'Admin',
+        role: 'admin',
+      );
       final PersistedAuditLogService service = PersistedAuditLogService(
         auditLogRepository: AuditLogRepository(db),
         logger: const NoopAppLogger(),
@@ -120,7 +136,11 @@ void main() {
       final db = createTestDatabase();
       addTearDown(db.close);
 
-      final int actorUserId = await insertUser(db, name: 'Admin', role: 'admin');
+      final int actorUserId = await insertUser(
+        db,
+        name: 'Admin',
+        role: 'admin',
+      );
       final PersistedAuditLogService service = PersistedAuditLogService(
         auditLogRepository: AuditLogRepository(db),
         logger: const NoopAppLogger(),
@@ -137,13 +157,10 @@ void main() {
         },
       );
 
-      expect(
-        jsonDecode(record.metadataJson),
-        <String, Object?>{
-          'old_is_visible_on_pos': true,
-          'new_is_visible_on_pos': false,
-        },
-      );
+      expect(jsonDecode(record.metadataJson), <String, Object?>{
+        'old_is_visible_on_pos': true,
+        'new_is_visible_on_pos': false,
+      });
     });
   });
 }

@@ -25,7 +25,10 @@ class OrderRefundPolicy {
     required PaymentAdjustment? adjustment,
   }) {
     if (user == null ||
-        !AuthorizationPolicy.canPerform(user, OperatorPermission.refundPayment)) {
+        !AuthorizationPolicy.canPerform(
+          user,
+          OperatorPermission.refundPayment,
+        )) {
       return OrderRefundEligibility(
         isAllowed: false,
         blockedMessage: AppStrings.refundAdminOnly,

@@ -316,9 +316,7 @@ void main() {
       );
 
       expect(
-        () => controller.addProduct(
-          _product(1, 1, isVisibleOnPos: false),
-        ),
+        () => controller.addProduct(_product(1, 1, isVisibleOnPos: false)),
         throwsA(
           isA<ValidationException>().having(
             (ValidationException error) => error.message,

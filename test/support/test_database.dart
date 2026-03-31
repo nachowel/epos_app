@@ -243,6 +243,14 @@ class _TestAppDatabase extends AppDatabase {
         error_message TEXT NULL
       );
     ''');
+    await customStatement('''
+      CREATE TABLE sync_queue_root_graph_snapshots (
+        queue_id INTEGER NOT NULL PRIMARY KEY,
+        transaction_uuid TEXT NOT NULL,
+        graph_checksum TEXT NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+    ''');
   }
 
   Future<void> _createIndexes() async {
@@ -302,6 +310,9 @@ class _TestAppDatabase extends AppDatabase {
     );
     await customStatement(
       'CREATE INDEX idx_sync_queue_status ON sync_queue(status, created_at);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_sync_queue_root_graph_snapshots_tx_uuid ON sync_queue_root_graph_snapshots(transaction_uuid, queue_id);',
     );
   }
 

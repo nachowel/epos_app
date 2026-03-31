@@ -590,9 +590,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                   ),
                   child: Column(
                     children: <Widget>[
-                      for (int index = 0; index < details.lines.length; index++) ...<
-                        Widget
-                      >[
+                      for (
+                        int index = 0;
+                        index < details.lines.length;
+                        index++
+                      ) ...<Widget>[
                         if (index > 0)
                           const Divider(
                             height: 1,
@@ -613,9 +615,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                 decoration: const BoxDecoration(
                   color: AppColors.surface,
-                  border: Border(
-                    top: BorderSide(color: AppColors.border),
-                  ),
+                  border: Border(top: BorderSide(color: AppColors.border)),
                 ),
                 child: LayoutBuilder(
                   builder: (BuildContext context, BoxConstraints constraints) {
@@ -623,7 +623,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                         details.transaction.status == TransactionStatus.sent &&
                             paymentEligibility.isAllowed &&
                             !isActionLocked
-                        ? () => _handlePayment(details.transaction.totalAmountMinor)
+                        ? () => _handlePayment(
+                            details.transaction.totalAmountMinor,
+                          )
                         : null;
 
                     return Column(
@@ -673,7 +675,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                               child: _PrimaryActionButton(
                                 key: const ValueKey<String>('detail-cancel'),
                                 label: AppStrings.cancel,
-                                onPressed: canCancelOrder ? _handleCancel : null,
+                                onPressed: canCancelOrder
+                                    ? _handleCancel
+                                    : null,
                                 variant: _PrimaryActionVariant.outlinedDanger,
                               ),
                             ),
@@ -708,12 +712,16 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                                     ? AppStrings.addTable
                                     : AppStrings.editTable,
                                 onPressed: canEditTable
-                                    ? () => _handleTableUpdate(details.transaction)
+                                    ? () => _handleTableUpdate(
+                                        details.transaction,
+                                      )
                                     : null,
                               ),
                               const SizedBox(width: 8),
                               _SecondaryActionChip(
-                                key: const ValueKey<String>('detail-kitchen-print'),
+                                key: const ValueKey<String>(
+                                  'detail-kitchen-print',
+                                ),
                                 label: AppStrings.kitchenPrint,
                                 onPressed: canReprintKitchen
                                     ? _handleKitchenReprint
@@ -721,7 +729,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                               ),
                               const SizedBox(width: 8),
                               _SecondaryActionChip(
-                                key: const ValueKey<String>('detail-receipt-print'),
+                                key: const ValueKey<String>(
+                                  'detail-receipt-print',
+                                ),
                                 label: AppStrings.receiptPrint,
                                 onPressed: canReprintReceipt
                                     ? _handleReceiptReprint
@@ -741,7 +751,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                               ),
                               const SizedBox(width: 8),
                               _SecondaryActionChip(
-                                key: const ValueKey<String>('detail-discard-draft'),
+                                key: const ValueKey<String>(
+                                  'detail-discard-draft',
+                                ),
                                 label: AppStrings.discardDraftAction,
                                 onPressed: canDiscardDraft
                                     ? _handleDiscardDraft
@@ -1069,13 +1081,8 @@ class _SecondaryActionChip extends StatelessWidget {
         disabledForegroundColor: AppColors.textSecondary,
         side: BorderSide(color: accentColor.withValues(alpha: 0.35)),
         backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        textStyle: const TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
       ),
       child: Text(label),
     );

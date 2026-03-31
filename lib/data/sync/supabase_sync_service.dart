@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/logging/app_logger.dart';
 import 'phase1_sync_contract.dart';
 import 'supabase_mirror_writer.dart';
 import 'sync_remote_gateway.dart';
@@ -11,12 +12,14 @@ class SupabaseSyncService implements SyncRemoteGateway {
   factory SupabaseSyncService({
     SupabaseClient? client,
     AppConfig? config,
+    AppLogger logger = const NoopAppLogger(),
     SupabaseMirrorWriter? mirrorWriter,
     TrustedMirrorBoundaryInvoker? trustedBoundaryInvoker,
   }) {
     final _MirrorWriterSelection selection = _selectMirrorWriter(
       client,
       config,
+      logger,
       trustedBoundaryInvoker,
     );
     return SupabaseSyncService._(
@@ -71,6 +74,7 @@ class SupabaseSyncService implements SyncRemoteGateway {
   static _MirrorWriterSelection _selectMirrorWriter(
     SupabaseClient? client,
     AppConfig? config,
+    AppLogger logger,
     TrustedMirrorBoundaryInvoker? trustedBoundaryInvoker,
   ) {
     if (client == null) {
@@ -95,7 +99,11 @@ class SupabaseSyncService implements SyncRemoteGateway {
         return _MirrorWriterSelection(
           writer: TrustedSupabaseMirrorWriter(
             trustedBoundaryInvoker ??
-                SupabaseTrustedMirrorBoundaryInvoker(client),
+                SupabaseTrustedMirrorBoundaryInvoker(
+                  client: client,
+                  config: config ?? AppConfig.fallback(),
+                  logger: logger,
+                ),
           ),
           issue: null,
         );

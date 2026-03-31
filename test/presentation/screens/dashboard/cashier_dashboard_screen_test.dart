@@ -82,261 +82,258 @@ void main() {
       },
     );
 
-    testWidgets(
-      'open orders, preview status, and quick actions render',
-      (WidgetTester tester) async {
-        SharedPreferences.setMockInitialValues(<String, Object>{});
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
-        final AppDatabase db = createTestDatabase();
-        addTearDown(db.close);
+    testWidgets('open orders, preview status, and quick actions render', (
+      WidgetTester tester,
+    ) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
 
-        final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
-        final int cashierId = await insertUser(
-          db,
-          name: 'Cashier',
-          role: 'cashier',
-        );
-        final int shiftId = await insertShift(db, openedBy: cashierId);
-        await SettingsRepository(db).updateVisibilityRatio(0.5, userId: adminId);
+      final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      final int shiftId = await insertShift(db, openedBy: cashierId);
+      await SettingsRepository(db).updateVisibilityRatio(0.5, userId: adminId);
 
-        final int categoryId = await insertCategory(db, name: 'Drinks');
-        final int teaId = await insertProduct(
-          db,
-          categoryId: categoryId,
-          name: 'Tea',
-          priceMinor: 250,
-        );
-        final int breakfastId = await insertProduct(
-          db,
-          categoryId: categoryId,
-          name: 'Breakfast',
-          priceMinor: 700,
-        );
+      final int categoryId = await insertCategory(db, name: 'Drinks');
+      final int teaId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Tea',
+        priceMinor: 250,
+      );
+      final int breakfastId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Breakfast',
+        priceMinor: 700,
+      );
 
-        final TransactionRepository transactionRepository = TransactionRepository(
-          db,
-        );
-        final int openOrderId = await insertTransaction(
-          db,
-          uuid: 'dashboard-open-order',
-          shiftId: shiftId,
-          userId: cashierId,
-          status: 'draft',
-          totalAmountMinor: 1200,
-        );
-        await transactionRepository.addLine(
-          transactionId: openOrderId,
-          productId: teaId,
-          quantity: 2,
-        );
-        await transactionRepository.addLine(
-          transactionId: openOrderId,
-          productId: breakfastId,
-          quantity: 1,
-        );
+      final TransactionRepository transactionRepository = TransactionRepository(
+        db,
+      );
+      final int openOrderId = await insertTransaction(
+        db,
+        uuid: 'dashboard-open-order',
+        shiftId: shiftId,
+        userId: cashierId,
+        status: 'draft',
+        totalAmountMinor: 1200,
+      );
+      await transactionRepository.addLine(
+        transactionId: openOrderId,
+        productId: teaId,
+        quantity: 2,
+      );
+      await transactionRepository.addLine(
+        transactionId: openOrderId,
+        productId: breakfastId,
+        quantity: 1,
+      );
 
-        final int paidOrderId = await insertTransaction(
-          db,
-          uuid: 'dashboard-paid-order',
-          shiftId: shiftId,
-          userId: cashierId,
-          status: 'paid',
-          totalAmountMinor: 1000,
-          paidAt: DateTime(2026, 3, 28, 11, 0),
-        );
-        await insertPayment(
-          db,
-          uuid: 'dashboard-paid-payment',
-          transactionId: paidOrderId,
-          method: 'cash',
-          amountMinor: 1000,
-          paidAt: DateTime(2026, 3, 28, 11, 0),
-        );
+      final int paidOrderId = await insertTransaction(
+        db,
+        uuid: 'dashboard-paid-order',
+        shiftId: shiftId,
+        userId: cashierId,
+        status: 'paid',
+        totalAmountMinor: 1000,
+        paidAt: DateTime(2026, 3, 28, 11, 0),
+      );
+      await insertPayment(
+        db,
+        uuid: 'dashboard-paid-payment',
+        transactionId: paidOrderId,
+        method: 'cash',
+        amountMinor: 1000,
+        paidAt: DateTime(2026, 3, 28, 11, 0),
+      );
 
-        final ProviderContainer container = ProviderContainer(
-          overrides: <Override>[
-            appDatabaseProvider.overrideWithValue(db),
-            sharedPreferencesProvider.overrideWithValue(prefs),
-          ],
-        );
-        addTearDown(container.dispose);
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
+      addTearDown(container.dispose);
 
-        await container
-            .read(authNotifierProvider.notifier)
-            .loadUserById(cashierId);
-        await container.read(cashierDashboardNotifierProvider.notifier).load();
+      await container
+          .read(authNotifierProvider.notifier)
+          .loadUserById(cashierId);
+      await container.read(cashierDashboardNotifierProvider.notifier).load();
 
-        await tester.pumpWidget(_routerApp(container));
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(_routerApp(container));
+      await tester.pumpAndSettle();
 
-        expect(find.byType(CashierDashboardScreen), findsOneWidget);
-        expect(find.textContaining('2 Tea, 1 Breakfast'), findsOneWidget);
-        expect(find.text('Preview not yet taken'), findsOneWidget);
-        expect(find.textContaining('Total Sales'), findsNothing);
-        await tester.scrollUntilVisible(
-          find.byKey(const Key('cashier-dashboard-pos-action')),
-          400,
-        );
-        await tester.ensureVisible(
-          find.byKey(const Key('cashier-dashboard-pos-action')),
-        );
-        await tester.pumpAndSettle();
+      expect(find.byType(CashierDashboardScreen), findsOneWidget);
+      expect(find.textContaining('2 Tea, 1 Breakfast'), findsOneWidget);
+      expect(find.text('Preview not yet taken'), findsOneWidget);
+      expect(find.textContaining('Total Sales'), findsNothing);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('cashier-dashboard-pos-action')),
+        400,
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('cashier-dashboard-pos-action')),
+      );
+      await tester.pumpAndSettle();
 
-        await tester.tap(find.byKey(const Key('cashier-dashboard-pos-action')));
-        await tester.pumpAndSettle();
-        expect(find.text('POS TARGET'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('cashier-dashboard-pos-action')));
+      await tester.pumpAndSettle();
+      expect(find.text('POS TARGET'), findsOneWidget);
 
-        final GoRouter router = GoRouter.of(
-          tester.element(find.text('POS TARGET')),
-        );
-        router.go('/dashboard');
-        await tester.pumpAndSettle();
-        await tester.scrollUntilVisible(
-          find.byKey(const Key('cashier-dashboard-orders-action')),
-          400,
-        );
-        await tester.ensureVisible(
-          find.byKey(const Key('cashier-dashboard-orders-action')),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const Key('cashier-dashboard-orders-action')),
-        );
-        await tester.pumpAndSettle();
-        expect(find.text('ORDERS TARGET'), findsOneWidget);
+      final GoRouter router = GoRouter.of(
+        tester.element(find.text('POS TARGET')),
+      );
+      router.go('/dashboard');
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('cashier-dashboard-orders-action')),
+        400,
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('cashier-dashboard-orders-action')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('cashier-dashboard-orders-action')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('ORDERS TARGET'), findsOneWidget);
 
-        router.go('/dashboard');
-        await tester.pumpAndSettle();
-        await tester.scrollUntilVisible(
-          find.byKey(const Key('cashier-dashboard-preview-action')),
-          400,
-        );
-        await tester.ensureVisible(
-          find.byKey(const Key('cashier-dashboard-preview-action')),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(
-          find.byKey(const Key('cashier-dashboard-preview-action')),
-        );
-        await tester.pumpAndSettle();
-        expect(find.text('REPORTS TARGET'), findsOneWidget);
-      },
-    );
+      router.go('/dashboard');
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('cashier-dashboard-preview-action')),
+        400,
+      );
+      await tester.ensureVisible(
+        find.byKey(const Key('cashier-dashboard-preview-action')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('cashier-dashboard-preview-action')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('REPORTS TARGET'), findsOneWidget);
+    });
 
-    testWidgets(
-      'cashier dashboard omits monetary widgets and values',
-      (WidgetTester tester) async {
-        SharedPreferences.setMockInitialValues(<String, Object>{});
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
-        final AppDatabase db = createTestDatabase();
-        addTearDown(db.close);
+    testWidgets('cashier dashboard omits monetary widgets and values', (
+      WidgetTester tester,
+    ) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
 
-        final int cashierId = await insertUser(
-          db,
-          name: 'Cashier',
-          role: 'cashier',
-        );
-        final int shiftId = await insertShift(db, openedBy: cashierId);
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      final int shiftId = await insertShift(db, openedBy: cashierId);
 
-        final int paidId = await insertTransaction(
-          db,
-          uuid: 'masked-test-order',
-          shiftId: shiftId,
-          userId: cashierId,
-          status: 'paid',
-          totalAmountMinor: 2000,
-          paidAt: DateTime(2026, 3, 28, 10, 0),
-        );
-        await insertPayment(
-          db,
-          uuid: 'masked-test-payment',
-          transactionId: paidId,
-          method: 'card',
-          amountMinor: 2000,
-          paidAt: DateTime(2026, 3, 28, 10, 0),
-        );
+      final int paidId = await insertTransaction(
+        db,
+        uuid: 'masked-test-order',
+        shiftId: shiftId,
+        userId: cashierId,
+        status: 'paid',
+        totalAmountMinor: 2000,
+        paidAt: DateTime(2026, 3, 28, 10, 0),
+      );
+      await insertPayment(
+        db,
+        uuid: 'masked-test-payment',
+        transactionId: paidId,
+        method: 'card',
+        amountMinor: 2000,
+        paidAt: DateTime(2026, 3, 28, 10, 0),
+      );
 
-        final ProviderContainer container = ProviderContainer(
-          overrides: <Override>[
-            appDatabaseProvider.overrideWithValue(db),
-            sharedPreferencesProvider.overrideWithValue(prefs),
-          ],
-        );
-        addTearDown(container.dispose);
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
+      addTearDown(container.dispose);
 
-        await container
-            .read(authNotifierProvider.notifier)
-            .loadUserById(cashierId);
-        await container.read(cashierDashboardNotifierProvider.notifier).load();
-        await tester.pumpWidget(_routerApp(container));
-        await tester.pumpAndSettle();
+      await container
+          .read(authNotifierProvider.notifier)
+          .loadUserById(cashierId);
+      await container.read(cashierDashboardNotifierProvider.notifier).load();
+      await tester.pumpWidget(_routerApp(container));
+      await tester.pumpAndSettle();
 
-        expect(find.text('£20.00'), findsNothing);
-        expect(find.textContaining('Total Sales'), findsNothing);
-        expect(find.textContaining('Cash Total'), findsNothing);
-        expect(find.textContaining('Card Total'), findsNothing);
-        expect(find.textContaining('Cash Awareness'), findsNothing);
-        expect(find.textContaining('Expected Cash'), findsNothing);
-      },
-    );
+      expect(find.text('£20.00'), findsNothing);
+      expect(find.textContaining('Total Sales'), findsNothing);
+      expect(find.textContaining('Cash Total'), findsNothing);
+      expect(find.textContaining('Card Total'), findsNothing);
+      expect(find.textContaining('Cash Awareness'), findsNothing);
+      expect(find.textContaining('Expected Cash'), findsNothing);
+    });
 
-    testWidgets(
-      'dashboard does not expose admin-only financial data',
-      (WidgetTester tester) async {
-        SharedPreferences.setMockInitialValues(<String, Object>{});
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
-        final AppDatabase db = createTestDatabase();
-        addTearDown(db.close);
+    testWidgets('dashboard does not expose admin-only financial data', (
+      WidgetTester tester,
+    ) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
 
-        final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
-        final int cashierId = await insertUser(
-          db,
-          name: 'Cashier',
-          role: 'cashier',
-        );
-        final int shiftId = await insertShift(db, openedBy: cashierId);
-        await SettingsRepository(db).updateVisibilityRatio(0.5, userId: adminId);
+      final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      final int shiftId = await insertShift(db, openedBy: cashierId);
+      await SettingsRepository(db).updateVisibilityRatio(0.5, userId: adminId);
 
-        final int paidId = await insertTransaction(
-          db,
-          uuid: 'admin-only-test',
-          shiftId: shiftId,
-          userId: cashierId,
-          status: 'paid',
-          totalAmountMinor: 1000,
-          paidAt: DateTime(2026, 3, 28, 10, 0),
-        );
-        await insertPayment(
-          db,
-          uuid: 'admin-only-payment',
-          transactionId: paidId,
-          method: 'cash',
-          amountMinor: 1000,
-          paidAt: DateTime(2026, 3, 28, 10, 0),
-        );
+      final int paidId = await insertTransaction(
+        db,
+        uuid: 'admin-only-test',
+        shiftId: shiftId,
+        userId: cashierId,
+        status: 'paid',
+        totalAmountMinor: 1000,
+        paidAt: DateTime(2026, 3, 28, 10, 0),
+      );
+      await insertPayment(
+        db,
+        uuid: 'admin-only-payment',
+        transactionId: paidId,
+        method: 'cash',
+        amountMinor: 1000,
+        paidAt: DateTime(2026, 3, 28, 10, 0),
+      );
 
-        final ProviderContainer container = ProviderContainer(
-          overrides: <Override>[
-            appDatabaseProvider.overrideWithValue(db),
-            sharedPreferencesProvider.overrideWithValue(prefs),
-          ],
-        );
-        addTearDown(container.dispose);
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
+      addTearDown(container.dispose);
 
-        await container
-            .read(authNotifierProvider.notifier)
-            .loadUserById(cashierId);
-        await container.read(cashierDashboardNotifierProvider.notifier).load();
+      await container
+          .read(authNotifierProvider.notifier)
+          .loadUserById(cashierId);
+      await container.read(cashierDashboardNotifierProvider.notifier).load();
 
-        await tester.pumpWidget(_routerApp(container));
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(_routerApp(container));
+      await tester.pumpAndSettle();
 
-        expect(find.text('£10.00'), findsNothing);
-        expect(find.textContaining('Total Sales'), findsNothing);
-        expect(find.textContaining('Cash Total'), findsNothing);
-        expect(find.textContaining('Card Total'), findsNothing);
-      },
-    );
+      expect(find.text('£10.00'), findsNothing);
+      expect(find.textContaining('Total Sales'), findsNothing);
+      expect(find.textContaining('Cash Total'), findsNothing);
+      expect(find.textContaining('Card Total'), findsNothing);
+    });
 
     testWidgets(
       'last activity shows newest-first operational items via provider',
@@ -419,226 +416,218 @@ void main() {
           snapshot.activity[1].type,
           CashierDashboardActivityType.cancellation,
         );
-        expect(
-          snapshot.activity[2].type,
-          CashierDashboardActivityType.payment,
-        );
+        expect(snapshot.activity[2].type, CashierDashboardActivityType.payment);
       },
     );
 
-    testWidgets(
-      'open orders count and list are shown correctly via provider',
-      (WidgetTester tester) async {
-        SharedPreferences.setMockInitialValues(<String, Object>{});
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
-        final AppDatabase db = createTestDatabase();
-        addTearDown(db.close);
+    testWidgets('open orders count and list are shown correctly via provider', (
+      WidgetTester tester,
+    ) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
 
-        final int cashierId = await insertUser(
-          db,
-          name: 'Cashier',
-          role: 'cashier',
-        );
-        final int shiftId = await insertShift(db, openedBy: cashierId);
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      final int shiftId = await insertShift(db, openedBy: cashierId);
 
-        final int categoryId = await insertCategory(db, name: 'Food');
-        final int coffeeId = await insertProduct(
-          db,
-          categoryId: categoryId,
-          name: 'Coffee',
-          priceMinor: 350,
-        );
+      final int categoryId = await insertCategory(db, name: 'Food');
+      final int coffeeId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Coffee',
+        priceMinor: 350,
+      );
 
-        final TransactionRepository transactionRepository = TransactionRepository(
+      final TransactionRepository transactionRepository = TransactionRepository(
+        db,
+      );
+      final int order1 = await insertTransaction(
+        db,
+        uuid: 'open-list-1',
+        shiftId: shiftId,
+        userId: cashierId,
+        status: 'draft',
+        totalAmountMinor: 350,
+      );
+      await transactionRepository.addLine(
+        transactionId: order1,
+        productId: coffeeId,
+        quantity: 1,
+      );
+      final int order2 = await insertTransaction(
+        db,
+        uuid: 'open-list-2',
+        shiftId: shiftId,
+        userId: cashierId,
+        status: 'draft',
+        totalAmountMinor: 700,
+      );
+      await transactionRepository.addLine(
+        transactionId: order2,
+        productId: coffeeId,
+        quantity: 2,
+      );
+
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authNotifierProvider.notifier)
+          .loadUserById(cashierId);
+      await container.read(cashierDashboardNotifierProvider.notifier).load();
+
+      final CashierDashboardSnapshot? snapshot = container
+          .read(cashierDashboardNotifierProvider)
+          .snapshot;
+
+      expect(snapshot, isNotNull);
+      expect(snapshot!.openOrderCount, 2);
+      expect(snapshot.openOrders.length, 2);
+      expect(snapshot.openOrders[0].shortContent, contains('Coffee'));
+      expect(snapshot.openOrders[1].shortContent, contains('Coffee'));
+    });
+
+    testWidgets('no active shift shows no-shift warning banner', (
+      WidgetTester tester,
+    ) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authNotifierProvider.notifier)
+          .loadUserById(cashierId);
+      await container.read(cashierDashboardNotifierProvider.notifier).load();
+
+      await tester.pumpWidget(_routerApp(container));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('warning-no-shift')), findsOneWidget);
+    });
+
+    testWidgets('cashier preview taken shows preview warning banner', (
+      WidgetTester tester,
+    ) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      await insertShift(
+        db,
+        openedBy: cashierId,
+        cashierPreviewedBy: cashierId,
+        cashierPreviewedAt: DateTime(2026, 3, 28, 16, 0),
+      );
+
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authNotifierProvider.notifier)
+          .loadUserById(cashierId);
+      await container.read(cashierDashboardNotifierProvider.notifier).load();
+
+      await tester.pumpWidget(_routerApp(container));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('warning-preview-taken')), findsOneWidget);
+    });
+
+    testWidgets('open order count 6+ shows high load warning', (
+      WidgetTester tester,
+    ) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      final int shiftId = await insertShift(db, openedBy: cashierId);
+      final int categoryId = await insertCategory(db, name: 'Drinks');
+      final int teaId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Tea',
+        priceMinor: 200,
+      );
+
+      final TransactionRepository transactionRepository = TransactionRepository(
+        db,
+      );
+      for (int i = 0; i < 7; i++) {
+        final int txId = await insertTransaction(
           db,
-        );
-        final int order1 = await insertTransaction(
-          db,
-          uuid: 'open-list-1',
+          uuid: 'high-load-$i',
           shiftId: shiftId,
           userId: cashierId,
           status: 'draft',
-          totalAmountMinor: 350,
+          totalAmountMinor: 200,
         );
         await transactionRepository.addLine(
-          transactionId: order1,
-          productId: coffeeId,
+          transactionId: txId,
+          productId: teaId,
           quantity: 1,
         );
-        final int order2 = await insertTransaction(
-          db,
-          uuid: 'open-list-2',
-          shiftId: shiftId,
-          userId: cashierId,
-          status: 'draft',
-          totalAmountMinor: 700,
-        );
-        await transactionRepository.addLine(
-          transactionId: order2,
-          productId: coffeeId,
-          quantity: 2,
-        );
+      }
 
-        final ProviderContainer container = ProviderContainer(
-          overrides: <Override>[
-            appDatabaseProvider.overrideWithValue(db),
-            sharedPreferencesProvider.overrideWithValue(prefs),
-          ],
-        );
-        addTearDown(container.dispose);
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
+      addTearDown(container.dispose);
 
-        await container
-            .read(authNotifierProvider.notifier)
-            .loadUserById(cashierId);
-        await container.read(cashierDashboardNotifierProvider.notifier).load();
+      await container
+          .read(authNotifierProvider.notifier)
+          .loadUserById(cashierId);
+      await container.read(cashierDashboardNotifierProvider.notifier).load();
 
-        final CashierDashboardSnapshot? snapshot = container
-            .read(cashierDashboardNotifierProvider)
-            .snapshot;
+      await tester.pumpWidget(_routerApp(container));
+      await tester.pumpAndSettle();
 
-        expect(snapshot, isNotNull);
-        expect(snapshot!.openOrderCount, 2);
-        expect(snapshot.openOrders.length, 2);
-        expect(snapshot.openOrders[0].shortContent, contains('Coffee'));
-        expect(snapshot.openOrders[1].shortContent, contains('Coffee'));
-      },
-    );
-
-    testWidgets(
-      'no active shift shows no-shift warning banner',
-      (WidgetTester tester) async {
-        SharedPreferences.setMockInitialValues(<String, Object>{});
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
-        final AppDatabase db = createTestDatabase();
-        addTearDown(db.close);
-
-        final int cashierId = await insertUser(
-          db,
-          name: 'Cashier',
-          role: 'cashier',
-        );
-
-        final ProviderContainer container = ProviderContainer(
-          overrides: <Override>[
-            appDatabaseProvider.overrideWithValue(db),
-            sharedPreferencesProvider.overrideWithValue(prefs),
-          ],
-        );
-        addTearDown(container.dispose);
-
-        await container
-            .read(authNotifierProvider.notifier)
-            .loadUserById(cashierId);
-        await container.read(cashierDashboardNotifierProvider.notifier).load();
-
-        await tester.pumpWidget(_routerApp(container));
-        await tester.pumpAndSettle();
-
-        expect(find.byKey(const Key('warning-no-shift')), findsOneWidget);
-      },
-    );
-
-    testWidgets(
-      'cashier preview taken shows preview warning banner',
-      (WidgetTester tester) async {
-        SharedPreferences.setMockInitialValues(<String, Object>{});
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
-        final AppDatabase db = createTestDatabase();
-        addTearDown(db.close);
-
-        final int cashierId = await insertUser(
-          db,
-          name: 'Cashier',
-          role: 'cashier',
-        );
-        await insertShift(
-          db,
-          openedBy: cashierId,
-          cashierPreviewedBy: cashierId,
-          cashierPreviewedAt: DateTime(2026, 3, 28, 16, 0),
-        );
-
-        final ProviderContainer container = ProviderContainer(
-          overrides: <Override>[
-            appDatabaseProvider.overrideWithValue(db),
-            sharedPreferencesProvider.overrideWithValue(prefs),
-          ],
-        );
-        addTearDown(container.dispose);
-
-        await container
-            .read(authNotifierProvider.notifier)
-            .loadUserById(cashierId);
-        await container.read(cashierDashboardNotifierProvider.notifier).load();
-
-        await tester.pumpWidget(_routerApp(container));
-        await tester.pumpAndSettle();
-
-        expect(find.byKey(const Key('warning-preview-taken')), findsOneWidget);
-      },
-    );
-
-    testWidgets(
-      'open order count 6+ shows high load warning',
-      (WidgetTester tester) async {
-        SharedPreferences.setMockInitialValues(<String, Object>{});
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
-        final AppDatabase db = createTestDatabase();
-        addTearDown(db.close);
-
-        final int cashierId = await insertUser(
-          db,
-          name: 'Cashier',
-          role: 'cashier',
-        );
-        final int shiftId = await insertShift(db, openedBy: cashierId);
-        final int categoryId = await insertCategory(db, name: 'Drinks');
-        final int teaId = await insertProduct(
-          db,
-          categoryId: categoryId,
-          name: 'Tea',
-          priceMinor: 200,
-        );
-
-        final TransactionRepository transactionRepository = TransactionRepository(
-          db,
-        );
-        for (int i = 0; i < 7; i++) {
-          final int txId = await insertTransaction(
-            db,
-            uuid: 'high-load-$i',
-            shiftId: shiftId,
-            userId: cashierId,
-            status: 'draft',
-            totalAmountMinor: 200,
-          );
-          await transactionRepository.addLine(
-            transactionId: txId,
-            productId: teaId,
-            quantity: 1,
-          );
-        }
-
-        final ProviderContainer container = ProviderContainer(
-          overrides: <Override>[
-            appDatabaseProvider.overrideWithValue(db),
-            sharedPreferencesProvider.overrideWithValue(prefs),
-          ],
-        );
-        addTearDown(container.dispose);
-
-        await container
-            .read(authNotifierProvider.notifier)
-            .loadUserById(cashierId);
-        await container.read(cashierDashboardNotifierProvider.notifier).load();
-
-        await tester.pumpWidget(_routerApp(container));
-        await tester.pumpAndSettle();
-
-        expect(find.byKey(const Key('warning-high-load')), findsOneWidget);
-      },
-    );
-
+      expect(find.byKey(const Key('warning-high-load')), findsOneWidget);
+    });
   });
 }
 
@@ -652,7 +641,8 @@ Widget _routerApp(ProviderContainer container) {
       ),
       GoRoute(
         path: '/pos',
-        builder: (_, __) => const Scaffold(body: Center(child: Text('POS TARGET'))),
+        builder: (_, __) =>
+            const Scaffold(body: Center(child: Text('POS TARGET'))),
       ),
       GoRoute(
         path: '/orders',

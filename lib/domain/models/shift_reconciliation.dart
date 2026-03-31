@@ -27,8 +27,7 @@ class ShiftReconciliation {
   final int countedBy;
   final DateTime countedAt;
 
-  bool get wasOperatorEntered =>
-      countedCashSource == CountedCashSource.entered;
+  bool get wasOperatorEntered => countedCashSource == CountedCashSource.entered;
 
   ShiftReconciliation copyWith({
     int? id,

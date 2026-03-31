@@ -1,3 +1,5 @@
+import 'sync_failure_details.dart';
+
 enum SyncQueueOperation { upsert }
 
 enum SyncQueueStatus { pending, processing, synced, failed }
@@ -26,6 +28,9 @@ class SyncQueueItem {
   final DateTime? lastAttemptAt;
   final DateTime? syncedAt;
   final String? errorMessage;
+
+  SyncFailureDetails? get failureDetails =>
+      SyncFailureDetails.tryParse(errorMessage);
 
   SyncQueueItem copyWith({
     int? id,

@@ -294,6 +294,15 @@ port = 54327
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"
 
+[functions.mirror-health]
+verify_jwt = false
+
+[functions.mirror-transaction-graph]
+verify_jwt = false
+
+[functions.owner-revenue-analytics]
+verify_jwt = false
+
 # Experimental features may be deprecated any time
 [experimental]
 # Configures Postgres storage engine to use OrioleDB (S3)

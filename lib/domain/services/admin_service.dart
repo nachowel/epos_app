@@ -1,5 +1,6 @@
 import '../../core/config/app_config.dart';
 import '../../core/errors/exceptions.dart';
+import '../../core/logging/app_logger.dart';
 import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/modifier_repository.dart';
 import '../../data/repositories/product_repository.dart';
@@ -19,8 +20,12 @@ import '../models/product_modifier.dart';
 import '../models/shift.dart';
 import '../models/shift_report.dart';
 import '../models/sync_runtime_state.dart';
+import '../models/sync_failure_guidance.dart';
 import '../models/sync_monitor_snapshot.dart';
+import '../models/sync_operations_summary.dart';
 import '../models/sync_queue_item.dart';
+import '../models/sync_reset_blocked_result.dart';
+import '../models/sync_retry_all_result.dart';
 import '../models/system_health_snapshot.dart';
 import '../models/user.dart';
 import '../models/z_report_action_result.dart';
@@ -31,6 +36,9 @@ import 'cash_movement_service.dart';
 import 'shift_session_service.dart';
 
 class AdminService {
+  static const int defaultSyncMaxRetryAttempts = 5;
+  static const Duration defaultProcessingStuckThreshold = Duration(minutes: 2);
+
   const AdminService({
     required CategoryRepository categoryRepository,
     required ProductRepository productRepository,
@@ -46,6 +54,7 @@ class AdminService {
     required PrinterService printerService,
     required AppConfig appConfig,
     AuditLogService auditLogService = const NoopAuditLogService(),
+    AppLogger logger = const NoopAppLogger(),
   }) : _categoryRepository = categoryRepository,
        _productRepository = productRepository,
        _modifierRepository = modifierRepository,
@@ -59,7 +68,8 @@ class AdminService {
        _cashMovementService = cashMovementService,
        _printerService = printerService,
        _appConfig = appConfig,
-       _auditLogService = auditLogService;
+       _auditLogService = auditLogService,
+       _logger = logger;
 
   final CategoryRepository _categoryRepository;
   final ProductRepository _productRepository;
@@ -75,6 +85,7 @@ class AdminService {
   final PrinterService _printerService;
   final AppConfig _appConfig;
   final AuditLogService _auditLogService;
+  final AppLogger _logger;
 
   Future<AdminDashboardSnapshot> getDashboardSnapshot({
     required User user,
@@ -502,18 +513,28 @@ class AdminService {
     _ensureAdmin(user);
     final ({int pendingCount, int failedCount}) counts =
         await _syncQueueRepository.getMonitorCounts();
-    final String? queueError = await _syncQueueRepository.getLastError();
+    final SyncOperationsSummary operationsSummary =
+        await _buildOperationsSummary();
     return SyncMonitorSnapshot(
       items: await _syncQueueRepository.getMonitorItems(limit: limit),
       pendingCount: counts.pendingCount,
       failedCount: counts.failedCount,
-      stuckCount: await _syncQueueRepository.getStuckCount(),
+      syncedCount: await _syncQueueRepository.getSyncedCount(),
+      stuckCount: operationsSummary.stuckCount,
+      maxRetryAttempts: defaultSyncMaxRetryAttempts,
+      retryableFailedCount: operationsSummary.retryableFailedCount,
+      nonRetryableFailedCount: operationsSummary.nonRetryableFailedCount,
+      driftBlockedCount: operationsSummary.driftBlockedCount,
+      processingStuckCount: operationsSummary.processingStuckCount,
+      exhaustedRetryCount: operationsSummary.exhaustedRetryCount,
+      stuckDefinition: operationsSummary.stuckDefinition,
+      lastFailedItem: await _syncQueueRepository.getLatestFailedItem(),
       syncEnabled: _appConfig.featureFlags.syncEnabled,
       isSupabaseConfigured: _appConfig.isSupabaseReadyForSync,
       supabaseConfigurationLabel: _appConfig.supabaseConfigurationLabel,
       supabaseConfigurationIssue: _appConfig.supabaseConfigurationIssue,
       lastSyncedAt: await _syncQueueRepository.getLastSyncedAt(),
-      lastError: runtimeState.lastRuntimeError ?? queueError,
+      lastError: runtimeState.lastRuntimeError,
       isOnline: runtimeState.isOnline,
       isRunning: runtimeState.isRunning,
     );
@@ -521,12 +542,120 @@ class AdminService {
 
   Future<void> retrySyncItem({required User user, required int itemId}) async {
     _ensureAdmin(user);
+    SyncQueueItem? item;
+    for (final SyncQueueItem entry
+        in await _syncQueueRepository.getFailedItems()) {
+      if (entry.id == itemId) {
+        item = entry;
+        break;
+      }
+    }
+    if (item == null) {
+      throw NotFoundException(
+        'Sync queue item not found or not failed: $itemId',
+      );
+    }
+    final SyncFailureGuidance guidance = resolveSyncFailureGuidance(
+      item,
+      maxRetryAttempts: defaultSyncMaxRetryAttempts,
+    );
+    if (!guidance.canManualRetry) {
+      throw ValidationException(guidance.nextStep);
+    }
     await _syncQueueRepository.resetAttempts(itemId);
   }
 
-  Future<void> retryAllSyncItems({required User user}) async {
+  Future<SyncRetryAllResult> retryAllSyncItems({required User user}) async {
     _ensureAdmin(user);
-    await _syncQueueRepository.resetAllFailedAttempts();
+    final List<SyncQueueItem> failedItems = await _syncQueueRepository
+        .getFailedItems();
+    final List<int> retryableIds = <int>[];
+    int skippedNonRetryableCount = 0;
+    int skippedManualReviewCount = 0;
+
+    for (final SyncQueueItem item in failedItems) {
+      final SyncFailureGuidance guidance = resolveSyncFailureGuidance(
+        item,
+        maxRetryAttempts: defaultSyncMaxRetryAttempts,
+      );
+      _logger.audit(
+        eventType: 'admin_sync_retry_all_item_evaluated',
+        entityId: item.recordUuid,
+        message: guidance.includedInRetryAll
+            ? 'Sync item reset for retry-all.'
+            : 'Sync item skipped during retry-all evaluation.',
+        metadata: <String, Object?>{
+          'queue_row_id': item.id,
+          'previous_status': item.status.name,
+          'new_status': guidance.includedInRetryAll
+              ? SyncQueueStatus.pending.name
+              : item.status.name,
+          'failure_type': item.failureDetails?.failureKind.name ?? 'unknown',
+          'retryable': item.failureDetails?.retryable,
+          'retry_all_action': guidance.includedInRetryAll ? 'reset' : 'skip',
+          'skip_reason': guidance.kind.name,
+        },
+      );
+      if (guidance.includedInRetryAll) {
+        retryableIds.add(item.id);
+        continue;
+      }
+      if (guidance.isNonRetryable) {
+        skippedNonRetryableCount += 1;
+      } else {
+        skippedManualReviewCount += 1;
+      }
+    }
+
+    await _syncQueueRepository.resetAttemptsForItems(retryableIds);
+    return SyncRetryAllResult(
+      retriedCount: retryableIds.length,
+      skippedCount: failedItems.length - retryableIds.length,
+      skippedNonRetryableCount: skippedNonRetryableCount,
+      skippedManualReviewCount: skippedManualReviewCount,
+    );
+  }
+
+  Future<SyncResetBlockedResult> resetBlockedTrustedSyncFailures({
+    required User user,
+  }) async {
+    _ensureAdmin(user);
+    final List<SyncQueueItem> failedItems = await _syncQueueRepository
+        .getFailedItems();
+    final List<int> resetIds = <int>[];
+
+    for (final SyncQueueItem item in failedItems) {
+      final SyncFailureGuidance guidance = resolveSyncFailureGuidance(
+        item,
+        maxRetryAttempts: defaultSyncMaxRetryAttempts,
+      );
+      if (_isBlockedTrustedSyncFailure(guidance.kind)) {
+        resetIds.add(item.id);
+      }
+      _logger.audit(
+        eventType: 'admin_sync_blocked_failure_evaluated',
+        entityId: item.recordUuid,
+        message: _isBlockedTrustedSyncFailure(guidance.kind)
+            ? 'Blocked trusted-sync failure reset for retest.'
+            : 'Sync failure left unchanged during blocked-failure reset.',
+        metadata: <String, Object?>{
+          'queue_row_id': item.id,
+          'previous_status': item.status.name,
+          'new_status': _isBlockedTrustedSyncFailure(guidance.kind)
+              ? SyncQueueStatus.pending.name
+              : item.status.name,
+          'failure_type': item.failureDetails?.failureKind.name ?? 'unknown',
+          'retryable': item.failureDetails?.retryable,
+          'reset_for_retest': _isBlockedTrustedSyncFailure(guidance.kind),
+        },
+      );
+    }
+
+    await _syncQueueRepository.resetAttemptsForItems(resetIds);
+    return SyncResetBlockedResult(
+      resetCount: resetIds.length,
+      skippedCount: failedItems.length - resetIds.length,
+    );
   }
 
   Future<SystemHealthSnapshot> getSystemHealthSnapshot({
@@ -631,5 +760,70 @@ class AdminService {
     if (value < 0) {
       throw ValidationException('$fieldName cannot be negative.');
     }
+  }
+
+  Future<SyncOperationsSummary> _buildOperationsSummary() async {
+    final DateTime now = DateTime.now();
+    final List<SyncQueueItem> failedItems = await _syncQueueRepository
+        .getFailedItems();
+    final List<SyncQueueItem> processingItems = await _syncQueueRepository
+        .getProcessingItems();
+
+    int retryableFailedCount = 0;
+    int nonRetryableFailedCount = 0;
+    int driftBlockedCount = 0;
+    int exhaustedRetryCount = 0;
+
+    for (final SyncQueueItem item in failedItems) {
+      final SyncFailureGuidance guidance = resolveSyncFailureGuidance(
+        item,
+        maxRetryAttempts: defaultSyncMaxRetryAttempts,
+      );
+      switch (guidance.kind) {
+        case SyncFailureGuidanceKind.retryable:
+        case SyncFailureGuidanceKind.networkUnreachable:
+        case SyncFailureGuidanceKind.remoteServerError:
+          retryableFailedCount += 1;
+          break;
+        case SyncFailureGuidanceKind.localGraphDrift:
+          nonRetryableFailedCount += 1;
+          driftBlockedCount += 1;
+          break;
+        case SyncFailureGuidanceKind.maxRetryHit:
+          exhaustedRetryCount += 1;
+          break;
+        case SyncFailureGuidanceKind.validationFailure:
+        case SyncFailureGuidanceKind.authOrConfigFailure:
+          nonRetryableFailedCount += 1;
+          break;
+        case SyncFailureGuidanceKind.unknown:
+          exhaustedRetryCount += 1;
+          break;
+      }
+    }
+
+    int processingStuckCount = 0;
+    for (final SyncQueueItem item in processingItems) {
+      final DateTime? lastAttemptAt = item.lastAttemptAt;
+      final bool isStuck =
+          lastAttemptAt != null &&
+          lastAttemptAt.add(defaultProcessingStuckThreshold).isBefore(now);
+      if (isStuck) {
+        processingStuckCount += 1;
+      }
+    }
+
+    return SyncOperationsSummary(
+      retryableFailedCount: retryableFailedCount,
+      nonRetryableFailedCount: nonRetryableFailedCount,
+      driftBlockedCount: driftBlockedCount,
+      processingStuckCount: processingStuckCount,
+      exhaustedRetryCount: exhaustedRetryCount,
+    );
+  }
+
+  bool _isBlockedTrustedSyncFailure(SyncFailureGuidanceKind kind) {
+    return kind == SyncFailureGuidanceKind.authOrConfigFailure ||
+        kind == SyncFailureGuidanceKind.validationFailure;
   }
 }

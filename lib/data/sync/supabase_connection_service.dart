@@ -1,9 +1,8 @@
 import 'dart:async';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../../core/config/app_config.dart';
 import 'phase1_sync_contract.dart';
+import 'supabase_edge_function_invoker.dart';
 
 enum SupabaseConnectionState {
   notConfigured,
@@ -47,22 +46,21 @@ abstract class SupabaseConnectionProbe {
   );
 }
 
-class SupabaseFlutterConnectionProbe implements SupabaseConnectionProbe {
-  const SupabaseFlutterConnectionProbe(this._client);
+class SupabaseEdgeFunctionConnectionProbe implements SupabaseConnectionProbe {
+  const SupabaseEdgeFunctionConnectionProbe(this._functionInvoker);
 
-  final SupabaseClient _client;
+  final SupabaseEdgeFunctionInvoker _functionInvoker;
 
   @override
   Future<Map<String, SupabaseRemoteTableState>> probeRequiredTables(
     List<String> tableNames,
   ) async {
-    final FunctionResponse response = await _client.functions
-        .invoke(
-          'mirror-health',
-          body: <String, Object?>{'required_tables': tableNames},
-        )
-        .timeout(const Duration(seconds: 5));
-    final dynamic data = response.data;
+    final SupabaseEdgeFunctionResponse response = await _functionInvoker.invoke(
+      functionName: 'mirror-health',
+      body: <String, Object?>{'required_tables': tableNames},
+      includeAuthorization: false,
+    );
+    final Object? data = response.data;
     if (data is! Map) {
       throw StateError('Mirror health probe returned a non-JSON response.');
     }
@@ -102,8 +100,7 @@ class SupabaseConnectionService {
   final SupabaseConnectionProbe? _probe;
 
   bool get isConfigured =>
-      _config.supabaseConfigurationStatus ==
-      SupabaseConfigurationStatus.valid;
+      _config.supabaseConfigurationStatus == SupabaseConfigurationStatus.valid;
 
   // Read-only operational check:
   // Can the remote mirror be reached, and are the required mirror tables ready?
@@ -154,7 +151,9 @@ class SupabaseConnectionService {
 
     try {
       requiredTables.addAll(
-        await probe.probeRequiredTables(Phase1SyncContract.requiredRemoteTables),
+        await probe.probeRequiredTables(
+          Phase1SyncContract.requiredRemoteTables,
+        ),
       );
     } on TimeoutException {
       return SupabaseConnectionStatus(
@@ -170,7 +169,8 @@ class SupabaseConnectionService {
         return SupabaseConnectionStatus(
           state: SupabaseConnectionState.unreachable,
           checkedAt: checkedAt,
-          message: 'Remote Supabase mirror is configured but currently unreachable.',
+          message:
+              'Remote Supabase mirror is configured but currently unreachable.',
           requiredTables: requiredTables,
           successfulQueryCount: 0,
         );
@@ -186,10 +186,14 @@ class SupabaseConnectionService {
     }
 
     final int successfulQueryCount = requiredTables.values
-        .where((SupabaseRemoteTableState value) => value == SupabaseRemoteTableState.present)
+        .where(
+          (SupabaseRemoteTableState value) =>
+              value == SupabaseRemoteTableState.present,
+        )
         .length;
     final bool hasMissingTables = requiredTables.values.any(
-      (SupabaseRemoteTableState value) => value == SupabaseRemoteTableState.missing,
+      (SupabaseRemoteTableState value) =>
+          value == SupabaseRemoteTableState.missing,
     );
     final bool hasInaccessibleTables = requiredTables.values.any(
       (SupabaseRemoteTableState value) =>
@@ -200,7 +204,8 @@ class SupabaseConnectionService {
       return SupabaseConnectionStatus(
         state: SupabaseConnectionState.misconfigured,
         checkedAt: checkedAt,
-        message: 'Remote mirror health probe reached Supabase, but one or more tables are inaccessible through the trusted probe.',
+        message:
+            'Remote mirror health probe reached Supabase, but one or more tables are inaccessible through the trusted probe.',
         requiredTables: requiredTables,
         successfulQueryCount: successfulQueryCount,
       );
@@ -228,7 +233,8 @@ class SupabaseConnectionService {
     return SupabaseConnectionStatus(
       state: SupabaseConnectionState.connected,
       checkedAt: checkedAt,
-      message: 'Remote Supabase mirror is reachable and required mirror tables are ready.',
+      message:
+          'Remote Supabase mirror is reachable and required mirror tables are ready.',
       requiredTables: requiredTables,
       successfulQueryCount: successfulQueryCount,
     );

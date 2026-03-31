@@ -453,7 +453,7 @@ class TransactionRepository {
       }
 
       if (OrderLifecyclePolicy.isTerminal(_statusFromDb(row.status))) {
-        await _syncQueueRepository?.addToQueue('transactions', row.uuid);
+        await _syncQueueRepository?.addTransactionRootToQueue(row.uuid);
       }
     });
   }

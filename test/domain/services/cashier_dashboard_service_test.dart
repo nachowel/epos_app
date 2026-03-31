@@ -68,9 +68,7 @@ void main() {
       expect(snapshot.activity, isEmpty);
       expect(snapshot.operationalState, ShiftOperationalState.noShift);
       expect(
-        snapshot.warnings.map(
-          (DashboardWarning w) => w.type,
-        ),
+        snapshot.warnings.map((DashboardWarning w) => w.type),
         contains(DashboardWarningType.noShift),
       );
     });
@@ -354,70 +352,62 @@ void main() {
         ).getSnapshot(user: _cashier(cashierId));
 
         expect(
-          snapshot.warnings.map(
-            (DashboardWarning w) => w.type,
-          ),
+          snapshot.warnings.map((DashboardWarning w) => w.type),
           contains(DashboardWarningType.previewTaken),
         );
         expect(
-          snapshot.warnings.map(
-            (DashboardWarning w) => w.type,
-          ),
+          snapshot.warnings.map((DashboardWarning w) => w.type),
           isNot(contains(DashboardWarningType.noShift)),
         );
       },
     );
 
-    test(
-      'snapshot warnings include highLoad when open orders >= 6',
-      () async {
-        final db = createTestDatabase();
-        addTearDown(db.close);
+    test('snapshot warnings include highLoad when open orders >= 6', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
 
-        final int cashierId = await insertUser(
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      final int shiftId = await insertShift(db, openedBy: cashierId);
+      final int categoryId = await insertCategory(db, name: 'Drinks');
+      final int teaId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Tea',
+        priceMinor: 200,
+      );
+
+      final TransactionRepository transactionRepository = TransactionRepository(
+        db,
+      );
+      for (int i = 0; i < 7; i++) {
+        final int txId = await insertTransaction(
           db,
-          name: 'Cashier',
-          role: 'cashier',
+          uuid: 'warning-load-$i',
+          shiftId: shiftId,
+          userId: cashierId,
+          status: 'draft',
+          totalAmountMinor: 200,
         );
-        final int shiftId = await insertShift(db, openedBy: cashierId);
-        final int categoryId = await insertCategory(db, name: 'Drinks');
-        final int teaId = await insertProduct(
-          db,
-          categoryId: categoryId,
-          name: 'Tea',
-          priceMinor: 200,
+        await transactionRepository.addLine(
+          transactionId: txId,
+          productId: teaId,
+          quantity: 1,
         );
+      }
 
-        final TransactionRepository transactionRepository =
-            TransactionRepository(db);
-        for (int i = 0; i < 7; i++) {
-          final int txId = await insertTransaction(
-            db,
-            uuid: 'warning-load-$i',
-            shiftId: shiftId,
-            userId: cashierId,
-            status: 'draft',
-            totalAmountMinor: 200,
-          );
-          await transactionRepository.addLine(
-            transactionId: txId,
-            productId: teaId,
-            quantity: 1,
-          );
-        }
+      final CashierDashboardSnapshot snapshot = await _makeService(
+        db,
+      ).getSnapshot(user: _cashier(cashierId));
 
-        final CashierDashboardSnapshot snapshot = await _makeService(
-          db,
-        ).getSnapshot(user: _cashier(cashierId));
-
-        expect(
-          snapshot.warnings.map(
-            (DashboardWarning w) => w.type,
-          ),
-          contains(DashboardWarningType.highLoad),
-        );
-      },
-    );
+      expect(
+        snapshot.warnings.map((DashboardWarning w) => w.type),
+        contains(DashboardWarningType.highLoad),
+      );
+    });
 
     test(
       'snapshot warnings are empty for normal open shift with low load',
@@ -440,26 +430,23 @@ void main() {
       },
     );
 
-    test(
-      'operationalState is normal for open shift without preview',
-      () async {
-        final db = createTestDatabase();
-        addTearDown(db.close);
+    test('operationalState is normal for open shift without preview', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
 
-        final int cashierId = await insertUser(
-          db,
-          name: 'Cashier',
-          role: 'cashier',
-        );
-        await insertShift(db, openedBy: cashierId);
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      await insertShift(db, openedBy: cashierId);
 
-        final CashierDashboardSnapshot snapshot = await _makeService(
-          db,
-        ).getSnapshot(user: _cashier(cashierId));
+      final CashierDashboardSnapshot snapshot = await _makeService(
+        db,
+      ).getSnapshot(user: _cashier(cashierId));
 
-        expect(snapshot.operationalState, ShiftOperationalState.normal);
-      },
-    );
+      expect(snapshot.operationalState, ShiftOperationalState.normal);
+    });
 
     test(
       'operationalState is previewTakenLocked when cashier preview is active',

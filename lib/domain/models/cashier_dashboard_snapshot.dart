@@ -12,29 +12,14 @@ enum CashierDashboardActivityType {
   cashMovement,
 }
 
-enum OpenOrderLoadLevel {
-  calm,
-  normal,
-  high,
-}
+enum OpenOrderLoadLevel { calm, normal, high }
 
-enum DashboardWarningType {
-  noShift,
-  previewTaken,
-  highLoad,
-}
+enum DashboardWarningType { noShift, previewTaken, highLoad }
 
-enum ShiftOperationalState {
-  noShift,
-  normal,
-  previewTakenLocked,
-}
+enum ShiftOperationalState { noShift, normal, previewTakenLocked }
 
 class DashboardWarning {
-  const DashboardWarning({
-    required this.type,
-    required this.message,
-  });
+  const DashboardWarning({required this.type, required this.message});
 
   final DashboardWarningType type;
   final String message;

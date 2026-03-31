@@ -1,4 +1,4 @@
-# Supabase Mirror Security Setup
+# Supabase Mirror Phase 2 Setup
 
 ## Architecture recap
 
@@ -16,9 +16,26 @@ Bu entegrasyon yalnızca şu 4 tabloyla sınırlıdır:
 - `order_modifiers`
 - `payments`
 
+## Repo state after the two-phase split
+
+Repo artık iki ayrı artifact taşır:
+
+- baseline schema truth:
+  [`supabase/phase1_sales_sync_foundation.sql`](/c:/Users/nacho/Desktop/EPOS/epos_app/supabase/phase1_sales_sync_foundation.sql)
+- trusted-only enforcement migration:
+  [`supabase/migrations/20260330130000_trusted_only_mirror_writes.sql`](/c:/Users/nacho/Desktop/EPOS/epos_app/supabase/migrations/20260330130000_trusted_only_mirror_writes.sql)
+
+Bu ayrım bilinçlidir:
+
+- baseline dosyası current live physical schema shape’ini anlatır
+- hardening migration davranış değişimini getirir
+- kör apply yerine kontrollü rollout hedeflenir
+
+Repo-level hazırlık tamamlanmış olsa da canlı ortamda enforcement ancak migration apply edilince gerçek olur.
+
 ## Current trusted write path
 
-Normal ve önerilen write yolu artık şudur:
+Önerilen ve korunmuş write yolu şudur:
 
 - `SyncWorker`
 - `SyncRemoteGateway`
@@ -28,205 +45,355 @@ Normal ve önerilen write yolu artık şudur:
 
 Client finalized local transaction graph’i üretir.
 Remote write kararı local tarafta verilir.
-Server-side function yalnız mirror tabloya UUID bazlı upsert yapar.
+Edge Function service-role ile mirror tablolarına upsert yapar.
 
-## Direct client write status
+Bu mimaride:
 
-`DirectSupabaseMirrorWriter` hâlâ kod tabanında vardır, ancak normal production yolu değildir.
+- local transaction/payment lifecycle authority değişmez
+- remote business authority üretmez
+- trusted function yalnız mirror write boundary olarak kalır
 
-Bu fazdan sonra:
+## What the hardening migration changes
 
-- varsayılan mode `trusted_sync_boundary`
-- `direct_mirror_write` yalnız açıkça seçilirse dev/non-prod amaçlı düşünülebilir
-- production environment içinde direct mode engellenir
-- trusted mode başarısızsa direct writer’a fallback yapılmaz
-
-Önemli:
-
-- Bu hardened SQL ile direct client table write artık çalışmamalıdır
-- direct writer yalnız test/dev wiring veya geçici kontrollü ortamlarda anlamlıdır
-
-## What was tightened in this phase
-
-- varsayılan sync write mode trusted boundary oldu
-- production’da direct client write config’i reddediliyor
-- remote health check artık doğrudan tablo select ile değil, read-only server-side probe ile çalışıyor
-- mirror tablolarında RLS etkinleştirildi
-- anon/authenticated direct table privileges kaldırıldı
-- trusted server-side function service-role ile yazmaya devam eder
-
-## SQL setup
-
-[`supabase/phase1_sales_sync_foundation.sql`](/abs/path/C:/Users/nacho/Desktop/EPOS/epos_app/supabase/phase1_sales_sync_foundation.sql)
+[`supabase/migrations/20260330130000_trusted_only_mirror_writes.sql`](/c:/Users/nacho/Desktop/EPOS/epos_app/supabase/migrations/20260330130000_trusted_only_mirror_writes.sql)
 şunları yapar:
 
-- 4 remote mirror tabloyu oluşturur
-- UUID tabanlı ilişkileri kurar
-- `last_received_at` trigger mantığını ekler
-- index’leri ekler
-- RLS’i etkinleştirir
-- anon/authenticated direct table grants’i kaldırır
+- mirror tablolarda RLS’in açık kaldığını garanti eder
+- live audit’te görülen permissive write policy’leri güvenli şekilde düşürür
+- `anon` ve `authenticated` rollerinden direct table privileges’i kaldırır
+- trusted function path’i bozmaz çünkü function service-role ile yazar
 
-Uygulama adımları:
+Hedef sonuç:
 
-1. Supabase dashboard’u açın.
-2. `SQL Editor` bölümüne gidin.
-3. SQL dosyasının tamamını kopyalayın.
-4. Editor içine yapıştırın.
-5. Script’i çalıştırın.
-6. Şu tablo ve güvenlik durumlarını doğrulayın:
-   - `transactions`
-   - `transaction_lines`
-   - `order_modifiers`
-   - `payments`
-   - RLS enabled
-   - anon/authenticated direct `select/insert/update/delete` yok
+- anon direct `insert` fail
+- anon direct `update` fail
+- authenticated direct `insert` fail
+- authenticated direct `update` fail
+- `mirror-transaction-graph` invoke sonrası write devam eder
 
-Script tekrar çalıştırılabilir yapıdadır.
+Kısa hali:
 
-## Edge Functions
+> Trusted function artık hedeflenen tek remote write yoludur, ama bu ancak hardening migration canlıya apply edilince fiilen enforce edilir.
 
-Trusted path için iki function beklenir:
+## Policies removed by the hardening migration
 
-- `mirror-transaction-graph`
-- `mirror-health`
+Migration özellikle şu permissive write policy’leri `drop policy if exists` ile temizler:
 
-Deploy:
+- `transactions_insert_sync`
+- `transactions_update_sync`
+- `transaction_lines_insert_sync`
+- `transaction_lines_update_sync`
+- `order_modifiers_insert_sync`
+- `order_modifiers_update_sync`
+- `payments_insert_sync`
+- `payments_update_sync`
 
-```powershell
-supabase functions deploy mirror-transaction-graph
-supabase functions deploy mirror-health
-```
+Burada yeni client write policy üretilmez.
+Amaç yalnız mevcut permissive direct write surface’i kapatmaktır.
 
-Bu function’ların server-side environment’ında şu secret’lar erişilebilir olmalıdır:
+## Grants tightened by the hardening migration
 
-- `SUPABASE_URL`
+Migration şu tablolarda `anon` ve `authenticated` için direct privileges’i kapatır:
+
+- `transactions`
+- `transaction_lines`
+- `order_modifiers`
+- `payments`
+
+Yaklaşım:
+
+- `revoke all privileges ... from anon, authenticated`
+
+Bu mirror tablolar için client direct `select/insert/update/delete` yüzeyini daraltır.
+Health/readiness kontrolü doğrudan client table read ile değil `mirror-health` function’ı ile devam eder.
+
+## Why the trusted function is not affected
+
+`mirror-transaction-graph` ve `mirror-health` function’ları şu secret ile server-side client kurar:
+
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-Function davranışı:
+Bu nedenle:
 
-- `mirror-transaction-graph`
-  - finalized graph validate eder
-  - transaction -> lines -> modifiers -> payment sırasıyla upsert yapar
-  - idempotent UUID write mantığını korur
-- `mirror-health`
-  - read-only kontrol yapar
-  - gerekli mirror tablolarının hazır olup olmadığını döner
+- anon/authenticated policy/grant daralması function path’i bozmaz
+- function service-role ile mirror tabloya erişmeye devam eder
+- client-side direct writer ise hardening apply sonrası canlıda başarısız olur
 
-## Environment ayarları
+Bu istenen davranıştır.
 
-Gerekli `dart-define` değerleri:
+## Baseline schema file
+
+[`supabase/phase1_sales_sync_foundation.sql`](/c:/Users/nacho/Desktop/EPOS/epos_app/supabase/phase1_sales_sync_foundation.sql)
+hala current live mirror schema baseline’ını temsil eder.
+
+Bu dosya:
+
+- UUID/FK tiplerini
+- finalized-only transaction status domain’ini
+- `transactions.synced_at`
+- live-style transaction guardrail trigger’ını
+- mevcut fiziksel tablo/index şeklini
+
+anlatır.
+
+Bu dosya özellikle şunu yapmaz:
+
+- trusted-only enforcement’i gömmez
+- client direct write closure’ı baseline içine karıştırmaz
+- behavior change migration rolünü üstlenmez
+
+## Draft baseline migration artifact
+
+[`supabase/migrations/20260330120000_live_mirror_schema_baseline_draft.sql`](/c:/Users/nacho/Desktop/EPOS/epos_app/supabase/migrations/20260330120000_live_mirror_schema_baseline_draft.sql)
+yalnız schema alignment taslağı olarak kalır.
+
+Bu dosya security migration değildir.
+Direct write closure getirmez.
+
+## Environment recommendation
+
+Uygulama config’i artık root `.env` dosyasından yüklenir. `flutter run`
+tek başına yeterlidir.
+
+Gerekli env anahtarları:
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
-- `SYNC_MIRROR_WRITE_MODE`
+- `EPOS_INTERNAL_API_KEY`
+- `FEATURE_SYNC_ENABLED`
 
-Önerilen değer:
+Önerilen ek değer:
 
 - `SYNC_MIRROR_WRITE_MODE=trusted_sync_boundary`
 
-PowerShell örneği:
+Production’da direct mode zaten uygulama seviyesinde geçerli write path olarak
+kabul edilmez. Hardening migration apply edildiğinde DB tarafı da bu kararı
+enforce eder.
+
+## Manual verification after live apply
+
+### 1. RLS durumu
+
+SQL Editor:
+
+```sql
+select
+  schemaname,
+  tablename,
+  rowsecurity
+from pg_tables
+where schemaname = 'public'
+  and tablename in (
+    'transactions',
+    'transaction_lines',
+    'order_modifiers',
+    'payments'
+  )
+order by tablename;
+```
+
+Beklenen:
+
+- tüm mirror tablolarında `rowsecurity = true`
+
+### 2. Policy temizliği
+
+SQL Editor:
+
+```sql
+select
+  schemaname,
+  tablename,
+  policyname,
+  cmd,
+  roles
+from pg_policies
+where schemaname = 'public'
+  and tablename in (
+    'transactions',
+    'transaction_lines',
+    'order_modifiers',
+    'payments'
+  )
+order by tablename, policyname;
+```
+
+Beklenen:
+
+- yukarıdaki `*_insert_sync` ve `*_update_sync` policy’leri görünmez
+- anon/authenticated için permissive write policy kalmaz
+
+### 3. Grant daralması
+
+SQL Editor:
+
+```sql
+select
+  table_name,
+  grantee,
+  privilege_type
+from information_schema.role_table_grants
+where table_schema = 'public'
+  and table_name in (
+    'transactions',
+    'transaction_lines',
+    'order_modifiers',
+    'payments'
+  )
+  and grantee in ('anon', 'authenticated')
+order by table_name, grantee, privilege_type;
+```
+
+Beklenen:
+
+- `INSERT`
+- `UPDATE`
+- `DELETE`
+
+satırları görünmez.
+İdeal olarak mirror tablo direct privilege satırı kalmaz.
+
+### 4. Anon direct insert fail
+
+HTTP örneği:
 
 ```powershell
-flutter run `
-  --dart-define=SUPABASE_URL=https://your-project.supabase.co `
-  --dart-define=SUPABASE_ANON_KEY=your-anon-key `
-  --dart-define=SYNC_MIRROR_WRITE_MODE=trusted_sync_boundary
+$headers = @{
+  apikey = "<SUPABASE_ANON_KEY>"
+  Authorization = "Bearer <SUPABASE_ANON_KEY>"
+  "Content-Type" = "application/json"
+  Prefer = "return=representation"
+}
+
+$body = @'
+[
+  {
+    "uuid": "aaaaaaaa-1111-1111-1111-111111111111",
+    "shift_local_id": 1,
+    "user_local_id": 1,
+    "table_number": null,
+    "status": "paid",
+    "subtotal_minor": 1000,
+    "modifier_total_minor": 0,
+    "total_amount_minor": 1000,
+    "created_at": "2026-03-30T12:00:00Z",
+    "paid_at": "2026-03-30T12:05:00Z",
+    "updated_at": "2026-03-30T12:05:00Z",
+    "cancelled_at": null,
+    "cancelled_by_local_id": null,
+    "kitchen_printed": false,
+    "receipt_printed": false
+  }
+]
+'@
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "https://<PROJECT_REF>.supabase.co/rest/v1/transactions" `
+  -Headers $headers `
+  -Body $body
 ```
 
-Supabase tanımlı değilse uygulama local çalışmaya devam eder.
+Beklenen:
 
-## Health check / probe
+- `401` / `403` / privilege-RLS failure
+- direct table write başarıyla dönmemeli
 
-Health check read-only kalır.
-Startup’ı bloklamaz.
-Write auth garantisi vermez.
+### 5. Anon direct update fail
 
-```dart
-final SupabaseConnectionStatus status = await ref
-    .read(supabaseConnectionServiceProvider)
-    .runDebugReadOnlyProbe();
+HTTP örneği:
+
+```powershell
+$headers = @{
+  apikey = "<SUPABASE_ANON_KEY>"
+  Authorization = "Bearer <SUPABASE_ANON_KEY>"
+  "Content-Type" = "application/json"
+}
+
+$body = @'
+{
+  "receipt_printed": true
+}
+'@
+
+Invoke-RestMethod `
+  -Method Patch `
+  -Uri "https://<PROJECT_REF>.supabase.co/rest/v1/transactions?uuid=eq.<EXISTING_UUID>" `
+  -Headers $headers `
+  -Body $body
 ```
 
-Bu probe artık `mirror-health` function’ı üzerinden şu soruya cevap verir:
+Beklenen:
 
-> Remote mirror ulaşılabilir mi ve gerekli mirror tabloları hazır mı?
+- `401` / `403` / privilege-RLS failure
+- existing row update edilememeli
 
-Probe şunları doğrular:
+### 6. Trusted function write still works
 
-- config geçerli mi
-- trusted read-only probe çağrılabiliyor mu
-- gerekli tablolar var mı
-- tablo erişim durumu function tarafından okunabiliyor mu
+HTTP örneği:
 
-Probe şunları doğrulamaz:
+```powershell
+$headers = @{
+  apikey = "<SUPABASE_ANON_KEY>"
+  Authorization = "Bearer <SUPABASE_ANON_KEY>"
+  "Content-Type" = "application/json"
+}
 
-- write path’in production’da eksiksiz hardened olduğu
-- Edge Function deployment dışı tüm auth/policy detaylarının kusursuz olduğu
+$body = @'
+{
+  "payload_version": 1,
+  "transaction_uuid": "11111111-1111-1111-1111-111111111111",
+  "transaction_idempotency_key": "idem-11111111",
+  "generated_at": "2026-03-30T12:10:00Z",
+  "transaction": {
+    "uuid": "11111111-1111-1111-1111-111111111111",
+    "shift_local_id": 1,
+    "user_local_id": 1,
+    "table_number": null,
+    "status": "paid",
+    "subtotal_minor": 1000,
+    "modifier_total_minor": 0,
+    "total_amount_minor": 1000,
+    "created_at": "2026-03-30T12:00:00Z",
+    "paid_at": "2026-03-30T12:05:00Z",
+    "updated_at": "2026-03-30T12:05:00Z",
+    "cancelled_at": null,
+    "cancelled_by_local_id": null,
+    "kitchen_printed": false,
+    "receipt_printed": false
+  },
+  "transaction_lines": [],
+  "order_modifiers": [],
+  "payment": {
+    "uuid": "22222222-2222-2222-2222-222222222222",
+    "transaction_uuid": "11111111-1111-1111-1111-111111111111",
+    "method": "card",
+    "amount_minor": 1000,
+    "paid_at": "2026-03-30T12:05:00Z"
+  }
+}
+'@
 
-## RLS / grants current state
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "https://<PROJECT_REF>.supabase.co/functions/v1/mirror-transaction-graph" `
+  -Headers $headers `
+  -Body $body
+```
 
-Bu fazdaki amaç “RLS varmış gibi görünmek” değil, direct surface’i gerçekten daraltmaktır.
+Beklenen:
 
-Şu anki hedef durum:
+- response `ok: true`
+- transaction/payment row’ları mirror’da yazılmaya devam eder
 
-- mirror tablolarında RLS enabled
-- anon/authenticated için direct table policy yok
-- anon/authenticated direct table grants yok
-- service-role ile çalışan Edge Function mirror write yapabiliyor
+## Operational note
 
-Yani normal client artık tabloya doğrudan yazmamalıdır.
+Bu repo değişikliği hardening’i hazırlar.
+Canlı ortamda trusted-only enforcement ancak şu sıra ile güvenle tamamlanır:
 
-## Production recommendation
+1. baseline doğru mu doğrula
+2. edge functions deploy ve secret’ları doğrula
+3. hardening migration’ı kontrollü apply et
+4. yukarıdaki verification bloklarını çalıştır
 
-Production için önerilen tek write yolu:
-
-- `trusted_sync_boundary`
-
-Production’da önerilmeyen yol:
-
-- `direct_mirror_write`
-
-Production environment içinde direct mode seçilirse uygulama bunu geçerli sync write path olarak kabul etmez.
-
-## Dev/debug exception path
-
-Direct writer tamamen silinmiş değildir.
-
-Kalan rolü:
-
-- test harness
-- kontrollü non-production deneyler
-- eski geçiş senaryoları
-
-Ama hardened SQL ile birlikte bu yolun normal Supabase mirror ortamında çalışması beklenmemelidir.
-
-## Domain alignment
-
-Remote mirror `transactions.status` domain’i:
-
-- `open`
-- `paid`
-- `cancelled`
-
-Local `draft` ve `sent` durumları remote authority üretmez.
-Sync worker hâlâ yalnız finalized local kayıtları mirror’a yollar.
-
-## What still remains for full hardening
-
-Bu faz önemli bir sıkılaştırma yapar, ama full production-complete security değildir.
-
-Hâlâ kalan işler:
-
-- direct writer’ın uygulamadan tamamen kaldırılması
-- Edge Function deployment ve secret yönetiminin operasyonel olarak doğrulanması
-- gerekiyorsa function invocation tarafında daha sıkı auth modeli
-- Supabase tarafında ek audit/monitoring
-
-## Next security phase
-
-Bir sonraki mantıklı faz:
-
-- direct writer’ı app runtime’dan tamamen çıkarmak
-- trusted boundary dışındaki write path’leri tamamen kapatılmış kabul etmek
-- function-side operational monitoring ve rotation/hardening eklemek
+Trusted path works, but enforcement is only real after the live migration is applied.

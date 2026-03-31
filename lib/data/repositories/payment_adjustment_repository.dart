@@ -81,10 +81,9 @@ class PaymentAdjustmentRepository {
           );
 
       final db.PaymentAdjustment? inserted =
-          await (_database.select(_database.paymentAdjustments)
-                ..where(
-                  (db.$PaymentAdjustmentsTable t) => t.id.equals(adjustmentId),
-                ))
+          await (_database.select(_database.paymentAdjustments)..where(
+                (db.$PaymentAdjustmentsTable t) => t.id.equals(adjustmentId),
+              ))
               .getSingleOrNull();
       if (inserted == null) {
         throw DatabaseException('Payment adjustment not found after insert.');

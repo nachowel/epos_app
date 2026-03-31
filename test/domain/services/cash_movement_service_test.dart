@@ -150,13 +150,14 @@ void main() {
       final _CashMovementHarness harness = await _CashMovementHarness.create();
       addTearDown(harness.db.close);
 
-      final CashMovement movement = await harness.service.createManualCashMovement(
-        type: CashMovementType.expense,
-        category: 'Bank drop',
-        amountMinor: 500,
-        paymentMethod: CashMovementPaymentMethod.cash,
-        actorUserId: harness.adminId,
-      );
+      final CashMovement movement = await harness.service
+          .createManualCashMovement(
+            type: CashMovementType.expense,
+            category: 'Bank drop',
+            amountMinor: 500,
+            paymentMethod: CashMovementPaymentMethod.cash,
+            actorUserId: harness.adminId,
+          );
 
       final logs = await harness.auditLogRepository.listAuditLogsByEntity(
         entityType: 'cash_movement',

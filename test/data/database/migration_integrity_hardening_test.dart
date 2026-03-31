@@ -11,46 +11,48 @@ void main() {
     test(
       'fresh schema protects cash_movements and audit_logs with explicit FK or trigger-backed enforcement',
       () async {
-      final AppDatabase db = _createFreshDatabase();
-      addTearDown(db.close);
+        final AppDatabase db = _createFreshDatabase();
+        addTearDown(db.close);
 
-      final List<_ForeignKeyRow> cashMovementFks = await _readForeignKeys(
-        db,
-        'cash_movements',
-      );
-      final Set<String> cashMovementTriggers = await _readTriggers(
-        db,
-        'cash_movements',
-      );
-      final List<_ForeignKeyRow> auditLogFks = await _readForeignKeys(
-        db,
-        'audit_logs',
-      );
-      final Set<String> auditLogTriggers = await _readTriggers(
-        db,
-        'audit_logs',
-      );
+        final List<_ForeignKeyRow> cashMovementFks = await _readForeignKeys(
+          db,
+          'cash_movements',
+        );
+        final Set<String> cashMovementTriggers = await _readTriggers(
+          db,
+          'cash_movements',
+        );
+        final List<_ForeignKeyRow> auditLogFks = await _readForeignKeys(
+          db,
+          'audit_logs',
+        );
+        final Set<String> auditLogTriggers = await _readTriggers(
+          db,
+          'audit_logs',
+        );
 
-      expect(
-        cashMovementFks.isNotEmpty ||
-            cashMovementTriggers.contains('fk_cash_movements_shift_id_insert'),
-        isTrue,
-      );
-      expect(
-        cashMovementFks.isNotEmpty ||
-            cashMovementTriggers.contains(
-              'fk_cash_movements_created_by_user_id_insert',
-            ),
-        isTrue,
-      );
-      expect(
-        auditLogFks.isNotEmpty ||
-            auditLogTriggers.contains('fk_audit_logs_actor_user_id_insert'),
-        isTrue,
-      );
+        expect(
+          cashMovementFks.isNotEmpty ||
+              cashMovementTriggers.contains(
+                'fk_cash_movements_shift_id_insert',
+              ),
+          isTrue,
+        );
+        expect(
+          cashMovementFks.isNotEmpty ||
+              cashMovementTriggers.contains(
+                'fk_cash_movements_created_by_user_id_insert',
+              ),
+          isTrue,
+        );
+        expect(
+          auditLogFks.isNotEmpty ||
+              auditLogTriggers.contains('fk_audit_logs_actor_user_id_insert'),
+          isTrue,
+        );
 
-      await expectLater(
-        db.customStatement('''
+        await expectLater(
+          db.customStatement('''
           INSERT INTO cash_movements (
             shift_id,
             type,
@@ -61,10 +63,10 @@ void main() {
             created_at
           ) VALUES (999, 'expense', 'Invalid shift', 100, 'cash', 999, 1710000000);
         '''),
-        throwsException,
-      );
-      await expectLater(
-        db.customStatement('''
+          throwsException,
+        );
+        await expectLater(
+          db.customStatement('''
           INSERT INTO audit_logs (
             actor_user_id,
             action,
@@ -74,9 +76,10 @@ void main() {
             created_at
           ) VALUES (999, 'shift_closed', 'shift', '1', '{}', 1710000001);
         '''),
-        throwsException,
-      );
-    });
+          throwsException,
+        );
+      },
+    );
 
     test(
       'migrated schema protects cash_movements with trigger-backed FK enforcement and preserves rows',
@@ -94,8 +97,14 @@ void main() {
         );
 
         expect(cashMovementFks, isEmpty);
-        expect(cashMovementTriggers, contains('fk_cash_movements_shift_id_insert'));
-        expect(cashMovementTriggers, contains('fk_cash_movements_shift_id_update'));
+        expect(
+          cashMovementTriggers,
+          contains('fk_cash_movements_shift_id_insert'),
+        );
+        expect(
+          cashMovementTriggers,
+          contains('fk_cash_movements_shift_id_update'),
+        );
         expect(
           cashMovementTriggers,
           contains('fk_cash_movements_created_by_user_id_insert'),
@@ -301,9 +310,7 @@ Future<Set<String>> _readTriggers(AppDatabase db, String tableName) async {
         variables: [Variable<String>(tableName)],
       )
       .get();
-  return rows
-      .map((row) => row.read<String>('name'))
-      .toSet();
+  return rows.map((row) => row.read<String>('name')).toSet();
 }
 
 class _ForeignKeyRow {

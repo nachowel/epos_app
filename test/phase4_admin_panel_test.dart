@@ -4,7 +4,9 @@ import 'package:epos_app/core/constants/app_strings.dart';
 import 'package:epos_app/core/logging/app_logger.dart';
 import 'package:epos_app/core/providers/app_providers.dart';
 import 'package:epos_app/core/router/app_router.dart';
-import 'package:epos_app/data/database/app_database.dart' show AppDatabase;
+import 'package:drift/drift.dart' show Value;
+import 'package:epos_app/data/database/app_database.dart'
+    show AppDatabase, SyncQueueCompanion;
 import 'package:epos_app/data/repositories/audit_log_repository.dart';
 import 'package:epos_app/data/repositories/category_repository.dart';
 import 'package:epos_app/data/repositories/cash_movement_repository.dart';
@@ -44,6 +46,7 @@ import 'package:epos_app/presentation/screens/admin/admin_dashboard_screen.dart'
 import 'package:epos_app/presentation/screens/admin/admin_modifiers_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_printer_settings_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_products_screen.dart';
+import 'package:epos_app/presentation/screens/admin/admin_revenue_analytics_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_report_settings_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_shifts_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_sync_screen.dart';
@@ -392,7 +395,8 @@ void main() {
             recordUuid: 'failed-$index',
             status: 'failed',
             attemptCount: 3,
-            errorMessage: 'timeout',
+            errorMessage:
+                'failure_type=remoteServerError|retryable=true|table=payments|record_uuid=failed-$index|record_uuids=failed-$index|issues=-|message=timeout',
           );
         }
         for (int index = 0; index < 5; index += 1) {
@@ -401,6 +405,14 @@ void main() {
             tableName: 'transaction_lines',
             recordUuid: 'processing-$index',
             status: 'processing',
+          );
+        }
+        for (int index = 0; index < 3; index += 1) {
+          await insertSyncQueueItem(
+            db,
+            tableName: 'transactions',
+            recordUuid: 'synced-$index',
+            status: 'synced',
           );
         }
 
@@ -420,10 +432,150 @@ void main() {
         final AdminSyncState state = container.read(adminSyncNotifierProvider);
         expect(state.pendingCount, 120);
         expect(state.failedCount, 7);
+        expect(state.syncedCount, 3);
+        expect(state.retryableFailedCount, 7);
+        expect(state.nonRetryableFailedCount, 0);
+        expect(state.driftBlockedCount, 0);
         expect(state.items.length, 100);
         expect(state.syncEnabled, isTrue);
         expect(state.isSupabaseConfigured, isFalse);
         expect(state.supabaseConfigurationLabel, 'Supabase config missing');
+        expect(state.lastFailedItem?.failureDetails?.tableName, 'payments');
+        expect(
+          state.lastFailedItem?.failureDetails?.failureKind.name,
+          'remoteServerError',
+        );
+      },
+    );
+
+    test(
+      'retry all yalniz retry-all eligible failed itemlari resetler ve summary bucketlari dogru hesaplar',
+      () async {
+        final AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+
+        final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+        await insertSyncQueueItem(
+          db,
+          tableName: 'payments',
+          recordUuid: 'retryable-failed',
+          status: 'failed',
+          attemptCount: 2,
+          errorMessage:
+              'failure_type=remoteServerError|retryable=true|table=payments|record_uuid=retryable-failed|record_uuids=retryable-failed|issues=-|message=timeout',
+        );
+        await insertSyncQueueItem(
+          db,
+          tableName: 'transactions',
+          recordUuid: 'drift-blocked',
+          status: 'failed',
+          attemptCount: 5,
+          errorMessage:
+              'failure_type=localGraphDrift|retryable=false|table=transactions|record_uuid=drift-blocked|record_uuids=-|issues=expected_checksum=a,current_checksum=b|message=drift',
+        );
+        await insertSyncQueueItem(
+          db,
+          tableName: 'payments',
+          recordUuid: 'validation-blocked',
+          status: 'failed',
+          attemptCount: 5,
+          errorMessage:
+              'failure_type=validationFailure|retryable=false|table=payments|record_uuid=validation-blocked|record_uuids=-|issues=payments.method|message=payload invalid',
+        );
+        await insertSyncQueueItem(
+          db,
+          tableName: 'payments',
+          recordUuid: 'max-retry-hit',
+          status: 'failed',
+          attemptCount: AdminService.defaultSyncMaxRetryAttempts,
+          errorMessage:
+              'failure_type=remoteServerError|retryable=true|table=payments|record_uuid=max-retry-hit|record_uuids=max-retry-hit|issues=-|message=timeout',
+        );
+        final int staleProcessingId = await insertSyncQueueItem(
+          db,
+          tableName: 'transactions',
+          recordUuid: 'stale-processing',
+          status: 'processing',
+        );
+        await (db.update(
+          db.syncQueue,
+        )..where((table) => table.id.equals(staleProcessingId))).write(
+          SyncQueueCompanion(
+            lastAttemptAt: Value<DateTime>(
+              DateTime.now().subtract(const Duration(minutes: 5)),
+            ),
+          ),
+        );
+
+        final ProviderContainer container = ProviderContainer(
+          overrides: <Override>[
+            appDatabaseProvider.overrideWithValue(db),
+            sharedPreferencesProvider.overrideWithValue(_testPrefs),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(authNotifierProvider.notifier)
+            .loadUserById(adminId);
+        await container.read(adminSyncNotifierProvider.notifier).load();
+
+        AdminSyncState state = container.read(adminSyncNotifierProvider);
+        expect(state.retryableFailedCount, 1);
+        expect(state.nonRetryableFailedCount, 2);
+        expect(state.driftBlockedCount, 1);
+        expect(state.stuckCount, 4);
+        expect(state.exhaustedRetryCount, 1);
+        expect(state.processingStuckCount, 1);
+        expect(state.stuckDefinition, contains('non-retryable'));
+
+        final result = await container
+            .read(adminSyncNotifierProvider.notifier)
+            .retryAll();
+        expect(result, isNotNull);
+        expect(result!.retriedCount, 1);
+        expect(result.skippedCount, 3);
+        expect(result.skippedNonRetryableCount, 2);
+        expect(result.skippedManualReviewCount, 1);
+
+        final List<SyncQueueItem> queueItems = await SyncQueueRepository(
+          db,
+        ).getMonitorItems(limit: 20);
+        final SyncQueueItem retriedItem = queueItems.singleWhere(
+          (SyncQueueItem item) => item.recordUuid == 'retryable-failed',
+        );
+        expect(retriedItem.status, SyncQueueStatus.pending);
+        expect(retriedItem.attemptCount, 0);
+
+        expect(
+          queueItems
+              .singleWhere(
+                (SyncQueueItem item) => item.recordUuid == 'drift-blocked',
+              )
+              .status,
+          SyncQueueStatus.failed,
+        );
+        expect(
+          queueItems
+              .singleWhere(
+                (SyncQueueItem item) => item.recordUuid == 'validation-blocked',
+              )
+              .status,
+          SyncQueueStatus.failed,
+        );
+        expect(
+          queueItems
+              .singleWhere(
+                (SyncQueueItem item) => item.recordUuid == 'max-retry-hit',
+              )
+              .status,
+          SyncQueueStatus.failed,
+        );
+
+        state = container.read(adminSyncNotifierProvider);
+        expect(state.retryableFailedCount, 0);
+        expect(state.nonRetryableFailedCount, 2);
+        expect(state.driftBlockedCount, 1);
       },
     );
 
@@ -1046,6 +1198,7 @@ class _AdminRouteExpectation {
 
 const List<_AdminRouteExpectation> _adminRoutes = <_AdminRouteExpectation>[
   _AdminRouteExpectation('/admin', AdminDashboardScreen),
+  _AdminRouteExpectation('/admin/analytics', AdminRevenueAnalyticsScreen),
   _AdminRouteExpectation('/admin/products', AdminProductsScreen),
   _AdminRouteExpectation('/admin/categories', AdminCategoriesScreen),
   _AdminRouteExpectation('/admin/modifiers', AdminModifiersScreen),

@@ -77,7 +77,9 @@ void main() {
       final Finder firstCardFinder = find.byType(ProductCard).first;
       final Size firstCardSize = tester.getSize(firstCardFinder);
       final Offset firstCardOffset = tester.getTopLeft(firstCardFinder);
-      final Iterable<Element> cardElements = find.byType(ProductCard).evaluate();
+      final Iterable<Element> cardElements = find
+          .byType(ProductCard)
+          .evaluate();
       final List<Offset> cardOffsets = cardElements
           .map(
             (Element element) =>
@@ -102,63 +104,60 @@ void main() {
     },
   );
 
-  testWidgets(
-    'POS cart panel narrows proportionally on medium-width layouts',
-    (WidgetTester tester) async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final db = createTestDatabase();
-      addTearDown(db.close);
+  testWidgets('POS cart panel narrows proportionally on medium-width layouts', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final db = createTestDatabase();
+    addTearDown(db.close);
 
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
 
-      final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
-      final int cashierId = await insertUser(
+    final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+    final int cashierId = await insertUser(
+      db,
+      name: 'Cashier',
+      role: 'cashier',
+    );
+    final int categoryId = await insertCategory(db, name: 'Breakfast');
+    for (int i = 0; i < 10; i++) {
+      await insertProduct(
         db,
-        name: 'Cashier',
-        role: 'cashier',
+        categoryId: categoryId,
+        name: 'Product $i',
+        priceMinor: 300 + (i * 50),
+        hasModifiers: i.isEven,
       );
-      final int categoryId = await insertCategory(db, name: 'Breakfast');
-      for (int i = 0; i < 10; i++) {
-        await insertProduct(
-          db,
-          categoryId: categoryId,
-          name: 'Product $i',
-          priceMinor: 300 + (i * 50),
-          hasModifiers: i.isEven,
-        );
-      }
-      await insertShift(db, openedBy: adminId);
+    }
+    await insertShift(db, openedBy: adminId);
 
-      final ProviderContainer container = ProviderContainer(
-        overrides: <Override>[
-          appDatabaseProvider.overrideWithValue(db),
-          sharedPreferencesProvider.overrideWithValue(prefs),
-          ordersNotifierProvider.overrideWith(
-            (Ref ref) => _StaticOrdersNotifier(ref),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        appDatabaseProvider.overrideWithValue(db),
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        ordersNotifierProvider.overrideWith(
+          (Ref ref) => _StaticOrdersNotifier(ref),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
 
-      await container
-          .read(authNotifierProvider.notifier)
-          .loadUserById(cashierId);
-      await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
+    await container.read(authNotifierProvider.notifier).loadUserById(cashierId);
+    await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
 
-      await tester.pumpWidget(_localizedTestApp(container));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(_localizedTestApp(container));
+    await tester.pumpAndSettle();
 
-      final Size cartPanelSize = tester.getSize(find.byType(CartPanel));
-      final Size firstCardSize = tester.getSize(find.byType(ProductCard).first);
+    final Size cartPanelSize = tester.getSize(find.byType(CartPanel));
+    final Size firstCardSize = tester.getSize(find.byType(ProductCard).first);
 
-      expect(cartPanelSize.width, greaterThanOrEqualTo(264));
-      expect(cartPanelSize.width, lessThan(320));
-      expect(firstCardSize.width, greaterThanOrEqualTo(150));
-      expect(firstCardSize.height, lessThan(260));
-    },
-  );
+    expect(cartPanelSize.width, greaterThanOrEqualTo(264));
+    expect(cartPanelSize.width, lessThan(320));
+    expect(firstCardSize.width, greaterThanOrEqualTo(150));
+    expect(firstCardSize.height, lessThan(260));
+  });
 }
 
 class _StaticOrdersNotifier extends OrdersNotifier {

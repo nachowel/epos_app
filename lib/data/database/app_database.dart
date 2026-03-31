@@ -495,7 +495,7 @@ class AppDatabase extends _$AppDatabase {
     return AppDatabase(NativeDatabase(file));
   }
 
-  static const int currentSchemaVersion = 14;
+  static const int currentSchemaVersion = 15;
   final List<MigrationLogEntry> _migrationHistory = <MigrationLogEntry>[];
   MigrationLogEntry? _lastMigrationFailure;
 
@@ -632,6 +632,14 @@ class AppDatabase extends _$AppDatabase {
           fromVersion: from < 13 ? 13 : from,
           toVersion: 14,
           action: _migrateToV14,
+        );
+      }
+      if (from < 15) {
+        await _runMigrationStep(
+          step: 'migrate_v15',
+          fromVersion: from < 14 ? 14 : from,
+          toVersion: 15,
+          action: _migrateToV15,
         );
       }
     },
@@ -866,6 +874,7 @@ class AppDatabase extends _$AppDatabase {
         error_message TEXT NULL
       );
     ''');
+    await _createSyncRootSnapshotTable();
   }
 
   Future<void> _createFreshPathFkEmulation() async {
@@ -1039,6 +1048,9 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, created_at);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_sync_queue_root_graph_snapshots_tx_uuid ON sync_queue_root_graph_snapshots(transaction_uuid, queue_id);',
     );
     // SQLite partial unique index destegi oldugu icin tek-acik-shift kurali DB seviyesinde enforce edilir.
     await customStatement(
@@ -1565,6 +1577,24 @@ class AppDatabase extends _$AppDatabase {
     await customStatement(
       'ALTER TABLE report_settings ADD COLUMN business_address TEXT NULL;',
     );
+  }
+
+  Future<void> _migrateToV15() async {
+    await _createSyncRootSnapshotTable();
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_sync_queue_root_graph_snapshots_tx_uuid ON sync_queue_root_graph_snapshots(transaction_uuid, queue_id);',
+    );
+  }
+
+  Future<void> _createSyncRootSnapshotTable() async {
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS sync_queue_root_graph_snapshots (
+        queue_id INTEGER NOT NULL PRIMARY KEY,
+        transaction_uuid TEXT NOT NULL,
+        graph_checksum TEXT NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+    ''');
   }
 
   Future<void> _createMigrationFkTrigger({

@@ -63,7 +63,8 @@ class _OpenOrdersScreenState extends ConsumerState<OpenOrdersScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppSizes.spacingMd),
           children: <Widget>[
-            if (shiftState.backendOpenShift == null || shiftState.paymentsLocked)
+            if (shiftState.backendOpenShift == null ||
+                shiftState.paymentsLocked)
               Container(
                 margin: const EdgeInsets.only(bottom: AppSizes.spacingMd),
                 padding: const EdgeInsets.all(AppSizes.spacingMd),
@@ -219,7 +220,9 @@ class _OpenOrderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Transaction order = summary.transaction;
-    final String totalLabel = CurrencyFormatter.fromMinor(order.totalAmountMinor);
+    final String totalLabel = CurrencyFormatter.fromMinor(
+      order.totalAmountMinor,
+    );
     final String payLabel = '${AppStrings.payAction} $totalLabel';
     final String itemCountLabel =
         '${summary.itemCount} ${AppStrings.itemCount.toLowerCase()}';
@@ -303,10 +306,7 @@ class _OpenOrderRow extends StatelessWidget {
                                   ),
                                 ),
                               )
-                            : const Icon(
-                                Icons.arrow_forward_rounded,
-                                size: 18,
-                              ),
+                            : const Icon(Icons.arrow_forward_rounded, size: 18),
                         label: Text(
                           payLabel,
                           maxLines: 1,
@@ -315,8 +315,8 @@ class _OpenOrderRow extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: AppColors.surface,
-                          disabledBackgroundColor:
-                              AppColors.surfaceMuted.withValues(alpha: 0.95),
+                          disabledBackgroundColor: AppColors.surfaceMuted
+                              .withValues(alpha: 0.95),
                           disabledForegroundColor: AppColors.textSecondary,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -344,7 +344,10 @@ class _OpenOrderRow extends StatelessWidget {
   String _itemNamesOnly(String summaryText) {
     return summaryText
         .split(',')
-        .map((String segment) => segment.replaceFirst(RegExp(r'^\s*\d+\s+'), '').trim())
+        .map(
+          (String segment) =>
+              segment.replaceFirst(RegExp(r'^\s*\d+\s+'), '').trim(),
+        )
         .where((String segment) => segment.isNotEmpty)
         .join(', ');
   }

@@ -184,7 +184,10 @@ class _AuditLogTile extends StatelessWidget {
           children: <Widget>[
             _Tag(label: entry.action, color: AppColors.primary),
             _Tag(label: entry.entityType, color: AppColors.textSecondary),
-            _Tag(label: 'Actor #${entry.actorUserId}', color: AppColors.success),
+            _Tag(
+              label: 'Actor #${entry.actorUserId}',
+              color: AppColors.success,
+            ),
           ],
         ),
         subtitle: Padding(

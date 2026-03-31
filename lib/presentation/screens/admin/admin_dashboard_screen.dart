@@ -12,6 +12,7 @@ import '../../providers/admin_dashboard_provider.dart';
 import 'widgets/admin_scaffold.dart';
 
 const String _cashMovementsLabel = 'Cash Movements';
+const String _analyticsLabel = 'Analytics';
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -90,6 +91,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 spacing: AppSizes.spacingSm,
                 runSpacing: AppSizes.spacingSm,
                 children: <Widget>[
+                  ElevatedButton.icon(
+                    onPressed: () => context.go('/admin/analytics'),
+                    icon: const Icon(Icons.analytics_rounded),
+                    label: const Text(_analyticsLabel),
+                  ),
                   ElevatedButton.icon(
                     onPressed: () => context.go('/admin/products'),
                     icon: const Icon(Icons.inventory_2_rounded),

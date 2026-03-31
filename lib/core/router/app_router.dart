@@ -6,6 +6,7 @@ import '../../presentation/providers/auth_provider.dart';
 import '../../presentation/screens/admin/admin_categories_screen.dart';
 import '../../presentation/screens/admin/admin_cash_movements_screen.dart';
 import '../../presentation/screens/admin/admin_dashboard_screen.dart';
+import '../../presentation/screens/admin/admin_revenue_analytics_screen.dart';
 import '../../presentation/screens/admin/admin_audit_logs_screen.dart';
 import '../../presentation/screens/admin/admin_modifiers_screen.dart';
 import '../../presentation/screens/admin/admin_printer_settings_screen.dart';
@@ -52,6 +53,10 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(path: '/reports', builder: (_, __) => const ZReportScreen()),
       GoRoute(path: '/settings', redirect: (_, __) => '/admin/settings'),
       GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardScreen()),
+      GoRoute(
+        path: '/admin/analytics',
+        builder: (_, __) => const AdminRevenueAnalyticsScreen(),
+      ),
       GoRoute(
         path: '/admin/products',
         builder: (_, __) => const AdminProductsScreen(),

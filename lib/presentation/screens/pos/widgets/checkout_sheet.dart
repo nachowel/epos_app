@@ -50,7 +50,9 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
   Widget build(BuildContext context) {
     final Size screenSize = MediaQuery.sizeOf(context);
     final double sheetWidth = math.min(360, screenSize.width * 0.36);
-    final String totalLabel = CurrencyFormatter.fromMinor(widget.cartTotalMinor);
+    final String totalLabel = CurrencyFormatter.fromMinor(
+      widget.cartTotalMinor,
+    );
 
     return Align(
       alignment: Alignment.centerRight,
@@ -135,22 +137,22 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                       selected: <PaymentMethod>{_paymentMethod},
                       showSelectedIcon: false,
                       style: ButtonStyle(
-                        backgroundColor: WidgetStateProperty.resolveWith<Color>((
-                          Set<WidgetState> states,
-                        ) {
-                          if (states.contains(WidgetState.selected)) {
-                            return AppColors.primary;
-                          }
-                          return AppColors.surfaceMuted;
-                        }),
-                        foregroundColor: WidgetStateProperty.resolveWith<Color>((
-                          Set<WidgetState> states,
-                        ) {
-                          if (states.contains(WidgetState.selected)) {
-                            return AppColors.surface;
-                          }
-                          return AppColors.textPrimary;
-                        }),
+                        backgroundColor: WidgetStateProperty.resolveWith<Color>(
+                          (Set<WidgetState> states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return AppColors.primary;
+                            }
+                            return AppColors.surfaceMuted;
+                          },
+                        ),
+                        foregroundColor: WidgetStateProperty.resolveWith<Color>(
+                          (Set<WidgetState> states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return AppColors.surface;
+                            }
+                            return AppColors.textPrimary;
+                          },
+                        ),
                         side: const WidgetStatePropertyAll<BorderSide>(
                           BorderSide(color: AppColors.border),
                         ),

@@ -12,6 +12,10 @@ enum Phase1SyncTable {
 class Phase1SyncContract {
   const Phase1SyncContract._();
 
+  static final RegExp _canonicalUuidPattern = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
   // Local Drift/SQLite is the operational authority.
   // Supabase stores synchronized mirror snapshots only.
   static const List<String> requiredRemoteTables = <String>[
@@ -42,7 +46,6 @@ class Phase1SyncContract {
   };
 
   static const Set<String> remoteTransactionStatuses = <String>{
-    'open',
     'paid',
     'cancelled',
   };
@@ -60,12 +63,12 @@ class Phase1SyncContract {
     return remoteTransactionStatuses.contains(status);
   }
 
+  static bool isCanonicalUuid(String value) {
+    return _canonicalUuidPattern.hasMatch(value);
+  }
+
   static String mapLocalTransactionStatusToRemote(String localStatus) {
     switch (localStatus) {
-      case 'open':
-      case 'draft':
-      case 'sent':
-        return 'open';
       case 'paid':
         return 'paid';
       case 'cancelled':
@@ -74,7 +77,7 @@ class Phase1SyncContract {
         throw ArgumentError.value(
           localStatus,
           'localStatus',
-          'Unsupported local transaction status for remote mirroring.',
+          'Remote mirror accepts finalized transaction statuses only.',
         );
     }
   }

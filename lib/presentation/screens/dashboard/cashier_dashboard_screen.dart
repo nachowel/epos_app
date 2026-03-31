@@ -111,13 +111,14 @@ class _CashierDashboardScreenState
               _TwoColumnRow(
                 left: _DashboardCard(
                   title: AppStrings.openOrdersTitle,
-                  accentColor: snapshot.openOrderLoadLevel ==
-                          OpenOrderLoadLevel.high
+                  accentColor:
+                      snapshot.openOrderLoadLevel == OpenOrderLoadLevel.high
                       ? AppColors.warning
                       : null,
                   trailing: TextButton(
-                    onPressed:
-                        canOpenOrders ? () => context.go('/orders') : null,
+                    onPressed: canOpenOrders
+                        ? () => context.go('/orders')
+                        : null,
                     child: Text(AppStrings.goToOpenOrders),
                   ),
                   child: _OpenOrdersBlock(snapshot: snapshot),
@@ -279,13 +280,11 @@ class _ShiftStatusBlock extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _StatusBadge(
-            color: AppColors.error,
-            label: AppStrings.shiftClosed,
-          ),
+          _StatusBadge(color: AppColors.error, label: AppStrings.shiftClosed),
           const SizedBox(height: AppSizes.spacingSm),
           _EmptyState(
-            message: snapshot.shiftSession.lockReason?.operatorMessage ??
+            message:
+                snapshot.shiftSession.lockReason?.operatorMessage ??
                 AppStrings.shiftClosedOpenShiftRequired,
           ),
         ],
@@ -294,19 +293,19 @@ class _ShiftStatusBlock extends StatelessWidget {
 
     final ({Color color, String label}) statusBadge =
         switch (snapshot.shiftSession.effectiveShiftStatus) {
-      ShiftStatus.open => (
-        color: AppColors.success,
-        label: AppStrings.shiftOpen,
-      ),
-      ShiftStatus.closed => (
-        color: AppColors.error,
-        label: AppStrings.shiftClosed,
-      ),
-      ShiftStatus.locked => (
-        color: AppColors.warning,
-        label: AppStrings.shiftLocked,
-      ),
-    };
+          ShiftStatus.open => (
+            color: AppColors.success,
+            label: AppStrings.shiftOpen,
+          ),
+          ShiftStatus.closed => (
+            color: AppColors.error,
+            label: AppStrings.shiftClosed,
+          ),
+          ShiftStatus.locked => (
+            color: AppColors.warning,
+            label: AppStrings.shiftLocked,
+          ),
+        };
 
     // Operational state indicator (driven by snapshot, not UI logic)
     final ({Color color, String label, IconData icon}) operationalState =
@@ -345,8 +344,8 @@ class _ShiftStatusBlock extends StatelessWidget {
         if (shift.cashierPreviewedAt != null)
           _InfoRow(
             label: AppStrings.cashierPreviewedBy,
-            value: snapshot.cashierPreviewedByUser?.name ??
-                AppStrings.unknownUser,
+            value:
+                snapshot.cashierPreviewedByUser?.name ?? AppStrings.unknownUser,
           ),
       ],
     );
@@ -380,8 +379,9 @@ class _OpenOrdersBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ({Color color, String label}) loadChip =
-        _loadChipData(snapshot.openOrderLoadLevel);
+    final ({Color color, String label}) loadChip = _loadChipData(
+      snapshot.openOrderLoadLevel,
+    );
 
     if (snapshot.openOrders.isEmpty) {
       return Column(
@@ -424,18 +424,12 @@ class _OpenOrdersBlock extends StatelessWidget {
           children: <Widget>[
             Text(
               '${snapshot.openOrderCount}',
-              style: const TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.w800,
-              ),
+              style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800),
             ),
             const SizedBox(width: AppSizes.spacingSm),
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
-              child: _StatusBadge(
-                color: loadChip.color,
-                label: loadChip.label,
-              ),
+              child: _StatusBadge(color: loadChip.color, label: loadChip.label),
             ),
           ],
         ),
@@ -445,9 +439,7 @@ class _OpenOrdersBlock extends StatelessWidget {
     );
   }
 
-  static ({Color color, String label}) _loadChipData(
-    OpenOrderLoadLevel level,
-  ) {
+  static ({Color color, String label}) _loadChipData(OpenOrderLoadLevel level) {
     switch (level) {
       case OpenOrderLoadLevel.calm:
         return (color: AppColors.success, label: AppStrings.openOrderLoadCalm);
@@ -457,10 +449,7 @@ class _OpenOrdersBlock extends StatelessWidget {
           label: AppStrings.openOrderLoadNormal,
         );
       case OpenOrderLoadLevel.high:
-        return (
-          color: AppColors.warning,
-          label: AppStrings.openOrderLoadHigh,
-        );
+        return (color: AppColors.warning, label: AppStrings.openOrderLoadHigh);
     }
   }
 
@@ -476,8 +465,7 @@ class _OpenOrdersBlock extends StatelessWidget {
           onTap: () => context.push('/orders/${summary.transaction.id}'),
           borderRadius: BorderRadius.circular(AppSizes.radiusMd),
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(vertical: AppSizes.spacingSm),
+            padding: const EdgeInsets.symmetric(vertical: AppSizes.spacingSm),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -534,8 +522,8 @@ class _PreviewStatusBlock extends StatelessWidget {
         if (previewTaken)
           _InfoRow(
             label: AppStrings.cashierPreviewedBy,
-            value: snapshot.cashierPreviewedByUser?.name ??
-                AppStrings.unknownUser,
+            value:
+                snapshot.cashierPreviewedByUser?.name ?? AppStrings.unknownUser,
           ),
       ],
     );
@@ -554,40 +542,41 @@ class _LastActivityBlock extends StatelessWidget {
     }
 
     return Column(
-      children:
-          snapshot.activity.map((CashierDashboardActivityItem item) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: AppSizes.spacingSm),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Icon(_iconFor(item), color: _iconColorFor(item)),
-              const SizedBox(width: AppSizes.spacingSm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      _labelFor(item),
-                      style: const TextStyle(
-                        fontSize: AppSizes.fontSm,
-                        fontWeight: FontWeight.w600,
-                      ),
+      children: snapshot.activity
+          .map((CashierDashboardActivityItem item) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSizes.spacingSm),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Icon(_iconFor(item), color: _iconColorFor(item)),
+                  const SizedBox(width: AppSizes.spacingSm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          _labelFor(item),
+                          style: const TextStyle(
+                            fontSize: AppSizes.fontSm,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          DateFormatter.formatDefault(item.occurredAt),
+                          style: const TextStyle(
+                            fontSize: AppSizes.fontSm,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      DateFormatter.formatDefault(item.occurredAt),
-                      style: const TextStyle(
-                        fontSize: AppSizes.fontSm,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        );
-      }).toList(growable: false),
+            );
+          })
+          .toList(growable: false),
     );
   }
 
@@ -632,8 +621,8 @@ class _LastActivityBlock extends StatelessWidget {
       case CashierDashboardActivityType.cashMovement:
         final String movementType =
             item.cashMovementType == CashMovementType.income
-                ? 'income'
-                : 'expense';
+            ? 'income'
+            : 'expense';
         final String category = item.cashMovementCategory == null
             ? ''
             : ' · ${item.cashMovementCategory}';
@@ -726,11 +715,7 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({
-    required this.color,
-    required this.label,
-    this.icon,
-  });
+  const _StatusBadge({required this.color, required this.label, this.icon});
 
   final Color color;
   final String label;
@@ -798,10 +783,7 @@ class _Banner extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(color: color, fontWeight: FontWeight.w600),
             ),
           ),
         ],

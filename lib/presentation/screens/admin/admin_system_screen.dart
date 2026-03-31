@@ -273,9 +273,7 @@ class _AuditActivityCard extends StatelessWidget {
                             ),
                             Expanded(
                               flex: 2,
-                              child: Text(
-                                'Actor #${entry.actorUserId}',
-                              ),
+                              child: Text('Actor #${entry.actorUserId}'),
                             ),
                             Expanded(
                               flex: 3,
@@ -291,8 +289,10 @@ class _AuditActivityCard extends StatelessWidget {
               );
             },
             loading: () => const CircularProgressIndicator(),
-            error: (Object error, StackTrace stackTrace) =>
-                Text(error.toString(), style: const TextStyle(color: AppColors.error)),
+            error: (Object error, StackTrace stackTrace) => Text(
+              error.toString(),
+              style: const TextStyle(color: AppColors.error),
+            ),
           ),
         ],
       ),

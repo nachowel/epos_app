@@ -35,8 +35,7 @@ class CategoryRepository {
     final query = _database.select(_database.categories)
       ..where(
         (db.$CategoriesTable t) =>
-            t.isActive.equals(true) &
-            t.id.isInQuery(visibleProductsQuery),
+            t.isActive.equals(true) & t.id.isInQuery(visibleProductsQuery),
       )
       ..orderBy(<OrderingTerm Function(db.$CategoriesTable)>[
         (db.$CategoriesTable t) => OrderingTerm.asc(t.sortOrder),

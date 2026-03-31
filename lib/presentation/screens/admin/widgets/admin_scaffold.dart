@@ -11,6 +11,7 @@ import '../../../widgets/section_app_bar.dart';
 
 const String _cashMovementsLabel = 'Cash Movements';
 const String _auditLogsLabel = 'Audit Logs';
+const String _analyticsLabel = 'Analytics';
 
 class AdminScaffold extends ConsumerWidget {
   const AdminScaffold({
@@ -29,6 +30,11 @@ class AdminScaffold extends ConsumerWidget {
       label: AppStrings.dashboard,
       route: '/admin',
       icon: Icons.space_dashboard_rounded,
+    ),
+    _AdminDestination(
+      label: _analyticsLabel,
+      route: '/admin/analytics',
+      icon: Icons.analytics_rounded,
     ),
     _AdminDestination(
       label: AppStrings.products,
@@ -58,7 +64,7 @@ class AdminScaffold extends ConsumerWidget {
     _AdminDestination(
       label: AppStrings.navSettings,
       route: '/admin/settings',
-      icon: Icons.analytics_rounded,
+      icon: Icons.settings_rounded,
     ),
     _AdminDestination(
       label: AppStrings.shifts,

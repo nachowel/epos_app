@@ -223,23 +223,28 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           },
         );
       },
-      transitionBuilder: (
-        BuildContext context,
-        Animation<double> animation,
-        Animation<double> secondaryAnimation,
-        Widget child,
-      ) {
-        final Animation<Offset> offsetAnimation = Tween<Offset>(
-          begin: const Offset(0.08, 0),
-          end: Offset.zero,
-        ).animate(
-          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-        );
-        return FadeTransition(
-          opacity: animation,
-          child: SlideTransition(position: offsetAnimation, child: child),
-        );
-      },
+      transitionBuilder:
+          (
+            BuildContext context,
+            Animation<double> animation,
+            Animation<double> secondaryAnimation,
+            Widget child,
+          ) {
+            final Animation<Offset> offsetAnimation =
+                Tween<Offset>(
+                  begin: const Offset(0.08, 0),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
+                );
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(position: offsetAnimation, child: child),
+            );
+          },
     );
   }
 
@@ -288,8 +293,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             Expanded(
               child: LayoutBuilder(
                 builder: (BuildContext context, BoxConstraints constraints) {
-                  final double cartPanelWidth = AppSizes
-                      .responsiveCartPanelWidth(constraints.maxWidth);
+                  final double cartPanelWidth =
+                      AppSizes.responsiveCartPanelWidth(constraints.maxWidth);
 
                   return Row(
                     children: <Widget>[

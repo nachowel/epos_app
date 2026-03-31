@@ -166,81 +166,78 @@ void main() {
     },
   );
 
-  testWidgets(
-    'checkout opens side sheet with focused payment actions',
-    (WidgetTester tester) async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final db = createTestDatabase();
-      addTearDown(db.close);
+  testWidgets('checkout opens side sheet with focused payment actions', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final db = createTestDatabase();
+    addTearDown(db.close);
 
-      final int cashierId = await insertUser(
-        db,
-        name: 'Cashier',
-        role: 'cashier',
-      );
-      final int categoryId = await insertCategory(db, name: 'Drinks');
-      final int productId = await insertProduct(
-        db,
-        categoryId: categoryId,
-        name: 'Tea',
-        priceMinor: 250,
-      );
-      await insertShift(db, openedBy: cashierId);
+    final int cashierId = await insertUser(
+      db,
+      name: 'Cashier',
+      role: 'cashier',
+    );
+    final int categoryId = await insertCategory(db, name: 'Drinks');
+    final int productId = await insertProduct(
+      db,
+      categoryId: categoryId,
+      name: 'Tea',
+      priceMinor: 250,
+    );
+    await insertShift(db, openedBy: cashierId);
 
-      final ProviderContainer container = ProviderContainer(
-        overrides: <Override>[
-          appDatabaseProvider.overrideWithValue(db),
-          sharedPreferencesProvider.overrideWithValue(prefs),
-          ordersNotifierProvider.overrideWith(
-            (Ref ref) => _StaticOrdersNotifier(ref),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      await container
-          .read(authNotifierProvider.notifier)
-          .loadUserById(cashierId);
-      await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
-      container
-          .read(cartNotifierProvider.notifier)
-          .addProduct(
-            Product(
-              id: productId,
-              categoryId: categoryId,
-              name: 'Tea',
-              priceMinor: 250,
-              imageUrl: null,
-              hasModifiers: false,
-              isActive: true,
-              sortOrder: 0,
-            ),
-          );
-
-      await tester.pumpWidget(_localizedTestApp(container));
-      await tester.pumpAndSettle();
-
-      expect(find.widgetWithText(ElevatedButton, AppStrings.checkout), findsOne);
-      expect(find.text(AppStrings.saveAsOpenOrder), findsNothing);
-
-      await tester.tap(find.widgetWithText(ElevatedButton, AppStrings.checkout));
-      await tester.pumpAndSettle();
-
-      expect(find.text(AppStrings.paymentTitle), findsOneWidget);
-      expect(find.text(AppStrings.saveAsOpenOrder), findsOneWidget);
-      expect(find.text(AppStrings.clearCart), findsOneWidget);
-      expect(find.text(AppStrings.cash), findsOneWidget);
-      expect(find.text(AppStrings.card), findsOneWidget);
-      expect(
-        find.widgetWithText(
-          ElevatedButton,
-          '${AppStrings.payAction} ${CurrencyFormatter.fromMinor(250)}',
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        appDatabaseProvider.overrideWithValue(db),
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        ordersNotifierProvider.overrideWith(
+          (Ref ref) => _StaticOrdersNotifier(ref),
         ),
-        findsOneWidget,
-      );
-    },
-  );
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(authNotifierProvider.notifier).loadUserById(cashierId);
+    await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
+    container
+        .read(cartNotifierProvider.notifier)
+        .addProduct(
+          Product(
+            id: productId,
+            categoryId: categoryId,
+            name: 'Tea',
+            priceMinor: 250,
+            imageUrl: null,
+            hasModifiers: false,
+            isActive: true,
+            sortOrder: 0,
+          ),
+        );
+
+    await tester.pumpWidget(_localizedTestApp(container));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(ElevatedButton, AppStrings.checkout), findsOne);
+    expect(find.text(AppStrings.saveAsOpenOrder), findsNothing);
+
+    await tester.tap(find.widgetWithText(ElevatedButton, AppStrings.checkout));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppStrings.paymentTitle), findsOneWidget);
+    expect(find.text(AppStrings.saveAsOpenOrder), findsOneWidget);
+    expect(find.text(AppStrings.clearCart), findsOneWidget);
+    expect(find.text(AppStrings.cash), findsOneWidget);
+    expect(find.text(AppStrings.card), findsOneWidget);
+    expect(
+      find.widgetWithText(
+        ElevatedButton,
+        '${AppStrings.payAction} ${CurrencyFormatter.fromMinor(250)}',
+      ),
+      findsOneWidget,
+    );
+  });
 }
 
 class _StaticOrdersNotifier extends OrdersNotifier {

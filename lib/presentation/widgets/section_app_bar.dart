@@ -104,7 +104,8 @@ class SectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ],
                   ),
                 ),
-                if (layoutConfig.layout != _HeaderNavLayout.collapsed) ...<Widget>[
+                if (layoutConfig.layout !=
+                    _HeaderNavLayout.collapsed) ...<Widget>[
                   const SizedBox(width: AppSizes.spacingMd),
                   _ShiftIndicator(
                     shiftIndicator: shiftIndicator,
@@ -239,8 +240,7 @@ class _HeaderLayoutConfig {
     return _HeaderLayoutConfig(
       layout: layout,
       useCompactTitle: compactVisual || layout != _HeaderNavLayout.wide,
-      useCompactInlineNav:
-          compactVisual || layout == _HeaderNavLayout.compact,
+      useCompactInlineNav: compactVisual || layout == _HeaderNavLayout.compact,
     );
   }
 
@@ -397,9 +397,7 @@ class _InlineHeaderActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        right: compactVisual ? 8 : AppSizes.spacingMd,
-      ),
+      padding: EdgeInsets.only(right: compactVisual ? 8 : AppSizes.spacingMd),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
@@ -532,67 +530,67 @@ class _CollapsedNavigationButton extends StatelessWidget {
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.12),
       transitionDuration: const Duration(milliseconds: 160),
-      pageBuilder: (
-        BuildContext dialogContext,
-        Animation<double> animation,
-        Animation<double> secondaryAnimation,
-      ) {
-        return SafeArea(
-          child: Align(
-            alignment: Alignment.topRight,
-            child: Padding(
-              padding: EdgeInsets.only(
-                top: compactVisual ? 6 : 10,
-                right: compactVisual ? 8 : 12,
-                left: 12,
+      pageBuilder:
+          (
+            BuildContext dialogContext,
+            Animation<double> animation,
+            Animation<double> secondaryAnimation,
+          ) {
+            return SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: compactVisual ? 6 : 10,
+                    right: compactVisual ? 8 : 12,
+                    left: 12,
+                  ),
+                  child: _CollapsedNavigationSheet(
+                    destinations: destinations,
+                    onSelectDestination: (_NavDestination destination) {
+                      Navigator.of(dialogContext).pop();
+                      if (!destination.isActive) {
+                        context.go(destination.route);
+                      }
+                    },
+                    onLogout: () {
+                      Navigator.of(dialogContext).pop();
+                      onLogout();
+                    },
+                  ),
+                ),
               ),
-              child: _CollapsedNavigationSheet(
-                destinations: destinations,
-                onSelectDestination: (_NavDestination destination) {
-                  Navigator.of(dialogContext).pop();
-                  if (!destination.isActive) {
-                    context.go(destination.route);
-                  }
-                },
-                onLogout: () {
-                  Navigator.of(dialogContext).pop();
-                  onLogout();
-                },
+            );
+          },
+      transitionBuilder:
+          (
+            BuildContext context,
+            Animation<double> animation,
+            Animation<double> secondaryAnimation,
+            Widget child,
+          ) {
+            final CurvedAnimation curve = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            );
+            return FadeTransition(
+              opacity: curve,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.04, -0.02),
+                  end: Offset.zero,
+                ).animate(curve),
+                child: child,
               ),
-            ),
-          ),
-        );
-      },
-      transitionBuilder: (
-        BuildContext context,
-        Animation<double> animation,
-        Animation<double> secondaryAnimation,
-        Widget child,
-      ) {
-        final CurvedAnimation curve = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-        );
-        return FadeTransition(
-          opacity: curve,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0.04, -0.02),
-              end: Offset.zero,
-            ).animate(curve),
-            child: child,
-          ),
-        );
-      },
+            );
+          },
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        right: compactVisual ? 4 : AppSizes.spacingSm,
-      ),
+      padding: EdgeInsets.only(right: compactVisual ? 4 : AppSizes.spacingSm),
       child: IconButton(
         key: const ValueKey<String>('section_app_bar_nav_menu_button'),
         tooltip: 'Navigation',
@@ -602,9 +600,7 @@ class _CollapsedNavigationButton extends StatelessWidget {
           foregroundColor: AppColors.textPrimary,
           backgroundColor: AppColors.surface,
           minimumSize: const Size(40, 40),
-          side: BorderSide(
-            color: AppColors.border.withValues(alpha: 0.8),
-          ),
+          side: BorderSide(color: AppColors.border.withValues(alpha: 0.8)),
         ),
         icon: const Icon(Icons.menu_rounded),
       ),
@@ -629,17 +625,12 @@ class _CollapsedNavigationSheet extends StatelessWidget {
       key: const ValueKey<String>('section_app_bar_nav_menu_sheet'),
       color: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minWidth: 260,
-          maxWidth: 312,
-        ),
+        constraints: const BoxConstraints(minWidth: 260, maxWidth: 312),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: AppColors.border.withValues(alpha: 0.9),
-            ),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.9)),
             boxShadow: <BoxShadow>[
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.12),
@@ -726,18 +717,14 @@ class _CollapsedNavigationItem extends StatelessWidget {
     return TextButton(
       onPressed: isActive ? null : onTap,
       style: TextButton.styleFrom(
-        foregroundColor: isActive
-            ? AppColors.primary
-            : AppColors.textPrimary,
+        foregroundColor: isActive ? AppColors.primary : AppColors.textPrimary,
         backgroundColor: isActive
             ? AppColors.primary.withValues(alpha: 0.08)
             : Colors.transparent,
         alignment: Alignment.centerLeft,
         minimumSize: const Size.fromHeight(46),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         textStyle: TextStyle(
           fontSize: 14,
           fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,

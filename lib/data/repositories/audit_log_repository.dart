@@ -32,9 +32,9 @@ class AuditLogRepository {
           ),
         );
 
-    final db.AuditLog inserted = await (_database.select(_database.auditLogs)
-          ..where((db.$AuditLogsTable t) => t.id.equals(logId)))
-        .getSingle();
+    final db.AuditLog inserted = await (_database.select(
+      _database.auditLogs,
+    )..where((db.$AuditLogsTable t) => t.id.equals(logId))).getSingle();
     return _mapLog(inserted);
   }
 
@@ -112,9 +112,9 @@ class AuditLogRepository {
   }
 
   Future<void> _ensureActorExists(int actorUserId) async {
-    final db.User? actor = await (_database.select(_database.users)
-          ..where((db.$UsersTable t) => t.id.equals(actorUserId)))
-        .getSingleOrNull();
+    final db.User? actor = await (_database.select(
+      _database.users,
+    )..where((db.$UsersTable t) => t.id.equals(actorUserId))).getSingleOrNull();
     if (actor == null) {
       throw ValidationException('Audit log actor is invalid.');
     }

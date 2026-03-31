@@ -21,8 +21,7 @@ class ProductGrid extends StatelessWidget {
   static const double _mainAxisSpacing = 8;
   static const double _crossAxisSpacing = 8;
   static const double _childAspectRatio = 0.78;
-  static const double _minimumItemWidthForSixColumns =
-      _targetMaxExtent - 30;
+  static const double _minimumItemWidthForSixColumns = _targetMaxExtent - 30;
 
   final List<Product> products;
   final bool isLoading;

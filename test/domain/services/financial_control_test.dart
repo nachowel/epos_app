@@ -165,7 +165,9 @@ void main() {
           currentUser: harness.admin,
         );
 
-        final report = await harness.reportService.getShiftReport(harness.shiftId);
+        final report = await harness.reportService.getShiftReport(
+          harness.shiftId,
+        );
 
         expect(report.paidTotalMinor, 1600);
         expect(report.refundTotalMinor, 700);
@@ -241,7 +243,10 @@ void main() {
           ),
           hasLength(1),
         );
-        expect(adjustments.where((entry) => entry.transactionId == transactionId), hasLength(1));
+        expect(
+          adjustments.where((entry) => entry.transactionId == transactionId),
+          hasLength(1),
+        );
         expect(persistedPayment.uuid, originalPayment.uuid);
         expect(persistedPayment.amountMinor, originalPayment.amountMinor);
       },
@@ -286,7 +291,9 @@ void main() {
           throwsA(isA<OrderPaymentBlockedException>()),
         );
 
-        final report = await harness.reportService.getShiftReport(harness.shiftId);
+        final report = await harness.reportService.getShiftReport(
+          harness.shiftId,
+        );
         expect(report.paidTotalMinor, 650);
         expect(report.refundTotalMinor, 650);
         expect(report.netSalesMinor, 0);
@@ -317,9 +324,9 @@ void main() {
 
         final result = await harness.reportService
             .runAdminFinalCloseWithCountedCash(
-          user: harness.admin,
-          countedCashMinor: 1000,
-        );
+              user: harness.admin,
+              countedCashMinor: 1000,
+            );
         final ShiftReconciliation? reconciliation = await harness
             .shiftReconciliationRepository
             .getByShiftAndKind(
@@ -375,11 +382,11 @@ void main() {
           countedCashMinor: 200,
         );
         final ShiftReconciliation reconciliation = (await harness
-                .shiftReconciliationRepository
-                .getByShiftAndKind(
-                  shiftId: harness.shiftId,
-                  kind: ShiftReconciliationKind.finalClose,
-                ))!;
+            .shiftReconciliationRepository
+            .getByShiftAndKind(
+              shiftId: harness.shiftId,
+              kind: ShiftReconciliationKind.finalClose,
+            ))!;
 
         expect(reportBeforeClose.cashGrossTotalMinor, 1500);
         expect(reportBeforeClose.refundTotalMinor, 1500);
@@ -439,11 +446,11 @@ void main() {
           countedCashMinor: 550,
         );
         final ShiftReconciliation reconciliation = (await harness
-                .shiftReconciliationRepository
-                .getByShiftAndKind(
-                  shiftId: harness.shiftId,
-                  kind: ShiftReconciliationKind.finalClose,
-                ))!;
+            .shiftReconciliationRepository
+            .getByShiftAndKind(
+              shiftId: harness.shiftId,
+              kind: ShiftReconciliationKind.finalClose,
+            ))!;
 
         expect(reportBeforeClose.cardGrossTotalMinor, 1400);
         expect(reportBeforeClose.refundTotalMinor, 1400);
@@ -628,9 +635,9 @@ void main() {
         );
         final result = await harness.reportService
             .runAdminFinalCloseWithCountedCash(
-          user: harness.admin,
-          countedCashMinor: 0,
-        );
+              user: harness.admin,
+              countedCashMinor: 0,
+            );
         final reconciliation = await harness.shiftReconciliationRepository
             .getByShiftAndKind(
               shiftId: harness.shiftId,
@@ -740,7 +747,9 @@ void main() {
           currentUser: harness.admin,
         );
 
-        final report = await harness.reportService.getShiftReport(harness.shiftId);
+        final report = await harness.reportService.getShiftReport(
+          harness.shiftId,
+        );
 
         expect(report.paidTotalMinor, 2000);
         expect(report.refundTotalMinor, 400);
@@ -784,17 +793,14 @@ void main() {
           user: harness.admin,
         );
         final ShiftReconciliation reconciliation = (await harness
-                .shiftReconciliationRepository
-                .getByShiftAndKind(
-                  shiftId: harness.shiftId,
-                  kind: ShiftReconciliationKind.finalClose,
-                ))!;
-        final AuditLogRecord finalizationEntry = (await harness
-                .auditLogRepository
-                .listRecent(limit: 20))
-            .firstWhere(
-              (AuditLogRecord entry) =>
-                  entry.action == 'day_end_finalized',
+            .shiftReconciliationRepository
+            .getByShiftAndKind(
+              shiftId: harness.shiftId,
+              kind: ShiftReconciliationKind.finalClose,
+            ))!;
+        final AuditLogRecord finalizationEntry =
+            (await harness.auditLogRepository.listRecent(limit: 20)).firstWhere(
+              (AuditLogRecord entry) => entry.action == 'day_end_finalized',
             );
 
         expect(
@@ -845,7 +851,11 @@ class _FinanceHarness {
   static Future<_FinanceHarness> create() async {
     final AppDatabase db = createTestDatabase();
     final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
-    final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
+    final int cashierId = await insertUser(
+      db,
+      name: 'Cashier',
+      role: 'cashier',
+    );
     final AuditLogRepository auditLogRepository = AuditLogRepository(db);
     final AuditLogService auditLogService = PersistedAuditLogService(
       auditLogRepository: auditLogRepository,
@@ -860,7 +870,9 @@ class _FinanceHarness {
     final User admin = _user(adminId, UserRole.admin, 'Admin');
     final User cashier = _user(cashierId, UserRole.cashier, 'Cashier');
     final shift = await shiftSessionService.openShiftManually(admin);
-    final TransactionRepository transactionRepository = TransactionRepository(db);
+    final TransactionRepository transactionRepository = TransactionRepository(
+      db,
+    );
     final PaymentRepository paymentRepository = PaymentRepository(db);
     final PaymentAdjustmentRepository paymentAdjustmentRepository =
         PaymentAdjustmentRepository(db);

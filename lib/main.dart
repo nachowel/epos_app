@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
 
 import 'app.dart';
 import 'core/bootstrap/bootstrap_policy.dart';
@@ -18,11 +19,47 @@ Future<void> main() async {
     logger: () => logger,
     body: () async {
       WidgetsFlutterBinding.ensureInitialized();
-      config = AppConfig.fromEnvironment();
+      tz_data.initializeTimeZones();
+      config = await AppConfig.load();
+      debugPrint(
+        'EPOS_INTERNAL_API_KEY bootstrap: source=${config.envFileName}, '
+        'exists=${config.hasConfiguredInternalApiKey}, '
+        'length=${config.internalApiKeyLength}, '
+        'preview=${config.internalApiKeyPreview}. '
+        'Full app restart required after .env changes.',
+      );
+      if (config.hasStartupIssues) {
+        debugPrint(config.startupIssues.join('\n'));
+      }
       logger = await StructuredAppLogger.create(
         enableInfoLogs: config.featureFlags.debugLoggingEnabled,
       );
       AppCrashGuard.installFlutterErrorHandler(logger);
+      if (config.hasStartupIssues) {
+        logger.error(
+          eventType: 'app_config_invalid',
+          message:
+              'Application configuration loaded with explicit issues; degraded features may follow.',
+          metadata: <String, Object?>{
+            'environment': config.environment,
+            'env_file': config.envFileName,
+            'issues': config.startupIssues,
+          },
+        );
+      }
+      logger.audit(
+        eventType: 'app_config_loaded',
+        message:
+            'Application configuration loaded from the bundled environment asset.',
+        metadata: <String, Object?>{
+          'environment': config.environment,
+          'env_file': config.envFileName,
+          'internal_api_key_exists': config.hasConfiguredInternalApiKey,
+          'internal_api_key_length': config.internalApiKeyLength,
+          'internal_api_key_preview': config.internalApiKeyPreview,
+          'full_restart_required_after_env_change': true,
+        },
+      );
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       final SupabaseClient? supabaseClient =
           await _initialiseSupabaseIfConfigured(config, logger);

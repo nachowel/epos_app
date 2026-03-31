@@ -2,14 +2,75 @@ import 'package:drift/drift.dart';
 
 import '../../domain/models/sync_queue_item.dart';
 import '../database/app_database.dart' as db;
+import '../sync/sync_graph_checksum_calculator.dart';
+import '../sync/sync_payload_repository.dart';
+
+const String _rootGraphSnapshotsTable = 'sync_queue_root_graph_snapshots';
+const String _rootGraphSnapshotIndex =
+    'idx_sync_queue_root_graph_snapshots_tx_uuid';
+
+class SyncQueueEnqueueResult {
+  const SyncQueueEnqueueResult({
+    required this.queueId,
+    required this.previousStatus,
+    required this.newStatus,
+    required this.createdNewRow,
+  });
+
+  final int queueId;
+  final SyncQueueStatus? previousStatus;
+  final SyncQueueStatus newStatus;
+  final bool createdNewRow;
+}
 
 class SyncQueueRepository {
   const SyncQueueRepository(this._database);
 
   final db.AppDatabase _database;
 
-  Future<void> addToQueue(String tableName, String recordUuid) async {
-    await _database.transaction(() async {
+  Future<SyncQueueEnqueueResult> addToQueue(
+    String tableName,
+    String recordUuid,
+  ) async {
+    return _addToQueueInternal(tableName, recordUuid);
+  }
+
+  Future<SyncQueueEnqueueResult> addTransactionRootToQueue(
+    String transactionUuid,
+  ) async {
+    final SyncPayloadRepository payloadRepository = SyncPayloadRepository(
+      _database,
+    );
+    final graph = await payloadRepository.buildTransactionGraph(
+      transactionUuid,
+    );
+    if (graph == null) {
+      throw StateError(
+        'Cannot queue a sync snapshot for missing transaction $transactionUuid.',
+      );
+    }
+    final String checksum = const SyncGraphChecksumCalculator().calculate(
+      graph,
+    );
+    return _database.transaction(() async {
+      final SyncQueueEnqueueResult enqueueResult = await _addToQueueInternal(
+        'transactions',
+        transactionUuid,
+      );
+      await _upsertTransactionRootChecksum(
+        queueId: enqueueResult.queueId,
+        transactionUuid: transactionUuid,
+        checksum: checksum,
+      );
+      return enqueueResult;
+    });
+  }
+
+  Future<SyncQueueEnqueueResult> _addToQueueInternal(
+    String tableName,
+    String recordUuid,
+  ) async {
+    return _database.transaction(() async {
       final DateTime now = DateTime.now();
       final db.SyncQueueData? existing =
           await (_database.select(_database.syncQueue)
@@ -29,28 +90,34 @@ class SyncQueueRepository {
               .getSingleOrNull();
 
       if (existing == null) {
-        await _database
-            .into(_database.syncQueue)
-            .insert(
-              db.SyncQueueCompanion.insert(
-                queueTableName: tableName,
-                recordUuid: recordUuid,
-              ),
-            );
-        return;
+        final int queueId = await _database.into(_database.syncQueue).insert(
+          db.SyncQueueCompanion.insert(
+            queueTableName: tableName,
+            recordUuid: recordUuid,
+          ),
+        );
+        return SyncQueueEnqueueResult(
+          queueId: queueId,
+          previousStatus: null,
+          newStatus: SyncQueueStatus.pending,
+          createdNewRow: true,
+        );
       }
 
       if (existing.status == 'processing') {
-        await _database
-            .into(_database.syncQueue)
-            .insert(
-              db.SyncQueueCompanion.insert(
-                queueTableName: tableName,
-                recordUuid: recordUuid,
-                createdAt: Value<DateTime>(now),
-              ),
-            );
-        return;
+        final int queueId = await _database.into(_database.syncQueue).insert(
+          db.SyncQueueCompanion.insert(
+            queueTableName: tableName,
+            recordUuid: recordUuid,
+            createdAt: Value<DateTime>(now),
+          ),
+        );
+        return SyncQueueEnqueueResult(
+          queueId: queueId,
+          previousStatus: SyncQueueStatus.processing,
+          newStatus: SyncQueueStatus.pending,
+          createdNewRow: true,
+        );
       }
 
       await (_database.update(
@@ -65,7 +132,31 @@ class SyncQueueRepository {
           syncedAt: const Value<DateTime?>(null),
         ),
       );
+      return SyncQueueEnqueueResult(
+        queueId: existing.id,
+        previousStatus: _statusFromDb(existing.status),
+        newStatus: SyncQueueStatus.pending,
+        createdNewRow: false,
+      );
     });
+  }
+
+  Future<SyncQueueItem?> getLatestItemForRecord({
+    required String tableName,
+    required String recordUuid,
+  }) async {
+    final db.SyncQueueData? row =
+        await (_database.select(_database.syncQueue)
+              ..where((db.$SyncQueueTable t) {
+                return t.queueTableName.equals(tableName) &
+                    t.recordUuid.equals(recordUuid);
+              })
+              ..orderBy(<OrderingTerm Function(db.$SyncQueueTable)>[
+                (db.$SyncQueueTable t) => OrderingTerm.desc(t.id),
+              ])
+              ..limit(1))
+            .getSingleOrNull();
+    return row == null ? null : _mapQueueItem(row);
   }
 
   Future<List<SyncQueueItem>> claimProcessableItems({
@@ -155,6 +246,38 @@ class SyncQueueRepository {
     return rows.map(_mapQueueItem).toList(growable: false);
   }
 
+  Future<List<SyncQueueItem>> getFailedItems({int? limit}) async {
+    final List<db.SyncQueueData> rows =
+        await (_database.select(_database.syncQueue)
+              ..where((db.$SyncQueueTable t) => t.status.equals('failed'))
+              ..orderBy(<OrderingTerm Function(db.$SyncQueueTable)>[
+                (db.$SyncQueueTable t) =>
+                    OrderingTerm.desc(t.lastAttemptAt, nulls: NullsOrder.last),
+                (db.$SyncQueueTable t) => OrderingTerm.desc(t.createdAt),
+                (db.$SyncQueueTable t) => OrderingTerm.desc(t.id),
+              ])
+              ..limit(limit ?? 1000000))
+            .get();
+
+    return rows.map(_mapQueueItem).toList(growable: false);
+  }
+
+  Future<List<SyncQueueItem>> getProcessingItems({int? limit}) async {
+    final List<db.SyncQueueData> rows =
+        await (_database.select(_database.syncQueue)
+              ..where((db.$SyncQueueTable t) => t.status.equals('processing'))
+              ..orderBy(<OrderingTerm Function(db.$SyncQueueTable)>[
+                (db.$SyncQueueTable t) =>
+                    OrderingTerm.asc(t.lastAttemptAt, nulls: NullsOrder.first),
+                (db.$SyncQueueTable t) => OrderingTerm.asc(t.createdAt),
+                (db.$SyncQueueTable t) => OrderingTerm.asc(t.id),
+              ])
+              ..limit(limit ?? 1000000))
+            .get();
+
+    return rows.map(_mapQueueItem).toList(growable: false);
+  }
+
   Future<({int pendingCount, int failedCount})> getMonitorCounts() async {
     final QueryRow row = await _database
         .customSelect(
@@ -213,31 +336,47 @@ class SyncQueueRepository {
     return row?.readNullable<String>('error_message');
   }
 
+  Future<SyncQueueItem?> getLatestFailedItem() async {
+    final db.SyncQueueData? row =
+        await (_database.select(_database.syncQueue)
+              ..where((db.$SyncQueueTable t) => t.status.equals('failed'))
+              ..orderBy(<OrderingTerm Function(db.$SyncQueueTable)>[
+                (db.$SyncQueueTable t) =>
+                    OrderingTerm.desc(t.lastAttemptAt, nulls: NullsOrder.last),
+                (db.$SyncQueueTable t) => OrderingTerm.desc(t.createdAt),
+                (db.$SyncQueueTable t) => OrderingTerm.desc(t.id),
+              ])
+              ..limit(1))
+            .getSingleOrNull();
+
+    return row == null ? null : _mapQueueItem(row);
+  }
+
   Future<int> getStuckCount({
     int maxRetryAttempts = 5,
     Duration processingStuckThreshold = const Duration(minutes: 2),
     DateTime? now,
   }) async {
     final DateTime effectiveNow = now ?? DateTime.now();
-    final List<db.SyncQueueData> rows =
-        await (_database.select(_database.syncQueue)..where((
-              db.$SyncQueueTable t,
-            ) {
-              return t.status.equals('failed') | t.status.equals('processing');
-            }))
-            .get();
-
+    final List<SyncQueueItem> failedItems = await getFailedItems();
+    final List<SyncQueueItem> processingItems = await getProcessingItems();
     int stuckCount = 0;
-    for (final db.SyncQueueData row in rows) {
-      final bool isFailedStuck =
-          row.status == 'failed' && row.attemptCount >= maxRetryAttempts;
+    for (final SyncQueueItem item in failedItems) {
+      final bool isNonRetryableOrManualReview =
+          item.failureDetails?.retryable != true;
+      final bool isExhaustedRetry =
+          item.failureDetails?.retryable == true &&
+          item.attemptCount >= maxRetryAttempts;
+      if (isNonRetryableOrManualReview || isExhaustedRetry) {
+        stuckCount += 1;
+      }
+    }
+    for (final SyncQueueItem item in processingItems) {
+      final DateTime? lastAttemptAt = item.lastAttemptAt;
       final bool isProcessingStuck =
-          row.status == 'processing' &&
-          row.lastAttemptAt != null &&
-          row.lastAttemptAt!
-              .add(processingStuckThreshold)
-              .isBefore(effectiveNow);
-      if (isFailedStuck || isProcessingStuck) {
+          lastAttemptAt != null &&
+          lastAttemptAt.add(processingStuckThreshold).isBefore(effectiveNow);
+      if (isProcessingStuck) {
         stuckCount += 1;
       }
     }
@@ -320,6 +459,23 @@ class SyncQueueRepository {
     );
   }
 
+  Future<void> resetAttemptsForItems(Iterable<int> ids) async {
+    final List<int> normalizedIds = ids.toSet().toList(growable: false);
+    if (normalizedIds.isEmpty) {
+      return;
+    }
+    await (_database.update(
+      _database.syncQueue,
+    )..where((db.$SyncQueueTable t) => t.id.isIn(normalizedIds))).write(
+      const db.SyncQueueCompanion(
+        status: Value<String>('pending'),
+        attemptCount: Value<int>(0),
+        errorMessage: Value<String?>(null),
+        lastAttemptAt: Value<DateTime?>(null),
+      ),
+    );
+  }
+
   Future<int> getFailedCount() async {
     final ({int pendingCount, int failedCount}) counts =
         await getMonitorCounts();
@@ -330,6 +486,49 @@ class SyncQueueRepository {
     final ({int pendingCount, int failedCount}) counts =
         await getMonitorCounts();
     return counts.pendingCount;
+  }
+
+  Future<int> getSyncedCount() async {
+    final QueryRow row = await _database
+        .customSelect(
+          '''
+          SELECT COALESCE(SUM(CASE WHEN status = 'synced' THEN 1 ELSE 0 END), 0) AS synced_count
+          FROM sync_queue
+          ''',
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _database.syncQueue,
+          },
+        )
+        .getSingle();
+    return row.read<int>('synced_count');
+  }
+
+  Future<String?> getTransactionRootChecksum(int queueId) async {
+    await _ensureRootGraphSnapshotTable();
+    final QueryRow? row = await _database
+        .customSelect(
+          '''
+          SELECT graph_checksum
+          FROM $_rootGraphSnapshotsTable
+          WHERE queue_id = ?
+          LIMIT 1
+          ''',
+          variables: <Variable<Object>>[Variable<int>(queueId)],
+        )
+        .getSingleOrNull();
+    return row?.readNullable<String>('graph_checksum');
+  }
+
+  Future<void> saveTransactionRootChecksum({
+    required int queueId,
+    required String transactionUuid,
+    required String checksum,
+  }) {
+    return _upsertTransactionRootChecksum(
+      queueId: queueId,
+      transactionUuid: transactionUuid,
+      checksum: checksum,
+    );
   }
 
   Future<void> markRecordGraphSynced(
@@ -581,5 +780,48 @@ class SyncQueueRepository {
       deduped['${record.tableName}:${record.recordUuid}'] = record;
     }
     return deduped.values.toList(growable: false);
+  }
+
+  Future<void> _upsertTransactionRootChecksum({
+    required int queueId,
+    required String transactionUuid,
+    required String checksum,
+  }) async {
+    await _ensureRootGraphSnapshotTable();
+    await _database.customStatement(
+      '''
+      INSERT INTO $_rootGraphSnapshotsTable (
+        queue_id,
+        transaction_uuid,
+        graph_checksum,
+        created_at
+      )
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(queue_id) DO UPDATE SET
+        transaction_uuid = excluded.transaction_uuid,
+        graph_checksum = excluded.graph_checksum
+      ''',
+      <Object>[
+        queueId,
+        transactionUuid,
+        checksum,
+        DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      ],
+    );
+  }
+
+  Future<void> _ensureRootGraphSnapshotTable() async {
+    await _database.customStatement('''
+      CREATE TABLE IF NOT EXISTS $_rootGraphSnapshotsTable (
+        queue_id INTEGER NOT NULL PRIMARY KEY,
+        transaction_uuid TEXT NOT NULL,
+        graph_checksum TEXT NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+    ''');
+    await _database.customStatement('''
+      CREATE INDEX IF NOT EXISTS $_rootGraphSnapshotIndex
+      ON $_rootGraphSnapshotsTable(transaction_uuid, queue_id);
+    ''');
   }
 }

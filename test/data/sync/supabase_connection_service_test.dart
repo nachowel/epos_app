@@ -37,21 +37,24 @@ void main() {
     expect(status.successfulQueryCount, 0);
   });
 
-  test('reports unreachable when config is valid but no client probe exists', () async {
-    final SupabaseConnectionService service = SupabaseConnectionService(
-      config: AppConfig.fromValues(
-        environment: 'test',
-        appVersion: 'test',
-        supabaseUrl: 'https://example.supabase.co',
-        supabaseAnonKey: 'anon-key',
-      ),
-    );
+  test(
+    'reports unreachable when config is valid but no client probe exists',
+    () async {
+      final SupabaseConnectionService service = SupabaseConnectionService(
+        config: AppConfig.fromValues(
+          environment: 'test',
+          appVersion: 'test',
+          supabaseUrl: 'https://example.supabase.co',
+          supabaseAnonKey: 'anon-key',
+        ),
+      );
 
-    final SupabaseConnectionStatus status = await service.checkHealth();
+      final SupabaseConnectionStatus status = await service.checkHealth();
 
-    expect(status.state, SupabaseConnectionState.unreachable);
-    expect(status.successfulQueryCount, 0);
-  });
+      expect(status.state, SupabaseConnectionState.unreachable);
+      expect(status.successfulQueryCount, 0);
+    },
+  );
 
   test('reports connected when all required table probes succeed', () async {
     final SupabaseConnectionService service = SupabaseConnectionService(
@@ -118,9 +121,7 @@ void main() {
         supabaseUrl: 'https://example.supabase.co',
         supabaseAnonKey: 'anon-key',
       ),
-      probe: _RecordingProbe(
-        error: TimeoutException('timed out'),
-      ),
+      probe: _RecordingProbe(error: TimeoutException('timed out')),
     );
 
     final SupabaseConnectionStatus status = await service.checkHealth();
@@ -129,60 +130,70 @@ void main() {
     expect(status.successfulQueryCount, 0);
   });
 
-  test('reports misconfigured on permission-like table probe failures', () async {
-    final SupabaseConnectionService service = SupabaseConnectionService(
-      config: AppConfig.fromValues(
-        environment: 'test',
-        appVersion: 'test',
-        supabaseUrl: 'https://example.supabase.co',
-        supabaseAnonKey: 'anon-key',
-      ),
-      probe: _RecordingProbe(
-        tableStates: <String, SupabaseRemoteTableState>{
-          'transactions': SupabaseRemoteTableState.inaccessible,
-          'transaction_lines': SupabaseRemoteTableState.present,
-          'order_modifiers': SupabaseRemoteTableState.present,
-          'payments': SupabaseRemoteTableState.present,
-        },
-      ),
-    );
+  test(
+    'reports misconfigured on permission-like table probe failures',
+    () async {
+      final SupabaseConnectionService service = SupabaseConnectionService(
+        config: AppConfig.fromValues(
+          environment: 'test',
+          appVersion: 'test',
+          supabaseUrl: 'https://example.supabase.co',
+          supabaseAnonKey: 'anon-key',
+        ),
+        probe: _RecordingProbe(
+          tableStates: <String, SupabaseRemoteTableState>{
+            'transactions': SupabaseRemoteTableState.inaccessible,
+            'transaction_lines': SupabaseRemoteTableState.present,
+            'order_modifiers': SupabaseRemoteTableState.present,
+            'payments': SupabaseRemoteTableState.present,
+          },
+        ),
+      );
 
-    final SupabaseConnectionStatus status = await service.checkHealth();
+      final SupabaseConnectionStatus status = await service.checkHealth();
 
-    expect(status.state, SupabaseConnectionState.misconfigured);
-    expect(
-      status.requiredTables['transactions'],
-      SupabaseRemoteTableState.inaccessible,
-    );
-  });
+      expect(status.state, SupabaseConnectionState.misconfigured);
+      expect(
+        status.requiredTables['transactions'],
+        SupabaseRemoteTableState.inaccessible,
+      );
+    },
+  );
 
-  test('runDebugReadOnlyProbe reuses the same safe read-only health check', () async {
-    final SupabaseConnectionService service = SupabaseConnectionService(
-      config: AppConfig.fromValues(
-        environment: 'test',
-        appVersion: 'test',
-        supabaseUrl: 'https://example.supabase.co',
-        supabaseAnonKey: 'anon-key',
-      ),
-      probe: _RecordingProbe(
-        tableStates: <String, SupabaseRemoteTableState>{
-          'transactions': SupabaseRemoteTableState.present,
-          'transaction_lines': SupabaseRemoteTableState.present,
-          'order_modifiers': SupabaseRemoteTableState.present,
-          'payments': SupabaseRemoteTableState.present,
-        },
-      ),
-    );
+  test(
+    'runDebugReadOnlyProbe reuses the same safe read-only health check',
+    () async {
+      final SupabaseConnectionService service = SupabaseConnectionService(
+        config: AppConfig.fromValues(
+          environment: 'test',
+          appVersion: 'test',
+          supabaseUrl: 'https://example.supabase.co',
+          supabaseAnonKey: 'anon-key',
+        ),
+        probe: _RecordingProbe(
+          tableStates: <String, SupabaseRemoteTableState>{
+            'transactions': SupabaseRemoteTableState.present,
+            'transaction_lines': SupabaseRemoteTableState.present,
+            'order_modifiers': SupabaseRemoteTableState.present,
+            'payments': SupabaseRemoteTableState.present,
+          },
+        ),
+      );
 
-    final SupabaseConnectionStatus status = await service.runDebugReadOnlyProbe();
+      final SupabaseConnectionStatus status = await service
+          .runDebugReadOnlyProbe();
 
-    expect(status.state, SupabaseConnectionState.connected);
-    expect(status.successfulQueryCount, 4);
-  });
+      expect(status.state, SupabaseConnectionState.connected);
+      expect(status.successfulQueryCount, 4);
+    },
+  );
 }
 
 class _RecordingProbe implements SupabaseConnectionProbe {
-  const _RecordingProbe({this.tableStates = const <String, SupabaseRemoteTableState>{}, this.error});
+  const _RecordingProbe({
+    this.tableStates = const <String, SupabaseRemoteTableState>{},
+    this.error,
+  });
 
   final Map<String, SupabaseRemoteTableState> tableStates;
   final Object? error;

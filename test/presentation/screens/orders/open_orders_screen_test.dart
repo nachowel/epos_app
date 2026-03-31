@@ -21,119 +21,114 @@ void main() {
     AppLocalizationService.instance.setLocale(const Locale('en'));
   });
 
-  testWidgets(
-    'open orders rows show count metadata and direct pay action',
-    (WidgetTester tester) async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final AppDatabase db = createTestDatabase();
-      addTearDown(db.close);
+  testWidgets('open orders rows show count metadata and direct pay action', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final AppDatabase db = createTestDatabase();
+    addTearDown(db.close);
 
-      final int cashierId = await insertUser(
-        db,
-        name: 'Cashier',
-        role: 'cashier',
-      );
-      final int shiftId = await insertShift(db, openedBy: cashierId);
-      final int categoryId = await insertCategory(db, name: 'Breakfast');
-      final int breakfastId = await insertProduct(
-        db,
-        categoryId: categoryId,
-        name: 'SE5 Breakfast',
-        priceMinor: 850,
-      );
-      final int latteId = await insertProduct(
-        db,
-        categoryId: categoryId,
-        name: 'Latte',
-        priceMinor: 350,
-      );
-      final int cappuccinoId = await insertProduct(
-        db,
-        categoryId: categoryId,
-        name: 'Cappuccino',
-        priceMinor: 380,
-      );
-      final int orderId = await insertTransaction(
-        db,
-        uuid: 'open-orders-screen-order',
-        shiftId: shiftId,
-        userId: cashierId,
-        status: 'sent',
-        totalAmountMinor: 1580,
-      );
+    final int cashierId = await insertUser(
+      db,
+      name: 'Cashier',
+      role: 'cashier',
+    );
+    final int shiftId = await insertShift(db, openedBy: cashierId);
+    final int categoryId = await insertCategory(db, name: 'Breakfast');
+    final int breakfastId = await insertProduct(
+      db,
+      categoryId: categoryId,
+      name: 'SE5 Breakfast',
+      priceMinor: 850,
+    );
+    final int latteId = await insertProduct(
+      db,
+      categoryId: categoryId,
+      name: 'Latte',
+      priceMinor: 350,
+    );
+    final int cappuccinoId = await insertProduct(
+      db,
+      categoryId: categoryId,
+      name: 'Cappuccino',
+      priceMinor: 380,
+    );
+    final int orderId = await insertTransaction(
+      db,
+      uuid: 'open-orders-screen-order',
+      shiftId: shiftId,
+      userId: cashierId,
+      status: 'sent',
+      totalAmountMinor: 1580,
+    );
 
-      await _insertOrderLine(
-        db,
-        uuid: 'open-orders-screen-line-1',
-        transactionId: orderId,
-        productId: breakfastId,
-        productName: 'SE5 Breakfast',
-        unitPriceMinor: 850,
-        lineTotalMinor: 850,
-      );
-      await _insertOrderLine(
-        db,
-        uuid: 'open-orders-screen-line-2',
-        transactionId: orderId,
-        productId: latteId,
-        productName: 'Latte',
-        unitPriceMinor: 350,
-        lineTotalMinor: 350,
-      );
-      await _insertOrderLine(
-        db,
-        uuid: 'open-orders-screen-line-3',
-        transactionId: orderId,
-        productId: cappuccinoId,
-        productName: 'Cappuccino',
-        unitPriceMinor: 380,
-        lineTotalMinor: 380,
-      );
+    await _insertOrderLine(
+      db,
+      uuid: 'open-orders-screen-line-1',
+      transactionId: orderId,
+      productId: breakfastId,
+      productName: 'SE5 Breakfast',
+      unitPriceMinor: 850,
+      lineTotalMinor: 850,
+    );
+    await _insertOrderLine(
+      db,
+      uuid: 'open-orders-screen-line-2',
+      transactionId: orderId,
+      productId: latteId,
+      productName: 'Latte',
+      unitPriceMinor: 350,
+      lineTotalMinor: 350,
+    );
+    await _insertOrderLine(
+      db,
+      uuid: 'open-orders-screen-line-3',
+      transactionId: orderId,
+      productId: cappuccinoId,
+      productName: 'Cappuccino',
+      unitPriceMinor: 380,
+      lineTotalMinor: 380,
+    );
 
-      final ProviderContainer container = ProviderContainer(
-        overrides: <Override>[
-          appDatabaseProvider.overrideWithValue(db),
-          sharedPreferencesProvider.overrideWithValue(prefs),
-        ],
-      );
-      addTearDown(container.dispose);
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        appDatabaseProvider.overrideWithValue(db),
+        sharedPreferencesProvider.overrideWithValue(prefs),
+      ],
+    );
+    addTearDown(container.dispose);
 
-      await container
-          .read(authNotifierProvider.notifier)
-          .loadUserById(cashierId);
-      await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
+    await container.read(authNotifierProvider.notifier).loadUserById(cashierId);
+    await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
 
-      await tester.pumpWidget(_ordersApp(container));
-      await tester.pumpAndSettle();
+    await tester.pumpWidget(_ordersApp(container));
+    await tester.pumpAndSettle();
 
-      expect(find.byType(OpenOrdersScreen), findsOneWidget);
-      expect(find.text('Pay £15.80'), findsOneWidget);
-      final Finder metadataFinder = find.byWidgetPredicate(
-        (Widget widget) =>
-            widget is Text &&
-            widget.data != null &&
-            widget.data!.contains(
-              '3 items · SE5 Breakfast, Latte, Cappuccino',
-            ),
-      );
-      expect(metadataFinder, findsOneWidget);
+    expect(find.byType(OpenOrdersScreen), findsOneWidget);
+    expect(find.text('Pay £15.80'), findsOneWidget);
+    final Finder metadataFinder = find.byWidgetPredicate(
+      (Widget widget) =>
+          widget is Text &&
+          widget.data != null &&
+          widget.data!.contains('3 items · SE5 Breakfast, Latte, Cappuccino'),
+    );
+    expect(metadataFinder, findsOneWidget);
 
-      final Text metadataText = tester.widget<Text>(metadataFinder);
-      expect(metadataText.maxLines, 1);
-      expect(metadataText.overflow, TextOverflow.ellipsis);
-      expect(
-        find.text('18:28 · 3 items · SE5 Breakfast, Latte, Cappuccino'),
-        findsNothing,
-      );
+    final Text metadataText = tester.widget<Text>(metadataFinder);
+    expect(metadataText.maxLines, 1);
+    expect(metadataText.overflow, TextOverflow.ellipsis);
+    expect(
+      find.text('18:28 · 3 items · SE5 Breakfast, Latte, Cappuccino'),
+      findsNothing,
+    );
 
-      await tester.tap(find.byKey(Key('open-order-pay-$orderId')));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('open-order-pay-$orderId')));
+    await tester.pumpAndSettle();
 
-      expect(find.byType(PaymentDialog), findsOneWidget);
-      expect(find.text('detail-$orderId'), findsNothing);
-    },
-  );
+    expect(find.byType(PaymentDialog), findsOneWidget);
+    expect(find.text('detail-$orderId'), findsNothing);
+  });
 
   testWidgets('tapping the row opens the order detail route', (
     WidgetTester tester,
@@ -143,7 +138,11 @@ void main() {
     final AppDatabase db = createTestDatabase();
     addTearDown(db.close);
 
-    final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
+    final int cashierId = await insertUser(
+      db,
+      name: 'Cashier',
+      role: 'cashier',
+    );
     final int shiftId = await insertShift(db, openedBy: cashierId);
     final int categoryId = await insertCategory(db, name: 'Drinks');
     final int coffeeId = await insertProduct(
@@ -202,16 +201,18 @@ Future<void> _insertOrderLine(
   required int unitPriceMinor,
   required int lineTotalMinor,
 }) async {
-  await db.into(db.transactionLines).insert(
-    TransactionLinesCompanion.insert(
-      uuid: uuid,
-      transactionId: transactionId,
-      productId: productId,
-      productName: productName,
-      unitPriceMinor: unitPriceMinor,
-      lineTotalMinor: lineTotalMinor,
-    ),
-  );
+  await db
+      .into(db.transactionLines)
+      .insert(
+        TransactionLinesCompanion.insert(
+          uuid: uuid,
+          transactionId: transactionId,
+          productId: productId,
+          productName: productName,
+          unitPriceMinor: unitPriceMinor,
+          lineTotalMinor: lineTotalMinor,
+        ),
+      );
 }
 
 Widget _ordersApp(ProviderContainer container) {

@@ -459,7 +459,20 @@ class OrderService {
     // A terminal transaction is synced as a full graph rooted at the
     // transaction snapshot. Child rows remain immutable and are rebuilt from
     // local DB during sync, so one queue event is enough to recover the graph.
-    await syncQueueRepository.addToQueue('transactions', transactionUuid);
+    final enqueueResult = await syncQueueRepository.addTransactionRootToQueue(
+      transactionUuid,
+    );
+    _logger.audit(
+      eventType: 'sync_queue_root_enqueued',
+      entityId: transactionUuid,
+      message: 'Terminal transaction root queued for sync replay.',
+      metadata: <String, Object?>{
+        'queue_row_id': enqueueResult.queueId,
+        'previous_status': enqueueResult.previousStatus?.name ?? 'none',
+        'new_status': enqueueResult.newStatus.name,
+        'created_new_row': enqueueResult.createdNewRow,
+      },
+    );
   }
 
   Future<void> _ensureProductAvailableForSale(int productId) async {

@@ -10,7 +10,11 @@ void main() {
       final db = createTestDatabase();
       addTearDown(db.close);
 
-      final int actorUserId = await insertUser(db, name: 'Admin', role: 'admin');
+      final int actorUserId = await insertUser(
+        db,
+        name: 'Admin',
+        role: 'admin',
+      );
       final AuditLogRepository repository = AuditLogRepository(db);
 
       final created = await repository.createAuditLog(

@@ -169,13 +169,11 @@ class ProductRepository {
 
   Future<bool> toggleVisibilityOnPos(int id, bool isVisibleOnPos) async {
     final int updatedCount =
-        await (_database.update(_database.products)
-              ..where((db.$ProductsTable t) => t.id.equals(id)))
-            .write(
-              db.ProductsCompanion(
-                isVisibleOnPos: Value<bool>(isVisibleOnPos),
-              ),
-            );
+        await (_database.update(
+          _database.products,
+        )..where((db.$ProductsTable t) => t.id.equals(id))).write(
+          db.ProductsCompanion(isVisibleOnPos: Value<bool>(isVisibleOnPos)),
+        );
 
     return updatedCount > 0;
   }

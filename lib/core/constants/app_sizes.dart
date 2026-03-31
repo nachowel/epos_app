@@ -24,9 +24,7 @@ class AppSizes {
     final double ratio = viewportWidth >= 1400
         ? 0.24
         : (viewportWidth >= 1100 ? 0.235 : 0.22);
-    final double minWidth = viewportWidth >= 1100
-        ? 280
-        : cartPanelMinWidth;
+    final double minWidth = viewportWidth >= 1100 ? 280 : cartPanelMinWidth;
 
     return (viewportWidth * ratio).clamp(minWidth, cartPanelWidth).toDouble();
   }

@@ -70,7 +70,8 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
           ? state.selectedCategoryId
           : null;
       final int? effectiveCategoryId =
-          selectedCategoryId ?? (categories.isEmpty ? null : categories.first.id);
+          selectedCategoryId ??
+          (categories.isEmpty ? null : categories.first.id);
 
       final List<Product> products = await _ref
           .read(catalogServiceProvider)

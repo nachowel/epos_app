@@ -68,7 +68,9 @@ class AdminAuditState {
   }) {
     return AdminAuditState(
       logs: logs ?? this.logs,
-      actorFilter: actorFilter == _unset ? this.actorFilter : actorFilter as int?,
+      actorFilter: actorFilter == _unset
+          ? this.actorFilter
+          : actorFilter as int?,
       actionFilter: actionFilter == _unset
           ? this.actionFilter
           : actionFilter as String?,
@@ -117,21 +119,21 @@ class AdminAuditNotifier extends StateNotifier<AdminAuditState> {
 
       state = state.copyWith(
         logs: filteredLogs,
-        availableActorIds: allLogs
-            .map((AuditLogRecord entry) => entry.actorUserId)
-            .toSet()
-            .toList()
-          ..sort(),
-        availableActions: allLogs
-            .map((AuditLogRecord entry) => entry.action)
-            .toSet()
-            .toList()
-          ..sort(),
-        availableEntityTypes: allLogs
-            .map((AuditLogRecord entry) => entry.entityType)
-            .toSet()
-            .toList()
-          ..sort(),
+        availableActorIds:
+            allLogs
+                .map((AuditLogRecord entry) => entry.actorUserId)
+                .toSet()
+                .toList()
+              ..sort(),
+        availableActions:
+            allLogs.map((AuditLogRecord entry) => entry.action).toSet().toList()
+              ..sort(),
+        availableEntityTypes:
+            allLogs
+                .map((AuditLogRecord entry) => entry.entityType)
+                .toSet()
+                .toList()
+              ..sort(),
         isLoading: false,
         errorMessage: null,
       );

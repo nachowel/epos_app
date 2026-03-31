@@ -88,10 +88,7 @@ class CartLineTile extends StatelessWidget {
                   ),
                 ),
               ),
-              _StepperButton(
-                icon: Icons.remove_rounded,
-                onPressed: onDecrease,
-              ),
+              _StepperButton(icon: Icons.remove_rounded, onPressed: onDecrease),
               Container(
                 width: 22,
                 alignment: Alignment.center,
@@ -104,10 +101,7 @@ class CartLineTile extends StatelessWidget {
                   ),
                 ),
               ),
-              _StepperButton(
-                icon: Icons.add_rounded,
-                onPressed: onIncrease,
-              ),
+              _StepperButton(icon: Icons.add_rounded, onPressed: onIncrease),
               SizedBox(width: compactLayout ? 2 : 4),
               IconButton(
                 onPressed: onDelete,
@@ -131,8 +125,7 @@ class CartLineTile extends StatelessWidget {
 
   String _modifierLabel(CartModifier modifier) {
     final bool isAdd = modifier.action == ModifierAction.add;
-    final String pricePart =
-        isAdd && modifier.extraPriceMinor > 0
+    final String pricePart = isAdd && modifier.extraPriceMinor > 0
         ? ' ${CurrencyFormatter.fromMinor(modifier.extraPriceMinor)}'
         : '';
     return '${isAdd ? '+' : '-'} ${modifier.itemName}$pricePart';
