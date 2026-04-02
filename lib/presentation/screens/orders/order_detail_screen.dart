@@ -24,6 +24,8 @@ import '../../providers/orders_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../widgets/section_app_bar.dart';
 import '../pos/widgets/payment_dialog.dart';
+import 'widgets/breakfast_modifier_popup.dart';
+import 'widgets/order_modifier_presentation.dart';
 
 class OrderDetailScreen extends ConsumerStatefulWidget {
   const OrderDetailScreen({required this.transactionId, super.key});
@@ -328,6 +330,39 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     await _loadDetails();
   }
 
+  Future<void> _handleBreakfastEdit(OrderDetailLine detailLine) async {
+    final BreakfastEditorData? initialData = await ref
+        .read(ordersNotifierProvider.notifier)
+        .loadBreakfastEditorData(
+          transactionId: widget.transactionId,
+          transactionLineId: detailLine.line.id,
+        );
+    if (!mounted || initialData == null) {
+      _showMessage(
+        ref.read(ordersNotifierProvider).errorMessage ??
+            AppStrings.operationFailed,
+      );
+      return;
+    }
+
+    final bool? changed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) {
+        return BreakfastModifierPopup(
+          transactionId: widget.transactionId,
+          initialData: initialData,
+        );
+      },
+    );
+
+    if (!mounted || changed != true) {
+      return;
+    }
+    await ref.read(ordersNotifierProvider.notifier).refreshOpenOrders();
+    await _loadDetails();
+  }
+
   Future<bool> _confirmCancel() async {
     final bool? result = await showDialog<bool>(
       context: context,
@@ -601,7 +636,16 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                             thickness: 1,
                             color: AppColors.border,
                           ),
-                        _OrderLineRow(detailLine: details.lines[index]),
+                        _OrderLineRow(
+                          detailLine: details.lines[index],
+                          onEditBreakfast:
+                              details.lines[index].isBreakfastConfigurable &&
+                                  details.transaction.status ==
+                                      TransactionStatus.draft &&
+                                  !isActionLocked
+                              ? () => _handleBreakfastEdit(details.lines[index])
+                              : null,
+                        ),
                       ],
                     ],
                   ),
@@ -937,9 +981,10 @@ class _InlineNotice extends StatelessWidget {
 }
 
 class _OrderLineRow extends StatelessWidget {
-  const _OrderLineRow({required this.detailLine});
+  const _OrderLineRow({required this.detailLine, this.onEditBreakfast});
 
   final OrderDetailLine detailLine;
+  final VoidCallback? onEditBreakfast;
 
   @override
   Widget build(BuildContext context) {
@@ -975,14 +1020,26 @@ class _OrderLineRow extends StatelessWidget {
               ),
             ],
           ),
+          if (onEditBreakfast != null) ...<Widget>[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton(
+                key: ValueKey<String>(
+                  'detail-edit-breakfast-${detailLine.line.id}',
+                ),
+                onPressed: onEditBreakfast,
+                child: const Text('Edit breakfast'),
+              ),
+            ),
+          ],
           if (detailLine.modifiers.isNotEmpty) ...<Widget>[
             const SizedBox(height: 4),
             ...detailLine.modifiers.map((OrderModifier modifier) {
-              final bool isAdd = modifier.action == ModifierAction.add;
               return Padding(
                 padding: const EdgeInsets.only(top: 1),
                 child: Text(
-                  '${isAdd ? '+' : '-'} ${modifier.itemName}${isAdd ? ' ${CurrencyFormatter.fromMinor(modifier.extraPriceMinor)}' : ''}',
+                  formatOrderModifierLabel(modifier),
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,

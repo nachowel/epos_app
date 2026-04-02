@@ -42,6 +42,20 @@ class Categories extends Table {
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
 
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  IntColumn get removalDiscount1Minor => integer()
+      .named('removal_discount_1_minor')
+      .withDefault(const Constant(0))();
+
+  IntColumn get removalDiscount2Minor => integer()
+      .named('removal_discount_2_minor')
+      .withDefault(const Constant(0))();
+
+  @override
+  List<String> get customConstraints => <String>[
+    'CHECK (removal_discount_1_minor >= 0)',
+    'CHECK (removal_discount_2_minor >= 0)',
+  ];
 }
 
 class Products extends Table {
@@ -72,8 +86,17 @@ class Products extends Table {
 class ProductModifiers extends Table {
   IntColumn get id => integer().autoIncrement()();
 
+  @ReferenceName('modifierOwnerProducts')
   IntColumn get productId =>
       integer().customConstraint('NOT NULL REFERENCES "products" ("id")')();
+
+  IntColumn get groupId => integer().nullable().customConstraint(
+    'REFERENCES "modifier_groups" ("id")',
+  )();
+
+  @ReferenceName('modifierItemProducts')
+  IntColumn get itemProductId =>
+      integer().nullable().customConstraint('REFERENCES "products" ("id")')();
 
   TextColumn get name => text()();
 
@@ -85,8 +108,78 @@ class ProductModifiers extends Table {
 
   @override
   List<String> get customConstraints => <String>[
-    "CHECK (type IN ('included','extra'))",
+    "CHECK (type IN ('included','extra','choice'))",
     'CHECK (extra_price_minor >= 0)',
+    "CHECK ((type = 'choice' AND group_id IS NOT NULL AND item_product_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))",
+  ];
+}
+
+class MenuSettings extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get freeSwapLimit => integer().withDefault(const Constant(2))();
+
+  IntColumn get maxSwaps => integer().withDefault(const Constant(4))();
+
+  IntColumn get updatedBy =>
+      integer().nullable().customConstraint('REFERENCES "users" ("id")')();
+
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<String> get customConstraints => <String>[
+    'CHECK (free_swap_limit >= 0)',
+    'CHECK (max_swaps >= 0)',
+  ];
+}
+
+class SetItems extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  @ReferenceName('setProducts')
+  IntColumn get productId =>
+      integer().customConstraint('NOT NULL REFERENCES "products" ("id")')();
+
+  @ReferenceName('setItemProducts')
+  IntColumn get itemProductId =>
+      integer().customConstraint('NOT NULL REFERENCES "products" ("id")')();
+
+  BoolColumn get isRemovable => boolean().withDefault(const Constant(true))();
+
+  IntColumn get defaultQuantity => integer().withDefault(const Constant(1))();
+
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  List<String> get customConstraints => <String>[
+    'CHECK (default_quantity > 0)',
+    'UNIQUE(product_id, item_product_id)',
+  ];
+}
+
+class ModifierGroups extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get productId =>
+      integer().customConstraint('NOT NULL REFERENCES "products" ("id")')();
+
+  TextColumn get name => text()();
+
+  IntColumn get minSelect => integer().withDefault(const Constant(1))();
+
+  IntColumn get maxSelect => integer().withDefault(const Constant(1))();
+
+  IntColumn get includedQuantity => integer().withDefault(const Constant(1))();
+
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  List<String> get customConstraints => <String>[
+    'CHECK (min_select >= 0)',
+    'CHECK (max_select > 0)',
+    'CHECK (included_quantity > 0)',
+    'CHECK (max_select >= min_select)',
+    'UNIQUE(product_id, name)',
   ];
 }
 
@@ -190,11 +283,19 @@ class TransactionLines extends Table {
 
   IntColumn get lineTotalMinor => integer()();
 
+  TextColumn get pricingMode =>
+      text().withDefault(const Constant('standard'))();
+
+  IntColumn get removalDiscountTotalMinor =>
+      integer().withDefault(const Constant(0))();
+
   @override
   List<String> get customConstraints => <String>[
     'CHECK (unit_price_minor >= 0)',
     'CHECK (quantity > 0)',
     'CHECK (line_total_minor >= 0)',
+    "CHECK (pricing_mode IN ('standard','set'))",
+    'CHECK (removal_discount_total_minor >= 0)',
   ];
 }
 
@@ -211,12 +312,30 @@ class OrderModifiers extends Table {
 
   TextColumn get itemName => text()();
 
+  IntColumn get quantity => integer().withDefault(const Constant(1))();
+
+  IntColumn get itemProductId =>
+      integer().nullable().customConstraint('REFERENCES "products" ("id")')();
+
   IntColumn get extraPriceMinor => integer().withDefault(const Constant(0))();
+
+  TextColumn get chargeReason => text().nullable()();
+
+  IntColumn get unitPriceMinor => integer().withDefault(const Constant(0))();
+
+  IntColumn get priceEffectMinor => integer().withDefault(const Constant(0))();
+
+  IntColumn get sortKey => integer().withDefault(const Constant(0))();
 
   @override
   List<String> get customConstraints => <String>[
-    "CHECK (\"action\" IN ('remove','add'))",
+    "CHECK (\"action\" IN ('remove','add','choice'))",
+    'CHECK (quantity > 0)',
     'CHECK (extra_price_minor >= 0)',
+    'CHECK (unit_price_minor >= 0)',
+    'CHECK (price_effect_minor >= 0)',
+    "CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount'))",
+    "CHECK (\"action\" != 'choice' OR charge_reason = 'included_choice')",
   ];
 }
 
@@ -471,6 +590,9 @@ class SyncQueue extends Table {
     Users,
     Categories,
     Products,
+    MenuSettings,
+    SetItems,
+    ModifierGroups,
     ProductModifiers,
     Shifts,
     Transactions,
@@ -495,7 +617,7 @@ class AppDatabase extends _$AppDatabase {
     return AppDatabase(NativeDatabase(file));
   }
 
-  static const int currentSchemaVersion = 15;
+  static const int currentSchemaVersion = 19;
   final List<MigrationLogEntry> _migrationHistory = <MigrationLogEntry>[];
   MigrationLogEntry? _lastMigrationFailure;
 
@@ -525,6 +647,7 @@ class AppDatabase extends _$AppDatabase {
             await _createBaseTables();
             await _createFreshPathFkEmulation();
           }
+          await _seedDefaultMenuSettings();
           await _createIndexes();
         },
       );
@@ -642,6 +765,38 @@ class AppDatabase extends _$AppDatabase {
           action: _migrateToV15,
         );
       }
+      if (from < 16) {
+        await _runMigrationStep(
+          step: 'migrate_v16',
+          fromVersion: from < 15 ? 15 : from,
+          toVersion: 16,
+          action: _migrateToV16,
+        );
+      }
+      if (from < 17) {
+        await _runMigrationStep(
+          step: 'migrate_v17',
+          fromVersion: from < 16 ? 16 : from,
+          toVersion: 17,
+          action: _migrateToV17,
+        );
+      }
+      if (from < 18) {
+        await _runMigrationStep(
+          step: 'migrate_v18',
+          fromVersion: from < 17 ? 17 : from,
+          toVersion: 18,
+          action: _migrateToV18,
+        );
+      }
+      if (from < 19) {
+        await _runMigrationStep(
+          step: 'migrate_v19',
+          fromVersion: from < 18 ? 18 : from,
+          toVersion: 19,
+          action: _migrateToV19,
+        );
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
@@ -680,7 +835,9 @@ class AppDatabase extends _$AppDatabase {
         name TEXT NOT NULL,
         image_url TEXT NULL,
         sort_order INTEGER NOT NULL DEFAULT 0,
-        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        removal_discount_1_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_1_minor >= 0),
+        removal_discount_2_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_2_minor >= 0)
       );
     ''');
     await customStatement('''
@@ -697,13 +854,49 @@ class AppDatabase extends _$AppDatabase {
       );
     ''');
     await customStatement('''
-      CREATE TABLE IF NOT EXISTS product_modifiers (
+      CREATE TABLE IF NOT EXISTS menu_settings (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        free_swap_limit INTEGER NOT NULL DEFAULT 2 CHECK (free_swap_limit >= 0),
+        max_swaps INTEGER NOT NULL DEFAULT 4 CHECK (max_swaps >= 0),
+        updated_by INTEGER NULL,
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS set_items (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        item_product_id INTEGER NOT NULL,
+        is_removable INTEGER NOT NULL DEFAULT 1 CHECK (is_removable IN (0, 1)),
+        default_quantity INTEGER NOT NULL DEFAULT 1 CHECK (default_quantity > 0),
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(product_id, item_product_id)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS modifier_groups (
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         product_id INTEGER NOT NULL,
         name TEXT NOT NULL,
-        type TEXT NOT NULL CHECK (type IN ('included','extra')),
+        min_select INTEGER NOT NULL DEFAULT 1 CHECK (min_select >= 0),
+        max_select INTEGER NOT NULL DEFAULT 1 CHECK (max_select > 0),
+        included_quantity INTEGER NOT NULL DEFAULT 1 CHECK (included_quantity > 0),
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        CHECK (max_select >= min_select),
+        UNIQUE(product_id, name)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS product_modifiers (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        group_id INTEGER NULL,
+        item_product_id INTEGER NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('included','extra','choice')),
         extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
-        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        CHECK ((type = 'choice' AND group_id IS NOT NULL AND item_product_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))
       );
     ''');
     await customStatement('''
@@ -748,7 +941,9 @@ class AppDatabase extends _$AppDatabase {
         product_name TEXT NOT NULL,
         unit_price_minor INTEGER NOT NULL CHECK (unit_price_minor >= 0),
         quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
-        line_total_minor INTEGER NOT NULL CHECK (line_total_minor >= 0)
+        line_total_minor INTEGER NOT NULL CHECK (line_total_minor >= 0),
+        pricing_mode TEXT NOT NULL DEFAULT 'standard' CHECK (pricing_mode IN ('standard','set')),
+        removal_discount_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_total_minor >= 0)
       );
     ''');
     await customStatement('''
@@ -756,9 +951,16 @@ class AppDatabase extends _$AppDatabase {
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         uuid TEXT NOT NULL UNIQUE,
         transaction_line_id INTEGER NOT NULL,
-        action TEXT NOT NULL CHECK (action IN ('remove','add')),
+        action TEXT NOT NULL CHECK (action IN ('remove','add','choice')),
         item_name TEXT NOT NULL,
-        extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0)
+        quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+        item_product_id INTEGER NULL,
+        extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
+        charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount')),
+        unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
+        price_effect_minor INTEGER NOT NULL DEFAULT 0 CHECK (price_effect_minor >= 0),
+        sort_key INTEGER NOT NULL DEFAULT 0,
+        CHECK (action != 'choice' OR charge_reason = 'included_choice')
       );
     ''');
     await customStatement('''
@@ -884,9 +1086,42 @@ class AppDatabase extends _$AppDatabase {
       referencedTable: 'categories',
     );
     await _createMigrationFkTrigger(
+      table: 'menu_settings',
+      column: 'updated_by',
+      referencedTable: 'users',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'set_items',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'set_items',
+      column: 'item_product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'modifier_groups',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
       table: 'product_modifiers',
       column: 'product_id',
       referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'group_id',
+      referencedTable: 'modifier_groups',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
     );
     await _createMigrationFkTrigger(
       table: 'shifts',
@@ -935,6 +1170,12 @@ class AppDatabase extends _$AppDatabase {
       table: 'order_modifiers',
       column: 'transaction_line_id',
       referencedTable: 'transaction_lines',
+    );
+    await _createMigrationFkTrigger(
+      table: 'order_modifiers',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
     );
     await _createMigrationFkTrigger(
       table: 'payments',
@@ -996,10 +1237,25 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _createIndexes() async {
     await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_menu_settings_updated_at ON menu_settings(updated_at, id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_set_items_product ON set_items(product_id, sort_order, id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_modifier_groups_product ON modifier_groups(product_id, sort_order, id);',
+    );
+    await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id, is_active, is_visible_on_pos, sort_order);',
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_product_modifiers_prod ON product_modifiers(product_id, is_active);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_product_modifiers_group ON product_modifiers(group_id, is_active);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_product_modifiers_item_product ON product_modifiers(item_product_id, type);',
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_transactions_shift ON transactions(shift_id, status, created_at);',
@@ -1012,6 +1268,12 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_order_modifiers_line ON order_modifiers(transaction_line_id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_item_product ON order_modifiers(item_product_id, charge_reason);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_item_product_semantics ON order_modifiers(item_product_id, action, charge_reason, sort_key);',
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_payments_tx ON payments(transaction_id);',
@@ -1586,6 +1848,413 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  Future<void> _migrateToV16() async {
+    await customStatement('''
+      ALTER TABLE categories
+      ADD COLUMN removal_discount_1_minor INTEGER NOT NULL DEFAULT 0
+      CHECK (removal_discount_1_minor >= 0);
+    ''');
+    await customStatement('''
+      ALTER TABLE categories
+      ADD COLUMN removal_discount_2_minor INTEGER NOT NULL DEFAULT 0
+      CHECK (removal_discount_2_minor >= 0);
+    ''');
+
+    await customStatement('''
+      ALTER TABLE transaction_lines
+      ADD COLUMN pricing_mode TEXT NOT NULL DEFAULT 'standard'
+      CHECK (pricing_mode IN ('standard','set'));
+    ''');
+    await customStatement('''
+      ALTER TABLE transaction_lines
+      ADD COLUMN removal_discount_total_minor INTEGER NOT NULL DEFAULT 0
+      CHECK (removal_discount_total_minor >= 0);
+    ''');
+
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS menu_settings (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        free_swap_limit INTEGER NOT NULL DEFAULT 2 CHECK (free_swap_limit >= 0),
+        max_swaps INTEGER NOT NULL DEFAULT 4 CHECK (max_swaps >= 0),
+        updated_by INTEGER NULL,
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+    ''');
+    await _seedDefaultMenuSettings();
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS set_items (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        item_product_id INTEGER NOT NULL,
+        is_removable INTEGER NOT NULL DEFAULT 1 CHECK (is_removable IN (0, 1)),
+        default_quantity INTEGER NOT NULL DEFAULT 1 CHECK (default_quantity > 0),
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(product_id, item_product_id)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS modifier_groups (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        min_select INTEGER NOT NULL DEFAULT 1 CHECK (min_select >= 0),
+        max_select INTEGER NOT NULL DEFAULT 1 CHECK (max_select > 0),
+        included_quantity INTEGER NOT NULL DEFAULT 1 CHECK (included_quantity > 0),
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        CHECK (max_select >= min_select),
+        UNIQUE(product_id, name)
+      );
+    ''');
+
+    await customStatement('PRAGMA foreign_keys = OFF;');
+    try {
+      await customStatement('DROP INDEX IF EXISTS idx_product_modifiers_prod;');
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_product_modifiers_group;',
+      );
+      await customStatement(
+        'ALTER TABLE product_modifiers RENAME TO product_modifiers_legacy_v16;',
+      );
+      await customStatement('''
+        CREATE TABLE product_modifiers (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          group_id INTEGER NULL,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('included','extra','choice')),
+          extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
+          is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+          CHECK ((group_id IS NOT NULL AND type = 'choice') OR (group_id IS NULL AND type IN ('included','extra')))
+        );
+      ''');
+      await customStatement('''
+        INSERT INTO product_modifiers (
+          id,
+          product_id,
+          group_id,
+          name,
+          type,
+          extra_price_minor,
+          is_active
+        )
+        SELECT
+          id,
+          product_id,
+          NULL,
+          name,
+          type,
+          extra_price_minor,
+          is_active
+        FROM product_modifiers_legacy_v16;
+      ''');
+      await customStatement('DROP TABLE product_modifiers_legacy_v16;');
+
+      await customStatement('DROP INDEX IF EXISTS idx_order_modifiers_line;');
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_order_modifiers_item_product;',
+      );
+      await customStatement(
+        'ALTER TABLE order_modifiers RENAME TO order_modifiers_legacy_v16;',
+      );
+      await customStatement('''
+        CREATE TABLE order_modifiers (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          transaction_line_id INTEGER NOT NULL,
+          action TEXT NOT NULL CHECK (action IN ('remove','add','choice')),
+          item_name TEXT NOT NULL,
+          quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+          item_product_id INTEGER NULL,
+          extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
+          charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount')),
+          CHECK (action != 'choice' OR charge_reason = 'included_choice')
+        );
+      ''');
+      await customStatement('''
+        INSERT INTO order_modifiers (
+          id,
+          uuid,
+          transaction_line_id,
+          action,
+          item_name,
+          quantity,
+          item_product_id,
+          extra_price_minor,
+          charge_reason
+        )
+        SELECT
+          id,
+          uuid,
+          transaction_line_id,
+          action,
+          item_name,
+          1,
+          NULL,
+          extra_price_minor,
+          NULL
+        FROM order_modifiers_legacy_v16;
+      ''');
+      await customStatement('DROP TABLE order_modifiers_legacy_v16;');
+    } finally {
+      await customStatement('PRAGMA foreign_keys = ON;');
+    }
+
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_menu_settings_updated_at ON menu_settings(updated_at, id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_set_items_product ON set_items(product_id, sort_order, id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_modifier_groups_product ON modifier_groups(product_id, sort_order, id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_product_modifiers_prod ON product_modifiers(product_id, is_active);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_product_modifiers_group ON product_modifiers(group_id, is_active);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_line ON order_modifiers(transaction_line_id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_item_product ON order_modifiers(item_product_id, charge_reason);',
+    );
+
+    await _createMigrationFkTrigger(
+      table: 'menu_settings',
+      column: 'updated_by',
+      referencedTable: 'users',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'set_items',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'set_items',
+      column: 'item_product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'modifier_groups',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'group_id',
+      referencedTable: 'modifier_groups',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'order_modifiers',
+      column: 'transaction_line_id',
+      referencedTable: 'transaction_lines',
+    );
+    await _createMigrationFkTrigger(
+      table: 'order_modifiers',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
+    );
+  }
+
+  Future<void> _migrateToV17() async {
+    final bool hasMaxSwaps = await _tableHasColumn(
+      tableName: 'menu_settings',
+      columnName: 'max_swaps',
+    );
+    if (!hasMaxSwaps) {
+      await customStatement('''
+        ALTER TABLE menu_settings
+        ADD COLUMN max_swaps INTEGER NOT NULL DEFAULT 4
+        CHECK (max_swaps >= 0);
+      ''');
+    }
+
+    await _seedDefaultMenuSettings();
+  }
+
+  Future<void> _migrateToV18() async {
+    await customStatement('PRAGMA foreign_keys = OFF;');
+    try {
+      await customStatement('DROP INDEX IF EXISTS idx_product_modifiers_prod;');
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_product_modifiers_group;',
+      );
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_product_modifiers_item_product;',
+      );
+      await customStatement(
+        'ALTER TABLE product_modifiers RENAME TO product_modifiers_legacy_v18;',
+      );
+      await customStatement('''
+        CREATE TABLE product_modifiers (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          group_id INTEGER NULL,
+          item_product_id INTEGER NULL,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('included','extra','choice')),
+          extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
+          is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+          CHECK ((type = 'choice' AND group_id IS NOT NULL AND item_product_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))
+        );
+      ''');
+      await customStatement('''
+        INSERT INTO product_modifiers (
+          id,
+          product_id,
+          group_id,
+          item_product_id,
+          name,
+          type,
+          extra_price_minor,
+          is_active
+        )
+        SELECT
+          id,
+          product_id,
+          group_id,
+          NULL,
+          name,
+          type,
+          extra_price_minor,
+          is_active
+        FROM product_modifiers_legacy_v18;
+      ''');
+      await customStatement('DROP TABLE product_modifiers_legacy_v18;');
+    } finally {
+      await customStatement('PRAGMA foreign_keys = ON;');
+    }
+
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_product_modifiers_prod ON product_modifiers(product_id, is_active);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_product_modifiers_group ON product_modifiers(group_id, is_active);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_product_modifiers_item_product ON product_modifiers(item_product_id, type);',
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'group_id',
+      referencedTable: 'modifier_groups',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
+    );
+  }
+
+  Future<void> _migrateToV19() async {
+    final bool hasOrderModifiersTable = await _tableExists('order_modifiers');
+    if (!hasOrderModifiersTable) {
+      return;
+    }
+
+    await customStatement('PRAGMA foreign_keys = OFF;');
+    try {
+      await customStatement('DROP INDEX IF EXISTS idx_order_modifiers_line;');
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_order_modifiers_item_product;',
+      );
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_order_modifiers_item_product_semantics;',
+      );
+      await customStatement(
+        'ALTER TABLE order_modifiers RENAME TO order_modifiers_legacy_v19;',
+      );
+      await customStatement('''
+        CREATE TABLE order_modifiers (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          transaction_line_id INTEGER NOT NULL,
+          action TEXT NOT NULL CHECK (action IN ('remove','add','choice')),
+          item_name TEXT NOT NULL,
+          quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+          item_product_id INTEGER NULL,
+          extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
+          charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount')),
+          unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
+          price_effect_minor INTEGER NOT NULL DEFAULT 0 CHECK (price_effect_minor >= 0),
+          sort_key INTEGER NOT NULL DEFAULT 0,
+          CHECK (action != 'choice' OR charge_reason = 'included_choice')
+        );
+      ''');
+      await customStatement('''
+        INSERT INTO order_modifiers (
+          id,
+          uuid,
+          transaction_line_id,
+          action,
+          item_name,
+          quantity,
+          item_product_id,
+          extra_price_minor,
+          charge_reason,
+          unit_price_minor,
+          price_effect_minor,
+          sort_key
+        )
+        SELECT
+          id,
+          uuid,
+          transaction_line_id,
+          action,
+          item_name,
+          quantity,
+          item_product_id,
+          extra_price_minor,
+          charge_reason,
+          extra_price_minor,
+          extra_price_minor,
+          0
+        FROM order_modifiers_legacy_v19;
+      ''');
+      await customStatement('DROP TABLE order_modifiers_legacy_v19;');
+    } finally {
+      await customStatement('PRAGMA foreign_keys = ON;');
+    }
+
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_line ON order_modifiers(transaction_line_id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_item_product ON order_modifiers(item_product_id, charge_reason);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_item_product_semantics ON order_modifiers(item_product_id, action, charge_reason, sort_key);',
+    );
+    await _createMigrationFkTrigger(
+      table: 'order_modifiers',
+      column: 'transaction_line_id',
+      referencedTable: 'transaction_lines',
+    );
+    await _createMigrationFkTrigger(
+      table: 'order_modifiers',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
+    );
+  }
+
   Future<void> _createSyncRootSnapshotTable() async {
     await customStatement('''
       CREATE TABLE IF NOT EXISTS sync_queue_root_graph_snapshots (
@@ -1626,6 +2295,41 @@ class AppDatabase extends _$AppDatabase {
         SELECT RAISE(ABORT, '$message');
       END;
     ''');
+  }
+
+  Future<void> _seedDefaultMenuSettings() async {
+    await customStatement('''
+      INSERT INTO menu_settings (
+        free_swap_limit,
+        max_swaps,
+        updated_by,
+        updated_at
+      )
+      SELECT 2, 4, NULL, unixepoch()
+      WHERE NOT EXISTS (SELECT 1 FROM menu_settings);
+    ''');
+  }
+
+  Future<bool> _tableHasColumn({
+    required String tableName,
+    required String columnName,
+  }) async {
+    final List<QueryRow> rows = await customSelect(
+      'PRAGMA table_info($tableName)',
+    ).get();
+    return rows.any((QueryRow row) => row.read<String>('name') == columnName);
+  }
+
+  Future<bool> _tableExists(String tableName) async {
+    final QueryRow? row = await customSelect(
+      '''
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table' AND name = ?
+      ''',
+      variables: <Variable<Object>>[Variable<String>(tableName)],
+    ).getSingleOrNull();
+    return row != null;
   }
 
   Future<void> _runMigrationStep({

@@ -23,6 +23,63 @@ class ValidationException extends AppException {
   ValidationException(super.message);
 }
 
+enum BreakfastEditBlockedReason { notDraft, sent, paid, cancelled }
+
+enum BreakfastEditErrorCode {
+  rootNotSetProduct,
+  invalidChoiceGroup,
+  choiceMemberNotAllowed,
+  mixedToastBreadNotSupported,
+  removeQuantityExceedsDefault,
+  swapCandidateNotSwapEligible,
+  negativeQuantity,
+  invalidChoiceQuantity,
+  unknownProduct,
+  unknownRequestedEntity,
+  unsupportedLineSplitState,
+}
+
+class BreakfastEditRejectedException extends ValidationException {
+  BreakfastEditRejectedException({
+    required this.codes,
+    this.transactionLineId,
+  }) : super(
+         'Breakfast edit rejected: ${codes.map((BreakfastEditErrorCode code) => code.name).join(', ')}',
+       );
+
+  final List<BreakfastEditErrorCode> codes;
+  final int? transactionLineId;
+}
+
+class BreakfastLineNotEditableException extends InvalidStateTransitionException {
+  BreakfastLineNotEditableException({
+    required this.reason,
+    required this.transactionLineId,
+    required this.transactionId,
+  }) : super(_buildMessage(reason, transactionLineId, transactionId));
+
+  final BreakfastEditBlockedReason reason;
+  final int transactionLineId;
+  final int transactionId;
+
+  static String _buildMessage(
+    BreakfastEditBlockedReason reason,
+    int transactionLineId,
+    int transactionId,
+  ) {
+    switch (reason) {
+      case BreakfastEditBlockedReason.notDraft:
+        return 'Breakfast line $transactionLineId in transaction $transactionId is not editable.';
+      case BreakfastEditBlockedReason.sent:
+        return 'Breakfast line $transactionLineId in transaction $transactionId belongs to a sent order and is not editable.';
+      case BreakfastEditBlockedReason.paid:
+        return 'Breakfast line $transactionLineId in transaction $transactionId belongs to a paid order and is not editable.';
+      case BreakfastEditBlockedReason.cancelled:
+        return 'Breakfast line $transactionLineId in transaction $transactionId belongs to a cancelled order and is not editable.';
+    }
+  }
+}
+
 class NotFoundException extends AppException {
   NotFoundException(super.message);
 }

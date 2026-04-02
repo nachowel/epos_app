@@ -1,3 +1,5 @@
+enum TransactionLinePricingMode { standard, set }
+
 class TransactionLine {
   const TransactionLine({
     required this.id,
@@ -8,6 +10,8 @@ class TransactionLine {
     required this.unitPriceMinor,
     required this.quantity,
     required this.lineTotalMinor,
+    this.pricingMode = TransactionLinePricingMode.standard,
+    this.removalDiscountTotalMinor = 0,
   });
 
   final int id;
@@ -18,6 +22,8 @@ class TransactionLine {
   final int unitPriceMinor;
   final int quantity;
   final int lineTotalMinor;
+  final TransactionLinePricingMode pricingMode;
+  final int removalDiscountTotalMinor;
 
   TransactionLine copyWith({
     int? id,
@@ -28,6 +34,8 @@ class TransactionLine {
     int? unitPriceMinor,
     int? quantity,
     int? lineTotalMinor,
+    TransactionLinePricingMode? pricingMode,
+    int? removalDiscountTotalMinor,
   }) {
     return TransactionLine(
       id: id ?? this.id,
@@ -38,6 +46,9 @@ class TransactionLine {
       unitPriceMinor: unitPriceMinor ?? this.unitPriceMinor,
       quantity: quantity ?? this.quantity,
       lineTotalMinor: lineTotalMinor ?? this.lineTotalMinor,
+      pricingMode: pricingMode ?? this.pricingMode,
+      removalDiscountTotalMinor:
+          removalDiscountTotalMinor ?? this.removalDiscountTotalMinor,
     );
   }
 
@@ -54,7 +65,9 @@ class TransactionLine {
         other.productName == productName &&
         other.unitPriceMinor == unitPriceMinor &&
         other.quantity == quantity &&
-        other.lineTotalMinor == lineTotalMinor;
+        other.lineTotalMinor == lineTotalMinor &&
+        other.pricingMode == pricingMode &&
+        other.removalDiscountTotalMinor == removalDiscountTotalMinor;
   }
 
   @override
@@ -67,5 +80,7 @@ class TransactionLine {
     unitPriceMinor,
     quantity,
     lineTotalMinor,
+    pricingMode,
+    removalDiscountTotalMinor,
   );
 }

@@ -1,4 +1,12 @@
-enum ModifierAction { remove, add }
+enum ModifierAction { remove, add, choice }
+
+enum ModifierChargeReason {
+  includedChoice,
+  freeSwap,
+  paidSwap,
+  extraAdd,
+  removalDiscount,
+}
 
 class OrderModifier {
   const OrderModifier({
@@ -8,6 +16,12 @@ class OrderModifier {
     required this.action,
     required this.itemName,
     required this.extraPriceMinor,
+    this.chargeReason,
+    this.itemProductId,
+    this.quantity = 1,
+    this.unitPriceMinor = 0,
+    this.priceEffectMinor = 0,
+    this.sortKey = 0,
   });
 
   final int id;
@@ -16,6 +30,12 @@ class OrderModifier {
   final ModifierAction action;
   final String itemName;
   final int extraPriceMinor;
+  final ModifierChargeReason? chargeReason;
+  final int? itemProductId;
+  final int quantity;
+  final int unitPriceMinor;
+  final int priceEffectMinor;
+  final int sortKey;
 
   OrderModifier copyWith({
     int? id,
@@ -24,6 +44,12 @@ class OrderModifier {
     ModifierAction? action,
     String? itemName,
     int? extraPriceMinor,
+    ModifierChargeReason? chargeReason,
+    Object? itemProductId = _unsetItemProductId,
+    int? quantity,
+    int? unitPriceMinor,
+    int? priceEffectMinor,
+    int? sortKey,
   }) {
     return OrderModifier(
       id: id ?? this.id,
@@ -32,6 +58,14 @@ class OrderModifier {
       action: action ?? this.action,
       itemName: itemName ?? this.itemName,
       extraPriceMinor: extraPriceMinor ?? this.extraPriceMinor,
+      chargeReason: chargeReason ?? this.chargeReason,
+      itemProductId: identical(itemProductId, _unsetItemProductId)
+          ? this.itemProductId
+          : itemProductId as int?,
+      quantity: quantity ?? this.quantity,
+      unitPriceMinor: unitPriceMinor ?? this.unitPriceMinor,
+      priceEffectMinor: priceEffectMinor ?? this.priceEffectMinor,
+      sortKey: sortKey ?? this.sortKey,
     );
   }
 
@@ -46,7 +80,13 @@ class OrderModifier {
         other.transactionLineId == transactionLineId &&
         other.action == action &&
         other.itemName == itemName &&
-        other.extraPriceMinor == extraPriceMinor;
+        other.extraPriceMinor == extraPriceMinor &&
+        other.chargeReason == chargeReason &&
+        other.itemProductId == itemProductId &&
+        other.quantity == quantity &&
+        other.unitPriceMinor == unitPriceMinor &&
+        other.priceEffectMinor == priceEffectMinor &&
+        other.sortKey == sortKey;
   }
 
   @override
@@ -57,5 +97,13 @@ class OrderModifier {
     action,
     itemName,
     extraPriceMinor,
+    chargeReason,
+    itemProductId,
+    quantity,
+    unitPriceMinor,
+    priceEffectMinor,
+    sortKey,
   );
 }
+
+const Object _unsetItemProductId = Object();

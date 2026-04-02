@@ -2,11 +2,14 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/logging/app_logger.dart';
 import '../../core/errors/exceptions.dart';
+import '../../data/repositories/breakfast_configuration_repository.dart';
 import '../../data/repositories/payment_repository.dart';
 import '../../data/repositories/print_job_repository.dart';
 import '../../data/repositories/sync_queue_repository.dart';
 import '../../data/repositories/transaction_repository.dart';
 import '../../data/repositories/transaction_state_repository.dart';
+import '../models/breakfast_line_edit.dart';
+import '../models/breakfast_rebuild.dart';
 import '../models/open_order_summary.dart';
 import '../models/authorization_policy.dart';
 import '../models/checkout_item.dart';
@@ -18,6 +21,8 @@ import '../models/transaction.dart';
 import '../models/transaction_line.dart';
 import '../models/user.dart';
 import 'audit_log_service.dart';
+import 'breakfast_rebuild_engine.dart';
+import 'breakfast_requested_state_mapper.dart';
 import 'shift_session_service.dart';
 
 class OrderService {
@@ -25,18 +30,23 @@ class OrderService {
     required ShiftSessionService shiftSessionService,
     required TransactionRepository transactionRepository,
     required TransactionStateRepository transactionStateRepository,
+    BreakfastConfigurationRepository? breakfastConfigurationRepository,
     PaymentRepository? paymentRepository,
     PrintJobRepository? printJobRepository,
     SyncQueueRepository? syncQueueRepository,
+    BreakfastRebuildEngine breakfastRebuildEngine =
+        const BreakfastRebuildEngine(),
     Uuid? uuidGenerator,
     AuditLogService auditLogService = const NoopAuditLogService(),
     AppLogger logger = const NoopAppLogger(),
   }) : _shiftSessionService = shiftSessionService,
        _transactionRepository = transactionRepository,
        _transactionStateRepository = transactionStateRepository,
+       _breakfastConfigurationRepository = breakfastConfigurationRepository,
        _paymentRepository = paymentRepository,
        _printJobRepository = printJobRepository,
        _syncQueueRepository = syncQueueRepository,
+       _breakfastRebuildEngine = breakfastRebuildEngine,
        _uuidGenerator = uuidGenerator ?? const Uuid(),
        _auditLogService = auditLogService,
        _logger = logger;
@@ -44,9 +54,11 @@ class OrderService {
   final ShiftSessionService _shiftSessionService;
   final TransactionRepository _transactionRepository;
   final TransactionStateRepository _transactionStateRepository;
+  final BreakfastConfigurationRepository? _breakfastConfigurationRepository;
   final PaymentRepository? _paymentRepository;
   final PrintJobRepository? _printJobRepository;
   final SyncQueueRepository? _syncQueueRepository;
+  final BreakfastRebuildEngine _breakfastRebuildEngine;
   final Uuid _uuidGenerator;
   final AuditLogService _auditLogService;
   final AppLogger _logger;
@@ -114,6 +126,206 @@ class OrderService {
         .getTransactionIdByLine(transactionLineId);
     await recalculateOrderTotals(transactionId);
     return modifier;
+  }
+
+  Future<TransactionLine> editBreakfastLine({
+    required int transactionLineId,
+    required BreakfastLineEdit edit,
+    int? actorUserId,
+  }) async {
+    final BreakfastConfigurationRepository configurationRepository =
+        _requiredBreakfastConfigurationRepository;
+
+    return _transactionRepository.runInTransaction(() async {
+      final ({TransactionLine line, TransactionStatus status})? initialContext =
+          await _transactionRepository.getLineContext(transactionLineId);
+      if (initialContext == null) {
+        throw NotFoundException(
+          'Transaction line not found: $transactionLineId',
+        );
+      }
+
+      try {
+        _ensureBreakfastLineEditable(
+          status: initialContext.status,
+          line: initialContext.line,
+        );
+      } on BreakfastLineNotEditableException catch (e) {
+        _logger.warn(
+          eventType: 'breakfast_edit_blocked',
+          entityId: initialContext.line.uuid,
+          message: 'Breakfast line edit rejected: not editable.',
+          metadata: <String, Object?>{
+            'transaction_line_id': transactionLineId,
+            'transaction_id': initialContext.line.transactionId,
+            'reason': e.reason.name,
+          },
+        );
+        rethrow;
+      }
+
+      TransactionLine workingLine = initialContext.line;
+      final int oldLineTotalMinor = workingLine.lineTotalMinor;
+      bool didSplit = false;
+      if (workingLine.quantity > 1) {
+        workingLine = await _transactionRepository.splitLineForIndependentEdit(
+          workingLine.id,
+        );
+        didSplit = true;
+      }
+
+      final BreakfastSetConfiguration? baseConfiguration =
+          await configurationRepository.loadSetConfiguration(workingLine.productId);
+      if (baseConfiguration == null) {
+        _logBreakfastEditRejected(
+          lineUuid: workingLine.uuid,
+          transactionLineId: workingLine.id,
+          codes: const <BreakfastEditErrorCode>[
+            BreakfastEditErrorCode.rootNotSetProduct,
+          ],
+        );
+        throw BreakfastEditRejectedException(
+          codes: const <BreakfastEditErrorCode>[
+            BreakfastEditErrorCode.rootNotSetProduct,
+          ],
+          transactionLineId: workingLine.id,
+        );
+      }
+
+      final List<OrderModifier> currentModifiers = await _transactionRepository
+          .getModifiersByLine(workingLine.id);
+      if (_hasLegacyModifierSnapshot(currentModifiers)) {
+        _logBreakfastEditRejected(
+          lineUuid: workingLine.uuid,
+          transactionLineId: workingLine.id,
+          codes: const <BreakfastEditErrorCode>[
+            BreakfastEditErrorCode.unsupportedLineSplitState,
+          ],
+        );
+        throw BreakfastEditRejectedException(
+          codes: const <BreakfastEditErrorCode>[
+            BreakfastEditErrorCode.unsupportedLineSplitState,
+          ],
+          transactionLineId: workingLine.id,
+        );
+      }
+
+      final BreakfastRequestedState currentRequestedState =
+          BreakfastRequestedStateMapper.reconstruct(
+            modifiers: currentModifiers,
+            configuration: baseConfiguration,
+          );
+      final BreakfastRequestedState nextRequestedState = edit.applyTo(
+        currentRequestedState,
+      );
+      final BreakfastSetConfiguration configuration = await _augmentConfiguration(
+        configurationRepository: configurationRepository,
+        baseConfiguration: baseConfiguration,
+        requestedState: nextRequestedState,
+      );
+
+      final BreakfastRebuildResult rebuildResult = _breakfastRebuildEngine.rebuild(
+        BreakfastRebuildInput(
+          transactionLine: BreakfastTransactionLineInput(
+            lineId: workingLine.id,
+            lineUuid: workingLine.uuid,
+            rootProductId: workingLine.productId,
+            rootProductName: workingLine.productName,
+            baseUnitPriceMinor: workingLine.unitPriceMinor,
+            lineQuantity: workingLine.quantity,
+          ),
+          setConfiguration: configuration,
+          requestedState: nextRequestedState,
+        ),
+      );
+      if (rebuildResult.validationErrors.isNotEmpty) {
+        _logBreakfastEditRejected(
+          lineUuid: workingLine.uuid,
+          transactionLineId: workingLine.id,
+          codes: rebuildResult.validationErrors,
+        );
+        throw BreakfastEditRejectedException(
+          codes: rebuildResult.validationErrors,
+          transactionLineId: workingLine.id,
+        );
+      }
+
+      await _transactionRepository.replaceBreakfastLineSnapshot(
+        transactionLineId: workingLine.id,
+        rebuildResult: rebuildResult,
+      );
+      await recalculateOrderTotals(workingLine.transactionId);
+
+      final TransactionLine? refreshedLine = await _transactionRepository.getLineById(
+        workingLine.id,
+      );
+      if (refreshedLine == null) {
+        throw NotFoundException('Transaction line not found: ${workingLine.id}');
+      }
+
+      // ── Audit: successful breakfast edit ──
+      final Map<String, int> reasonCounts = _buildReasonCounts(
+        rebuildResult.classifiedModifiers,
+      );
+      _logger.audit(
+        eventType: 'breakfast_line_edited',
+        entityId: workingLine.uuid,
+        message: 'Breakfast line snapshot replaced.',
+        metadata: <String, Object?>{
+          'transaction_id': workingLine.transactionId,
+          'transaction_line_id': workingLine.id,
+          'root_product_id': workingLine.productId,
+          'old_line_total_minor': oldLineTotalMinor,
+          'new_line_total_minor': refreshedLine.lineTotalMinor,
+          'did_split': didSplit,
+          'reason_counts': reasonCounts,
+          if (actorUserId != null) 'actor_user_id': actorUserId,
+        },
+      );
+
+      if (didSplit) {
+        _logger.audit(
+          eventType: 'breakfast_line_split',
+          entityId: workingLine.uuid,
+          message: 'Breakfast line was split for independent edit.',
+          metadata: <String, Object?>{
+            'transaction_id': workingLine.transactionId,
+            'original_line_id': initialContext.line.id,
+            'new_line_id': workingLine.id,
+            'root_product_id': workingLine.productId,
+          },
+        );
+      }
+
+      return refreshedLine;
+    });
+  }
+
+  Map<String, int> _buildReasonCounts(
+    List<BreakfastClassifiedModifier> modifiers,
+  ) {
+    final Map<String, int> counts = <String, int>{};
+    for (final BreakfastClassifiedModifier modifier in modifiers) {
+      final String key = modifier.chargeReason?.name ?? modifier.action.name;
+      counts[key] = (counts[key] ?? 0) + modifier.quantity;
+    }
+    return counts;
+  }
+
+  void _logBreakfastEditRejected({
+    required String lineUuid,
+    required int transactionLineId,
+    required List<BreakfastEditErrorCode> codes,
+  }) {
+    _logger.warn(
+      eventType: 'breakfast_edit_rejected',
+      entityId: lineUuid,
+      message: 'Breakfast edit validation failed.',
+      metadata: <String, Object?>{
+        'transaction_line_id': transactionLineId,
+        'error_codes': codes.map((BreakfastEditErrorCode c) => c.name).toList(),
+      },
+    );
   }
 
   Future<void> recalculateOrderTotals(int transactionId) async {
@@ -194,6 +406,18 @@ class OrderService {
       throw StateError('PaymentRepository is required for payment operations.');
     }
     return paymentRepository;
+  }
+
+  BreakfastConfigurationRepository
+  get _requiredBreakfastConfigurationRepository {
+    final BreakfastConfigurationRepository? repository =
+        _breakfastConfigurationRepository;
+    if (repository == null) {
+      throw StateError(
+        'BreakfastConfigurationRepository is required for breakfast edit operations.',
+      );
+    }
+    return repository;
   }
 
   Future<Transaction> markOrderPaidInCheckoutIfNeeded({
@@ -428,6 +652,78 @@ class OrderService {
     return _transactionRepository.updateTableNumber(
       transactionId: transactionId,
       tableNumber: tableNumber,
+    );
+  }
+
+  void _ensureBreakfastLineEditable({
+    required TransactionStatus status,
+    required TransactionLine line,
+  }) {
+    switch (status) {
+      case TransactionStatus.draft:
+        return;
+      case TransactionStatus.sent:
+        throw BreakfastLineNotEditableException(
+          reason: BreakfastEditBlockedReason.sent,
+          transactionLineId: line.id,
+          transactionId: line.transactionId,
+        );
+      case TransactionStatus.paid:
+        throw BreakfastLineNotEditableException(
+          reason: BreakfastEditBlockedReason.paid,
+          transactionLineId: line.id,
+          transactionId: line.transactionId,
+        );
+      case TransactionStatus.cancelled:
+        throw BreakfastLineNotEditableException(
+          reason: BreakfastEditBlockedReason.cancelled,
+          transactionLineId: line.id,
+          transactionId: line.transactionId,
+        );
+    }
+  }
+
+  bool _hasLegacyModifierSnapshot(List<OrderModifier> modifiers) {
+    for (final OrderModifier modifier in modifiers) {
+      if (modifier.chargeReason == null &&
+          modifier.itemProductId == null &&
+          modifier.action != ModifierAction.choice &&
+          modifier.sortKey == 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<BreakfastSetConfiguration> _augmentConfiguration({
+    required BreakfastConfigurationRepository configurationRepository,
+    required BreakfastSetConfiguration baseConfiguration,
+    required BreakfastRequestedState requestedState,
+  }) async {
+    final Set<int> missingProductIds = <int>{};
+    for (final BreakfastAddedProductRequest add in requestedState.addedProducts) {
+      if (baseConfiguration.findCatalogProduct(add.itemProductId) == null) {
+        missingProductIds.add(add.itemProductId);
+      }
+    }
+    for (final BreakfastChosenGroupRequest choice in requestedState.chosenGroups) {
+      final int? selectedItemProductId = choice.selectedItemProductId;
+      if (selectedItemProductId != null &&
+          baseConfiguration.findCatalogProduct(selectedItemProductId) == null) {
+        missingProductIds.add(selectedItemProductId);
+      }
+    }
+    if (missingProductIds.isEmpty) {
+      return baseConfiguration;
+    }
+
+    final Map<int, BreakfastCatalogProduct> extraProducts =
+        await configurationRepository.loadCatalogProductsByIds(missingProductIds);
+    return baseConfiguration.copyWith(
+      catalogProductsById: <int, BreakfastCatalogProduct>{
+        ...baseConfiguration.catalogProductsById,
+        ...extraProducts,
+      },
     );
   }
 

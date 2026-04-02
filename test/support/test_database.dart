@@ -48,7 +48,9 @@ class _TestAppDatabase extends AppDatabase {
         name TEXT NOT NULL,
         image_url TEXT NULL,
         sort_order INTEGER NOT NULL DEFAULT 0,
-        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        removal_discount_1_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_1_minor >= 0),
+        removal_discount_2_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_2_minor >= 0)
       );
     ''');
     await customStatement('''
@@ -65,13 +67,59 @@ class _TestAppDatabase extends AppDatabase {
       );
     ''');
     await customStatement('''
-      CREATE TABLE product_modifiers (
+      CREATE TABLE menu_settings (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        free_swap_limit INTEGER NOT NULL DEFAULT 2 CHECK (free_swap_limit >= 0),
+        max_swaps INTEGER NOT NULL DEFAULT 4 CHECK (max_swaps >= 0),
+        updated_by INTEGER NULL,
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+    ''');
+    await customStatement('''
+      INSERT INTO menu_settings (
+        free_swap_limit,
+        max_swaps,
+        updated_by,
+        updated_at
+      )
+      SELECT 2, 4, NULL, unixepoch()
+      WHERE NOT EXISTS (SELECT 1 FROM menu_settings);
+    ''');
+    await customStatement('''
+      CREATE TABLE set_items (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        item_product_id INTEGER NOT NULL,
+        is_removable INTEGER NOT NULL DEFAULT 1 CHECK (is_removable IN (0, 1)),
+        default_quantity INTEGER NOT NULL DEFAULT 1 CHECK (default_quantity > 0),
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(product_id, item_product_id)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE modifier_groups (
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         product_id INTEGER NOT NULL,
         name TEXT NOT NULL,
-        type TEXT NOT NULL CHECK (type IN ('included','extra')),
+        min_select INTEGER NOT NULL DEFAULT 1 CHECK (min_select >= 0),
+        max_select INTEGER NOT NULL DEFAULT 1 CHECK (max_select > 0),
+        included_quantity INTEGER NOT NULL DEFAULT 1 CHECK (included_quantity > 0),
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        CHECK (max_select >= min_select),
+        UNIQUE(product_id, name)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE product_modifiers (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        group_id INTEGER NULL,
+        item_product_id INTEGER NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('included','extra','choice')),
         extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
-        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        CHECK ((type = 'choice' AND group_id IS NOT NULL AND item_product_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))
       );
     ''');
     await customStatement('''
@@ -116,7 +164,9 @@ class _TestAppDatabase extends AppDatabase {
         product_name TEXT NOT NULL,
         unit_price_minor INTEGER NOT NULL CHECK (unit_price_minor >= 0),
         quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
-        line_total_minor INTEGER NOT NULL CHECK (line_total_minor >= 0)
+        line_total_minor INTEGER NOT NULL CHECK (line_total_minor >= 0),
+        pricing_mode TEXT NOT NULL DEFAULT 'standard' CHECK (pricing_mode IN ('standard','set')),
+        removal_discount_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_total_minor >= 0)
       );
     ''');
     await customStatement('''
@@ -124,9 +174,16 @@ class _TestAppDatabase extends AppDatabase {
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         uuid TEXT NOT NULL UNIQUE,
         transaction_line_id INTEGER NOT NULL,
-        action TEXT NOT NULL CHECK (action IN ('remove','add')),
+        action TEXT NOT NULL CHECK (action IN ('remove','add','choice')),
         item_name TEXT NOT NULL,
-        extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0)
+        quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+        item_product_id INTEGER NULL,
+        extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
+        charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount')),
+        unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
+        price_effect_minor INTEGER NOT NULL DEFAULT 0 CHECK (price_effect_minor >= 0),
+        sort_key INTEGER NOT NULL DEFAULT 0,
+        CHECK (action != 'choice' OR charge_reason = 'included_choice')
       );
     ''');
     await customStatement('''
@@ -258,10 +315,25 @@ class _TestAppDatabase extends AppDatabase {
       "CREATE UNIQUE INDEX ux_shifts_single_open ON shifts(status) WHERE status = 'open';",
     );
     await customStatement(
+      'CREATE INDEX idx_menu_settings_updated_at ON menu_settings(updated_at, id);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_set_items_product ON set_items(product_id, sort_order, id);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_modifier_groups_product ON modifier_groups(product_id, sort_order, id);',
+    );
+    await customStatement(
       'CREATE INDEX idx_products_category ON products(category_id, is_active, is_visible_on_pos, sort_order);',
     );
     await customStatement(
       'CREATE INDEX idx_product_modifiers_prod ON product_modifiers(product_id, is_active);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_product_modifiers_group ON product_modifiers(group_id, is_active);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_product_modifiers_item_product ON product_modifiers(item_product_id, type);',
     );
     await customStatement(
       'CREATE INDEX idx_transactions_shift ON transactions(shift_id, status, created_at);',
@@ -274,6 +346,12 @@ class _TestAppDatabase extends AppDatabase {
     );
     await customStatement(
       'CREATE INDEX idx_order_modifiers_line ON order_modifiers(transaction_line_id);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_order_modifiers_item_product ON order_modifiers(item_product_id, charge_reason);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_order_modifiers_item_product_semantics ON order_modifiers(item_product_id, action, charge_reason, sort_key);',
     );
     await customStatement(
       'CREATE INDEX idx_payments_tx ON payments(transaction_id);',
@@ -323,9 +401,42 @@ class _TestAppDatabase extends AppDatabase {
       referencedTable: 'categories',
     );
     await _createFkTrigger(
+      table: 'menu_settings',
+      column: 'updated_by',
+      referencedTable: 'users',
+      nullable: true,
+    );
+    await _createFkTrigger(
+      table: 'set_items',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createFkTrigger(
+      table: 'set_items',
+      column: 'item_product_id',
+      referencedTable: 'products',
+    );
+    await _createFkTrigger(
+      table: 'modifier_groups',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createFkTrigger(
       table: 'product_modifiers',
       column: 'product_id',
       referencedTable: 'products',
+    );
+    await _createFkTrigger(
+      table: 'product_modifiers',
+      column: 'group_id',
+      referencedTable: 'modifier_groups',
+      nullable: true,
+    );
+    await _createFkTrigger(
+      table: 'product_modifiers',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
     );
     await _createFkTrigger(
       table: 'shifts',
@@ -374,6 +485,12 @@ class _TestAppDatabase extends AppDatabase {
       table: 'order_modifiers',
       column: 'transaction_line_id',
       referencedTable: 'transaction_lines',
+    );
+    await _createFkTrigger(
+      table: 'order_modifiers',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
     );
     await _createFkTrigger(
       table: 'payments',

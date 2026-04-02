@@ -3,12 +3,13 @@ import 'package:drift/native.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/errors/exceptions.dart';
+import '../../domain/models/breakfast_rebuild.dart';
 import '../../domain/models/order_lifecycle_policy.dart';
-import '../../domain/models/shift_report_category_line.dart';
-import 'sync_queue_repository.dart';
 import '../../domain/models/order_modifier.dart';
-import '../../domain/models/transaction.dart';
+import '../../domain/models/shift_report_category_line.dart';
 import '../../domain/models/transaction_line.dart';
+import 'sync_queue_repository.dart';
+import '../../domain/models/transaction.dart';
 import '../database/app_database.dart' as db;
 
 class TransactionRepository {
@@ -283,7 +284,13 @@ class TransactionRepository {
             transactionLineId: transactionLineId,
             action: _modifierActionToDb(action),
             itemName: itemName,
+            quantity: const Value<int>(1),
+            itemProductId: const Value<int?>(null),
             extraPriceMinor: Value<int>(extraPriceMinor),
+            chargeReason: const Value<String?>(null),
+            unitPriceMinor: Value<int>(extraPriceMinor),
+            priceEffectMinor: Value<int>(extraPriceMinor),
+            sortKey: const Value<int>(0),
           ),
         );
 
@@ -300,6 +307,181 @@ class TransactionRepository {
       transactionLineId,
     );
     return line.transactionId;
+  }
+
+  Future<TransactionLine?> getLineById(int transactionLineId) async {
+    final db.TransactionLine? row =
+        await (_database.select(_database.transactionLines)
+              ..where((db.$TransactionLinesTable t) => t.id.equals(transactionLineId)))
+            .getSingleOrNull();
+    return row == null ? null : _mapLine(row);
+  }
+
+  Future<({TransactionLine line, TransactionStatus status})?>
+  getLineContext(int transactionLineId) async {
+    final TypedResult? row =
+        await (_database.select(_database.transactionLines).join(<Join>[
+                innerJoin(
+                  _database.transactions,
+                  _database.transactions.id.equalsExp(
+                    _database.transactionLines.transactionId,
+                  ),
+                ),
+              ])
+              ..where(_database.transactionLines.id.equals(transactionLineId)))
+            .getSingleOrNull();
+
+    if (row == null) {
+      return null;
+    }
+
+    final db.TransactionLine lineRow = row.readTable(_database.transactionLines);
+    final db.Transaction transactionRow = row.readTable(_database.transactions);
+    return (
+      line: _mapLine(lineRow),
+      status: _statusFromDb(transactionRow.status),
+    );
+  }
+
+  Future<TransactionLine> splitLineForIndependentEdit(int transactionLineId) async {
+    final db.TransactionLine lineRow = await _findLineByIdOrThrow(
+      transactionLineId,
+    );
+    if (lineRow.quantity <= 1) {
+      return _mapLine(lineRow);
+    }
+
+    await _ensureTransactionIsDraft(lineRow.transactionId);
+    final List<db.OrderModifier> modifiers =
+        await (_database.select(_database.orderModifiers)
+              ..where((db.$OrderModifiersTable t) {
+                return t.transactionLineId.equals(transactionLineId);
+              })
+              ..orderBy(<OrderingTerm Function(db.$OrderModifiersTable)>[
+                (db.$OrderModifiersTable t) => OrderingTerm.asc(t.id),
+              ]))
+            .get();
+
+    final bool hasSemanticBreakfastRows = lineRow.pricingMode == 'set' &&
+        lineRow.quantity > 1 &&
+        modifiers.any(_isSemanticModifierRow);
+    if (hasSemanticBreakfastRows) {
+      throw BreakfastEditRejectedException(
+        codes: const <BreakfastEditErrorCode>[
+          BreakfastEditErrorCode.unsupportedLineSplitState,
+        ],
+        transactionLineId: transactionLineId,
+      );
+    }
+
+    final int clonedLineId = await _database
+        .into(_database.transactionLines)
+        .insert(
+          db.TransactionLinesCompanion.insert(
+            uuid: _uuidGenerator.v4(),
+            transactionId: lineRow.transactionId,
+            productId: lineRow.productId,
+            productName: lineRow.productName,
+            unitPriceMinor: lineRow.unitPriceMinor,
+            quantity: const Value<int>(1),
+            lineTotalMinor: lineRow.unitPriceMinor,
+            pricingMode: Value<String>(lineRow.pricingMode),
+            removalDiscountTotalMinor: Value<int>(
+              lineRow.removalDiscountTotalMinor,
+            ),
+          ),
+        );
+
+    for (final db.OrderModifier modifier in modifiers) {
+      await _database.into(_database.orderModifiers).insert(
+        db.OrderModifiersCompanion.insert(
+          uuid: _uuidGenerator.v4(),
+          transactionLineId: clonedLineId,
+          action: modifier.action,
+          itemName: modifier.itemName,
+          quantity: Value<int>(modifier.quantity),
+          itemProductId: Value<int?>(modifier.itemProductId),
+          extraPriceMinor: Value<int>(modifier.extraPriceMinor),
+          chargeReason: Value<String?>(modifier.chargeReason),
+          unitPriceMinor: Value<int>(modifier.unitPriceMinor),
+          priceEffectMinor: Value<int>(modifier.priceEffectMinor),
+          sortKey: Value<int>(modifier.sortKey),
+        ),
+      );
+    }
+
+    final int updatedCount =
+        await (_database.update(_database.transactionLines)
+              ..where((db.$TransactionLinesTable t) {
+                return t.id.equals(transactionLineId);
+              }))
+            .write(
+              db.TransactionLinesCompanion(
+                quantity: Value<int>(lineRow.quantity - 1),
+              ),
+            );
+    if (updatedCount == 0) {
+      throw NotFoundException('Transaction line not found: $transactionLineId');
+    }
+
+    await _recalculateLineTotalInCurrentTransaction(transactionLineId);
+    await _recalculateLineTotalInCurrentTransaction(clonedLineId);
+    return _mapLine(await _findLineByIdOrThrow(clonedLineId));
+  }
+
+  Future<void> replaceBreakfastLineSnapshot({
+    required int transactionLineId,
+    required BreakfastRebuildResult rebuildResult,
+  }) async {
+    final db.TransactionLine lineRow = await _findLineByIdOrThrow(
+      transactionLineId,
+    );
+    await _ensureTransactionIsDraft(lineRow.transactionId);
+
+    await (_database.delete(_database.orderModifiers)
+          ..where((db.$OrderModifiersTable t) {
+            return t.transactionLineId.equals(transactionLineId);
+          }))
+        .go();
+
+    for (final BreakfastClassifiedModifier modifier
+        in rebuildResult.classifiedModifiers) {
+      await _database.into(_database.orderModifiers).insert(
+        db.OrderModifiersCompanion.insert(
+          uuid: _uuidGenerator.v4(),
+          transactionLineId: transactionLineId,
+          action: _modifierActionToDb(modifier.action),
+          itemName: modifier.displayName,
+          quantity: Value<int>(modifier.quantity),
+          itemProductId: Value<int?>(modifier.itemProductId),
+          extraPriceMinor: Value<int>(modifier.priceEffectMinor),
+          chargeReason: Value<String?>(_modifierChargeReasonToDb(
+            modifier.chargeReason,
+          )),
+          unitPriceMinor: Value<int>(modifier.unitPriceMinor),
+          priceEffectMinor: Value<int>(modifier.priceEffectMinor),
+          sortKey: Value<int>(modifier.sortKey),
+        ),
+      );
+    }
+
+    final int updatedCount =
+        await (_database.update(_database.transactionLines)
+              ..where((db.$TransactionLinesTable t) {
+                return t.id.equals(transactionLineId);
+              }))
+            .write(
+              db.TransactionLinesCompanion(
+                pricingMode: const Value<String>('set'),
+                removalDiscountTotalMinor: Value<int>(
+                  rebuildResult.lineSnapshot.removalDiscountTotalMinor,
+                ),
+                lineTotalMinor: Value<int>(rebuildResult.lineSnapshot.lineTotalMinor),
+              ),
+            );
+    if (updatedCount == 0) {
+      throw NotFoundException('Transaction line not found: $transactionLineId');
+    }
   }
 
   Future<({int subtotalMinor, int modifierTotalMinor, int totalAmountMinor})>
@@ -595,7 +777,16 @@ class TransactionRepository {
     final QueryRow row = await _database
         .customSelect(
           '''
-      SELECT COALESCE(SUM(om.extra_price_minor * tl.quantity), 0) AS modifier_total
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN om.charge_reason IS NOT NULL
+            OR om.action = 'choice'
+            OR om.item_product_id IS NOT NULL
+            OR om.sort_key > 0
+          THEN om.price_effect_minor
+          ELSE om.extra_price_minor * tl.quantity
+        END
+      ), 0) AS modifier_total
       FROM order_modifiers om
       INNER JOIN transaction_lines tl ON tl.id = om.transaction_line_id
       WHERE tl.transaction_id = ?
@@ -615,7 +806,16 @@ class TransactionRepository {
     final QueryRow row = await _database
         .customSelect(
           '''
-      SELECT COALESCE(SUM(om.extra_price_minor * tl.quantity), 0) AS modifier_total
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN om.charge_reason IS NOT NULL
+            OR om.action = 'choice'
+            OR om.item_product_id IS NOT NULL
+            OR om.sort_key > 0
+          THEN om.price_effect_minor
+          ELSE om.extra_price_minor * tl.quantity
+        END
+      ), 0) AS modifier_total
       FROM order_modifiers om
       INNER JOIN transaction_lines tl ON tl.id = om.transaction_line_id
       WHERE tl.id = ?
@@ -704,6 +904,8 @@ class TransactionRepository {
       unitPriceMinor: row.unitPriceMinor,
       quantity: row.quantity,
       lineTotalMinor: row.lineTotalMinor,
+      pricingMode: _pricingModeFromDb(row.pricingMode),
+      removalDiscountTotalMinor: row.removalDiscountTotalMinor,
     );
   }
 
@@ -715,6 +917,12 @@ class TransactionRepository {
       action: _modifierActionFromDb(row.action),
       itemName: row.itemName,
       extraPriceMinor: row.extraPriceMinor,
+      chargeReason: _modifierChargeReasonFromDb(row.chargeReason),
+      itemProductId: row.itemProductId,
+      quantity: row.quantity,
+      unitPriceMinor: row.unitPriceMinor,
+      priceEffectMinor: row.priceEffectMinor,
+      sortKey: row.sortKey,
     );
   }
 
@@ -753,6 +961,8 @@ class TransactionRepository {
         return ModifierAction.remove;
       case 'add':
         return ModifierAction.add;
+      case 'choice':
+        return ModifierAction.choice;
       default:
         throw DatabaseException('Unknown modifier action: $value');
     }
@@ -764,7 +974,63 @@ class TransactionRepository {
         return 'remove';
       case ModifierAction.add:
         return 'add';
+      case ModifierAction.choice:
+        return 'choice';
     }
+  }
+
+  ModifierChargeReason? _modifierChargeReasonFromDb(String? value) {
+    switch (value) {
+      case null:
+        return null;
+      case 'included_choice':
+        return ModifierChargeReason.includedChoice;
+      case 'free_swap':
+        return ModifierChargeReason.freeSwap;
+      case 'paid_swap':
+        return ModifierChargeReason.paidSwap;
+      case 'extra_add':
+        return ModifierChargeReason.extraAdd;
+      case 'removal_discount':
+        return ModifierChargeReason.removalDiscount;
+      default:
+        throw DatabaseException('Unknown modifier charge reason: $value');
+    }
+  }
+
+  String? _modifierChargeReasonToDb(ModifierChargeReason? value) {
+    switch (value) {
+      case null:
+        return null;
+      case ModifierChargeReason.includedChoice:
+        return 'included_choice';
+      case ModifierChargeReason.freeSwap:
+        return 'free_swap';
+      case ModifierChargeReason.paidSwap:
+        return 'paid_swap';
+      case ModifierChargeReason.extraAdd:
+        return 'extra_add';
+      case ModifierChargeReason.removalDiscount:
+        return 'removal_discount';
+    }
+  }
+
+  TransactionLinePricingMode _pricingModeFromDb(String value) {
+    switch (value) {
+      case 'standard':
+        return TransactionLinePricingMode.standard;
+      case 'set':
+        return TransactionLinePricingMode.set;
+      default:
+        throw DatabaseException('Unknown line pricing mode: $value');
+    }
+  }
+
+  bool _isSemanticModifierRow(db.OrderModifier row) {
+    return row.chargeReason != null ||
+        row.action == 'choice' ||
+        row.itemProductId != null ||
+        row.sortKey > 0;
   }
 
   bool _isUniqueIdempotencyViolation(SqliteException error) {

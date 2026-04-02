@@ -5,6 +5,9 @@ import '../../core/constants/app_strings.dart';
 import '../../core/errors/error_mapper.dart';
 import '../../core/errors/exceptions.dart';
 import '../../core/providers/app_providers.dart';
+import '../../data/repositories/breakfast_configuration_repository.dart';
+import '../../domain/models/breakfast_line_edit.dart';
+import '../../domain/models/breakfast_rebuild.dart';
 import '../../domain/models/checkout_item.dart';
 import '../../domain/models/checkout_modifier.dart';
 import '../../domain/models/open_order_summary.dart';
@@ -15,15 +18,21 @@ import '../../domain/models/print_job.dart';
 import '../../domain/models/transaction.dart';
 import '../../domain/models/transaction_line.dart';
 import '../../domain/models/user.dart';
+import '../../domain/services/breakfast_requested_state_mapper.dart';
 import 'auth_provider.dart';
 import 'cart_models.dart';
 import 'cart_provider.dart';
 
 class OrderDetailLine {
-  const OrderDetailLine({required this.line, required this.modifiers});
+  const OrderDetailLine({
+    required this.line,
+    required this.modifiers,
+    this.isBreakfastConfigurable = false,
+  });
 
   final TransactionLine line;
   final List<OrderModifier> modifiers;
+  final bool isBreakfastConfigurable;
 }
 
 class OrderDetails {
@@ -42,6 +51,42 @@ class OrderDetails {
   final List<OrderDetailLine> lines;
   final PrintJob? kitchenPrintJob;
   final PrintJob? receiptPrintJob;
+}
+
+class BreakfastAddableProduct {
+  const BreakfastAddableProduct({
+    required this.id,
+    required this.name,
+    required this.priceMinor,
+    required this.sortKey,
+    required this.isChoiceCapable,
+    required this.isSwapEligible,
+  });
+
+  final int id;
+  final String name;
+  final int priceMinor;
+  final int sortKey;
+  final bool isChoiceCapable;
+  final bool isSwapEligible;
+}
+
+class BreakfastEditorData {
+  const BreakfastEditorData({
+    required this.transaction,
+    required this.line,
+    required this.modifiers,
+    required this.configuration,
+    required this.requestedState,
+    required this.addableProducts,
+  });
+
+  final Transaction transaction;
+  final TransactionLine line;
+  final List<OrderModifier> modifiers;
+  final BreakfastSetConfiguration configuration;
+  final BreakfastRequestedState requestedState;
+  final List<BreakfastAddableProduct> addableProducts;
 }
 
 class OrdersState {
@@ -432,6 +477,8 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
   Future<OrderDetails?> getOrderDetails(int transactionId) async {
     try {
+      final BreakfastConfigurationRepository breakfastConfigurationRepository =
+          _ref.read(breakfastConfigurationRepositoryProvider);
       final Transaction? transaction = await _ref
           .read(orderServiceProvider)
           .getOrderById(transactionId);
@@ -452,7 +499,16 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
           final List<OrderModifier> modifiers = await _ref
               .read(orderServiceProvider)
               .getLineModifiers(line.id);
-          return OrderDetailLine(line: line, modifiers: modifiers);
+          final bool isBreakfastConfigurable =
+              transaction.status == TransactionStatus.draft &&
+              await breakfastConfigurationRepository.hasSetConfiguration(
+                line.productId,
+              );
+          return OrderDetailLine(
+            line: line,
+            modifiers: modifiers,
+            isBreakfastConfigurable: isBreakfastConfigurable,
+          );
         }),
       );
       final List<PrintJob> printJobs = await _ref
@@ -534,6 +590,69 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     state = state.copyWith(errorMessage: null);
   }
 
+  Future<BreakfastEditorData?> loadBreakfastEditorData({
+    required int transactionId,
+    required int transactionLineId,
+  }) async {
+    state = state.copyWith(errorMessage: null);
+    try {
+      return await _buildBreakfastEditorData(
+        transactionId: transactionId,
+        transactionLineId: transactionLineId,
+      );
+    } catch (error, stackTrace) {
+      state = state.copyWith(
+        errorMessage: ErrorMapper.toUserMessageAndLog(
+          error,
+          logger: _ref.read(appLoggerProvider),
+          eventType: 'breakfast_editor_load_failed',
+          stackTrace: stackTrace,
+          metadata: <String, Object?>{
+            'transaction_id': transactionId,
+            'transaction_line_id': transactionLineId,
+          },
+        ),
+      );
+      return null;
+    }
+  }
+
+  Future<BreakfastEditorData?> editBreakfastLine({
+    required int transactionId,
+    required int transactionLineId,
+    required BreakfastLineEdit edit,
+  }) async {
+    state = state.copyWith(errorMessage: null);
+    try {
+      final TransactionLine updatedLine = await _ref
+          .read(orderServiceProvider)
+          .editBreakfastLine(transactionLineId: transactionLineId, edit: edit);
+      return await _buildBreakfastEditorData(
+        transactionId: transactionId,
+        transactionLineId: updatedLine.id,
+      );
+    } catch (error, stackTrace) {
+      state = state.copyWith(
+        errorMessage: ErrorMapper.toUserMessageAndLog(
+          error,
+          logger: _ref.read(appLoggerProvider),
+          eventType: 'breakfast_editor_apply_failed',
+          stackTrace: stackTrace,
+          metadata: <String, Object?>{
+            'transaction_id': transactionId,
+            'transaction_line_id': transactionLineId,
+            'edit_type': edit.type.name,
+            'item_product_id': edit.itemProductId,
+            'group_id': edit.groupId,
+            'selected_item_product_id': edit.selectedItemProductId,
+            'quantity': edit.quantity,
+          },
+        ),
+      );
+      return null;
+    }
+  }
+
   Future<bool> refundOrder({
     required int transactionId,
     required String reason,
@@ -586,6 +705,154 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
           );
         })
         .toList(growable: false);
+  }
+
+  Future<BreakfastEditorData> _buildBreakfastEditorData({
+    required int transactionId,
+    required int transactionLineId,
+  }) async {
+    final orderService = _ref.read(orderServiceProvider);
+    final Transaction? transaction = await orderService.getOrderById(
+      transactionId,
+    );
+    if (transaction == null) {
+      throw NotFoundException('Transaction not found: $transactionId');
+    }
+
+    TransactionLine? line;
+    final List<TransactionLine> lines = await orderService.getOrderLines(
+      transactionId,
+    );
+    for (final TransactionLine candidate in lines) {
+      if (candidate.id == transactionLineId) {
+        line = candidate;
+        break;
+      }
+    }
+    if (line == null) {
+      throw NotFoundException('Transaction line not found: $transactionLineId');
+    }
+
+    final BreakfastConfigurationRepository configurationRepository = _ref.read(
+      breakfastConfigurationRepositoryProvider,
+    );
+    final BreakfastSetConfiguration? baseConfiguration =
+        await configurationRepository.loadSetConfiguration(line.productId);
+    if (baseConfiguration == null) {
+      throw ValidationException('Breakfast configuration is unavailable.');
+    }
+
+    final List<OrderModifier> modifiers = await orderService.getLineModifiers(
+      line.id,
+    );
+    final BreakfastSetConfiguration configuration =
+        await _augmentBreakfastConfiguration(
+          configurationRepository: configurationRepository,
+          baseConfiguration: baseConfiguration,
+          modifiers: modifiers,
+        );
+    final BreakfastRequestedState requestedState =
+        BreakfastRequestedStateMapper.reconstruct(
+          modifiers: modifiers,
+          configuration: configuration,
+        );
+
+    return BreakfastEditorData(
+      transaction: transaction,
+      line: line,
+      modifiers: modifiers,
+      configuration: configuration,
+      requestedState: requestedState,
+      addableProducts: _buildBreakfastAddableProducts(
+        configuration: configuration,
+        requestedState: requestedState,
+      ),
+    );
+  }
+
+  Future<BreakfastSetConfiguration> _augmentBreakfastConfiguration({
+    required BreakfastConfigurationRepository configurationRepository,
+    required BreakfastSetConfiguration baseConfiguration,
+    required List<OrderModifier> modifiers,
+  }) async {
+    final Set<int> missingProductIds = <int>{};
+    for (final OrderModifier modifier in modifiers) {
+      final int? itemProductId = modifier.itemProductId;
+      if (itemProductId != null &&
+          baseConfiguration.findCatalogProduct(itemProductId) == null) {
+        missingProductIds.add(itemProductId);
+      }
+    }
+    if (missingProductIds.isEmpty) {
+      return baseConfiguration;
+    }
+
+    final Map<int, BreakfastCatalogProduct> extraProducts =
+        await configurationRepository.loadCatalogProductsByIds(
+          missingProductIds,
+        );
+    return baseConfiguration.copyWith(
+      catalogProductsById: <int, BreakfastCatalogProduct>{
+        ...baseConfiguration.catalogProductsById,
+        ...extraProducts,
+      },
+    );
+  }
+
+  List<BreakfastAddableProduct> _buildBreakfastAddableProducts({
+    required BreakfastSetConfiguration configuration,
+    required BreakfastRequestedState requestedState,
+  }) {
+    final Map<int, int> sortKeys = <int, int>{};
+    for (final BreakfastSetItemConfig item in configuration.setItems) {
+      sortKeys[item.itemProductId] = 1000 + item.sortOrder;
+    }
+    for (final BreakfastChoiceGroupConfig group in configuration.choiceGroups) {
+      for (final BreakfastChoiceGroupMemberConfig member in group.members) {
+        sortKeys.putIfAbsent(
+          member.itemProductId,
+          () => 2000 + group.sortOrder,
+        );
+      }
+    }
+    for (final BreakfastAddedProductRequest add
+        in requestedState.addedProducts) {
+      sortKeys.putIfAbsent(add.itemProductId, () => 3000 + add.orderHint);
+    }
+
+    final List<BreakfastAddableProduct> products = configuration
+        .catalogProductsById
+        .values
+        .where((BreakfastCatalogProduct product) {
+          if (product.id == configuration.setRootProductId) {
+            return false;
+          }
+          return sortKeys.containsKey(product.id);
+        })
+        .map(
+          (BreakfastCatalogProduct product) => BreakfastAddableProduct(
+            id: product.id,
+            name: product.name,
+            priceMinor: product.priceMinor,
+            sortKey: sortKeys[product.id] ?? 9999,
+            isChoiceCapable: configuration.choiceCapableProductIds.contains(
+              product.id,
+            ),
+            isSwapEligible: configuration.swapEligibleProductIds.contains(
+              product.id,
+            ),
+          ),
+        )
+        .toList(growable: true);
+
+    products.sort((BreakfastAddableProduct a, BreakfastAddableProduct b) {
+      final int sortCompare = a.sortKey.compareTo(b.sortKey);
+      if (sortCompare != 0) {
+        return sortCompare;
+      }
+      return a.name.compareTo(b.name);
+    });
+    return products;
   }
 }
 

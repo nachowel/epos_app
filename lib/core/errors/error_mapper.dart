@@ -110,7 +110,22 @@ class ErrorMapper {
       return AppStrings.notFound;
     }
     if (error is ValidationException) {
+      if (error is BreakfastEditRejectedException) {
+        return _breakfastEditRejectedMessage(error);
+      }
       return error.message;
+    }
+    if (error is BreakfastLineNotEditableException) {
+      switch (error.reason) {
+        case BreakfastEditBlockedReason.notDraft:
+          return 'Breakfast items can only be edited while the order is still a draft.';
+        case BreakfastEditBlockedReason.sent:
+          return 'Sent breakfast orders can no longer be edited.';
+        case BreakfastEditBlockedReason.paid:
+          return 'Paid breakfast orders can no longer be edited.';
+        case BreakfastEditBlockedReason.cancelled:
+          return 'Cancelled breakfast orders can no longer be edited.';
+      }
     }
     if (error is AppException) {
       return error.message;
@@ -154,5 +169,32 @@ class ErrorMapper {
       );
     }
     return message;
+  }
+
+  static String _breakfastEditRejectedMessage(
+    BreakfastEditRejectedException error,
+  ) {
+    final Set<BreakfastEditErrorCode> codes = error.codes.toSet();
+    if (codes.contains(BreakfastEditErrorCode.removeQuantityExceedsDefault)) {
+      return 'Cannot remove more items than this breakfast includes.';
+    }
+    if (codes.contains(BreakfastEditErrorCode.choiceMemberNotAllowed) ||
+        codes.contains(BreakfastEditErrorCode.invalidChoiceGroup) ||
+        codes.contains(BreakfastEditErrorCode.invalidChoiceQuantity) ||
+        codes.contains(BreakfastEditErrorCode.mixedToastBreadNotSupported)) {
+      return 'That breakfast choice is not allowed.';
+    }
+    if (codes.contains(BreakfastEditErrorCode.unsupportedLineSplitState)) {
+      return 'This breakfast line cannot be edited until it is split into single units.';
+    }
+    if (codes.contains(BreakfastEditErrorCode.rootNotSetProduct) ||
+        codes.contains(BreakfastEditErrorCode.unknownProduct) ||
+        codes.contains(BreakfastEditErrorCode.unknownRequestedEntity)) {
+      return 'Breakfast configuration is unavailable for this item.';
+    }
+    if (codes.contains(BreakfastEditErrorCode.negativeQuantity)) {
+      return 'Quantity must be zero or greater.';
+    }
+    return AppStrings.operationFailed;
   }
 }
