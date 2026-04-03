@@ -187,6 +187,9 @@ class ErrorMapper {
     if (codes.contains(BreakfastEditErrorCode.unsupportedLineSplitState)) {
       return 'This breakfast line cannot be edited until it is split into single units.';
     }
+    if (codes.contains(BreakfastEditErrorCode.swapCandidateNotSwapEligible)) {
+      return 'That extra is not available for this breakfast.';
+    }
     if (codes.contains(BreakfastEditErrorCode.rootNotSetProduct) ||
         codes.contains(BreakfastEditErrorCode.unknownProduct) ||
         codes.contains(BreakfastEditErrorCode.unknownRequestedEntity)) {

@@ -286,6 +286,7 @@ class TransactionRepository {
             itemName: itemName,
             quantity: const Value<int>(1),
             itemProductId: const Value<int?>(null),
+            sourceGroupId: const Value<int?>(null),
             extraPriceMinor: Value<int>(extraPriceMinor),
             chargeReason: const Value<String?>(null),
             unitPriceMinor: Value<int>(extraPriceMinor),
@@ -311,31 +312,34 @@ class TransactionRepository {
 
   Future<TransactionLine?> getLineById(int transactionLineId) async {
     final db.TransactionLine? row =
-        await (_database.select(_database.transactionLines)
-              ..where((db.$TransactionLinesTable t) => t.id.equals(transactionLineId)))
+        await (_database.select(_database.transactionLines)..where(
+              (db.$TransactionLinesTable t) => t.id.equals(transactionLineId),
+            ))
             .getSingleOrNull();
     return row == null ? null : _mapLine(row);
   }
 
-  Future<({TransactionLine line, TransactionStatus status})?>
-  getLineContext(int transactionLineId) async {
+  Future<({TransactionLine line, TransactionStatus status})?> getLineContext(
+    int transactionLineId,
+  ) async {
     final TypedResult? row =
         await (_database.select(_database.transactionLines).join(<Join>[
-                innerJoin(
-                  _database.transactions,
-                  _database.transactions.id.equalsExp(
-                    _database.transactionLines.transactionId,
-                  ),
+              innerJoin(
+                _database.transactions,
+                _database.transactions.id.equalsExp(
+                  _database.transactionLines.transactionId,
                 ),
-              ])
-              ..where(_database.transactionLines.id.equals(transactionLineId)))
+              ),
+            ])..where(_database.transactionLines.id.equals(transactionLineId)))
             .getSingleOrNull();
 
     if (row == null) {
       return null;
     }
 
-    final db.TransactionLine lineRow = row.readTable(_database.transactionLines);
+    final db.TransactionLine lineRow = row.readTable(
+      _database.transactionLines,
+    );
     final db.Transaction transactionRow = row.readTable(_database.transactions);
     return (
       line: _mapLine(lineRow),
@@ -343,7 +347,9 @@ class TransactionRepository {
     );
   }
 
-  Future<TransactionLine> splitLineForIndependentEdit(int transactionLineId) async {
+  Future<TransactionLine> splitLineForIndependentEdit(
+    int transactionLineId,
+  ) async {
     final db.TransactionLine lineRow = await _findLineByIdOrThrow(
       transactionLineId,
     );
@@ -362,7 +368,8 @@ class TransactionRepository {
               ]))
             .get();
 
-    final bool hasSemanticBreakfastRows = lineRow.pricingMode == 'set' &&
+    final bool hasSemanticBreakfastRows =
+        lineRow.pricingMode == 'set' &&
         lineRow.quantity > 1 &&
         modifiers.any(_isSemanticModifierRow);
     if (hasSemanticBreakfastRows) {
@@ -393,21 +400,24 @@ class TransactionRepository {
         );
 
     for (final db.OrderModifier modifier in modifiers) {
-      await _database.into(_database.orderModifiers).insert(
-        db.OrderModifiersCompanion.insert(
-          uuid: _uuidGenerator.v4(),
-          transactionLineId: clonedLineId,
-          action: modifier.action,
-          itemName: modifier.itemName,
-          quantity: Value<int>(modifier.quantity),
-          itemProductId: Value<int?>(modifier.itemProductId),
-          extraPriceMinor: Value<int>(modifier.extraPriceMinor),
-          chargeReason: Value<String?>(modifier.chargeReason),
-          unitPriceMinor: Value<int>(modifier.unitPriceMinor),
-          priceEffectMinor: Value<int>(modifier.priceEffectMinor),
-          sortKey: Value<int>(modifier.sortKey),
-        ),
-      );
+      await _database
+          .into(_database.orderModifiers)
+          .insert(
+            db.OrderModifiersCompanion.insert(
+              uuid: _uuidGenerator.v4(),
+              transactionLineId: clonedLineId,
+              action: modifier.action,
+              itemName: modifier.itemName,
+              quantity: Value<int>(modifier.quantity),
+              itemProductId: Value<int?>(modifier.itemProductId),
+              sourceGroupId: Value<int?>(modifier.sourceGroupId),
+              extraPriceMinor: Value<int>(modifier.extraPriceMinor),
+              chargeReason: Value<String?>(modifier.chargeReason),
+              unitPriceMinor: Value<int>(modifier.unitPriceMinor),
+              priceEffectMinor: Value<int>(modifier.priceEffectMinor),
+              sortKey: Value<int>(modifier.sortKey),
+            ),
+          );
     }
 
     final int updatedCount =
@@ -446,23 +456,26 @@ class TransactionRepository {
 
     for (final BreakfastClassifiedModifier modifier
         in rebuildResult.classifiedModifiers) {
-      await _database.into(_database.orderModifiers).insert(
-        db.OrderModifiersCompanion.insert(
-          uuid: _uuidGenerator.v4(),
-          transactionLineId: transactionLineId,
-          action: _modifierActionToDb(modifier.action),
-          itemName: modifier.displayName,
-          quantity: Value<int>(modifier.quantity),
-          itemProductId: Value<int?>(modifier.itemProductId),
-          extraPriceMinor: Value<int>(modifier.priceEffectMinor),
-          chargeReason: Value<String?>(_modifierChargeReasonToDb(
-            modifier.chargeReason,
-          )),
-          unitPriceMinor: Value<int>(modifier.unitPriceMinor),
-          priceEffectMinor: Value<int>(modifier.priceEffectMinor),
-          sortKey: Value<int>(modifier.sortKey),
-        ),
-      );
+      await _database
+          .into(_database.orderModifiers)
+          .insert(
+            db.OrderModifiersCompanion.insert(
+              uuid: _uuidGenerator.v4(),
+              transactionLineId: transactionLineId,
+              action: _modifierActionToDb(modifier.action),
+              itemName: modifier.displayName,
+              quantity: Value<int>(modifier.quantity),
+              itemProductId: Value<int?>(modifier.itemProductId),
+              sourceGroupId: Value<int?>(modifier.sourceGroupId),
+              extraPriceMinor: Value<int>(modifier.priceEffectMinor),
+              chargeReason: Value<String?>(
+                _modifierChargeReasonToDb(modifier.chargeReason),
+              ),
+              unitPriceMinor: Value<int>(modifier.unitPriceMinor),
+              priceEffectMinor: Value<int>(modifier.priceEffectMinor),
+              sortKey: Value<int>(modifier.sortKey),
+            ),
+          );
     }
 
     final int updatedCount =
@@ -476,7 +489,9 @@ class TransactionRepository {
                 removalDiscountTotalMinor: Value<int>(
                   rebuildResult.lineSnapshot.removalDiscountTotalMinor,
                 ),
-                lineTotalMinor: Value<int>(rebuildResult.lineSnapshot.lineTotalMinor),
+                lineTotalMinor: Value<int>(
+                  rebuildResult.lineSnapshot.lineTotalMinor,
+                ),
               ),
             );
     if (updatedCount == 0) {
@@ -919,6 +934,7 @@ class TransactionRepository {
       extraPriceMinor: row.extraPriceMinor,
       chargeReason: _modifierChargeReasonFromDb(row.chargeReason),
       itemProductId: row.itemProductId,
+      sourceGroupId: row.sourceGroupId,
       quantity: row.quantity,
       unitPriceMinor: row.unitPriceMinor,
       priceEffectMinor: row.priceEffectMinor,

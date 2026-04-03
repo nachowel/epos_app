@@ -178,6 +178,7 @@ class _TestAppDatabase extends AppDatabase {
         item_name TEXT NOT NULL,
         quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
         item_product_id INTEGER NULL,
+        source_group_id INTEGER NULL,
         extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
         charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount')),
         unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
@@ -354,6 +355,9 @@ class _TestAppDatabase extends AppDatabase {
       'CREATE INDEX idx_order_modifiers_item_product_semantics ON order_modifiers(item_product_id, action, charge_reason, sort_key);',
     );
     await customStatement(
+      'CREATE INDEX idx_order_modifiers_source_group ON order_modifiers(source_group_id, item_product_id, charge_reason);',
+    );
+    await customStatement(
       'CREATE INDEX idx_payments_tx ON payments(transaction_id);',
     );
     await customStatement(
@@ -490,6 +494,12 @@ class _TestAppDatabase extends AppDatabase {
       table: 'order_modifiers',
       column: 'item_product_id',
       referencedTable: 'products',
+      nullable: true,
+    );
+    await _createFkTrigger(
+      table: 'order_modifiers',
+      column: 'source_group_id',
+      referencedTable: 'modifier_groups',
       nullable: true,
     );
     await _createFkTrigger(

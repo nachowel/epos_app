@@ -1,5 +1,6 @@
 import '../models/shift_report.dart';
 import '../models/user.dart';
+import '../models/semantic_sales_analytics.dart';
 
 class ReportVisibilityService {
   const ReportVisibilityService();
@@ -83,6 +84,7 @@ class ReportVisibilityService {
       cashTotalMinor: visibleCashTotalMinor,
       cardGrossTotalMinor: visibleCardGrossTotalMinor,
       cardTotalMinor: visibleCardTotalMinor,
+      semanticSalesAnalytics: const SemanticSalesAnalytics.empty(),
     );
   }
 

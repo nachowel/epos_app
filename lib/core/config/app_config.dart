@@ -51,12 +51,15 @@ class AppConfig {
     required this.supabaseUrl,
     required this.supabaseAnonKey,
     this.internalApiKey,
+    String analyticsEmail = '',
+    String analyticsPassword = '',
     this.mirrorWriteMode = MirrorWriteMode.directMirrorWrite,
     required this.syncIntervalSeconds,
     required this.featureFlags,
     this.envFileName = defaultEnvFileName,
     this.envLoadIssue,
-  });
+  }) : _analyticsEmail = analyticsEmail,
+       _analyticsPassword = analyticsPassword;
 
   static const String defaultEnvFileName = '.env';
   static const String _environmentKey = 'APP_ENV';
@@ -64,6 +67,8 @@ class AppConfig {
   static const String _supabaseUrlKey = 'SUPABASE_URL';
   static const String _supabaseAnonKeyKey = 'SUPABASE_ANON_KEY';
   static const String _internalApiKeyKey = 'EPOS_INTERNAL_API_KEY';
+  static const String _analyticsEmailKey = 'ANALYTICS_EMAIL';
+  static const String _analyticsPasswordKey = 'ANALYTICS_PASSWORD';
   static const String blockedDevInternalApiKey = 'local-dev-key';
   static const String _syncMirrorWriteModeKey = 'SYNC_MIRROR_WRITE_MODE';
   static const String _syncIntervalSecondsKey = 'SYNC_INTERVAL_SECONDS';
@@ -139,6 +144,8 @@ class AppConfig {
       supabaseUrl: _readString(values, _supabaseUrlKey),
       supabaseAnonKey: _readString(values, _supabaseAnonKeyKey),
       internalApiKey: _readString(values, _internalApiKeyKey),
+      analyticsEmail: _readString(values, _analyticsEmailKey) ?? '',
+      analyticsPassword: _readString(values, _analyticsPasswordKey) ?? '',
       mirrorWriteMode: MirrorWriteMode.fromRaw(
         values[_syncMirrorWriteModeKey] ?? '',
       ),
@@ -166,6 +173,8 @@ class AppConfig {
     String? supabaseUrl,
     String? supabaseAnonKey,
     String? internalApiKey,
+    String analyticsEmail = '',
+    String analyticsPassword = '',
     MirrorWriteMode mirrorWriteMode = MirrorWriteMode.trustedSyncBoundary,
     int syncIntervalSeconds = 10,
     FeatureFlags featureFlags = const FeatureFlags(
@@ -182,6 +191,8 @@ class AppConfig {
       supabaseUrl: supabaseUrl,
       supabaseAnonKey: supabaseAnonKey,
       internalApiKey: internalApiKey,
+      analyticsEmail: analyticsEmail,
+      analyticsPassword: analyticsPassword,
       mirrorWriteMode: mirrorWriteMode,
       syncIntervalSeconds: syncIntervalSeconds,
       featureFlags: featureFlags,
@@ -195,6 +206,8 @@ class AppConfig {
   final String? supabaseUrl;
   final String? supabaseAnonKey;
   final String? internalApiKey;
+  final String _analyticsEmail;
+  final String _analyticsPassword;
   final MirrorWriteMode mirrorWriteMode;
   final int syncIntervalSeconds;
   final FeatureFlags featureFlags;
@@ -205,6 +218,10 @@ class AppConfig {
       environment.trim().toLowerCase() == 'prod';
 
   bool get allowsDirectMirrorWrite => !isProductionEnvironment;
+
+  String get analyticsEmail => _analyticsEmail;
+
+  String get analyticsPassword => _analyticsPassword;
 
   String? get mirrorWriteModeIssue {
     if (mirrorWriteMode == MirrorWriteMode.directMirrorWrite &&

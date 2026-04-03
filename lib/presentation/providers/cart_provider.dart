@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/errors/exceptions.dart';
+import '../../domain/models/breakfast_cart_selection.dart';
 import '../../domain/models/order_modifier.dart';
 import '../../domain/models/product.dart';
 import 'cart_models.dart';
@@ -38,9 +39,15 @@ class CartNotifier extends StateNotifier<CartState> {
     Product product, {
     int quantity = 1,
     List<CartModifier> modifiers = const <CartModifier>[],
+    BreakfastCartSelection? breakfastSelection,
   }) {
     if (quantity <= 0) {
       return;
+    }
+    if (breakfastSelection != null && modifiers.isNotEmpty) {
+      throw ValidationException(
+        'Flat modifiers and semantic bundle state cannot share one cart line.',
+      );
     }
     _ensureProductAvailableForSale(product);
     final newItem = CartItem(
@@ -48,9 +55,10 @@ class CartNotifier extends StateNotifier<CartState> {
       productId: product.id,
       productName: product.name,
       unitPriceMinor: product.priceMinor,
-      hasModifiers: product.hasModifiers,
+      hasModifiers: product.hasModifiers || breakfastSelection != null,
       quantity: quantity,
       modifiers: modifiers,
+      breakfastSelection: breakfastSelection,
     );
     state = state.copyWith(items: <CartItem>[...state.items, newItem]);
   }

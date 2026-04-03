@@ -18,6 +18,7 @@ class OrderModifier {
     required this.extraPriceMinor,
     this.chargeReason,
     this.itemProductId,
+    this.sourceGroupId,
     this.quantity = 1,
     this.unitPriceMinor = 0,
     this.priceEffectMinor = 0,
@@ -32,6 +33,7 @@ class OrderModifier {
   final int extraPriceMinor;
   final ModifierChargeReason? chargeReason;
   final int? itemProductId;
+  final int? sourceGroupId;
   final int quantity;
   final int unitPriceMinor;
   final int priceEffectMinor;
@@ -46,6 +48,7 @@ class OrderModifier {
     int? extraPriceMinor,
     ModifierChargeReason? chargeReason,
     Object? itemProductId = _unsetItemProductId,
+    Object? sourceGroupId = _unsetSourceGroupId,
     int? quantity,
     int? unitPriceMinor,
     int? priceEffectMinor,
@@ -62,6 +65,9 @@ class OrderModifier {
       itemProductId: identical(itemProductId, _unsetItemProductId)
           ? this.itemProductId
           : itemProductId as int?,
+      sourceGroupId: identical(sourceGroupId, _unsetSourceGroupId)
+          ? this.sourceGroupId
+          : sourceGroupId as int?,
       quantity: quantity ?? this.quantity,
       unitPriceMinor: unitPriceMinor ?? this.unitPriceMinor,
       priceEffectMinor: priceEffectMinor ?? this.priceEffectMinor,
@@ -83,6 +89,7 @@ class OrderModifier {
         other.extraPriceMinor == extraPriceMinor &&
         other.chargeReason == chargeReason &&
         other.itemProductId == itemProductId &&
+        other.sourceGroupId == sourceGroupId &&
         other.quantity == quantity &&
         other.unitPriceMinor == unitPriceMinor &&
         other.priceEffectMinor == priceEffectMinor &&
@@ -99,6 +106,7 @@ class OrderModifier {
     extraPriceMinor,
     chargeReason,
     itemProductId,
+    sourceGroupId,
     quantity,
     unitPriceMinor,
     priceEffectMinor,
@@ -107,3 +115,4 @@ class OrderModifier {
 }
 
 const Object _unsetItemProductId = Object();
+const Object _unsetSourceGroupId = Object();

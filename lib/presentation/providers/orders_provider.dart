@@ -688,23 +688,31 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }
 
   List<CheckoutItem> _toCheckoutItems(List<CartItem> items) {
-    return items
-        .map((CartItem item) {
-          return CheckoutItem(
-            productId: item.productId,
-            quantity: item.quantity,
-            modifiers: item.modifiers
-                .map(
-                  (CartModifier modifier) => CheckoutModifier(
-                    action: modifier.action,
-                    itemName: modifier.itemName,
-                    extraPriceMinor: modifier.extraPriceMinor,
-                  ),
-                )
-                .toList(growable: false),
-          );
-        })
-        .toList(growable: false);
+    final List<CheckoutItem> checkoutItems = <CheckoutItem>[];
+    for (final CartItem item in items) {
+      final CheckoutItem baseItem = CheckoutItem(
+        productId: item.productId,
+        quantity: 1,
+        modifiers: item.modifiers
+            .map(
+              (CartModifier modifier) => CheckoutModifier(
+                action: modifier.action,
+                itemName: modifier.itemName,
+                extraPriceMinor: modifier.extraPriceMinor,
+              ),
+            )
+            .toList(growable: false),
+        breakfastSelection: item.breakfastSelection,
+      );
+      if (item.breakfastSelection != null) {
+        for (int index = 0; index < item.quantity; index += 1) {
+          checkoutItems.add(baseItem);
+        }
+        continue;
+      }
+      checkoutItems.add(baseItem.copyWith(quantity: item.quantity));
+    }
+    return checkoutItems;
   }
 
   Future<BreakfastEditorData> _buildBreakfastEditorData({
@@ -803,46 +811,27 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     required BreakfastSetConfiguration configuration,
     required BreakfastRequestedState requestedState,
   }) {
-    final Map<int, int> sortKeys = <int, int>{};
-    for (final BreakfastSetItemConfig item in configuration.setItems) {
-      sortKeys[item.itemProductId] = 1000 + item.sortOrder;
-    }
-    for (final BreakfastChoiceGroupConfig group in configuration.choiceGroups) {
-      for (final BreakfastChoiceGroupMemberConfig member in group.members) {
-        sortKeys.putIfAbsent(
-          member.itemProductId,
-          () => 2000 + group.sortOrder,
-        );
-      }
-    }
-    for (final BreakfastAddedProductRequest add
-        in requestedState.addedProducts) {
-      sortKeys.putIfAbsent(add.itemProductId, () => 3000 + add.orderHint);
-    }
-
-    final List<BreakfastAddableProduct> products = configuration
-        .catalogProductsById
-        .values
-        .where((BreakfastCatalogProduct product) {
-          if (product.id == configuration.setRootProductId) {
-            return false;
+    final List<BreakfastAddableProduct> products = configuration.extras
+        .map((BreakfastExtraItemConfig extra) {
+          final BreakfastCatalogProduct? product = configuration
+              .findCatalogProduct(extra.itemProductId);
+          if (product == null) {
+            return null;
           }
-          return sortKeys.containsKey(product.id);
-        })
-        .map(
-          (BreakfastCatalogProduct product) => BreakfastAddableProduct(
+          return BreakfastAddableProduct(
             id: product.id,
             name: product.name,
             priceMinor: product.priceMinor,
-            sortKey: sortKeys[product.id] ?? 9999,
+            sortKey: extra.sortOrder,
             isChoiceCapable: configuration.choiceCapableProductIds.contains(
               product.id,
             ),
             isSwapEligible: configuration.swapEligibleProductIds.contains(
               product.id,
             ),
-          ),
-        )
+          );
+        })
+        .whereType<BreakfastAddableProduct>()
         .toList(growable: true);
 
     products.sort((BreakfastAddableProduct a, BreakfastAddableProduct b) {

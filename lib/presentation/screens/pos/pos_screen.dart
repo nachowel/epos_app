@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/errors/error_mapper.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../domain/models/payment.dart';
 import '../../../domain/models/product.dart';
 import '../../../domain/models/transaction.dart';
@@ -23,6 +25,9 @@ import 'widgets/interaction_lock_shell.dart';
 import 'widgets/modifier_popup.dart';
 import 'widgets/payment_dialog.dart';
 import 'widgets/product_grid.dart';
+import 'widgets/semantic_bundle_editor_dialog.dart';
+import '../../../domain/services/breakfast_pos_service.dart';
+import '../../../domain/models/breakfast_cart_selection.dart';
 
 class PosScreen extends ConsumerStatefulWidget {
   const PosScreen({super.key});
@@ -53,26 +58,71 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       return;
     }
 
-    if (!product.hasModifiers) {
-      interactionController.addProduct(product);
+    final PosProductSelectionPath selectionPath = await ref
+        .read(breakfastPosServiceProvider)
+        .getSelectionPath(product);
+    if (!mounted) {
       return;
     }
 
-    final List<CartModifier>? selectedModifiers =
-        await showDialog<List<CartModifier>>(
-          context: context,
-          builder: (_) {
-            return ModifierPopup(
-              productId: product.id,
-              productName: product.name,
+    switch (selectionPath) {
+      case PosProductSelectionPath.standard:
+        interactionController.addProduct(product);
+        return;
+      case PosProductSelectionPath.legacyFlat:
+        final List<CartModifier>? selectedModifiers =
+            await showDialog<List<CartModifier>>(
+              context: context,
+              builder: (_) {
+                return ModifierPopup(
+                  productId: product.id,
+                  productName: product.name,
+                );
+              },
             );
-          },
+        if (!mounted || selectedModifiers == null) {
+          return;
+        }
+        interactionController.addProduct(product, modifiers: selectedModifiers);
+        return;
+      case PosProductSelectionPath.semanticBundle:
+        final BreakfastPosEditorData editorData;
+        try {
+          editorData = await ref
+              .read(breakfastPosServiceProvider)
+              .loadEditorData(product: product);
+        } catch (error, stackTrace) {
+          if (!mounted) {
+            return;
+          }
+          _showMessage(
+            ErrorMapper.toUserMessageAndLog(
+              error,
+              logger: ref.read(appLoggerProvider),
+              eventType: 'semantic_bundle_editor_open_failed',
+              stackTrace: stackTrace,
+            ),
+          );
+          return;
+        }
+        final BreakfastCartSelection? selection =
+            await showDialog<BreakfastCartSelection>(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) => SemanticBundleEditorDialog(
+                product: product,
+                initialEditorData: editorData,
+              ),
+            );
+        if (!mounted || selection == null) {
+          return;
+        }
+        interactionController.addProduct(
+          product,
+          breakfastSelection: selection,
         );
-    if (!mounted || selectedModifiers == null) {
-      return;
+        return;
     }
-
-    interactionController.addProduct(product, modifiers: selectedModifiers);
   }
 
   Future<bool> _createOrderFromCart() async {

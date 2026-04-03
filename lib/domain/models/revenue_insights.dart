@@ -1,3 +1,5 @@
+import 'analytics/insight.dart';
+
 class RevenueInsights {
   const RevenueInsights({
     required this.weeklyPerformance,
@@ -8,6 +10,7 @@ class RevenueInsights {
     required this.lowHours,
     required this.topHourConcentration,
     required this.distributionBalance,
+    this.structuredInsights = const <Insight>[],
   });
 
   final String weeklyPerformance;
@@ -18,6 +21,7 @@ class RevenueInsights {
   final String lowHours;
   final String topHourConcentration;
   final String distributionBalance;
+  final List<Insight> structuredInsights;
 
   List<String> get messages => <String>[
     weeklyPerformance,

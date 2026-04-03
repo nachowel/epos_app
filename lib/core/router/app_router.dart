@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../domain/models/user.dart';
+import '../../domain/models/analytics/analytics_period.dart';
 import '../../presentation/providers/auth_provider.dart';
 import '../../presentation/screens/admin/admin_categories_screen.dart';
 import '../../presentation/screens/admin/admin_cash_movements_screen.dart';
@@ -55,7 +56,20 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardScreen()),
       GoRoute(
         path: '/admin/analytics',
-        builder: (_, __) => const AdminRevenueAnalyticsScreen(),
+        builder: (_, GoRouterState state) => AdminRevenueAnalyticsScreen(
+          initialPeriodSelection: AnalyticsPeriodSelection.fromQueryParameters(
+            state.uri.queryParameters,
+          ),
+          initialComparisonMode: analyticsComparisonModeFromQuery(
+            state.uri.queryParameters['mode'],
+          ),
+          initialInsightCode: state.uri.queryParameters['insight'],
+          initialTrendDate: DateTime.tryParse(
+            state.uri.queryParameters['trend'] ?? '',
+          ),
+          initialDaypart: state.uri.queryParameters['daypart'],
+          initialMoverId: state.uri.queryParameters['mover'],
+        ),
       ),
       GoRoute(
         path: '/admin/products',

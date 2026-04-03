@@ -2,6 +2,7 @@ import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/modifier_repository.dart';
 import '../../data/repositories/product_repository.dart';
 import '../models/category.dart';
+import '../models/legacy_flat_modifier_view.dart';
 import '../models/product.dart';
 import '../models/product_modifier.dart';
 
@@ -28,5 +29,14 @@ class CatalogService {
 
   Future<List<ProductModifier>> getProductModifiers(int productId) {
     return _modifierRepository.getByProductId(productId, activeOnly: true);
+  }
+
+  Future<LegacyFlatModifierView> getLegacyFlatModifierView(
+    int productId,
+  ) async {
+    final List<ProductModifier> modifiers = await getProductModifiers(
+      productId,
+    );
+    return LegacyFlatModifierView.fromModifiers(modifiers);
   }
 }

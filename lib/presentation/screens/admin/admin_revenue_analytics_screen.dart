@@ -1,28 +1,38 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_sizes.dart';
-import '../../../core/utils/currency_formatter.dart';
-import '../../../domain/models/daily_revenue_point.dart';
-import '../../../domain/models/hourly_distribution.dart';
-import '../../../domain/models/revenue_comparison.dart';
+import '../../../domain/models/analytics/analytics_export.dart';
+import '../../../domain/models/analytics/analytics_period.dart';
+import '../../../domain/models/analytics/analytics_snapshot.dart';
+import '../../../domain/models/analytics/insight.dart';
+import '../../../domain/models/analytics/saved_analytics_view.dart';
 import '../../../domain/models/revenue_summary.dart';
-import '../../../domain/models/weekly_revenue_point.dart';
 import '../../providers/admin_revenue_analytics_provider.dart';
+import 'widgets/admin_analytics_print_view.dart';
+import 'widgets/admin_revenue_analytics_dashboard.dart';
 import 'widgets/admin_scaffold.dart';
 
 const String _analyticsTitle = 'Revenue Analytics';
-const String _dailyTrendTitle = 'Daily Revenue Trend';
-const String _weeklySummaryTitle = 'Weekly Revenue Summary';
-const String _hourlyDistributionTitle = 'Hourly Distribution';
-const String _insightsTitle = 'Derived Insights';
 
 class AdminRevenueAnalyticsScreen extends ConsumerStatefulWidget {
-  const AdminRevenueAnalyticsScreen({super.key});
+  const AdminRevenueAnalyticsScreen({
+    required this.initialPeriodSelection,
+    required this.initialComparisonMode,
+    this.initialInsightCode,
+    this.initialTrendDate,
+    this.initialDaypart,
+    this.initialMoverId,
+    super.key,
+  });
+
+  final AnalyticsPeriodSelection initialPeriodSelection;
+  final AnalyticsComparisonMode initialComparisonMode;
+  final String? initialInsightCode;
+  final DateTime? initialTrendDate;
+  final String? initialDaypart;
+  final String? initialMoverId;
 
   @override
   ConsumerState<AdminRevenueAnalyticsScreen> createState() =>
@@ -31,12 +41,52 @@ class AdminRevenueAnalyticsScreen extends ConsumerStatefulWidget {
 
 class _AdminRevenueAnalyticsScreenState
     extends ConsumerState<AdminRevenueAnalyticsScreen> {
+  late AnalyticsComparisonMode _comparisonMode;
+  String? _selectedInsightCode;
+  DateTime? _selectedTrendDate;
+  String? _selectedDaypart;
+  String? _selectedMoverId;
+
   @override
   void initState() {
     super.initState();
+    _comparisonMode = widget.initialComparisonMode;
+    _selectedInsightCode = widget.initialInsightCode;
+    _selectedTrendDate = widget.initialTrendDate;
+    _selectedDaypart = widget.initialDaypart;
+    _selectedMoverId = widget.initialMoverId;
     Future<void>.microtask(
-      () => ref.read(adminRevenueAnalyticsNotifierProvider.notifier).load(),
+      () => ref
+          .read(adminRevenueAnalyticsNotifierProvider.notifier)
+          .initialize(selection: widget.initialPeriodSelection),
     );
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminRevenueAnalyticsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialComparisonMode != widget.initialComparisonMode) {
+      _comparisonMode = widget.initialComparisonMode;
+    }
+    if (oldWidget.initialInsightCode != widget.initialInsightCode) {
+      _selectedInsightCode = widget.initialInsightCode;
+    }
+    if (oldWidget.initialTrendDate != widget.initialTrendDate) {
+      _selectedTrendDate = widget.initialTrendDate;
+    }
+    if (oldWidget.initialDaypart != widget.initialDaypart) {
+      _selectedDaypart = widget.initialDaypart;
+    }
+    if (oldWidget.initialMoverId != widget.initialMoverId) {
+      _selectedMoverId = widget.initialMoverId;
+    }
+    if (oldWidget.initialPeriodSelection != widget.initialPeriodSelection) {
+      Future<void>.microtask(
+        () => ref
+            .read(adminRevenueAnalyticsNotifierProvider.notifier)
+            .ensurePeriodSelection(widget.initialPeriodSelection),
+      );
+    }
   }
 
   @override
@@ -45,533 +95,524 @@ class _AdminRevenueAnalyticsScreenState
       adminRevenueAnalyticsNotifierProvider,
     );
     final RevenueSummary? summary = state.summary;
+    final AdminRevenueAnalyticsNotifier notifier = ref.read(
+      adminRevenueAnalyticsNotifierProvider.notifier,
+    );
+
+    final Widget content = switch ((
+      summary,
+      state.errorMessage,
+      state.isLoading,
+    )) {
+      (null, final String message?, _) => AdminRevenueAnalyticsErrorView(
+        message: message,
+        onRetry: () => notifier.load(),
+      ),
+      (null, _, _) => const AdminRevenueAnalyticsLoadingView(),
+      (final RevenueSummary loaded, _, _)
+          when !loaded.hasPaidData && loaded.semanticSalesAnalytics.isEmpty =>
+        AdminRevenueAnalyticsEmptyView(statusMessage: state.errorMessage),
+      (final RevenueSummary loaded, _, final bool isLoading) =>
+        AdminRevenueAnalyticsDashboard(
+          summary: loaded,
+          periodSelection: state.periodSelection,
+          comparisonMode: _comparisonMode,
+          savedViews: state.savedViews,
+          selectedSavedViewId: state.selectedSavedViewId,
+          selectedInsightCode: _selectedInsightCode,
+          selectedTrendDate: _selectedTrendDate,
+          selectedDaypart: _selectedDaypart,
+          selectedMoverId: _selectedMoverId,
+          statusMessage: state.errorMessage,
+          isRefreshing: isLoading,
+          onPeriodSelected: _handlePresetSelected,
+          onCustomPeriodRequested: () => _handleCustomPeriodSelected(context),
+          onComparisonModeSelected: _handleComparisonModeSelected,
+          onSaveViewRequested: () =>
+              _showSaveViewDialog(context: context, notifier: notifier),
+          onSavedViewsRequested: () => _showSavedViewsSheet(
+            context: context,
+            notifier: notifier,
+            savedViews: state.savedViews,
+            selectedSavedViewId: state.selectedSavedViewId,
+          ),
+          onCopyShareLink: () => _copyShareLink(
+            context: context,
+            periodSelection: state.periodSelection,
+            comparisonMode: _comparisonMode,
+          ),
+          onInsightSelected: _handleInsightSelected,
+          onTrendDateSelected: _handleTrendDateSelected,
+          onDaypartSelected: _handleDaypartSelected,
+          onMoverSelected: _handleMoverSelected,
+          onCopySnapshot: () => _copySnapshot(
+            context: context,
+            summary: loaded,
+            periodSelection: state.periodSelection,
+            notifier: notifier,
+          ),
+          onPreviewSnapshot: () => _previewSnapshot(
+            context: context,
+            summary: loaded,
+            periodSelection: state.periodSelection,
+            notifier: notifier,
+          ),
+          onOpenPrintView: () => _openPrintView(
+            context: context,
+            summary: loaded,
+            periodSelection: state.periodSelection,
+            notifier: notifier,
+          ),
+        ),
+    };
 
     return AdminScaffold(
       title: _analyticsTitle,
       currentRoute: '/admin/analytics',
       child: RefreshIndicator(
-        onRefresh: () =>
-            ref.read(adminRevenueAnalyticsNotifierProvider.notifier).load(),
+        onRefresh: () => notifier.load(),
         child: ListView(
-          children: <Widget>[
-            if (state.errorMessage != null)
-              _Banner(message: state.errorMessage!, color: AppColors.error),
-            if (state.isLoading && summary == null)
-              const Padding(
-                padding: EdgeInsets.all(AppSizes.spacingXl),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (summary != null) ...<Widget>[
-              _Banner(
-                message:
-                    'Source: paid Supabase mirror transactions only. Generated ${DateFormat('dd MMM yyyy HH:mm').format(summary.generatedAt)} (${summary.timezone}).',
-              ),
-              const SizedBox(height: AppSizes.spacingMd),
-              if (!summary.hasPaidData)
-                const _Banner(
-                  message:
-                      'No paid transactions were returned for the current analytics window. Charts remain zero-filled instead of showing missing data.',
-                  color: AppColors.warning,
-                ),
-              if (!summary.hasPaidData)
-                const SizedBox(height: AppSizes.spacingMd),
-              Wrap(
-                spacing: AppSizes.spacingMd,
-                runSpacing: AppSizes.spacingMd,
-                children: <Widget>[
-                  _KpiCard(
-                    title: 'Today revenue',
-                    comparisonLabel: 'vs yesterday',
-                    comparison: summary.todayRevenue,
-                  ),
-                  _KpiCard(
-                    title: 'This week revenue',
-                    comparisonLabel: 'vs last week',
-                    comparison: summary.thisWeekRevenue,
-                  ),
-                  _KpiCard(
-                    title: 'This month revenue',
-                    comparisonLabel: 'vs last month',
-                    comparison: summary.thisMonthRevenue,
-                  ),
-                  _KpiCard(
-                    title: 'Average order value',
-                    subtitle: 'Current week',
-                    comparisonLabel: 'vs last week',
-                    comparison: summary.averageOrderValueCurrentWeek,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSizes.spacingLg),
-              _ChartPanel(
-                title: _dailyTrendTitle,
-                subtitle: 'Last 14 days with zero-filled gaps',
-                child: _DailyRevenueLineChart(points: summary.dailyTrend),
-              ),
-              const SizedBox(height: AppSizes.spacingLg),
-              _ChartPanel(
-                title: _weeklySummaryTitle,
-                subtitle: 'Last 6 Monday-based business weeks',
-                child: _WeeklyRevenueBarChart(points: summary.weeklySummary),
-              ),
-              const SizedBox(height: AppSizes.spacingLg),
-              _ChartPanel(
-                title: _hourlyDistributionTitle,
-                subtitle: 'Last 14 days, grouped by local business hour',
-                child: _HourlyDistributionChart(
-                  hourlyDistribution: summary.hourlyDistribution,
-                ),
-              ),
-              const SizedBox(height: AppSizes.spacingLg),
-              _ChartPanel(
-                title: _insightsTitle,
-                subtitle: 'Backend/domain-derived commentary',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: summary.insights.messages
-                      .map((String message) => _InsightTile(message: message))
-                      .toList(growable: false),
-                ),
-              ),
-            ],
-          ],
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: <Widget>[content],
         ),
       ),
     );
   }
-}
 
-class _KpiCard extends StatelessWidget {
-  const _KpiCard({
-    required this.title,
-    required this.comparison,
-    this.subtitle,
-    this.comparisonLabel,
-  });
-
-  final String title;
-  final String? subtitle;
-  final String? comparisonLabel;
-  final RevenueComparison comparison;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color trendColor = comparison.isPositiveChange
-        ? AppColors.success
-        : comparison.isNegativeChange
-        ? AppColors.error
-        : AppColors.textSecondary;
-
-    return Container(
-      constraints: const BoxConstraints(minWidth: 250, maxWidth: 320),
-      padding: const EdgeInsets.all(AppSizes.spacingLg),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: AppSizes.fontSm,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          if (subtitle != null) ...<Widget>[
-            const SizedBox(height: AppSizes.spacingXs),
-            Text(
-              subtitle!,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-          const SizedBox(height: AppSizes.spacingMd),
-          Text(
-            _formatMetric(comparison.currentValue, comparison.metricFormat),
-            style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: AppSizes.spacingSm),
-          Text(
-            _comparisonLabel(comparison),
-            style: TextStyle(fontWeight: FontWeight.w700, color: trendColor),
-          ),
-          const SizedBox(height: AppSizes.spacingXs),
-          Text(
-            '${comparisonLabel ?? 'Previous period'}: ${_formatMetric(comparison.previousValue, comparison.metricFormat)}',
-            style: const TextStyle(color: AppColors.textSecondary),
-          ),
-        ],
-      ),
+  Future<void> _handlePresetSelected(AnalyticsPresetPeriod preset) async {
+    final AnalyticsPeriodSelection selection = AnalyticsPeriodSelection.preset(
+      preset,
     );
+    await _applyPeriodSelection(selection);
   }
 
-  String _formatMetric(int value, RevenueMetricFormat format) {
-    return switch (format) {
-      RevenueMetricFormat.currencyMinor => CurrencyFormatter.fromMinor(value),
-      RevenueMetricFormat.count => '$value',
-    };
-  }
-
-  String _comparisonLabel(RevenueComparison comparison) {
-    final double? percentageChange = comparison.percentageChange;
-    if (percentageChange == null) {
-      return comparison.currentValue == 0
-          ? 'No previous period data'
-          : 'New versus previous period';
-    }
-    if (comparison.isFlat) {
-      return '0.0% vs previous period';
-    }
-    final String prefix = percentageChange > 0 ? '+' : '-';
-    return '$prefix${percentageChange.abs().toStringAsFixed(1)}% vs previous period';
-  }
-}
-
-class _ChartPanel extends StatelessWidget {
-  const _ChartPanel({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
-
-  final String title;
-  final String subtitle;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSizes.spacingLg),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: AppSizes.fontMd,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: AppSizes.spacingXs),
-          Text(
-            subtitle,
-            style: const TextStyle(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: AppSizes.spacingLg),
-          child,
-        ],
-      ),
+  Future<void> _handleCustomPeriodSelected(BuildContext context) async {
+    final AdminRevenueAnalyticsState state = ref.read(
+      adminRevenueAnalyticsNotifierProvider,
     );
-  }
-}
-
-class _DailyRevenueLineChart extends StatelessWidget {
-  const _DailyRevenueLineChart({required this.points});
-
-  final List<DailyRevenuePoint> points;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 240,
-      child: Column(
-        children: <Widget>[
-          Expanded(
-            child: CustomPaint(
-              painter: _LineChartPainter(points: points),
-              size: Size.infinite,
-            ),
-          ),
-          const SizedBox(height: AppSizes.spacingSm),
-          Row(
-            children: points
-                .map(
-                  (DailyRevenuePoint point) => Expanded(
-                    child: Text(
-                      DateFormat('d MMM').format(point.date),
-                      maxLines: 1,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                )
-                .toList(growable: false),
-          ),
-        ],
-      ),
+    final RevenueSelectedPeriodSummary? summary =
+        state.summary?.selectedPeriodSummary;
+    final DateTimeRange initialDateRange = DateTimeRange(
+      start: state.periodSelection.isCustom
+          ? state.periodSelection.start!
+          : (summary?.startDate ?? DateTime.now()).toLocal(),
+      end: state.periodSelection.isCustom
+          ? state.periodSelection.end!
+          : (summary?.endDate ?? DateTime.now()).toLocal(),
     );
-  }
-}
-
-class _WeeklyRevenueBarChart extends StatelessWidget {
-  const _WeeklyRevenueBarChart({required this.points});
-
-  final List<WeeklyRevenuePoint> points;
-
-  @override
-  Widget build(BuildContext context) {
-    final int maxValue = points.fold<int>(
-      0,
-      (int current, WeeklyRevenuePoint point) =>
-          math.max(current, point.revenueMinor),
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2024, 1, 1),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+      initialDateRange: initialDateRange,
     );
-    return SizedBox(
-      height: 250,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: points
-            .map(
-              (WeeklyRevenuePoint point) => Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.spacingXs,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: <Widget>[
-                      Text(
-                        CurrencyFormatter.fromMinor(point.revenueMinor),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: AppSizes.spacingSm),
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Container(
-                            width: 42,
-                            height: maxValue == 0
-                                ? 4
-                                : (180 * (point.revenueMinor / maxValue))
-                                      .clamp(4, 180)
-                                      .toDouble(),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryLight,
-                              borderRadius: BorderRadius.circular(
-                                AppSizes.radiusSm,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSizes.spacingSm),
-                      Text(
-                        DateFormat('d MMM').format(point.weekStart),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            )
-            .toList(growable: false),
-      ),
-    );
-  }
-}
-
-class _HourlyDistributionChart extends StatelessWidget {
-  const _HourlyDistributionChart({required this.hourlyDistribution});
-
-  final List<HourlyDistribution> hourlyDistribution;
-
-  @override
-  Widget build(BuildContext context) {
-    final int maxRevenue = hourlyDistribution.fold<int>(
-      0,
-      (int current, HourlyDistribution point) =>
-          math.max(current, point.revenueMinor),
-    );
-
-    return SizedBox(
-      height: 260,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: hourlyDistribution
-              .map(
-                (HourlyDistribution point) => Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.spacingXs,
-                  ),
-                  child: SizedBox(
-                    width: 36,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: <Widget>[
-                        Text(
-                          '${point.orderCount}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: AppSizes.spacingXs),
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
-                            child: Container(
-                              width: 22,
-                              height: maxRevenue == 0
-                                  ? 4
-                                  : (160 * (point.revenueMinor / maxRevenue))
-                                        .clamp(4, 160)
-                                        .toDouble(),
-                              decoration: BoxDecoration(
-                                color: point.orderCount == 0
-                                    ? AppColors.surfaceMuted
-                                    : AppColors.success,
-                                borderRadius: BorderRadius.circular(
-                                  AppSizes.radiusSm,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: AppSizes.spacingXs),
-                        Text(
-                          point.hour.toString().padLeft(2, '0'),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              )
-              .toList(growable: false),
-        ),
-      ),
-    );
-  }
-}
-
-class _InsightTile extends StatelessWidget {
-  const _InsightTile({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSizes.spacingMd),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            width: 10,
-            height: 10,
-            margin: const EdgeInsets.only(top: 6),
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: AppSizes.spacingSm),
-          Expanded(child: Text(message)),
-        ],
-      ),
-    );
-  }
-}
-
-class _Banner extends StatelessWidget {
-  const _Banner({required this.message, this.color = AppColors.primary});
-
-  final String message;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSizes.spacingMd),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-      ),
-      child: Text(message, style: TextStyle(color: color)),
-    );
-  }
-}
-
-class _LineChartPainter extends CustomPainter {
-  const _LineChartPainter({required this.points});
-
-  final List<DailyRevenuePoint> points;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (points.isEmpty) {
+    if (picked == null) {
       return;
     }
-
-    final double chartWidth = size.width;
-    final double chartHeight = size.height;
-    final int maxRevenue = points.fold<int>(
-      0,
-      (int current, DailyRevenuePoint point) =>
-          math.max(current, point.revenueMinor),
+    await _applyPeriodSelection(
+      AnalyticsPeriodSelection.custom(
+        start: DateTime.utc(
+          picked.start.year,
+          picked.start.month,
+          picked.start.day,
+        ),
+        end: DateTime.utc(picked.end.year, picked.end.month, picked.end.day),
+      ),
     );
-
-    final Paint gridPaint = Paint()
-      ..color = AppColors.border
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    final Paint linePaint = Paint()
-      ..color = AppColors.primary
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
-    final Paint pointPaint = Paint()..color = AppColors.success;
-
-    for (int lineIndex = 0; lineIndex < 4; lineIndex += 1) {
-      final double y = (chartHeight / 3) * lineIndex;
-      canvas.drawLine(Offset(0, y), Offset(chartWidth, y), gridPaint);
-    }
-
-    final Path path = Path();
-    for (int index = 0; index < points.length; index += 1) {
-      final double x = points.length == 1
-          ? chartWidth / 2
-          : chartWidth * index / (points.length - 1);
-      final double ratio = maxRevenue == 0
-          ? 0
-          : points[index].revenueMinor / maxRevenue;
-      final double y = chartHeight - (ratio * (chartHeight - 8)) - 4;
-      if (index == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-      canvas.drawCircle(Offset(x, y), 4, pointPaint);
-    }
-    canvas.drawPath(path, linePaint);
   }
 
-  @override
-  bool shouldRepaint(covariant _LineChartPainter oldDelegate) {
-    return oldDelegate.points != points;
+  Future<void> _applyPeriodSelection(AnalyticsPeriodSelection selection) async {
+    await ref
+        .read(adminRevenueAnalyticsNotifierProvider.notifier)
+        .setPeriodSelection(selection);
+    ref
+        .read(adminRevenueAnalyticsNotifierProvider.notifier)
+        .clearSelectedSavedView();
+    _syncLocation(selection: selection, comparisonMode: _comparisonMode);
   }
+
+  void _handleComparisonModeSelected(AnalyticsComparisonMode value) {
+    setState(() {
+      _comparisonMode = value;
+    });
+    ref
+        .read(adminRevenueAnalyticsNotifierProvider.notifier)
+        .clearSelectedSavedView();
+    _syncLocation(
+      selection: ref
+          .read(adminRevenueAnalyticsNotifierProvider)
+          .periodSelection,
+      comparisonMode: value,
+    );
+  }
+
+  void _handleInsightSelected(String value) {
+    setState(() {
+      _selectedInsightCode = value;
+    });
+    _syncLocation(
+      selection: ref
+          .read(adminRevenueAnalyticsNotifierProvider)
+          .periodSelection,
+      comparisonMode: _comparisonMode,
+    );
+  }
+
+  void _handleTrendDateSelected(DateTime value) {
+    setState(() {
+      _selectedTrendDate = value;
+    });
+    _syncLocation(
+      selection: ref
+          .read(adminRevenueAnalyticsNotifierProvider)
+          .periodSelection,
+      comparisonMode: _comparisonMode,
+    );
+  }
+
+  void _handleDaypartSelected(String value) {
+    setState(() {
+      _selectedDaypart = value;
+    });
+    _syncLocation(
+      selection: ref
+          .read(adminRevenueAnalyticsNotifierProvider)
+          .periodSelection,
+      comparisonMode: _comparisonMode,
+    );
+  }
+
+  void _handleMoverSelected(String value) {
+    setState(() {
+      _selectedMoverId = value;
+    });
+    _syncLocation(
+      selection: ref
+          .read(adminRevenueAnalyticsNotifierProvider)
+          .periodSelection,
+      comparisonMode: _comparisonMode,
+    );
+  }
+
+  Future<void> _showSaveViewDialog({
+    required BuildContext context,
+    required AdminRevenueAnalyticsNotifier notifier,
+  }) async {
+    final TextEditingController controller = TextEditingController(
+      text: _defaultSavedViewName(
+        ref.read(adminRevenueAnalyticsNotifierProvider).periodSelection,
+        _comparisonMode,
+      ),
+    );
+    final String? name = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Geçerli Görünümü Kaydet'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Görünüm adı',
+              hintText: 'Aylık Genel Bakış',
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('İptal'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('Kaydet'),
+            ),
+          ],
+        );
+      },
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.dispose();
+    });
+    if (name == null || name.trim().isEmpty) {
+      return;
+    }
+    final SavedAnalyticsView savedView = await notifier.saveCurrentView(
+      name: name,
+      comparisonMode: _comparisonMode,
+    );
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Saved analytics view "${savedView.name}"')),
+    );
+  }
+
+  Future<void> _showSavedViewsSheet({
+    required BuildContext context,
+    required AdminRevenueAnalyticsNotifier notifier,
+    required List<SavedAnalyticsView> savedViews,
+    required String? selectedSavedViewId,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: savedViews.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text('No saved analytics views yet.'),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: savedViews.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (BuildContext context, int index) {
+                    final SavedAnalyticsView view = savedViews[index];
+                    return ListTile(
+                      title: Text(view.name),
+                      subtitle: Text(
+                        '${view.periodSelection.label} · ${_comparisonModeLabel(view.resolvedComparisonMode)}',
+                      ),
+                      leading: view.id == selectedSavedViewId
+                          ? const Icon(Icons.check_circle_outline)
+                          : const Icon(Icons.bookmark_outline),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () async {
+                          await notifier.deleteSavedView(view.id);
+                          if (!context.mounted) {
+                            return;
+                          }
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                      onTap: () async {
+                        final NavigatorState navigator = Navigator.of(context);
+                        final SavedAnalyticsView? applied = await notifier
+                            .applySavedView(view.id);
+                        if (applied == null) {
+                          return;
+                        }
+                        if (!context.mounted) {
+                          return;
+                        }
+                        setState(() {
+                          _comparisonMode = applied.resolvedComparisonMode;
+                        });
+                        navigator.pop();
+                        _syncLocation(
+                          selection: applied.periodSelection,
+                          comparisonMode: applied.resolvedComparisonMode,
+                        );
+                      },
+                    );
+                  },
+                ),
+        );
+      },
+    );
+  }
+
+  Future<void> _copyShareLink({
+    required BuildContext context,
+    required AnalyticsPeriodSelection periodSelection,
+    required AnalyticsComparisonMode comparisonMode,
+  }) async {
+    final String link = buildAdminAnalyticsShareLink(
+      periodSelection: periodSelection,
+      comparisonMode: comparisonMode,
+      selectedInsightCode: _selectedInsightCode,
+      selectedTrendDate: _selectedTrendDate,
+      selectedDaypart: _selectedDaypart,
+      selectedMoverId: _selectedMoverId,
+    );
+    await Clipboard.setData(ClipboardData(text: link));
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Share link copied')));
+  }
+
+  Future<void> _copySnapshot({
+    required BuildContext context,
+    required RevenueSummary summary,
+    required AnalyticsPeriodSelection periodSelection,
+    required AdminRevenueAnalyticsNotifier notifier,
+  }) async {
+    final AnalyticsExport export = buildAdminAnalyticsExport(
+      summary: summary,
+      periodSelection: periodSelection,
+      comparisonMode: _comparisonMode,
+      selectedInsight: _selectedInsight(summary),
+    );
+    notifier.setLastExport(export);
+    final String text = buildAdminAnalyticsSnapshotText(
+      summary: summary,
+      periodSelection: periodSelection,
+      comparisonMode: _comparisonMode,
+      selectedInsight: _selectedInsight(summary),
+    );
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Analytics snapshot copied to clipboard')),
+    );
+  }
+
+  Future<void> _previewSnapshot({
+    required BuildContext context,
+    required RevenueSummary summary,
+    required AnalyticsPeriodSelection periodSelection,
+    required AdminRevenueAnalyticsNotifier notifier,
+  }) async {
+    final AnalyticsExport export = buildAdminAnalyticsExport(
+      summary: summary,
+      periodSelection: periodSelection,
+      comparisonMode: _comparisonMode,
+      selectedInsight: _selectedInsight(summary),
+    );
+    notifier.setLastExport(export);
+    final String text = buildAdminAnalyticsSnapshotText(
+      summary: summary,
+      periodSelection: periodSelection,
+      comparisonMode: _comparisonMode,
+      selectedInsight: _selectedInsight(summary),
+    );
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Text(
+                'Snapshot Preview',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 16),
+              SelectableText(text),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openPrintView({
+    required BuildContext context,
+    required RevenueSummary summary,
+    required AnalyticsPeriodSelection periodSelection,
+    required AdminRevenueAnalyticsNotifier notifier,
+  }) async {
+    final AnalyticsSnapshot snapshot = buildAdminAnalyticsSnapshot(
+      summary: summary,
+      periodSelection: periodSelection,
+      comparisonMode: _comparisonMode,
+      selectedInsight: _selectedInsight(summary),
+    );
+    final AnalyticsExport export = buildAdminAnalyticsExport(
+      summary: summary,
+      periodSelection: periodSelection,
+      comparisonMode: _comparisonMode,
+      selectedInsight: _selectedInsight(summary),
+    );
+    notifier.setLastExport(export);
+    notifier.setPrintViewOpen(true);
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(24),
+          child: AdminAnalyticsPrintView(
+            summary: summary,
+            snapshot: snapshot,
+            export: export,
+          ),
+        );
+      },
+    );
+    notifier.setPrintViewOpen(false);
+  }
+
+  Insight? _selectedInsight(RevenueSummary summary) {
+    final List<Insight> insights = orderAdminAnalyticsInsights(
+      buildPrimaryAnalyticsInsights(summary.insights),
+      _comparisonMode,
+    );
+    return selectAdminAnalyticsInsight(
+      insights,
+      _selectedInsightCode,
+      _comparisonMode,
+    );
+  }
+
+  void _syncLocation({
+    required AnalyticsPeriodSelection selection,
+    required AnalyticsComparisonMode comparisonMode,
+  }) {
+    final GoRouter? router = GoRouter.maybeOf(context);
+    if (router == null) {
+      return;
+    }
+    router.replace(
+      buildAdminAnalyticsShareLink(
+        periodSelection: selection,
+        comparisonMode: comparisonMode,
+        selectedInsightCode: _selectedInsightCode,
+        selectedTrendDate: _selectedTrendDate,
+        selectedDaypart: _selectedDaypart,
+        selectedMoverId: _selectedMoverId,
+      ),
+    );
+  }
+}
+
+String buildAdminAnalyticsShareLink({
+  required AnalyticsPeriodSelection periodSelection,
+  required AnalyticsComparisonMode comparisonMode,
+  String? selectedInsightCode,
+  DateTime? selectedTrendDate,
+  String? selectedDaypart,
+  String? selectedMoverId,
+}) {
+  final Map<String, String> queryParameters = <String, String>{
+    ...periodSelection.toQueryParameters(),
+    'mode': analyticsComparisonModeQueryValue(comparisonMode),
+    if (selectedInsightCode != null && selectedInsightCode.isNotEmpty)
+      'insight': selectedInsightCode,
+    if (selectedTrendDate != null)
+      'trend': selectedTrendDate.toIso8601String().split('T').first,
+    if (selectedDaypart != null && selectedDaypart.isNotEmpty)
+      'daypart': selectedDaypart,
+    if (selectedMoverId != null && selectedMoverId.isNotEmpty)
+      'mover': selectedMoverId,
+  };
+  return Uri(
+    path: '/admin/analytics',
+    queryParameters: queryParameters,
+  ).toString();
+}
+
+String _defaultSavedViewName(
+  AnalyticsPeriodSelection selection,
+  AnalyticsComparisonMode comparisonMode,
+) {
+  return '${selection.label} ${_comparisonModeLabel(comparisonMode)}';
+}
+
+String _comparisonModeLabel(AnalyticsComparisonMode mode) {
+  return switch (mode) {
+    AnalyticsComparisonMode.baselineSummary => 'Baseline',
+    AnalyticsComparisonMode.previousEquivalentPeriod => 'Previous',
+    AnalyticsComparisonMode.momentumView => 'Momentum',
+  };
 }

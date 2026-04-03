@@ -72,6 +72,44 @@ class CategoryRepository {
         );
   }
 
+  Future<bool> nameExistsIgnoreCase(
+    String name, {
+    int? excludeCategoryId,
+  }) async {
+    final String normalizedName = name.trim().toLowerCase();
+    final List<db.Category> rows = await _database
+        .select(_database.categories)
+        .get();
+    for (final db.Category row in rows) {
+      if (excludeCategoryId != null && row.id == excludeCategoryId) {
+        continue;
+      }
+      if (row.name.trim().toLowerCase() == normalizedName) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<Category?> findByNameIgnoreCase(
+    String name, {
+    int? excludeCategoryId,
+  }) async {
+    final String normalizedName = name.trim().toLowerCase();
+    final List<db.Category> rows = await _database
+        .select(_database.categories)
+        .get();
+    for (final db.Category row in rows) {
+      if (excludeCategoryId != null && row.id == excludeCategoryId) {
+        continue;
+      }
+      if (row.name.trim().toLowerCase() == normalizedName) {
+        return _mapCategory(row);
+      }
+    }
+    return null;
+  }
+
   Future<bool> updateCategory({
     required int id,
     String? name,
@@ -120,6 +158,40 @@ class CategoryRepository {
             .write(db.CategoriesCompanion(isActive: Value<bool>(isActive)));
 
     return updatedCount > 0;
+  }
+
+  Future<bool> hasProducts(int id) async {
+    final int count =
+        await (_database.selectOnly(_database.products)
+              ..addColumns(<Expression<Object>>[_database.products.id.count()])
+              ..where(_database.products.categoryId.equals(id)))
+            .map(
+              (TypedResult row) => row.read(_database.products.id.count()) ?? 0,
+            )
+            .getSingle();
+    return count > 0;
+  }
+
+  Future<bool> hasActiveProducts(int id) async {
+    final int count =
+        await (_database.selectOnly(_database.products)
+              ..addColumns(<Expression<Object>>[_database.products.id.count()])
+              ..where(
+                _database.products.categoryId.equals(id) &
+                    _database.products.isActive.equals(true),
+              ))
+            .map(
+              (TypedResult row) => row.read(_database.products.id.count()) ?? 0,
+            )
+            .getSingle();
+    return count > 0;
+  }
+
+  Future<bool> deleteCategory(int id) async {
+    final int deletedCount = await (_database.delete(
+      _database.categories,
+    )..where((db.$CategoriesTable t) => t.id.equals(id))).go();
+    return deletedCount > 0;
   }
 
   Category _mapCategory(db.Category row) {

@@ -36,6 +36,7 @@ class BreakfastSetConfiguration {
     required this.setRootProductId,
     required this.setItems,
     required this.choiceGroups,
+    required this.extras,
     required this.menuSettings,
     required this.catalogProductsById,
   });
@@ -43,6 +44,7 @@ class BreakfastSetConfiguration {
   final int setRootProductId;
   final List<BreakfastSetItemConfig> setItems;
   final List<BreakfastChoiceGroupConfig> choiceGroups;
+  final List<BreakfastExtraItemConfig> extras;
   final BreakfastMenuSettings menuSettings;
   final Map<int, BreakfastCatalogProduct> catalogProductsById;
 
@@ -50,6 +52,7 @@ class BreakfastSetConfiguration {
     int? setRootProductId,
     List<BreakfastSetItemConfig>? setItems,
     List<BreakfastChoiceGroupConfig>? choiceGroups,
+    List<BreakfastExtraItemConfig>? extras,
     BreakfastMenuSettings? menuSettings,
     Map<int, BreakfastCatalogProduct>? catalogProductsById,
   }) {
@@ -57,15 +60,16 @@ class BreakfastSetConfiguration {
       setRootProductId: setRootProductId ?? this.setRootProductId,
       setItems: setItems ?? this.setItems,
       choiceGroups: choiceGroups ?? this.choiceGroups,
+      extras: extras ?? this.extras,
       menuSettings: menuSettings ?? this.menuSettings,
       catalogProductsById: catalogProductsById ?? this.catalogProductsById,
     );
   }
 
-  Set<int> get swapEligibleProductIds => setItems
-      .where((BreakfastSetItemConfig item) => item.isRemovable)
-      .map((BreakfastSetItemConfig item) => item.itemProductId)
-      .toSet();
+  Set<int> get extraProductIds =>
+      extras.map((BreakfastExtraItemConfig item) => item.itemProductId).toSet();
+
+  Set<int> get swapEligibleProductIds => extraProductIds;
 
   Set<int> get choiceCapableProductIds => choiceGroups
       .expand(
@@ -96,6 +100,9 @@ class BreakfastSetConfiguration {
     }
     return null;
   }
+
+  bool isExplicitExtraProduct(int productId) =>
+      extraProductIds.contains(productId);
 }
 
 class BreakfastCatalogProduct {
@@ -176,6 +183,20 @@ class BreakfastChoiceGroupMemberConfig {
   final int productModifierId;
   final int itemProductId;
   final String displayName;
+}
+
+class BreakfastExtraItemConfig {
+  const BreakfastExtraItemConfig({
+    required this.productModifierId,
+    required this.itemProductId,
+    required this.itemName,
+    required this.sortOrder,
+  });
+
+  final int productModifierId;
+  final int itemProductId;
+  final String itemName;
+  final int sortOrder;
 }
 
 class BreakfastMenuSettings {

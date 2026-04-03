@@ -317,6 +317,10 @@ class OrderModifiers extends Table {
   IntColumn get itemProductId =>
       integer().nullable().customConstraint('REFERENCES "products" ("id")')();
 
+  IntColumn get sourceGroupId => integer().nullable().customConstraint(
+    'REFERENCES "modifier_groups" ("id")',
+  )();
+
   IntColumn get extraPriceMinor => integer().withDefault(const Constant(0))();
 
   TextColumn get chargeReason => text().nullable()();
@@ -617,7 +621,7 @@ class AppDatabase extends _$AppDatabase {
     return AppDatabase(NativeDatabase(file));
   }
 
-  static const int currentSchemaVersion = 19;
+  static const int currentSchemaVersion = 20;
   final List<MigrationLogEntry> _migrationHistory = <MigrationLogEntry>[];
   MigrationLogEntry? _lastMigrationFailure;
 
@@ -797,6 +801,14 @@ class AppDatabase extends _$AppDatabase {
           action: _migrateToV19,
         );
       }
+      if (from < 20) {
+        await _runMigrationStep(
+          step: 'migrate_v20',
+          fromVersion: from < 19 ? 19 : from,
+          toVersion: 20,
+          action: _migrateToV20,
+        );
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
@@ -955,6 +967,7 @@ class AppDatabase extends _$AppDatabase {
         item_name TEXT NOT NULL,
         quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
         item_product_id INTEGER NULL,
+        source_group_id INTEGER NULL,
         extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
         charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount')),
         unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
@@ -1274,6 +1287,9 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_order_modifiers_item_product_semantics ON order_modifiers(item_product_id, action, charge_reason, sort_key);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_source_group ON order_modifiers(source_group_id, item_product_id, charge_reason);',
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_payments_tx ON payments(transaction_id);',
@@ -2251,6 +2267,39 @@ class AppDatabase extends _$AppDatabase {
       table: 'order_modifiers',
       column: 'item_product_id',
       referencedTable: 'products',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'order_modifiers',
+      column: 'source_group_id',
+      referencedTable: 'modifier_groups',
+      nullable: true,
+    );
+  }
+
+  Future<void> _migrateToV20() async {
+    final bool hasOrderModifiersTable = await _tableExists('order_modifiers');
+    if (!hasOrderModifiersTable) {
+      return;
+    }
+
+    final bool hasSourceGroupId = await _tableHasColumn(
+      tableName: 'order_modifiers',
+      columnName: 'source_group_id',
+    );
+    if (!hasSourceGroupId) {
+      await customStatement(
+        'ALTER TABLE order_modifiers ADD COLUMN source_group_id INTEGER NULL;',
+      );
+    }
+
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_source_group ON order_modifiers(source_group_id, item_product_id, charge_reason);',
+    );
+    await _createMigrationFkTrigger(
+      table: 'order_modifiers',
+      column: 'source_group_id',
+      referencedTable: 'modifier_groups',
       nullable: true,
     );
   }

@@ -122,6 +122,10 @@ Future<SupabaseClient?> _initialiseSupabaseIfConfigured(
       url: config.supabaseUrl!,
       anonKey: config.supabaseAnonKey!,
     );
+    final Session? session = Supabase.instance.client.auth.currentSession;
+    print('=== ANALYTICS DEBUG ===');
+    print('USER ID: ${session?.user.id}');
+    print('TOKEN NULL: ${session?.accessToken == null}');
     logger.audit(
       eventType: 'supabase_initialized',
       message: 'Supabase client initialized for sync.',

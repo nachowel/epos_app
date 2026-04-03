@@ -303,6 +303,16 @@ Deno.serve(async (request: Request) => {
       "EPOS_INTERNAL_API_KEY must be configured for mirror writes",
     );
   }
+  console.log("[AUTH_DEBUG] expected_key_length:", internalApiKey?.length);
+  console.log("[AUTH_DEBUG] expected_key_preview:", internalApiKey?.substring(0, 6));
+  console.log(
+    "[AUTH_DEBUG] received_key_preview:",
+    request.headers.get("x-epos-internal-key")?.substring(0, 6),
+  );
+  console.log(
+    "[AUTH_DEBUG] received_key_length:",
+    request.headers.get("x-epos-internal-key")?.length,
+  );
   const auth = validateInternalFunctionAuth(request.headers, internalApiKey);
   if (!auth.ok) {
     if (auth.status === 500) {

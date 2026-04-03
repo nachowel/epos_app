@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../domain/services/breakfast_modifier_renderer.dart';
 import '../../../../domain/models/order_modifier.dart';
 import '../../../providers/cart_models.dart';
 
@@ -23,9 +24,7 @@ class CartLineTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String modifierSummary = item.modifiers
-        .map(_modifierLabel)
-        .join('  ·  ');
+    final String modifierSummary = _buildModifierSummary();
 
     return Padding(
       padding: EdgeInsets.symmetric(vertical: compactLayout ? 4 : 5),
@@ -121,6 +120,19 @@ class CartLineTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _buildModifierSummary() {
+    if (item.breakfastSelection != null) {
+      const BreakfastModifierRenderer renderer = BreakfastModifierRenderer();
+      return renderer
+          .renderClassified(
+            item.breakfastSelection!.rebuildResult.classifiedModifiers,
+          )
+          .map((BreakfastModifierRendered rendered) => rendered.label)
+          .join('  ·  ');
+    }
+    return item.modifiers.map(_modifierLabel).join('  ·  ');
   }
 
   String _modifierLabel(CartModifier modifier) {

@@ -148,6 +148,58 @@ class AdminCategoriesNotifier extends StateNotifier<AdminCategoriesState> {
       return false;
     }
   }
+
+  Future<bool?> categoryHasActiveProducts({required int id}) async {
+    final User? currentUser = _ref.read(authNotifierProvider).currentUser;
+    if (currentUser == null) {
+      state = state.copyWith(errorMessage: AppStrings.accessDenied);
+      return null;
+    }
+    state = state.copyWith(errorMessage: null);
+    try {
+      return await _ref
+          .read(adminServiceProvider)
+          .categoryHasActiveProducts(user: currentUser, id: id);
+    } catch (error, stackTrace) {
+      state = state.copyWith(
+        errorMessage: ErrorMapper.toUserMessageAndLog(
+          error,
+          logger: _ref.read(appLoggerProvider),
+          eventType: 'admin_category_has_active_products_failed',
+          stackTrace: stackTrace,
+        ),
+      );
+      return null;
+    }
+  }
+
+  Future<bool> deleteCategory({required int id}) async {
+    final User? currentUser = _ref.read(authNotifierProvider).currentUser;
+    if (currentUser == null) {
+      state = state.copyWith(errorMessage: AppStrings.accessDenied);
+      return false;
+    }
+    state = state.copyWith(isSaving: true, errorMessage: null);
+    try {
+      await _ref
+          .read(adminServiceProvider)
+          .deleteCategory(user: currentUser, id: id);
+      await load();
+      state = state.copyWith(isSaving: false, errorMessage: null);
+      return true;
+    } catch (error, stackTrace) {
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: ErrorMapper.toUserMessageAndLog(
+          error,
+          logger: _ref.read(appLoggerProvider),
+          eventType: 'admin_category_delete_failed',
+          stackTrace: stackTrace,
+        ),
+      );
+      return false;
+    }
+  }
 }
 
 final StateNotifierProvider<AdminCategoriesNotifier, AdminCategoriesState>

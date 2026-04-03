@@ -35,7 +35,33 @@ import 'report_service.dart';
 import 'cash_movement_service.dart';
 import 'shift_session_service.dart';
 
+enum ProductDeleteOutcome { deleted, deactivated }
+
+class ProductDeletionAnalysis {
+  const ProductDeletionAnalysis({
+    required this.product,
+    required this.hasHistoricalUsage,
+    required this.isSetProduct,
+    required this.setConfigReferenceCount,
+    required this.requiredChoiceReferenceCount,
+    required this.extrasPoolReferenceCount,
+  });
+
+  final Product product;
+  final bool hasHistoricalUsage;
+  final bool isSetProduct;
+  final int setConfigReferenceCount;
+  final int requiredChoiceReferenceCount;
+  final int extrasPoolReferenceCount;
+
+  bool get hasSemanticReferences =>
+      setConfigReferenceCount > 0 ||
+      requiredChoiceReferenceCount > 0 ||
+      extrasPoolReferenceCount > 0;
+}
+
 class AdminService {
+  static const String archivedCategoryName = 'Archived Products';
   static const int defaultSyncMaxRetryAttempts = 5;
   static const Duration defaultProcessingStuckThreshold = Duration(minutes: 2);
 
@@ -123,6 +149,7 @@ class AdminService {
     _ensureAdmin(user);
     _validateRequiredName(name, fieldName: 'Category name');
     _validateNonNegative(sortOrder, fieldName: 'sortOrder');
+    await _ensureUniqueCategoryName(name);
 
     return _categoryRepository.insert(
       name: name.trim(),
@@ -141,6 +168,7 @@ class AdminService {
     _ensureAdmin(user);
     _validateRequiredName(name, fieldName: 'Category name');
     _validateNonNegative(sortOrder, fieldName: 'sortOrder');
+    await _ensureUniqueCategoryName(name, excludeCategoryId: id);
 
     final bool updated = await _categoryRepository.updateCategory(
       id: id,
@@ -149,6 +177,43 @@ class AdminService {
       isActive: isActive,
     );
     if (!updated) {
+      throw NotFoundException('Category not found: $id');
+    }
+  }
+
+  Future<bool> categoryHasActiveProducts({
+    required User user,
+    required int id,
+  }) async {
+    _ensureAdmin(user);
+    return _categoryRepository.hasActiveProducts(id);
+  }
+
+  Future<void> deleteCategory({required User user, required int id}) async {
+    _ensureAdmin(user);
+    if (await _categoryRepository.hasActiveProducts(id)) {
+      throw ValidationException(
+        'This category contains active products. Move, archive, or delete them first.',
+      );
+    }
+    final List<Product> categoryProducts = await _productRepository
+        .getByCategory(id, activeOnly: false);
+    final List<Product> archivedProducts = categoryProducts
+        .where((Product product) => !product.isActive)
+        .toList(growable: false);
+    if (archivedProducts.isNotEmpty) {
+      final int archivedCategoryId = await _ensureArchivedFallbackCategory(
+        excludeCategoryId: id,
+      );
+      for (final Product product in archivedProducts) {
+        await _productRepository.updateProduct(
+          id: product.id,
+          categoryId: archivedCategoryId,
+        );
+      }
+    }
+    final bool deleted = await _categoryRepository.deleteCategory(id);
+    if (!deleted) {
       throw NotFoundException('Category not found: $id');
     }
   }
@@ -310,6 +375,84 @@ class AdminService {
     );
   }
 
+  Future<ProductDeletionAnalysis> analyzeProductDeletion({
+    required User user,
+    required int id,
+  }) async {
+    _ensureAdmin(user);
+    final Product product = await _requireExistingProduct(id);
+    final ({int setConfigCount, int requiredChoiceCount, int extrasPoolCount})
+    semanticReferences = await _productRepository.loadSemanticReferenceSummary(
+      id,
+    );
+    return ProductDeletionAnalysis(
+      product: product,
+      hasHistoricalUsage: await _productRepository.hasHistoricalUsage(id),
+      isSetProduct: await _productRepository.hasOwnedSemanticConfiguration(id),
+      setConfigReferenceCount: semanticReferences.setConfigCount,
+      requiredChoiceReferenceCount: semanticReferences.requiredChoiceCount,
+      extrasPoolReferenceCount: semanticReferences.extrasPoolCount,
+    );
+  }
+
+  Future<ProductDeleteOutcome> deleteProduct({
+    required User user,
+    required int id,
+    bool confirmSemanticImpact = false,
+  }) async {
+    _ensureAdmin(user);
+    final ProductDeletionAnalysis analysis = await analyzeProductDeletion(
+      user: user,
+      id: id,
+    );
+    final Product before = analysis.product;
+    if (analysis.hasHistoricalUsage) {
+      final bool updated = await _productRepository.updateProduct(
+        id: id,
+        isActive: false,
+      );
+      if (!updated) {
+        throw NotFoundException('Product not found: $id');
+      }
+      await _logProductVisibilityChangeIfNeeded(
+        actorUserId: user.id,
+        before: before,
+        after: before.copyWith(isActive: false),
+      );
+      return ProductDeleteOutcome.deactivated;
+    }
+
+    if (!analysis.isSetProduct &&
+        analysis.hasSemanticReferences &&
+        !confirmSemanticImpact) {
+      throw ValidationException(
+        'This product is used by other set configurations. Deleting it may affect those sets.',
+      );
+    }
+
+    final bool deleted = analysis.isSetProduct
+        ? await _productRepository.deleteSetProduct(id)
+        : await _productRepository.deleteStandardProduct(id);
+    if (!deleted) {
+      throw NotFoundException('Product not found: $id');
+    }
+    await _auditLogService.logActionSafely(
+      actorUserId: user.id,
+      action: 'product_deleted',
+      entityType: 'product',
+      entityId: '$id',
+      metadata: <String, Object?>{
+        'category_id': before.categoryId,
+        'name': before.name,
+        'price_minor': before.priceMinor,
+        'has_modifiers': before.hasModifiers,
+        'is_active': before.isActive,
+        'is_visible_on_pos': before.isVisibleOnPos,
+      },
+    );
+    return ProductDeleteOutcome.deleted;
+  }
+
   Future<List<ProductModifier>> getModifiersForProduct(int productId) async {
     await _requireProduct(productId);
     return _modifierRepository.getByProductId(productId, activeOnly: false);
@@ -332,7 +475,7 @@ class AdminService {
       productId: productId,
       name: name.trim(),
       type: type,
-      extraPriceMinor: type == ModifierType.included ? 0 : extraPriceMinor,
+      extraPriceMinor: type == ModifierType.extra ? extraPriceMinor : 0,
       isActive: isActive,
     );
   }
@@ -356,7 +499,7 @@ class AdminService {
       productId: productId,
       name: name.trim(),
       type: type,
-      extraPriceMinor: type == ModifierType.included ? 0 : extraPriceMinor,
+      extraPriceMinor: type == ModifierType.extra ? extraPriceMinor : 0,
       isActive: isActive,
     );
     if (!updated) {
@@ -759,6 +902,33 @@ class AdminService {
   void _validateNonNegative(int value, {required String fieldName}) {
     if (value < 0) {
       throw ValidationException('$fieldName cannot be negative.');
+    }
+  }
+
+  Future<int> _ensureArchivedFallbackCategory({int? excludeCategoryId}) async {
+    final Category? existing = await _categoryRepository.findByNameIgnoreCase(
+      archivedCategoryName,
+      excludeCategoryId: excludeCategoryId,
+    );
+    if (existing != null) {
+      return existing.id;
+    }
+    return _categoryRepository.insert(
+      name: archivedCategoryName,
+      sortOrder: 9999,
+      isActive: true,
+    );
+  }
+
+  Future<void> _ensureUniqueCategoryName(
+    String name, {
+    int? excludeCategoryId,
+  }) async {
+    if (await _categoryRepository.nameExistsIgnoreCase(
+      name,
+      excludeCategoryId: excludeCategoryId,
+    )) {
+      throw ValidationException('Category with this name already exists');
     }
   }
 

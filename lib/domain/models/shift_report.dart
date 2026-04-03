@@ -1,4 +1,5 @@
 import 'shift_report_category_line.dart';
+import 'semantic_sales_analytics.dart';
 
 class ShiftReport {
   const ShiftReport({
@@ -19,6 +20,7 @@ class ShiftReport {
     this.cardGrossTotalMinor = 0,
     required this.cardTotalMinor,
     this.categoryBreakdown = const <ShiftReportCategoryLine>[],
+    this.semanticSalesAnalytics = const SemanticSalesAnalytics.empty(),
   });
 
   final int shiftId;
@@ -38,6 +40,7 @@ class ShiftReport {
   final int cardGrossTotalMinor;
   final int cardTotalMinor;
   final List<ShiftReportCategoryLine> categoryBreakdown;
+  final SemanticSalesAnalytics semanticSalesAnalytics;
 
   ShiftReport copyWith({
     int? shiftId,
@@ -57,6 +60,7 @@ class ShiftReport {
     int? cardGrossTotalMinor,
     int? cardTotalMinor,
     List<ShiftReportCategoryLine>? categoryBreakdown,
+    SemanticSalesAnalytics? semanticSalesAnalytics,
   }) {
     return ShiftReport(
       shiftId: shiftId ?? this.shiftId,
@@ -76,6 +80,8 @@ class ShiftReport {
       cardGrossTotalMinor: cardGrossTotalMinor ?? this.cardGrossTotalMinor,
       cardTotalMinor: cardTotalMinor ?? this.cardTotalMinor,
       categoryBreakdown: categoryBreakdown ?? this.categoryBreakdown,
+      semanticSalesAnalytics:
+          semanticSalesAnalytics ?? this.semanticSalesAnalytics,
     );
   }
 
@@ -101,7 +107,8 @@ class ShiftReport {
         other.cardCount == cardCount &&
         other.cardGrossTotalMinor == cardGrossTotalMinor &&
         other.cardTotalMinor == cardTotalMinor &&
-        _listEquals(other.categoryBreakdown, categoryBreakdown);
+        _listEquals(other.categoryBreakdown, categoryBreakdown) &&
+        other.semanticSalesAnalytics == semanticSalesAnalytics;
   }
 
   @override
@@ -123,6 +130,7 @@ class ShiftReport {
     cardGrossTotalMinor,
     cardTotalMinor,
     Object.hashAll(categoryBreakdown),
+    semanticSalesAnalytics,
   );
 
   bool _listEquals(

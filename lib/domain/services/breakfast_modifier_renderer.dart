@@ -1,4 +1,5 @@
 import '../../core/utils/currency_formatter.dart';
+import '../models/breakfast_rebuild.dart';
 import '../models/order_modifier.dart';
 
 /// Shared rendering policy for breakfast modifier rows.
@@ -53,22 +54,51 @@ class BreakfastModifierRenderer {
   /// Output is sorted by [sortKey], then by semantic group priority
   /// (removes, included choices, free swaps, paid swaps, extra adds).
   List<BreakfastModifierRendered> renderAll(List<OrderModifier> modifiers) {
-    final List<BreakfastModifierRendered> result = <BreakfastModifierRendered>[];
+    final List<BreakfastModifierRendered> result =
+        <BreakfastModifierRendered>[];
     for (final OrderModifier modifier in modifiers) {
       result.add(_renderOne(modifier));
     }
     result.sort((BreakfastModifierRendered a, BreakfastModifierRendered b) {
       final int sortCmp = a.sortKey.compareTo(b.sortKey);
       if (sortCmp != 0) return sortCmp;
-      return _groupPriority(a.chargeReason, a.action)
-          .compareTo(_groupPriority(b.chargeReason, b.action));
+      return _groupPriority(
+        a.chargeReason,
+        a.action,
+      ).compareTo(_groupPriority(b.chargeReason, b.action));
     });
     return result;
   }
 
+  List<BreakfastModifierRendered> renderClassified(
+    List<BreakfastClassifiedModifier> modifiers,
+  ) {
+    return renderAll(
+      modifiers
+          .map(
+            (BreakfastClassifiedModifier modifier) => OrderModifier(
+              id: 0,
+              uuid: '',
+              transactionLineId: 0,
+              action: modifier.action,
+              itemName: modifier.displayName,
+              extraPriceMinor: modifier.priceEffectMinor,
+              chargeReason: modifier.chargeReason,
+              itemProductId: modifier.itemProductId,
+              quantity: modifier.quantity,
+              unitPriceMinor: modifier.unitPriceMinor,
+              priceEffectMinor: modifier.priceEffectMinor,
+              sortKey: modifier.sortKey,
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
   BreakfastModifierRendered _renderOne(OrderModifier modifier) {
-    final String quantitySuffix =
-        modifier.quantity > 1 ? ' x${modifier.quantity}' : '';
+    final String quantitySuffix = modifier.quantity > 1
+        ? ' x${modifier.quantity}'
+        : '';
 
     switch (modifier.chargeReason) {
       case ModifierChargeReason.includedChoice:
@@ -186,9 +216,12 @@ class BreakfastModifierRenderer {
         final int amountMinor = modifier.priceEffectMinor > 0
             ? modifier.priceEffectMinor
             : modifier.extraPriceMinor;
-        final String priceLabel =
-            amountMinor > 0 ? '+${CurrencyFormatter.fromMinor(amountMinor)}' : '';
-        final String priceSuffix = priceLabel.isNotEmpty ? ' ($priceLabel)' : '';
+        final String priceLabel = amountMinor > 0
+            ? '+${CurrencyFormatter.fromMinor(amountMinor)}'
+            : '';
+        final String priceSuffix = priceLabel.isNotEmpty
+            ? ' ($priceLabel)'
+            : '';
         return BreakfastModifierRendered(
           label: '+ ${modifier.itemName}$quantitySuffix$priceSuffix',
           priceLabel: priceLabel,
@@ -226,8 +259,9 @@ class BreakfastModifierRenderer {
   /// Returns kitchen-appropriate label for a modifier.
   /// Kitchen uses action-oriented wording: "no beans", "tea", "swap → X".
   String kitchenLabel(OrderModifier modifier) {
-    final String quantitySuffix =
-        modifier.quantity > 1 ? ' x${modifier.quantity}' : '';
+    final String quantitySuffix = modifier.quantity > 1
+        ? ' x${modifier.quantity}'
+        : '';
 
     if (modifier.action == ModifierAction.remove) {
       return 'no ${modifier.itemName}$quantitySuffix';

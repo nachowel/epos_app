@@ -33,15 +33,21 @@ class ModifierRepository {
     required ModifierType type,
     int extraPriceMinor = 0,
     bool isActive = true,
+    int? groupId,
+    int? itemProductId,
   }) {
     return _database
         .into(_database.productModifiers)
         .insert(
           db.ProductModifiersCompanion.insert(
             productId: productId,
+            groupId: Value<int?>(groupId),
+            itemProductId: Value<int?>(itemProductId),
             name: name,
             type: _typeToDb(type),
-            extraPriceMinor: Value<int>(extraPriceMinor),
+            extraPriceMinor: Value<int>(
+              type == ModifierType.extra ? extraPriceMinor : 0,
+            ),
             isActive: Value<bool>(isActive),
           ),
         );
@@ -96,6 +102,8 @@ class ModifierRepository {
     return ProductModifier(
       id: row.id,
       productId: row.productId,
+      groupId: row.groupId,
+      itemProductId: row.itemProductId,
       name: row.name,
       type: _typeFromDb(row.type),
       extraPriceMinor: row.extraPriceMinor,
@@ -109,6 +117,8 @@ class ModifierRepository {
         return ModifierType.included;
       case 'extra':
         return ModifierType.extra;
+      case 'choice':
+        return ModifierType.choice;
       default:
         throw DatabaseException('Unknown modifier type: $value');
     }
@@ -120,6 +130,8 @@ class ModifierRepository {
         return 'included';
       case ModifierType.extra:
         return 'extra';
+      case ModifierType.choice:
+        return 'choice';
     }
   }
 }

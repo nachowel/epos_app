@@ -120,9 +120,22 @@ class SupabaseEdgeFunctionInvoker {
     );
 
     try {
+      print('[SYNC_DEBUG] URL: $url');
+      print(
+        "[SYNC_DEBUG] internal_key_exists: ${requestHeaders.containsKey('x-epos-internal-key')}",
+      );
+      print(
+        "[SYNC_DEBUG] internal_key_length: ${requestHeaders['x-epos-internal-key']?.length}",
+      );
+      print(
+        "[SYNC_DEBUG] internal_key_preview: ${requestHeaders['x-epos-internal-key']?.substring(0, 6)}",
+      );
+      print('[SYNC_DEBUG] status_code: PENDING');
       final http.Response response = await _httpClient
           .post(url, headers: requestHeaders, body: jsonEncode(body))
           .timeout(const Duration(seconds: 20));
+      print('[SYNC_DEBUG] response_status: ${response.statusCode}');
+      print('[SYNC_DEBUG] response_body: ${response.body}');
       final Object? responseBody = _decodeResponseBody(response);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {

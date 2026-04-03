@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/errors/exceptions.dart';
+import '../../domain/models/analytics/analytics_period.dart';
 import '../sync/supabase_edge_function_invoker.dart';
 
 class RevenueAnalyticsSnapshot {
@@ -22,6 +23,44 @@ class RevenueAnalyticsSnapshot {
     required this.dailyTrend,
     required this.weeklySummary,
     required this.hourlyDistribution,
+    this.periodWindow,
+    this.comparisonWindow,
+    this.periodRevenueMinor,
+    this.previousPeriodRevenueMinor,
+    this.periodOrderCount,
+    this.previousPeriodOrderCount,
+    this.periodAverageOrderValueMinor,
+    this.previousPeriodAverageOrderValueMinor,
+    this.periodCashRevenueMinor,
+    this.periodCardRevenueMinor,
+    this.previousPeriodCashRevenueMinor,
+    this.previousPeriodCardRevenueMinor,
+    this.periodCancelledOrderCount,
+    this.previousPeriodCancelledOrderCount,
+    this.todayOrderCount,
+    this.yesterdayOrderCount,
+    this.thisMonthOrderCount,
+    this.lastMonthOrderCount,
+    this.thisWeekAverageOrderValueMinor,
+    this.lastWeekAverageOrderValueMinor,
+    this.thisMonthAverageOrderValueMinor,
+    this.lastMonthAverageOrderValueMinor,
+    this.thisWeekCashRevenueMinor,
+    this.thisWeekCardRevenueMinor,
+    this.lastWeekCashRevenueMinor,
+    this.lastWeekCardRevenueMinor,
+    this.thisMonthCashRevenueMinor,
+    this.thisMonthCardRevenueMinor,
+    this.lastMonthCashRevenueMinor,
+    this.lastMonthCardRevenueMinor,
+    this.thisWeekCancelledOrderCount,
+    this.lastWeekCancelledOrderCount,
+    this.thisMonthCancelledOrderCount,
+    this.lastMonthCancelledOrderCount,
+    this.daypartDistribution = const <RevenueAnalyticsDaypartPoint>[],
+    this.topProductsCurrentPeriod = const <RevenueAnalyticsTopProductPoint>[],
+    this.topProductsPreviousPeriod = const <RevenueAnalyticsTopProductPoint>[],
+    this.dataQualityNotes = const <String>[],
   });
 
   factory RevenueAnalyticsSnapshot.fromJson(Map<String, Object?> json) {
@@ -48,6 +87,15 @@ class RevenueAnalyticsSnapshot {
     _validateWeeklySummary(weeklySummary);
     _validateHourlyDistribution(hourlyDistribution);
 
+    final List<RevenueAnalyticsDaypartPoint> daypartDistribution =
+        _readOptionalList(
+          json,
+          'daypart_distribution',
+          (Map<String, Object?> item) =>
+              RevenueAnalyticsDaypartPoint.fromJson(item),
+        );
+    _validateDaypartDistribution(daypartDistribution);
+
     return RevenueAnalyticsSnapshot(
       generatedAt: generatedAt,
       timezone: timezone,
@@ -62,6 +110,132 @@ class RevenueAnalyticsSnapshot {
       dailyTrend: dailyTrend,
       weeklySummary: weeklySummary,
       hourlyDistribution: hourlyDistribution,
+      periodWindow: _readOptionalPeriodWindow(json, 'period'),
+      comparisonWindow: _readOptionalComparisonWindow(json, 'comparison_period'),
+      periodRevenueMinor: _readOptionalInt(json, 'period_total_minor'),
+      previousPeriodRevenueMinor: _readOptionalInt(
+        json,
+        'previous_period_total_minor',
+      ),
+      periodOrderCount: _readOptionalInt(json, 'period_order_count'),
+      previousPeriodOrderCount: _readOptionalInt(
+        json,
+        'previous_period_order_count',
+      ),
+      periodAverageOrderValueMinor: _readOptionalInt(
+        json,
+        'period_average_order_value_minor',
+      ),
+      previousPeriodAverageOrderValueMinor: _readOptionalInt(
+        json,
+        'previous_period_average_order_value_minor',
+      ),
+      periodCashRevenueMinor: _readOptionalInt(
+        json,
+        'period_cash_revenue_minor',
+      ),
+      periodCardRevenueMinor: _readOptionalInt(
+        json,
+        'period_card_revenue_minor',
+      ),
+      previousPeriodCashRevenueMinor: _readOptionalInt(
+        json,
+        'previous_period_cash_revenue_minor',
+      ),
+      previousPeriodCardRevenueMinor: _readOptionalInt(
+        json,
+        'previous_period_card_revenue_minor',
+      ),
+      periodCancelledOrderCount: _readOptionalInt(
+        json,
+        'period_cancelled_order_count',
+      ),
+      previousPeriodCancelledOrderCount: _readOptionalInt(
+        json,
+        'previous_period_cancelled_order_count',
+      ),
+      todayOrderCount: _readOptionalInt(json, 'today_order_count'),
+      yesterdayOrderCount: _readOptionalInt(json, 'yesterday_order_count'),
+      thisMonthOrderCount: _readOptionalInt(json, 'this_month_order_count'),
+      lastMonthOrderCount: _readOptionalInt(json, 'last_month_order_count'),
+      thisWeekAverageOrderValueMinor: _readOptionalInt(
+        json,
+        'this_week_average_order_value_minor',
+      ),
+      lastWeekAverageOrderValueMinor: _readOptionalInt(
+        json,
+        'last_week_average_order_value_minor',
+      ),
+      thisMonthAverageOrderValueMinor: _readOptionalInt(
+        json,
+        'this_month_average_order_value_minor',
+      ),
+      lastMonthAverageOrderValueMinor: _readOptionalInt(
+        json,
+        'last_month_average_order_value_minor',
+      ),
+      thisWeekCashRevenueMinor: _readOptionalInt(
+        json,
+        'this_week_cash_revenue_minor',
+      ),
+      thisWeekCardRevenueMinor: _readOptionalInt(
+        json,
+        'this_week_card_revenue_minor',
+      ),
+      lastWeekCashRevenueMinor: _readOptionalInt(
+        json,
+        'last_week_cash_revenue_minor',
+      ),
+      lastWeekCardRevenueMinor: _readOptionalInt(
+        json,
+        'last_week_card_revenue_minor',
+      ),
+      thisMonthCashRevenueMinor: _readOptionalInt(
+        json,
+        'this_month_cash_revenue_minor',
+      ),
+      thisMonthCardRevenueMinor: _readOptionalInt(
+        json,
+        'this_month_card_revenue_minor',
+      ),
+      lastMonthCashRevenueMinor: _readOptionalInt(
+        json,
+        'last_month_cash_revenue_minor',
+      ),
+      lastMonthCardRevenueMinor: _readOptionalInt(
+        json,
+        'last_month_card_revenue_minor',
+      ),
+      thisWeekCancelledOrderCount: _readOptionalInt(
+        json,
+        'this_week_cancelled_order_count',
+      ),
+      lastWeekCancelledOrderCount: _readOptionalInt(
+        json,
+        'last_week_cancelled_order_count',
+      ),
+      thisMonthCancelledOrderCount: _readOptionalInt(
+        json,
+        'this_month_cancelled_order_count',
+      ),
+      lastMonthCancelledOrderCount: _readOptionalInt(
+        json,
+        'last_month_cancelled_order_count',
+      ),
+      daypartDistribution: daypartDistribution,
+      topProductsCurrentPeriod: _readOptionalList(
+        json,
+        'top_products_current_period',
+        (Map<String, Object?> item) =>
+            RevenueAnalyticsTopProductPoint.fromJson(item),
+      ),
+      topProductsPreviousPeriod: _readOptionalList(
+        json,
+        'top_products_previous_period',
+        (Map<String, Object?> item) =>
+            RevenueAnalyticsTopProductPoint.fromJson(item),
+      ),
+      dataQualityNotes: _readOptionalStringList(json, 'data_quality_notes'),
     );
   }
 
@@ -78,6 +252,44 @@ class RevenueAnalyticsSnapshot {
   final List<RevenueAnalyticsDailyPoint> dailyTrend;
   final List<RevenueAnalyticsWeeklyPoint> weeklySummary;
   final List<RevenueAnalyticsHourlyPoint> hourlyDistribution;
+  final RevenueAnalyticsPeriodWindow? periodWindow;
+  final RevenueAnalyticsComparisonWindow? comparisonWindow;
+  final int? periodRevenueMinor;
+  final int? previousPeriodRevenueMinor;
+  final int? periodOrderCount;
+  final int? previousPeriodOrderCount;
+  final int? periodAverageOrderValueMinor;
+  final int? previousPeriodAverageOrderValueMinor;
+  final int? periodCashRevenueMinor;
+  final int? periodCardRevenueMinor;
+  final int? previousPeriodCashRevenueMinor;
+  final int? previousPeriodCardRevenueMinor;
+  final int? periodCancelledOrderCount;
+  final int? previousPeriodCancelledOrderCount;
+  final int? todayOrderCount;
+  final int? yesterdayOrderCount;
+  final int? thisMonthOrderCount;
+  final int? lastMonthOrderCount;
+  final int? thisWeekAverageOrderValueMinor;
+  final int? lastWeekAverageOrderValueMinor;
+  final int? thisMonthAverageOrderValueMinor;
+  final int? lastMonthAverageOrderValueMinor;
+  final int? thisWeekCashRevenueMinor;
+  final int? thisWeekCardRevenueMinor;
+  final int? lastWeekCashRevenueMinor;
+  final int? lastWeekCardRevenueMinor;
+  final int? thisMonthCashRevenueMinor;
+  final int? thisMonthCardRevenueMinor;
+  final int? lastMonthCashRevenueMinor;
+  final int? lastMonthCardRevenueMinor;
+  final int? thisWeekCancelledOrderCount;
+  final int? lastWeekCancelledOrderCount;
+  final int? thisMonthCancelledOrderCount;
+  final int? lastMonthCancelledOrderCount;
+  final List<RevenueAnalyticsDaypartPoint> daypartDistribution;
+  final List<RevenueAnalyticsTopProductPoint> topProductsCurrentPeriod;
+  final List<RevenueAnalyticsTopProductPoint> topProductsPreviousPeriod;
+  final List<String> dataQualityNotes;
 
   static String _readString(Map<String, Object?> json, String key) {
     final Object? value = json[key];
@@ -96,6 +308,19 @@ class RevenueAnalyticsSnapshot {
     final Object? value = json[key];
     if (value is! num) {
       throw FormatException('Revenue analytics response is missing $key.');
+    }
+    return value.toInt();
+  }
+
+  static int? _readOptionalInt(Map<String, Object?> json, String key) {
+    final Object? value = json[key];
+    if (value == null) {
+      return null;
+    }
+    if (value is! num) {
+      throw FormatException(
+        'Revenue analytics response contains invalid $key.',
+      );
     }
     return value.toInt();
   }
@@ -121,10 +346,86 @@ class RevenueAnalyticsSnapshot {
         .toList(growable: false);
   }
 
+  static List<T> _readOptionalList<T>(
+    Map<String, Object?> json,
+    String key,
+    T Function(Map<String, Object?> item) decoder,
+  ) {
+    final Object? value = json[key];
+    if (value == null) {
+      return <T>[];
+    }
+    if (value is! List) {
+      throw FormatException(
+        'Revenue analytics response contains invalid $key.',
+      );
+    }
+    return value
+        .map((Object? item) {
+          if (item is! Map) {
+            throw FormatException(
+              'Revenue analytics response contains invalid $key.',
+            );
+          }
+          return decoder(Map<String, Object?>.from(item));
+        })
+        .toList(growable: false);
+  }
+
+  static RevenueAnalyticsPeriodWindow? _readOptionalPeriodWindow(
+    Map<String, Object?> json,
+    String key,
+  ) {
+    final Object? value = json[key];
+    if (value == null) {
+      return null;
+    }
+    if (value is! Map) {
+      throw FormatException(
+        'Revenue analytics response contains invalid $key.',
+      );
+    }
+    return RevenueAnalyticsPeriodWindow.fromJson(Map<String, Object?>.from(value));
+  }
+
+  static RevenueAnalyticsComparisonWindow? _readOptionalComparisonWindow(
+    Map<String, Object?> json,
+    String key,
+  ) {
+    final Object? value = json[key];
+    if (value == null) {
+      return null;
+    }
+    if (value is! Map) {
+      throw FormatException(
+        'Revenue analytics response contains invalid $key.',
+      );
+    }
+    return RevenueAnalyticsComparisonWindow.fromJson(
+      Map<String, Object?>.from(value),
+    );
+  }
+
+  static List<String> _readOptionalStringList(
+    Map<String, Object?> json,
+    String key,
+  ) {
+    final Object? value = json[key];
+    if (value == null) {
+      return const <String>[];
+    }
+    if (value is! List || value.any((Object? item) => item is! String)) {
+      throw FormatException(
+        'Revenue analytics response contains invalid $key.',
+      );
+    }
+    return value.cast<String>().toList(growable: false);
+  }
+
   static void _validateDailyTrend(List<RevenueAnalyticsDailyPoint> points) {
-    if (points.length != 14) {
+    if (points.isEmpty) {
       throw const FormatException(
-        'Revenue analytics daily_trend must contain exactly 14 buckets.',
+        'Revenue analytics daily_trend must contain at least one bucket.',
       );
     }
     final Set<String> uniqueKeys = points
@@ -138,9 +439,9 @@ class RevenueAnalyticsSnapshot {
   }
 
   static void _validateWeeklySummary(List<RevenueAnalyticsWeeklyPoint> points) {
-    if (points.length != 6) {
+    if (points.isEmpty) {
       throw const FormatException(
-        'Revenue analytics weekly_summary must contain exactly 6 buckets.',
+        'Revenue analytics weekly_summary must contain at least one bucket.',
       );
     }
     final Set<String> uniqueKeys = points
@@ -171,6 +472,118 @@ class RevenueAnalyticsSnapshot {
       );
     }
   }
+
+  static void _validateDaypartDistribution(
+    List<RevenueAnalyticsDaypartPoint> points,
+  ) {
+    if (points.isEmpty) {
+      return;
+    }
+    if (points.length != RevenueAnalyticsDaypartPoint.expectedDayparts.length) {
+      throw const FormatException(
+        'Revenue analytics daypart_distribution must contain exactly 5 buckets.',
+      );
+    }
+    final Set<String> uniqueKeys = points
+        .map((RevenueAnalyticsDaypartPoint point) => point.daypart)
+        .toSet();
+    if (uniqueKeys.length != points.length ||
+        !uniqueKeys.containsAll(RevenueAnalyticsDaypartPoint.expectedDayparts)) {
+      throw const FormatException(
+        'Revenue analytics daypart_distribution must contain the fixed dayparts.',
+      );
+    }
+  }
+}
+
+class RevenueAnalyticsPeriodWindow {
+  const RevenueAnalyticsPeriodWindow({
+    required this.selection,
+    required this.startDate,
+    required this.endDate,
+    required this.dayCount,
+  });
+
+  factory RevenueAnalyticsPeriodWindow.fromJson(Map<String, Object?> json) {
+    final String typeValue = RevenueAnalyticsSnapshot._readString(json, 'type');
+    final AnalyticsPeriodType type = switch (typeValue) {
+      'preset' => AnalyticsPeriodType.preset,
+      'custom' => AnalyticsPeriodType.custom,
+      _ => throw FormatException(
+        'Revenue analytics response contains invalid period type: $typeValue.',
+      ),
+    };
+    final DateTime startDate = _readCivilDate(json, 'start_date');
+    final DateTime endDate = _readCivilDate(json, 'end_date');
+    final int dayCount = RevenueAnalyticsSnapshot._readInt(json, 'day_count');
+    final AnalyticsPeriodSelection selection = switch (type) {
+      AnalyticsPeriodType.preset => AnalyticsPeriodSelection.preset(
+        _readPreset(json, 'preset'),
+      ),
+      AnalyticsPeriodType.custom => AnalyticsPeriodSelection.custom(
+        start: startDate,
+        end: endDate,
+      ),
+    };
+    return RevenueAnalyticsPeriodWindow(
+      selection: selection,
+      startDate: startDate,
+      endDate: endDate,
+      dayCount: dayCount,
+    );
+  }
+
+  final AnalyticsPeriodSelection selection;
+  final DateTime startDate;
+  final DateTime endDate;
+  final int dayCount;
+
+  static AnalyticsPresetPeriod _readPreset(
+    Map<String, Object?> json,
+    String key,
+  ) {
+    final String rawValue = RevenueAnalyticsSnapshot._readString(json, key);
+    return switch (rawValue) {
+      'today' => AnalyticsPresetPeriod.today,
+      'this_week' => AnalyticsPresetPeriod.thisWeek,
+      'this_month' => AnalyticsPresetPeriod.thisMonth,
+      'last_14_days' => AnalyticsPresetPeriod.last14Days,
+      _ => throw FormatException(
+        'Revenue analytics response contains invalid preset: $rawValue.',
+      ),
+    };
+  }
+
+  static DateTime _readCivilDate(Map<String, Object?> json, String key) {
+    final String rawValue = RevenueAnalyticsSnapshot._readString(json, key);
+    final DateTime parsed = DateTime.parse(rawValue);
+    return DateTime.utc(parsed.year, parsed.month, parsed.day);
+  }
+}
+
+class RevenueAnalyticsComparisonWindow {
+  const RevenueAnalyticsComparisonWindow({
+    required this.startDate,
+    required this.endDate,
+    required this.dayCount,
+    required this.basis,
+  });
+
+  factory RevenueAnalyticsComparisonWindow.fromJson(
+    Map<String, Object?> json,
+  ) {
+    return RevenueAnalyticsComparisonWindow(
+      startDate: RevenueAnalyticsPeriodWindow._readCivilDate(json, 'start_date'),
+      endDate: RevenueAnalyticsPeriodWindow._readCivilDate(json, 'end_date'),
+      dayCount: RevenueAnalyticsSnapshot._readInt(json, 'day_count'),
+      basis: RevenueAnalyticsSnapshot._readString(json, 'basis'),
+    );
+  }
+
+  final DateTime startDate;
+  final DateTime endDate;
+  final int dayCount;
+  final String basis;
 }
 
 class RevenueAnalyticsDailyPoint {
@@ -233,8 +646,80 @@ class RevenueAnalyticsHourlyPoint {
   final int orderCount;
 }
 
+class RevenueAnalyticsDaypartPoint {
+  const RevenueAnalyticsDaypartPoint({
+    required this.daypart,
+    required this.revenueMinor,
+    required this.orderCount,
+  });
+
+  static const Set<String> expectedDayparts = <String>{
+    'breakfast',
+    'lunch',
+    'afternoon',
+    'evening',
+    'late',
+  };
+
+  factory RevenueAnalyticsDaypartPoint.fromJson(Map<String, Object?> json) {
+    final String daypart = RevenueAnalyticsSnapshot._readString(
+      json,
+      'daypart',
+    );
+    if (!expectedDayparts.contains(daypart)) {
+      throw FormatException(
+        'Revenue analytics response contains invalid daypart: $daypart.',
+      );
+    }
+    return RevenueAnalyticsDaypartPoint(
+      daypart: daypart,
+      revenueMinor: RevenueAnalyticsSnapshot._readInt(json, 'revenue_minor'),
+      orderCount: RevenueAnalyticsSnapshot._readInt(json, 'order_count'),
+    );
+  }
+
+  final String daypart;
+  final int revenueMinor;
+  final int orderCount;
+}
+
+class RevenueAnalyticsTopProductPoint {
+  const RevenueAnalyticsTopProductPoint({
+    required this.productKey,
+    required this.productName,
+    required this.quantitySold,
+    required this.revenueMinor,
+  });
+
+  factory RevenueAnalyticsTopProductPoint.fromJson(Map<String, Object?> json) {
+    final Object? productKey = json['product_key'];
+    final String normalizedProductKey = switch (productKey) {
+      String value when value.trim().isNotEmpty => value,
+      num value => value.toInt().toString(),
+      _ => throw const FormatException(
+        'Revenue analytics response contains invalid product_key.',
+      ),
+    };
+    return RevenueAnalyticsTopProductPoint(
+      productKey: normalizedProductKey,
+      productName: RevenueAnalyticsSnapshot._readString(json, 'product_name'),
+      quantitySold: RevenueAnalyticsSnapshot._readInt(json, 'quantity_sold'),
+      revenueMinor: RevenueAnalyticsSnapshot._readInt(json, 'revenue_minor'),
+    );
+  }
+
+  final String productKey;
+  final String productName;
+  final int quantitySold;
+  final int revenueMinor;
+}
+
 abstract class RevenueAnalyticsRepository {
   Future<RevenueAnalyticsSnapshot> fetchRevenueAnalytics();
+
+  Future<RevenueAnalyticsSnapshot> fetchAnalytics({
+    required AnalyticsPeriodSelection selection,
+  });
 }
 
 class SupabaseRevenueAnalyticsRepository implements RevenueAnalyticsRepository {
@@ -259,6 +744,19 @@ class SupabaseRevenueAnalyticsRepository implements RevenueAnalyticsRepository {
 
   @override
   Future<RevenueAnalyticsSnapshot> fetchRevenueAnalytics() async {
+    return _invokeSnapshot(const <String, Object?>{});
+  }
+
+  @override
+  Future<RevenueAnalyticsSnapshot> fetchAnalytics({
+    required AnalyticsPeriodSelection selection,
+  }) async {
+    return _invokeSnapshot(selection.toRequestBody());
+  }
+
+  Future<RevenueAnalyticsSnapshot> _invokeSnapshot(
+    Map<String, Object?> body,
+  ) async {
     final SupabaseClient? client = _client;
     if (client == null) {
       throw ValidationException(
@@ -267,11 +765,10 @@ class SupabaseRevenueAnalyticsRepository implements RevenueAnalyticsRepository {
     }
 
     try {
-      final SupabaseEdgeFunctionResponse response = await _functionInvoker
-          .invoke(
-            functionName: functionName,
-            body: const <String, Object?>{},
-          );
+      final SupabaseEdgeFunctionResponse response = await _functionInvoker.invoke(
+        functionName: functionName,
+        body: body,
+      );
       final Object? data = response.data;
       if (data is! Map) {
         throw DatabaseException(

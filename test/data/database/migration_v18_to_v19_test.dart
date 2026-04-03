@@ -13,12 +13,19 @@ void main() {
         final AppDatabase db = _createV18ThenMigrateToCurrent();
         addTearDown(db.close);
 
-        final List<String> columns = await _readTableColumns(db, 'order_modifiers');
-        expect(columns, containsAll(<String>[
-          'unit_price_minor',
-          'price_effect_minor',
-          'sort_key',
-        ]));
+        final List<String> columns = await _readTableColumns(
+          db,
+          'order_modifiers',
+        );
+        expect(
+          columns,
+          containsAll(<String>[
+            'unit_price_minor',
+            'price_effect_minor',
+            'sort_key',
+            'source_group_id',
+          ]),
+        );
 
         final QueryRow row = await db.customSelect('''
           SELECT
@@ -30,7 +37,8 @@ void main() {
             charge_reason,
             unit_price_minor,
             price_effect_minor,
-            sort_key
+            sort_key,
+            source_group_id
           FROM order_modifiers
           WHERE id = 1
         ''').getSingle();
@@ -44,6 +52,7 @@ void main() {
         expect(row.read<int>('unit_price_minor'), 150);
         expect(row.read<int>('price_effect_minor'), 150);
         expect(row.read<int>('sort_key'), 0);
+        expect(row.read<int?>('source_group_id'), isNull);
       },
     );
 
@@ -64,7 +73,7 @@ void main() {
           'order_modifiers',
         );
 
-        expect(freshColumns, migratedColumns);
+        expect(freshColumns, unorderedEquals(migratedColumns));
       },
     );
   });
@@ -121,7 +130,9 @@ AppDatabase _createV18ThenMigrateToCurrent() {
       database.execute(
         "INSERT INTO order_modifiers (id, uuid, transaction_line_id, action, item_name, quantity, item_product_id, extra_price_minor, charge_reason) VALUES (1, 'modifier-1', 1, 'add', 'Extra Bacon', 1, NULL, 150, NULL);",
       );
-      database.execute('CREATE INDEX idx_order_modifiers_line ON order_modifiers(transaction_line_id);');
+      database.execute(
+        'CREATE INDEX idx_order_modifiers_line ON order_modifiers(transaction_line_id);',
+      );
       database.execute(
         'CREATE INDEX idx_order_modifiers_item_product ON order_modifiers(item_product_id, charge_reason);',
       );

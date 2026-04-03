@@ -208,6 +208,81 @@ AppDatabase _createV11ThenMigrateToCurrent() {
         );
       ''');
       database.execute('''
+        CREATE TABLE categories (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          image_url TEXT NULL,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+        );
+      ''');
+      database.execute('''
+        CREATE TABLE products (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          category_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          price_minor INTEGER NOT NULL CHECK (price_minor >= 0),
+          image_url TEXT NULL,
+          has_modifiers INTEGER NOT NULL DEFAULT 0 CHECK (has_modifiers IN (0, 1)),
+          is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+          is_visible_on_pos INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_on_pos IN (0, 1)),
+          sort_order INTEGER NOT NULL DEFAULT 0
+        );
+      ''');
+      database.execute('''
+        CREATE TABLE product_modifiers (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('included','extra')),
+          extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
+          is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+        );
+      ''');
+      database.execute('''
+        CREATE TABLE transactions (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          shift_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          table_number INTEGER NULL,
+          status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid','cancelled')),
+          subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
+          modifier_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (modifier_total_minor >= 0),
+          total_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_amount_minor >= 0),
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+          paid_at INTEGER NULL,
+          updated_at INTEGER NOT NULL,
+          cancelled_at INTEGER NULL,
+          cancelled_by INTEGER NULL,
+          idempotency_key TEXT NOT NULL UNIQUE,
+          kitchen_printed INTEGER NOT NULL DEFAULT 0 CHECK (kitchen_printed IN (0, 1)),
+          receipt_printed INTEGER NOT NULL DEFAULT 0 CHECK (receipt_printed IN (0, 1))
+        );
+      ''');
+      database.execute('''
+        CREATE TABLE transaction_lines (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          transaction_id INTEGER NOT NULL,
+          product_id INTEGER NOT NULL,
+          product_name TEXT NOT NULL,
+          unit_price_minor INTEGER NOT NULL CHECK (unit_price_minor >= 0),
+          quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+          line_total_minor INTEGER NOT NULL CHECK (line_total_minor >= 0)
+        );
+      ''');
+      database.execute('''
+        CREATE TABLE order_modifiers (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          transaction_line_id INTEGER NOT NULL,
+          action TEXT NOT NULL CHECK (action IN ('remove','add')),
+          item_name TEXT NOT NULL,
+          extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0)
+        );
+      ''');
+      database.execute('''
         CREATE TABLE cash_movements (
           id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
           shift_id INTEGER NOT NULL,
@@ -231,6 +306,14 @@ AppDatabase _createV11ThenMigrateToCurrent() {
           created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
         );
       ''');
+      database.execute('''
+        CREATE TABLE report_settings (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          visibility_ratio REAL NOT NULL DEFAULT 1.0 CHECK (visibility_ratio >= 0.0 AND visibility_ratio <= 1.0),
+          updated_by INTEGER NULL,
+          updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+        );
+      ''');
       database.execute(
         "CREATE INDEX idx_cash_movements_shift ON cash_movements(shift_id, created_at);",
       );
@@ -242,6 +325,9 @@ AppDatabase _createV11ThenMigrateToCurrent() {
       );
       database.execute(
         "CREATE INDEX idx_audit_logs_actor ON audit_logs(actor_user_id, created_at);",
+      );
+      database.execute(
+        "INSERT INTO report_settings (id, visibility_ratio, updated_by, updated_at) VALUES (1, 1.0, 1, 1710000000);",
       );
 
       database.execute(

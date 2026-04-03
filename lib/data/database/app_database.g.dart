@@ -5424,6 +5424,18 @@ class $OrderModifiersTable extends OrderModifiers
     requiredDuringInsert: false,
     $customConstraints: 'REFERENCES "products" ("id")',
   );
+  static const VerificationMeta _sourceGroupIdMeta = const VerificationMeta(
+    'sourceGroupId',
+  );
+  @override
+  late final GeneratedColumn<int> sourceGroupId = GeneratedColumn<int>(
+    'source_group_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'REFERENCES "modifier_groups" ("id")',
+  );
   static const VerificationMeta _extraPriceMinorMeta = const VerificationMeta(
     'extraPriceMinor',
   );
@@ -5492,6 +5504,7 @@ class $OrderModifiersTable extends OrderModifiers
     itemName,
     quantity,
     itemProductId,
+    sourceGroupId,
     extraPriceMinor,
     chargeReason,
     unitPriceMinor,
@@ -5560,6 +5573,15 @@ class $OrderModifiersTable extends OrderModifiers
         itemProductId.isAcceptableOrUnknown(
           data['item_product_id']!,
           _itemProductIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('source_group_id')) {
+      context.handle(
+        _sourceGroupIdMeta,
+        sourceGroupId.isAcceptableOrUnknown(
+          data['source_group_id']!,
+          _sourceGroupIdMeta,
         ),
       );
     }
@@ -5642,6 +5664,10 @@ class $OrderModifiersTable extends OrderModifiers
         DriftSqlType.int,
         data['${effectivePrefix}item_product_id'],
       ),
+      sourceGroupId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}source_group_id'],
+      ),
       extraPriceMinor: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}extra_price_minor'],
@@ -5679,6 +5705,7 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
   final String itemName;
   final int quantity;
   final int? itemProductId;
+  final int? sourceGroupId;
   final int extraPriceMinor;
   final String? chargeReason;
   final int unitPriceMinor;
@@ -5692,6 +5719,7 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
     required this.itemName,
     required this.quantity,
     this.itemProductId,
+    this.sourceGroupId,
     required this.extraPriceMinor,
     this.chargeReason,
     required this.unitPriceMinor,
@@ -5709,6 +5737,9 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
     map['quantity'] = Variable<int>(quantity);
     if (!nullToAbsent || itemProductId != null) {
       map['item_product_id'] = Variable<int>(itemProductId);
+    }
+    if (!nullToAbsent || sourceGroupId != null) {
+      map['source_group_id'] = Variable<int>(sourceGroupId);
     }
     map['extra_price_minor'] = Variable<int>(extraPriceMinor);
     if (!nullToAbsent || chargeReason != null) {
@@ -5731,6 +5762,9 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
       itemProductId: itemProductId == null && nullToAbsent
           ? const Value.absent()
           : Value(itemProductId),
+      sourceGroupId: sourceGroupId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceGroupId),
       extraPriceMinor: Value(extraPriceMinor),
       chargeReason: chargeReason == null && nullToAbsent
           ? const Value.absent()
@@ -5754,6 +5788,7 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
       itemName: serializer.fromJson<String>(json['itemName']),
       quantity: serializer.fromJson<int>(json['quantity']),
       itemProductId: serializer.fromJson<int?>(json['itemProductId']),
+      sourceGroupId: serializer.fromJson<int?>(json['sourceGroupId']),
       extraPriceMinor: serializer.fromJson<int>(json['extraPriceMinor']),
       chargeReason: serializer.fromJson<String?>(json['chargeReason']),
       unitPriceMinor: serializer.fromJson<int>(json['unitPriceMinor']),
@@ -5772,6 +5807,7 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
       'itemName': serializer.toJson<String>(itemName),
       'quantity': serializer.toJson<int>(quantity),
       'itemProductId': serializer.toJson<int?>(itemProductId),
+      'sourceGroupId': serializer.toJson<int?>(sourceGroupId),
       'extraPriceMinor': serializer.toJson<int>(extraPriceMinor),
       'chargeReason': serializer.toJson<String?>(chargeReason),
       'unitPriceMinor': serializer.toJson<int>(unitPriceMinor),
@@ -5788,6 +5824,7 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
     String? itemName,
     int? quantity,
     Value<int?> itemProductId = const Value.absent(),
+    Value<int?> sourceGroupId = const Value.absent(),
     int? extraPriceMinor,
     Value<String?> chargeReason = const Value.absent(),
     int? unitPriceMinor,
@@ -5803,6 +5840,9 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
     itemProductId: itemProductId.present
         ? itemProductId.value
         : this.itemProductId,
+    sourceGroupId: sourceGroupId.present
+        ? sourceGroupId.value
+        : this.sourceGroupId,
     extraPriceMinor: extraPriceMinor ?? this.extraPriceMinor,
     chargeReason: chargeReason.present ? chargeReason.value : this.chargeReason,
     unitPriceMinor: unitPriceMinor ?? this.unitPriceMinor,
@@ -5822,6 +5862,9 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
       itemProductId: data.itemProductId.present
           ? data.itemProductId.value
           : this.itemProductId,
+      sourceGroupId: data.sourceGroupId.present
+          ? data.sourceGroupId.value
+          : this.sourceGroupId,
       extraPriceMinor: data.extraPriceMinor.present
           ? data.extraPriceMinor.value
           : this.extraPriceMinor,
@@ -5848,6 +5891,7 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
           ..write('itemName: $itemName, ')
           ..write('quantity: $quantity, ')
           ..write('itemProductId: $itemProductId, ')
+          ..write('sourceGroupId: $sourceGroupId, ')
           ..write('extraPriceMinor: $extraPriceMinor, ')
           ..write('chargeReason: $chargeReason, ')
           ..write('unitPriceMinor: $unitPriceMinor, ')
@@ -5866,6 +5910,7 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
     itemName,
     quantity,
     itemProductId,
+    sourceGroupId,
     extraPriceMinor,
     chargeReason,
     unitPriceMinor,
@@ -5883,6 +5928,7 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
           other.itemName == this.itemName &&
           other.quantity == this.quantity &&
           other.itemProductId == this.itemProductId &&
+          other.sourceGroupId == this.sourceGroupId &&
           other.extraPriceMinor == this.extraPriceMinor &&
           other.chargeReason == this.chargeReason &&
           other.unitPriceMinor == this.unitPriceMinor &&
@@ -5898,6 +5944,7 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
   final Value<String> itemName;
   final Value<int> quantity;
   final Value<int?> itemProductId;
+  final Value<int?> sourceGroupId;
   final Value<int> extraPriceMinor;
   final Value<String?> chargeReason;
   final Value<int> unitPriceMinor;
@@ -5911,6 +5958,7 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
     this.itemName = const Value.absent(),
     this.quantity = const Value.absent(),
     this.itemProductId = const Value.absent(),
+    this.sourceGroupId = const Value.absent(),
     this.extraPriceMinor = const Value.absent(),
     this.chargeReason = const Value.absent(),
     this.unitPriceMinor = const Value.absent(),
@@ -5925,6 +5973,7 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
     required String itemName,
     this.quantity = const Value.absent(),
     this.itemProductId = const Value.absent(),
+    this.sourceGroupId = const Value.absent(),
     this.extraPriceMinor = const Value.absent(),
     this.chargeReason = const Value.absent(),
     this.unitPriceMinor = const Value.absent(),
@@ -5942,6 +5991,7 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
     Expression<String>? itemName,
     Expression<int>? quantity,
     Expression<int>? itemProductId,
+    Expression<int>? sourceGroupId,
     Expression<int>? extraPriceMinor,
     Expression<String>? chargeReason,
     Expression<int>? unitPriceMinor,
@@ -5956,6 +6006,7 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
       if (itemName != null) 'item_name': itemName,
       if (quantity != null) 'quantity': quantity,
       if (itemProductId != null) 'item_product_id': itemProductId,
+      if (sourceGroupId != null) 'source_group_id': sourceGroupId,
       if (extraPriceMinor != null) 'extra_price_minor': extraPriceMinor,
       if (chargeReason != null) 'charge_reason': chargeReason,
       if (unitPriceMinor != null) 'unit_price_minor': unitPriceMinor,
@@ -5972,6 +6023,7 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
     Value<String>? itemName,
     Value<int>? quantity,
     Value<int?>? itemProductId,
+    Value<int?>? sourceGroupId,
     Value<int>? extraPriceMinor,
     Value<String?>? chargeReason,
     Value<int>? unitPriceMinor,
@@ -5986,6 +6038,7 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
       itemName: itemName ?? this.itemName,
       quantity: quantity ?? this.quantity,
       itemProductId: itemProductId ?? this.itemProductId,
+      sourceGroupId: sourceGroupId ?? this.sourceGroupId,
       extraPriceMinor: extraPriceMinor ?? this.extraPriceMinor,
       chargeReason: chargeReason ?? this.chargeReason,
       unitPriceMinor: unitPriceMinor ?? this.unitPriceMinor,
@@ -6018,6 +6071,9 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
     if (itemProductId.present) {
       map['item_product_id'] = Variable<int>(itemProductId.value);
     }
+    if (sourceGroupId.present) {
+      map['source_group_id'] = Variable<int>(sourceGroupId.value);
+    }
     if (extraPriceMinor.present) {
       map['extra_price_minor'] = Variable<int>(extraPriceMinor.value);
     }
@@ -6046,6 +6102,7 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
           ..write('itemName: $itemName, ')
           ..write('quantity: $quantity, ')
           ..write('itemProductId: $itemProductId, ')
+          ..write('sourceGroupId: $sourceGroupId, ')
           ..write('extraPriceMinor: $extraPriceMinor, ')
           ..write('chargeReason: $chargeReason, ')
           ..write('unitPriceMinor: $unitPriceMinor, ')
@@ -14393,6 +14450,27 @@ final class $$ModifierGroupsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$OrderModifiersTable, List<OrderModifier>>
+  _orderModifiersRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.orderModifiers,
+    aliasName: $_aliasNameGenerator(
+      db.modifierGroups.id,
+      db.orderModifiers.sourceGroupId,
+    ),
+  );
+
+  $$OrderModifiersTableProcessedTableManager get orderModifiersRefs {
+    final manager = $$OrderModifiersTableTableManager(
+      $_db,
+      $_db.orderModifiers,
+    ).filter((f) => f.sourceGroupId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_orderModifiersRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$ModifierGroupsTableFilterComposer
@@ -14473,6 +14551,31 @@ class $$ModifierGroupsTableFilterComposer
           }) => $$ProductModifiersTableFilterComposer(
             $db: $db,
             $table: $db.productModifiers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> orderModifiersRefs(
+    Expression<bool> Function($$OrderModifiersTableFilterComposer f) f,
+  ) {
+    final $$OrderModifiersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.orderModifiers,
+      getReferencedColumn: (t) => t.sourceGroupId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$OrderModifiersTableFilterComposer(
+            $db: $db,
+            $table: $db.orderModifiers,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -14622,6 +14725,31 @@ class $$ModifierGroupsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> orderModifiersRefs<T extends Object>(
+    Expression<T> Function($$OrderModifiersTableAnnotationComposer a) f,
+  ) {
+    final $$OrderModifiersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.orderModifiers,
+      getReferencedColumn: (t) => t.sourceGroupId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$OrderModifiersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.orderModifiers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$ModifierGroupsTableTableManager
@@ -14637,7 +14765,11 @@ class $$ModifierGroupsTableTableManager
           $$ModifierGroupsTableUpdateCompanionBuilder,
           (ModifierGroup, $$ModifierGroupsTableReferences),
           ModifierGroup,
-          PrefetchHooks Function({bool productId, bool productModifiersRefs})
+          PrefetchHooks Function({
+            bool productId,
+            bool productModifiersRefs,
+            bool orderModifiersRefs,
+          })
         > {
   $$ModifierGroupsTableTableManager(
     _$AppDatabase db,
@@ -14697,11 +14829,16 @@ class $$ModifierGroupsTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({productId = false, productModifiersRefs = false}) {
+              ({
+                productId = false,
+                productModifiersRefs = false,
+                orderModifiersRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (productModifiersRefs) db.productModifiers,
+                    if (orderModifiersRefs) db.orderModifiers,
                   ],
                   addJoins:
                       <
@@ -14760,6 +14897,27 @@ class $$ModifierGroupsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (orderModifiersRefs)
+                        await $_getPrefetchedData<
+                          ModifierGroup,
+                          $ModifierGroupsTable,
+                          OrderModifier
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ModifierGroupsTableReferences
+                              ._orderModifiersRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ModifierGroupsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).orderModifiersRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.sourceGroupId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -14780,7 +14938,11 @@ typedef $$ModifierGroupsTableProcessedTableManager =
       $$ModifierGroupsTableUpdateCompanionBuilder,
       (ModifierGroup, $$ModifierGroupsTableReferences),
       ModifierGroup,
-      PrefetchHooks Function({bool productId, bool productModifiersRefs})
+      PrefetchHooks Function({
+        bool productId,
+        bool productModifiersRefs,
+        bool orderModifiersRefs,
+      })
     >;
 typedef $$ProductModifiersTableCreateCompanionBuilder =
     ProductModifiersCompanion Function({
@@ -17977,6 +18139,7 @@ typedef $$OrderModifiersTableCreateCompanionBuilder =
       required String itemName,
       Value<int> quantity,
       Value<int?> itemProductId,
+      Value<int?> sourceGroupId,
       Value<int> extraPriceMinor,
       Value<String?> chargeReason,
       Value<int> unitPriceMinor,
@@ -17992,6 +18155,7 @@ typedef $$OrderModifiersTableUpdateCompanionBuilder =
       Value<String> itemName,
       Value<int> quantity,
       Value<int?> itemProductId,
+      Value<int?> sourceGroupId,
       Value<int> extraPriceMinor,
       Value<String?> chargeReason,
       Value<int> unitPriceMinor,
@@ -18042,6 +18206,28 @@ final class $$OrderModifiersTableReferences
       $_db.products,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_itemProductIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ModifierGroupsTable _sourceGroupIdTable(_$AppDatabase db) =>
+      db.modifierGroups.createAlias(
+        $_aliasNameGenerator(
+          db.orderModifiers.sourceGroupId,
+          db.modifierGroups.id,
+        ),
+      );
+
+  $$ModifierGroupsTableProcessedTableManager? get sourceGroupId {
+    final $_column = $_itemColumn<int>('source_group_id');
+    if ($_column == null) return null;
+    final manager = $$ModifierGroupsTableTableManager(
+      $_db,
+      $_db.modifierGroups,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_sourceGroupIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -18145,6 +18331,29 @@ class $$OrderModifiersTableFilterComposer
           }) => $$ProductsTableFilterComposer(
             $db: $db,
             $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ModifierGroupsTableFilterComposer get sourceGroupId {
+    final $$ModifierGroupsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sourceGroupId,
+      referencedTable: $db.modifierGroups,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ModifierGroupsTableFilterComposer(
+            $db: $db,
+            $table: $db.modifierGroups,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -18259,6 +18468,29 @@ class $$OrderModifiersTableOrderingComposer
     );
     return composer;
   }
+
+  $$ModifierGroupsTableOrderingComposer get sourceGroupId {
+    final $$ModifierGroupsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sourceGroupId,
+      referencedTable: $db.modifierGroups,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ModifierGroupsTableOrderingComposer(
+            $db: $db,
+            $table: $db.modifierGroups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$OrderModifiersTableAnnotationComposer
@@ -18353,6 +18585,29 @@ class $$OrderModifiersTableAnnotationComposer
     );
     return composer;
   }
+
+  $$ModifierGroupsTableAnnotationComposer get sourceGroupId {
+    final $$ModifierGroupsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sourceGroupId,
+      referencedTable: $db.modifierGroups,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ModifierGroupsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.modifierGroups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$OrderModifiersTableTableManager
@@ -18368,7 +18623,11 @@ class $$OrderModifiersTableTableManager
           $$OrderModifiersTableUpdateCompanionBuilder,
           (OrderModifier, $$OrderModifiersTableReferences),
           OrderModifier,
-          PrefetchHooks Function({bool transactionLineId, bool itemProductId})
+          PrefetchHooks Function({
+            bool transactionLineId,
+            bool itemProductId,
+            bool sourceGroupId,
+          })
         > {
   $$OrderModifiersTableTableManager(
     _$AppDatabase db,
@@ -18392,6 +18651,7 @@ class $$OrderModifiersTableTableManager
                 Value<String> itemName = const Value.absent(),
                 Value<int> quantity = const Value.absent(),
                 Value<int?> itemProductId = const Value.absent(),
+                Value<int?> sourceGroupId = const Value.absent(),
                 Value<int> extraPriceMinor = const Value.absent(),
                 Value<String?> chargeReason = const Value.absent(),
                 Value<int> unitPriceMinor = const Value.absent(),
@@ -18405,6 +18665,7 @@ class $$OrderModifiersTableTableManager
                 itemName: itemName,
                 quantity: quantity,
                 itemProductId: itemProductId,
+                sourceGroupId: sourceGroupId,
                 extraPriceMinor: extraPriceMinor,
                 chargeReason: chargeReason,
                 unitPriceMinor: unitPriceMinor,
@@ -18420,6 +18681,7 @@ class $$OrderModifiersTableTableManager
                 required String itemName,
                 Value<int> quantity = const Value.absent(),
                 Value<int?> itemProductId = const Value.absent(),
+                Value<int?> sourceGroupId = const Value.absent(),
                 Value<int> extraPriceMinor = const Value.absent(),
                 Value<String?> chargeReason = const Value.absent(),
                 Value<int> unitPriceMinor = const Value.absent(),
@@ -18433,6 +18695,7 @@ class $$OrderModifiersTableTableManager
                 itemName: itemName,
                 quantity: quantity,
                 itemProductId: itemProductId,
+                sourceGroupId: sourceGroupId,
                 extraPriceMinor: extraPriceMinor,
                 chargeReason: chargeReason,
                 unitPriceMinor: unitPriceMinor,
@@ -18448,7 +18711,11 @@ class $$OrderModifiersTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({transactionLineId = false, itemProductId = false}) {
+              ({
+                transactionLineId = false,
+                itemProductId = false,
+                sourceGroupId = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [],
@@ -18498,6 +18765,21 @@ class $$OrderModifiersTableTableManager
                                   )
                                   as T;
                         }
+                        if (sourceGroupId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.sourceGroupId,
+                                    referencedTable:
+                                        $$OrderModifiersTableReferences
+                                            ._sourceGroupIdTable(db),
+                                    referencedColumn:
+                                        $$OrderModifiersTableReferences
+                                            ._sourceGroupIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
 
                         return state;
                       },
@@ -18522,7 +18804,11 @@ typedef $$OrderModifiersTableProcessedTableManager =
       $$OrderModifiersTableUpdateCompanionBuilder,
       (OrderModifier, $$OrderModifiersTableReferences),
       OrderModifier,
-      PrefetchHooks Function({bool transactionLineId, bool itemProductId})
+      PrefetchHooks Function({
+        bool transactionLineId,
+        bool itemProductId,
+        bool sourceGroupId,
+      })
     >;
 typedef $$PaymentsTableCreateCompanionBuilder =
     PaymentsCompanion Function({

@@ -6,6 +6,7 @@ import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../domain/models/legacy_flat_modifier_view.dart';
 import '../../../../domain/models/order_modifier.dart';
 import '../../../../domain/models/product_modifier.dart';
 import '../../../providers/cart_models.dart';
@@ -45,15 +46,11 @@ class _ModifierPopupState extends ConsumerState<ModifierPopup> {
       _errorMessage = null;
     });
     try {
-      final List<ProductModifier> modifiers = await ref
+      final LegacyFlatModifierView flatView = await ref
           .read(catalogServiceProvider)
-          .getProductModifiers(widget.productId);
-      final List<ProductModifier> included = modifiers
-          .where((ProductModifier m) => m.type == ModifierType.included)
-          .toList(growable: false);
-      final List<ProductModifier> extras = modifiers
-          .where((ProductModifier m) => m.type == ModifierType.extra)
-          .toList(growable: false);
+          .getLegacyFlatModifierView(widget.productId);
+      final List<ProductModifier> included = flatView.included;
+      final List<ProductModifier> extras = flatView.extras;
 
       _includedChecked
         ..clear()

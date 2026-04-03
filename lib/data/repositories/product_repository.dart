@@ -178,6 +178,151 @@ class ProductRepository {
     return updatedCount > 0;
   }
 
+  Future<bool> hasHistoricalUsage(int id) async {
+    final QueryRow row = await _database
+        .customSelect(
+          '''
+      SELECT CASE
+        WHEN EXISTS(
+          SELECT 1
+          FROM transaction_lines
+          WHERE product_id = ?
+          LIMIT 1
+        ) OR EXISTS(
+          SELECT 1
+          FROM order_modifiers
+          WHERE item_product_id = ?
+          LIMIT 1
+        )
+        THEN 1
+        ELSE 0
+      END AS has_usage
+      ''',
+          variables: <Variable<Object>>[Variable<int>(id), Variable<int>(id)],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _database.transactionLines,
+            _database.orderModifiers,
+          },
+        )
+        .getSingle();
+    return row.read<int>('has_usage') == 1;
+  }
+
+  Future<bool> hasOwnedSemanticConfiguration(int id) async {
+    final QueryRow row = await _database
+        .customSelect(
+          '''
+      SELECT CASE
+        WHEN EXISTS(
+          SELECT 1 FROM set_items WHERE product_id = ? LIMIT 1
+        ) OR EXISTS(
+          SELECT 1 FROM modifier_groups WHERE product_id = ? LIMIT 1
+        ) OR EXISTS(
+          SELECT 1
+          FROM product_modifiers
+          WHERE product_id = ?
+            AND (
+              type = 'choice'
+              OR (type = 'extra' AND item_product_id IS NOT NULL)
+            )
+          LIMIT 1
+        )
+        THEN 1
+        ELSE 0
+      END AS has_semantic_config
+      ''',
+          variables: <Variable<Object>>[
+            Variable<int>(id),
+            Variable<int>(id),
+            Variable<int>(id),
+          ],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _database.setItems,
+            _database.modifierGroups,
+            _database.productModifiers,
+          },
+        )
+        .getSingle();
+    return row.read<int>('has_semantic_config') == 1;
+  }
+
+  Future<({int setConfigCount, int requiredChoiceCount, int extrasPoolCount})>
+  loadSemanticReferenceSummary(int id) async {
+    final QueryRow row = await _database
+        .customSelect(
+          '''
+      SELECT
+        (SELECT COUNT(DISTINCT product_id)
+         FROM set_items
+         WHERE item_product_id = ?) AS set_config_count,
+        (SELECT COUNT(*)
+         FROM product_modifiers
+         WHERE type = 'choice'
+           AND item_product_id = ?) AS required_choice_count,
+        (SELECT COUNT(*)
+         FROM product_modifiers
+         WHERE type = 'extra'
+           AND item_product_id = ?) AS extras_pool_count
+      ''',
+          variables: <Variable<Object>>[
+            Variable<int>(id),
+            Variable<int>(id),
+            Variable<int>(id),
+          ],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _database.setItems,
+            _database.productModifiers,
+          },
+        )
+        .getSingle();
+    return (
+      setConfigCount: row.read<int>('set_config_count'),
+      requiredChoiceCount: row.read<int>('required_choice_count'),
+      extrasPoolCount: row.read<int>('extras_pool_count'),
+    );
+  }
+
+  Future<bool> deleteStandardProduct(int id) async {
+    return _database.transaction(() async {
+      await (_database.delete(_database.productModifiers)
+            ..where((db.$ProductModifiersTable t) {
+              return t.productId.equals(id) | t.itemProductId.equals(id);
+            }))
+          .go();
+      await (_database.delete(
+        _database.modifierGroups,
+      )..where((db.$ModifierGroupsTable t) => t.productId.equals(id))).go();
+      await (_database.delete(_database.setItems)..where((db.$SetItemsTable t) {
+            return t.productId.equals(id) | t.itemProductId.equals(id);
+          }))
+          .go();
+
+      final int deletedCount = await (_database.delete(
+        _database.products,
+      )..where((db.$ProductsTable t) => t.id.equals(id))).go();
+      return deletedCount > 0;
+    });
+  }
+
+  Future<bool> deleteSetProduct(int id) async {
+    return _database.transaction(() async {
+      await (_database.delete(
+        _database.productModifiers,
+      )..where((db.$ProductModifiersTable t) => t.productId.equals(id))).go();
+      await (_database.delete(
+        _database.modifierGroups,
+      )..where((db.$ModifierGroupsTable t) => t.productId.equals(id))).go();
+      await (_database.delete(
+        _database.setItems,
+      )..where((db.$SetItemsTable t) => t.productId.equals(id))).go();
+
+      final int deletedCount = await (_database.delete(
+        _database.products,
+      )..where((db.$ProductsTable t) => t.id.equals(id))).go();
+      return deletedCount > 0;
+    });
+  }
+
   Product _mapProduct(db.Product row) {
     return Product(
       id: row.id,

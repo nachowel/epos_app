@@ -403,16 +403,10 @@ class _BreakfastModifierPopupState
                               .map((BreakfastAddableProduct product) {
                                 final int addedQuantity =
                                     addedQuantities[product.id] ?? 0;
-                                final String semanticHint =
-                                    product.isChoiceCapable
-                                    ? 'Choice-capable'
-                                    : (product.isSwapEligible
-                                          ? 'Swap eligible'
-                                          : 'Extra add');
                                 return _AdjustableRow(
                                   label: product.name,
                                   subtitle:
-                                      '${CurrencyFormatter.fromMinor(product.priceMinor)} • $semanticHint',
+                                      '${CurrencyFormatter.fromMinor(product.priceMinor)} • Extra charge applies',
                                   quantity: addedQuantity,
                                   canDecrease:
                                       !_isSubmitting && addedQuantity > 0,

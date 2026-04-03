@@ -9,6 +9,7 @@ import '../../data/repositories/sync_queue_repository.dart';
 import '../../data/repositories/transaction_repository.dart';
 import '../../data/repositories/transaction_state_repository.dart';
 import '../models/breakfast_line_edit.dart';
+import '../models/breakfast_cart_selection.dart';
 import '../models/breakfast_rebuild.dart';
 import '../models/open_order_summary.dart';
 import '../models/authorization_policy.dart';
@@ -110,6 +111,38 @@ class OrderService {
     return line;
   }
 
+  Future<TransactionLine> addBreakfastSelectionToOrder({
+    required int transactionId,
+    required int productId,
+    required BreakfastCartSelection selection,
+  }) async {
+    await _ensureProductAvailableForSale(productId);
+    if (selection.rebuildResult.validationErrors.isNotEmpty) {
+      throw BreakfastEditRejectedException(
+        codes: selection.rebuildResult.validationErrors,
+      );
+    }
+
+    return _transactionRepository.runInTransaction(() async {
+      final TransactionLine line = await _transactionRepository.addLine(
+        transactionId: transactionId,
+        productId: productId,
+        quantity: 1,
+      );
+      await _transactionRepository.replaceBreakfastLineSnapshot(
+        transactionLineId: line.id,
+        rebuildResult: selection.rebuildResult,
+      );
+      await recalculateOrderTotals(transactionId);
+      final TransactionLine? persisted = await _transactionRepository
+          .getLineById(line.id);
+      if (persisted == null) {
+        throw NotFoundException('Transaction line not found: ${line.id}');
+      }
+      return persisted;
+    });
+  }
+
   Future<OrderModifier> addModifierToLine({
     required int transactionLineId,
     required ModifierAction action,
@@ -175,7 +208,9 @@ class OrderService {
       }
 
       final BreakfastSetConfiguration? baseConfiguration =
-          await configurationRepository.loadSetConfiguration(workingLine.productId);
+          await configurationRepository.loadSetConfiguration(
+            workingLine.productId,
+          );
       if (baseConfiguration == null) {
         _logBreakfastEditRejected(
           lineUuid: workingLine.uuid,
@@ -218,26 +253,45 @@ class OrderService {
       final BreakfastRequestedState nextRequestedState = edit.applyTo(
         currentRequestedState,
       );
-      final BreakfastSetConfiguration configuration = await _augmentConfiguration(
-        configurationRepository: configurationRepository,
-        baseConfiguration: baseConfiguration,
-        requestedState: nextRequestedState,
-      );
+      final List<BreakfastEditErrorCode> invalidExtraCodes =
+          _validateRequestedExtras(
+            configuration: baseConfiguration,
+            currentRequestedState: currentRequestedState,
+            nextRequestedState: nextRequestedState,
+          );
+      if (invalidExtraCodes.isNotEmpty) {
+        _logBreakfastEditRejected(
+          lineUuid: workingLine.uuid,
+          transactionLineId: workingLine.id,
+          codes: invalidExtraCodes,
+        );
+        throw BreakfastEditRejectedException(
+          codes: invalidExtraCodes,
+          transactionLineId: workingLine.id,
+        );
+      }
+      final BreakfastSetConfiguration configuration =
+          await _augmentConfiguration(
+            configurationRepository: configurationRepository,
+            baseConfiguration: baseConfiguration,
+            requestedState: nextRequestedState,
+          );
 
-      final BreakfastRebuildResult rebuildResult = _breakfastRebuildEngine.rebuild(
-        BreakfastRebuildInput(
-          transactionLine: BreakfastTransactionLineInput(
-            lineId: workingLine.id,
-            lineUuid: workingLine.uuid,
-            rootProductId: workingLine.productId,
-            rootProductName: workingLine.productName,
-            baseUnitPriceMinor: workingLine.unitPriceMinor,
-            lineQuantity: workingLine.quantity,
-          ),
-          setConfiguration: configuration,
-          requestedState: nextRequestedState,
-        ),
-      );
+      final BreakfastRebuildResult rebuildResult = _breakfastRebuildEngine
+          .rebuild(
+            BreakfastRebuildInput(
+              transactionLine: BreakfastTransactionLineInput(
+                lineId: workingLine.id,
+                lineUuid: workingLine.uuid,
+                rootProductId: workingLine.productId,
+                rootProductName: workingLine.productName,
+                baseUnitPriceMinor: workingLine.unitPriceMinor,
+                lineQuantity: workingLine.quantity,
+              ),
+              setConfiguration: configuration,
+              requestedState: nextRequestedState,
+            ),
+          );
       if (rebuildResult.validationErrors.isNotEmpty) {
         _logBreakfastEditRejected(
           lineUuid: workingLine.uuid,
@@ -256,11 +310,12 @@ class OrderService {
       );
       await recalculateOrderTotals(workingLine.transactionId);
 
-      final TransactionLine? refreshedLine = await _transactionRepository.getLineById(
-        workingLine.id,
-      );
+      final TransactionLine? refreshedLine = await _transactionRepository
+          .getLineById(workingLine.id);
       if (refreshedLine == null) {
-        throw NotFoundException('Transaction line not found: ${workingLine.id}');
+        throw NotFoundException(
+          'Transaction line not found: ${workingLine.id}',
+        );
       }
 
       // ── Audit: successful breakfast edit ──
@@ -435,6 +490,17 @@ class OrderService {
       );
 
       for (final CheckoutItem item in cartItems) {
+        final BreakfastCartSelection? breakfastSelection =
+            item.breakfastSelection;
+        if (breakfastSelection != null) {
+          await addBreakfastSelectionToOrder(
+            transactionId: createdTransaction.id,
+            productId: item.productId,
+            selection: breakfastSelection,
+          );
+          continue;
+        }
+
         final TransactionLine line = await addProductToOrder(
           transactionId: createdTransaction.id,
           productId: item.productId,
@@ -701,12 +767,14 @@ class OrderService {
     required BreakfastRequestedState requestedState,
   }) async {
     final Set<int> missingProductIds = <int>{};
-    for (final BreakfastAddedProductRequest add in requestedState.addedProducts) {
+    for (final BreakfastAddedProductRequest add
+        in requestedState.addedProducts) {
       if (baseConfiguration.findCatalogProduct(add.itemProductId) == null) {
         missingProductIds.add(add.itemProductId);
       }
     }
-    for (final BreakfastChosenGroupRequest choice in requestedState.chosenGroups) {
+    for (final BreakfastChosenGroupRequest choice
+        in requestedState.chosenGroups) {
       final int? selectedItemProductId = choice.selectedItemProductId;
       if (selectedItemProductId != null &&
           baseConfiguration.findCatalogProduct(selectedItemProductId) == null) {
@@ -718,13 +786,39 @@ class OrderService {
     }
 
     final Map<int, BreakfastCatalogProduct> extraProducts =
-        await configurationRepository.loadCatalogProductsByIds(missingProductIds);
+        await configurationRepository.loadCatalogProductsByIds(
+          missingProductIds,
+        );
     return baseConfiguration.copyWith(
       catalogProductsById: <int, BreakfastCatalogProduct>{
         ...baseConfiguration.catalogProductsById,
         ...extraProducts,
       },
     );
+  }
+
+  List<BreakfastEditErrorCode> _validateRequestedExtras({
+    required BreakfastSetConfiguration configuration,
+    required BreakfastRequestedState currentRequestedState,
+    required BreakfastRequestedState nextRequestedState,
+  }) {
+    final Map<int, int> currentQuantities = <int, int>{
+      for (final BreakfastAddedProductRequest add
+          in currentRequestedState.addedProducts)
+        add.itemProductId: add.quantity,
+    };
+    final List<BreakfastEditErrorCode> codes = <BreakfastEditErrorCode>[];
+    for (final BreakfastAddedProductRequest add
+        in nextRequestedState.addedProducts) {
+      final int previousQuantity = currentQuantities[add.itemProductId] ?? 0;
+      if (add.quantity <= previousQuantity) {
+        continue;
+      }
+      if (!configuration.isExplicitExtraProduct(add.itemProductId)) {
+        codes.add(BreakfastEditErrorCode.swapCandidateNotSwapEligible);
+      }
+    }
+    return codes;
   }
 
   String _buildShortContent(List<TransactionLine> lines) {

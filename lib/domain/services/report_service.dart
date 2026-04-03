@@ -1,26 +1,34 @@
 import '../../core/logging/app_logger.dart';
 import '../../core/errors/exceptions.dart';
+import '../../data/repositories/breakfast_configuration_repository.dart';
 import '../../data/repositories/payment_adjustment_repository.dart';
 import '../../data/repositories/payment_repository.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/repositories/shift_repository.dart';
 import '../../data/repositories/shift_reconciliation_repository.dart';
 import '../../data/repositories/transaction_repository.dart';
+import '../models/breakfast_rebuild.dart';
+import '../models/order_modifier.dart';
 import '../models/payment_adjustment.dart';
 import '../models/payment.dart';
 import '../models/authorization_policy.dart';
 import '../models/business_identity_settings.dart';
 import '../models/cashier_z_report_settings.dart';
 import '../models/report_settings_policy.dart';
+import '../models/semantic_sales_analytics.dart';
 import '../models/shift_cash_summary.dart';
 import '../models/shift.dart';
 import '../models/shift_report.dart';
 import '../models/shift_reconciliation.dart';
 import '../models/stale_final_close_recovery_details.dart';
 import '../models/transaction.dart';
+import '../models/transaction_line.dart';
 import '../models/user.dart';
 import '../models/z_report_action_result.dart';
+import '../models/analytics/analytics_period.dart';
 import 'audit_log_service.dart';
+import 'breakfast_analytics_extractor.dart';
+import 'breakfast_requested_state_mapper.dart';
 import 'report_visibility_service.dart';
 import 'shift_session_service.dart';
 
@@ -32,8 +40,11 @@ class ReportService {
     required PaymentRepository paymentRepository,
     PaymentAdjustmentRepository? paymentAdjustmentRepository,
     ShiftReconciliationRepository? shiftReconciliationRepository,
+    BreakfastConfigurationRepository? breakfastConfigurationRepository,
     required SettingsRepository settingsRepository,
     required ReportVisibilityService reportVisibilityService,
+    BreakfastAnalyticsExtractor breakfastAnalyticsExtractor =
+        const BreakfastAnalyticsExtractor(),
     AuditLogService auditLogService = const NoopAuditLogService(),
     AppLogger logger = const NoopAppLogger(),
   }) : _shiftRepository = shiftRepository,
@@ -42,8 +53,10 @@ class ReportService {
        _paymentRepository = paymentRepository,
        _paymentAdjustmentRepository = paymentAdjustmentRepository,
        _shiftReconciliationRepository = shiftReconciliationRepository,
+       _breakfastConfigurationRepository = breakfastConfigurationRepository,
        _settingsRepository = settingsRepository,
        _reportVisibilityService = reportVisibilityService,
+       _breakfastAnalyticsExtractor = breakfastAnalyticsExtractor,
        _auditLogService = auditLogService,
        _logger = logger;
 
@@ -53,8 +66,10 @@ class ReportService {
   final PaymentRepository _paymentRepository;
   final PaymentAdjustmentRepository? _paymentAdjustmentRepository;
   final ShiftReconciliationRepository? _shiftReconciliationRepository;
+  final BreakfastConfigurationRepository? _breakfastConfigurationRepository;
   final SettingsRepository _settingsRepository;
   final ReportVisibilityService _reportVisibilityService;
+  final BreakfastAnalyticsExtractor _breakfastAnalyticsExtractor;
   final AuditLogService _auditLogService;
   final AppLogger _logger;
 
@@ -130,6 +145,8 @@ class ReportService {
     final int netSalesMinor = grossSalesMinor - refundTotalMinor;
     final categoryBreakdown = await _transactionRepository
         .getPaidCategoryTotalsForShift(shiftId);
+    final SemanticSalesAnalytics semanticSalesAnalytics =
+        await _buildSemanticSalesAnalytics(paidTransactions);
 
     return ShiftReport(
       shiftId: shiftId,
@@ -149,6 +166,7 @@ class ReportService {
       cardGrossTotalMinor: cardGrossTotalMinor,
       cardTotalMinor: cardTotalMinor,
       categoryBreakdown: categoryBreakdown,
+      semanticSalesAnalytics: semanticSalesAnalytics,
     );
   }
 
@@ -599,11 +617,735 @@ class ReportService {
     );
   }
 
+  Future<SemanticSalesAnalytics> getSemanticSalesAnalyticsForPeriod({
+    required User user,
+    required AnalyticsPeriodSelection periodSelection,
+    DateTime? now,
+  }) async {
+    AuthorizationPolicy.ensureAllowed(user, OperatorPermission.viewFullReports);
+    final _AnalyticsWindow window = _resolveAnalyticsWindow(
+      selection: periodSelection,
+      now: now ?? DateTime.now(),
+    );
+    final List<Transaction> paidTransactions = await _transactionRepository
+        .getPaidTransactionsBetween(
+          startInclusive: window.startInclusive,
+          endExclusive: window.endExclusive,
+        );
+    return _buildSemanticSalesAnalytics(paidTransactions);
+  }
+
   int _sumTransactionTotals(List<Transaction> transactions) {
     return transactions.fold<int>(
       0,
       (int sum, Transaction transaction) => sum + transaction.totalAmountMinor,
     );
+  }
+
+  Future<SemanticSalesAnalytics> _buildSemanticSalesAnalytics(
+    List<Transaction> paidTransactions,
+  ) async {
+    final BreakfastConfigurationRepository? configurationRepository =
+        _breakfastConfigurationRepository;
+    if (configurationRepository == null || paidTransactions.isEmpty) {
+      return const SemanticSalesAnalytics.empty();
+    }
+
+    final Map<int, _RootProductAccumulator> rootBuckets =
+        <int, _RootProductAccumulator>{};
+    final Map<ModifierChargeReason, _ChargeReasonAccumulator> reasonBuckets =
+        <ModifierChargeReason, _ChargeReasonAccumulator>{};
+    final Map<_RootItemKey, _ItemBehaviorAccumulator> addedBuckets =
+        <_RootItemKey, _ItemBehaviorAccumulator>{};
+    final Map<_RootItemKey, _ItemBehaviorAccumulator> removedBuckets =
+        <_RootItemKey, _ItemBehaviorAccumulator>{};
+    final Map<_ChoiceAnalyticsKey, _ChoiceSelectionAccumulator> choiceBuckets =
+        <_ChoiceAnalyticsKey, _ChoiceSelectionAccumulator>{};
+    final Map<_VariantAnalyticsKey, _VariantAccumulator> variantBuckets =
+        <_VariantAnalyticsKey, _VariantAccumulator>{};
+    final Map<int, BreakfastSetConfiguration?> configurationCache =
+        <int, BreakfastSetConfiguration?>{};
+    final Map<int, String> fallbackItemNames = <int, String>{};
+    final Set<int> itemProductIds = <int>{};
+    final Set<String> dataQualityNotes = <String>{};
+    bool inferredChoiceGroups = false;
+
+    for (final Transaction transaction in paidTransactions) {
+      final List<TransactionLine> lines = await _transactionRepository.getLines(
+        transaction.id,
+      );
+
+      for (final TransactionLine line in lines) {
+        if (line.pricingMode != TransactionLinePricingMode.set) {
+          continue;
+        }
+
+        final _RootProductAccumulator rootAccumulator = rootBuckets.putIfAbsent(
+          line.productId,
+          () => _RootProductAccumulator(rootProductName: line.productName),
+        );
+        rootAccumulator.quantitySold += line.quantity;
+        rootAccumulator.revenueMinor += line.lineTotalMinor;
+
+        final List<OrderModifier> modifiers = await _transactionRepository
+            .getModifiersByLine(line.id);
+        final BreakfastAnalyticsSnapshot analyticsSnapshot =
+            _breakfastAnalyticsExtractor.extract(modifiers);
+        for (final BreakfastModifierAnalyticsEntry entry
+            in analyticsSnapshot.entries) {
+          itemProductIds.add(entry.itemProductId);
+          final _ChargeReasonAccumulator accumulator = reasonBuckets
+              .putIfAbsent(entry.chargeReason, _ChargeReasonAccumulator.new);
+          accumulator.totalQuantity += entry.totalQuantity;
+          accumulator.revenueMinor += entry.totalRevenueMinor;
+        }
+        for (final OrderModifier modifier in modifiers) {
+          final ModifierChargeReason? reason = modifier.chargeReason;
+          final int? itemProductId = modifier.itemProductId;
+          if (reason != null &&
+              reason != ModifierChargeReason.removalDiscount) {
+            reasonBuckets.putIfAbsent(reason, _ChargeReasonAccumulator.new)
+              ..eventCount += 1;
+          }
+          if (itemProductId != null) {
+            itemProductIds.add(itemProductId);
+            fallbackItemNames.putIfAbsent(
+              itemProductId,
+              () => modifier.itemName,
+            );
+          }
+        }
+
+        final BreakfastSetConfiguration? configuration =
+            configurationCache.containsKey(line.productId)
+            ? configurationCache[line.productId]
+            : await configurationRepository.loadSetConfiguration(
+                line.productId,
+              );
+        configurationCache[line.productId] = configuration;
+
+        if (configuration == null) {
+          final BreakfastRequestedState requestedState =
+              BreakfastRequestedStateMapper.reconstructWithoutConfiguration(
+                modifiers: modifiers,
+              );
+          if (modifiers.any(
+            (OrderModifier modifier) =>
+                modifier.action == ModifierAction.choice &&
+                modifier.chargeReason == ModifierChargeReason.includedChoice &&
+                modifier.itemProductId != null &&
+                modifier.sourceGroupId == null,
+          )) {
+            dataQualityNotes.add(
+              'Legacy semantic modifier rows for root product ${line.productId} are missing source group IDs and cannot be fully grouped after the live configuration was removed.',
+            );
+          }
+          dataQualityNotes.add(
+            'Choice-group analytics for root product ${line.productId} are using archived semantic modifier data because the current configuration is no longer available.',
+          );
+          _accumulateRequestedStateBehaviors(
+            rootProductId: line.productId,
+            rootProductName: line.productName,
+            requestedState: requestedState,
+            modifiers: modifiers,
+            addedBuckets: addedBuckets,
+            removedBuckets: removedBuckets,
+          );
+          _accumulateChoiceSelections(
+            rootProductId: line.productId,
+            rootProductName: line.productName,
+            paidAt: transaction.paidAt ?? transaction.createdAt,
+            requestedState: requestedState,
+            configuration: null,
+            choiceBuckets: choiceBuckets,
+            dataQualityNotes: dataQualityNotes,
+            fallbackItemNames: fallbackItemNames,
+            itemProductIds: itemProductIds,
+          );
+          _accumulateBundleVariant(
+            rootProductId: line.productId,
+            rootProductName: line.productName,
+            lineRevenueMinor: line.lineTotalMinor,
+            requestedState: requestedState,
+            variantBuckets: variantBuckets,
+          );
+          continue;
+        }
+
+        final bool needsLegacyInference = modifiers.any(
+          (OrderModifier modifier) =>
+              modifier.action == ModifierAction.choice &&
+              modifier.chargeReason == ModifierChargeReason.includedChoice &&
+              modifier.itemProductId != null &&
+              modifier.sourceGroupId == null,
+        );
+        inferredChoiceGroups = inferredChoiceGroups || needsLegacyInference;
+        final BreakfastRequestedState requestedState =
+            BreakfastRequestedStateMapper.reconstruct(
+              modifiers: modifiers,
+              configuration: configuration,
+            );
+
+        _accumulateRequestedStateBehaviors(
+          rootProductId: line.productId,
+          rootProductName: line.productName,
+          requestedState: requestedState,
+          modifiers: modifiers,
+          addedBuckets: addedBuckets,
+          removedBuckets: removedBuckets,
+        );
+        _accumulateChoiceSelections(
+          rootProductId: line.productId,
+          rootProductName: line.productName,
+          paidAt: transaction.paidAt ?? transaction.createdAt,
+          requestedState: requestedState,
+          configuration: configuration,
+          choiceBuckets: choiceBuckets,
+          dataQualityNotes: dataQualityNotes,
+          fallbackItemNames: fallbackItemNames,
+          itemProductIds: itemProductIds,
+        );
+        _accumulateBundleVariant(
+          rootProductId: line.productId,
+          rootProductName: line.productName,
+          lineRevenueMinor: line.lineTotalMinor,
+          requestedState: requestedState,
+          variantBuckets: variantBuckets,
+        );
+      }
+    }
+
+    if (rootBuckets.isEmpty) {
+      return const SemanticSalesAnalytics.empty();
+    }
+
+    if (inferredChoiceGroups) {
+      dataQualityNotes.add(
+        'Legacy semantic modifier rows without persisted source group IDs were inferred from the current semantic configuration.',
+      );
+    }
+
+    final Map<int, BreakfastCatalogProduct> itemNamesByProductId =
+        await configurationRepository.loadCatalogProductsByIds(itemProductIds);
+
+    String resolveItemName(int itemProductId) {
+      return itemNamesByProductId[itemProductId]?.name ??
+          fallbackItemNames[itemProductId] ??
+          'Product $itemProductId';
+    }
+
+    final List<SemanticRootProductAnalytics> rootProducts =
+        rootBuckets.entries
+            .map(
+              (MapEntry<int, _RootProductAccumulator> entry) =>
+                  SemanticRootProductAnalytics(
+                    rootProductId: entry.key,
+                    rootProductName: entry.value.rootProductName,
+                    quantitySold: entry.value.quantitySold,
+                    revenueMinor: entry.value.revenueMinor,
+                  ),
+            )
+            .toList(growable: true)
+          ..sort(_compareRootProducts);
+
+    final Map<_RootGroupKey, int> choiceGroupTotals = <_RootGroupKey, int>{};
+    for (final MapEntry<_ChoiceAnalyticsKey, _ChoiceSelectionAccumulator> entry
+        in choiceBuckets.entries) {
+      final _RootGroupKey rootGroupKey = _RootGroupKey(
+        rootProductId: entry.key.rootProductId,
+        groupId: entry.key.groupId,
+      );
+      choiceGroupTotals.update(
+        rootGroupKey,
+        (int count) => count + entry.value.totalSelectedQuantity,
+        ifAbsent: () => entry.value.totalSelectedQuantity,
+      );
+    }
+
+    final List<SemanticChoiceSelectionAnalytics> choiceSelections =
+        choiceBuckets.entries
+            .map((
+              MapEntry<_ChoiceAnalyticsKey, _ChoiceSelectionAccumulator> entry,
+            ) {
+              final int totalForGroup =
+                  choiceGroupTotals[_RootGroupKey(
+                    rootProductId: entry.key.rootProductId,
+                    groupId: entry.key.groupId,
+                  )] ??
+                  0;
+              return SemanticChoiceSelectionAnalytics(
+                rootProductId: entry.key.rootProductId,
+                rootProductName: entry.value.rootProductName,
+                groupId: entry.key.groupId,
+                groupName: entry.value.groupName,
+                itemProductId: entry.key.itemProductId,
+                itemName: resolveItemName(entry.key.itemProductId),
+                selectionCount: entry.value.selectionCount,
+                totalSelectedQuantity: entry.value.totalSelectedQuantity,
+                distributionPercent: totalForGroup <= 0
+                    ? 0
+                    : (entry.value.totalSelectedQuantity * 100) / totalForGroup,
+                trend: entry.value.buildTrend(),
+              );
+            })
+            .toList(growable: true)
+          ..sort(_compareChoiceSelections);
+
+    final List<SemanticItemBehaviorAnalytics> addedItems =
+        _buildItemBehaviorAnalytics(
+          buckets: addedBuckets,
+          rootBuckets: rootBuckets,
+          resolveItemName: resolveItemName,
+        );
+    final List<SemanticItemBehaviorAnalytics> removedItems =
+        _buildItemBehaviorAnalytics(
+          buckets: removedBuckets,
+          rootBuckets: rootBuckets,
+          resolveItemName: resolveItemName,
+        );
+
+    final List<SemanticChargeReasonAnalytics> chargeReasonBreakdown =
+        reasonBuckets.entries
+            .map(
+              (
+                MapEntry<ModifierChargeReason, _ChargeReasonAccumulator> entry,
+              ) => SemanticChargeReasonAnalytics(
+                chargeReason: entry.key,
+                eventCount: entry.value.eventCount,
+                totalQuantity: entry.value.totalQuantity,
+                revenueMinor: entry.value.revenueMinor,
+              ),
+            )
+            .toList(growable: true)
+          ..sort(
+            (
+              SemanticChargeReasonAnalytics a,
+              SemanticChargeReasonAnalytics b,
+            ) => b.revenueMinor.compareTo(a.revenueMinor),
+          );
+
+    final List<SemanticBundleVariantAnalytics> bundleVariants =
+        variantBuckets.entries
+            .map(
+              (MapEntry<_VariantAnalyticsKey, _VariantAccumulator> entry) =>
+                  SemanticBundleVariantAnalytics(
+                    rootProductId: entry.key.rootProductId,
+                    rootProductName: entry.value.rootProductName,
+                    variantKey: entry.key.variantKey,
+                    orderCount: entry.value.orderCount,
+                    revenueMinor: entry.value.revenueMinor,
+                    chosenItemProductIds: entry.value.chosenItemProductIds,
+                    chosenItemNames: entry.value.chosenItemProductIds
+                        .map(resolveItemName)
+                        .toList(growable: false),
+                    removedItemProductIds: entry.value.removedItemProductIds,
+                    removedItemNames: entry.value.removedItemProductIds
+                        .map(resolveItemName)
+                        .toList(growable: false),
+                    addedItemProductIds: entry.value.addedItemProductIds,
+                    addedItemNames: entry.value.addedItemProductIds
+                        .map(resolveItemName)
+                        .toList(growable: false),
+                  ),
+            )
+            .toList(growable: true)
+          ..sort((
+            SemanticBundleVariantAnalytics a,
+            SemanticBundleVariantAnalytics b,
+          ) {
+            final int orderCompare = b.orderCount.compareTo(a.orderCount);
+            if (orderCompare != 0) {
+              return orderCompare;
+            }
+            return b.revenueMinor.compareTo(a.revenueMinor);
+          });
+
+    return SemanticSalesAnalytics(
+      rootProducts: List<SemanticRootProductAnalytics>.unmodifiable(
+        rootProducts,
+      ),
+      choiceSelections: List<SemanticChoiceSelectionAnalytics>.unmodifiable(
+        choiceSelections,
+      ),
+      addedItems: List<SemanticItemBehaviorAnalytics>.unmodifiable(addedItems),
+      removedItems: List<SemanticItemBehaviorAnalytics>.unmodifiable(
+        removedItems,
+      ),
+      chargeReasonBreakdown: List<SemanticChargeReasonAnalytics>.unmodifiable(
+        chargeReasonBreakdown,
+      ),
+      bundleVariants: List<SemanticBundleVariantAnalytics>.unmodifiable(
+        bundleVariants,
+      ),
+      dataQualityNotes: List<String>.unmodifiable(
+        dataQualityNotes.toList(growable: false)..sort(),
+      ),
+    );
+  }
+
+  void _accumulateDirectItemBehaviors({
+    required int rootProductId,
+    required String rootProductName,
+    required List<OrderModifier> modifiers,
+    required Map<_RootItemKey, _ItemBehaviorAccumulator> addedBuckets,
+    required Map<_RootItemKey, _ItemBehaviorAccumulator> removedBuckets,
+  }) {
+    for (final OrderModifier modifier in modifiers) {
+      final int? itemProductId = modifier.itemProductId;
+      if (itemProductId == null) {
+        continue;
+      }
+      if (modifier.action == ModifierAction.remove) {
+        removedBuckets.putIfAbsent(
+            _RootItemKey(
+              rootProductId: rootProductId,
+              itemProductId: itemProductId,
+            ),
+            () => _ItemBehaviorAccumulator(rootProductName: rootProductName),
+          )
+          ..occurrenceCount += 1
+          ..totalQuantity += modifier.quantity;
+        continue;
+      }
+      if (modifier.action == ModifierAction.add &&
+          modifier.chargeReason != ModifierChargeReason.removalDiscount) {
+        addedBuckets.putIfAbsent(
+            _RootItemKey(
+              rootProductId: rootProductId,
+              itemProductId: itemProductId,
+            ),
+            () => _ItemBehaviorAccumulator(rootProductName: rootProductName),
+          )
+          ..occurrenceCount += 1
+          ..totalQuantity += modifier.quantity
+          ..revenueMinor += modifier.priceEffectMinor;
+      }
+    }
+  }
+
+  void _accumulateRequestedStateBehaviors({
+    required int rootProductId,
+    required String rootProductName,
+    required BreakfastRequestedState requestedState,
+    required List<OrderModifier> modifiers,
+    required Map<_RootItemKey, _ItemBehaviorAccumulator> addedBuckets,
+    required Map<_RootItemKey, _ItemBehaviorAccumulator> removedBuckets,
+  }) {
+    final Map<int, int> addRevenueByProductId = <int, int>{};
+    for (final OrderModifier modifier in modifiers) {
+      final int? itemProductId = modifier.itemProductId;
+      if (modifier.action == ModifierAction.add &&
+          itemProductId != null &&
+          modifier.chargeReason != ModifierChargeReason.removalDiscount) {
+        addRevenueByProductId.update(
+          itemProductId,
+          (int value) => value + modifier.priceEffectMinor,
+          ifAbsent: () => modifier.priceEffectMinor,
+        );
+      }
+    }
+
+    for (final BreakfastRemovedSetItemRequest removal
+        in requestedState.removedSetItems) {
+      removedBuckets.putIfAbsent(
+          _RootItemKey(
+            rootProductId: rootProductId,
+            itemProductId: removal.itemProductId,
+          ),
+          () => _ItemBehaviorAccumulator(rootProductName: rootProductName),
+        )
+        ..occurrenceCount += 1
+        ..totalQuantity += removal.quantity;
+    }
+
+    for (final BreakfastAddedProductRequest addition
+        in requestedState.addedProducts) {
+      addedBuckets.putIfAbsent(
+          _RootItemKey(
+            rootProductId: rootProductId,
+            itemProductId: addition.itemProductId,
+          ),
+          () => _ItemBehaviorAccumulator(rootProductName: rootProductName),
+        )
+        ..occurrenceCount += 1
+        ..totalQuantity += addition.quantity
+        ..revenueMinor += addRevenueByProductId[addition.itemProductId] ?? 0;
+    }
+  }
+
+  void _accumulateChoiceSelections({
+    required int rootProductId,
+    required String rootProductName,
+    required DateTime paidAt,
+    required BreakfastRequestedState requestedState,
+    required BreakfastSetConfiguration? configuration,
+    required Map<_ChoiceAnalyticsKey, _ChoiceSelectionAccumulator>
+    choiceBuckets,
+    required Set<String> dataQualityNotes,
+    required Map<int, String> fallbackItemNames,
+    required Set<int> itemProductIds,
+  }) {
+    final DateTime trendDate = DateTime(paidAt.year, paidAt.month, paidAt.day);
+    for (final BreakfastChosenGroupRequest choice
+        in requestedState.chosenGroups) {
+      final int? selectedItemProductId = choice.selectedItemProductId;
+      if (selectedItemProductId == null || choice.requestedQuantity <= 0) {
+        continue;
+      }
+      final BreakfastChoiceGroupConfig? group = configuration?.findGroup(
+        choice.groupId,
+      );
+      final BreakfastChoiceGroupMemberConfig? member = group?.findMember(
+        selectedItemProductId,
+      );
+      if (group == null) {
+        dataQualityNotes.add(
+          'Choice-group analytics for root product $rootProductId are using archived group ${choice.groupId} from persisted semantic modifiers because the current configuration no longer contains that group.',
+        );
+      } else if (member == null) {
+        dataQualityNotes.add(
+          'Choice-group analytics for root product $rootProductId are using persisted group ${group.groupId} for item $selectedItemProductId because the current configuration no longer matches that historical membership.',
+        );
+      }
+      itemProductIds.add(selectedItemProductId);
+      fallbackItemNames.putIfAbsent(
+        selectedItemProductId,
+        () => member?.displayName ?? 'Product $selectedItemProductId',
+      );
+      choiceBuckets.putIfAbsent(
+          _ChoiceAnalyticsKey(
+            rootProductId: rootProductId,
+            groupId: choice.groupId,
+            itemProductId: selectedItemProductId,
+          ),
+          () => _ChoiceSelectionAccumulator(
+            rootProductName: rootProductName,
+            groupName: group?.groupName ?? 'Group #${choice.groupId}',
+          ),
+        )
+        ..selectionCount += 1
+        ..totalSelectedQuantity += choice.requestedQuantity
+        ..track(trendDate, choice.requestedQuantity);
+    }
+  }
+
+  void _accumulateBundleVariant({
+    required int rootProductId,
+    required String rootProductName,
+    required int lineRevenueMinor,
+    required BreakfastRequestedState requestedState,
+    required Map<_VariantAnalyticsKey, _VariantAccumulator> variantBuckets,
+  }) {
+    final List<_VariantItem> chosenItems =
+        requestedState.chosenGroups
+            .where(
+              (BreakfastChosenGroupRequest choice) =>
+                  choice.selectedItemProductId != null &&
+                  choice.requestedQuantity > 0,
+            )
+            .map(
+              (BreakfastChosenGroupRequest choice) => _VariantItem(
+                productId: choice.selectedItemProductId!,
+                quantity: choice.requestedQuantity,
+              ),
+            )
+            .toList(growable: true)
+          ..sort(_compareVariantItems);
+    final List<_VariantItem> removedItems =
+        requestedState.removedSetItems
+            .where(
+              (BreakfastRemovedSetItemRequest removal) => removal.quantity > 0,
+            )
+            .map(
+              (BreakfastRemovedSetItemRequest removal) => _VariantItem(
+                productId: removal.itemProductId,
+                quantity: removal.quantity,
+              ),
+            )
+            .toList(growable: true)
+          ..sort(_compareVariantItems);
+    final List<_VariantItem> addedItems =
+        requestedState.addedProducts
+            .where((BreakfastAddedProductRequest add) => add.quantity > 0)
+            .map(
+              (BreakfastAddedProductRequest add) => _VariantItem(
+                productId: add.itemProductId,
+                quantity: add.quantity,
+              ),
+            )
+            .toList(growable: true)
+          ..sort(_compareVariantItems);
+
+    final String variantKey = _buildVariantKey(
+      chosenItems: chosenItems,
+      removedItems: removedItems,
+      addedItems: addedItems,
+    );
+    variantBuckets.putIfAbsent(
+        _VariantAnalyticsKey(
+          rootProductId: rootProductId,
+          variantKey: variantKey,
+        ),
+        () => _VariantAccumulator(
+          rootProductName: rootProductName,
+          chosenItemProductIds: chosenItems
+              .map((_VariantItem item) => item.productId)
+              .toList(growable: false),
+          removedItemProductIds: removedItems
+              .map((_VariantItem item) => item.productId)
+              .toList(growable: false),
+          addedItemProductIds: addedItems
+              .map((_VariantItem item) => item.productId)
+              .toList(growable: false),
+        ),
+      )
+      ..orderCount += 1
+      ..revenueMinor += lineRevenueMinor;
+  }
+
+  List<SemanticItemBehaviorAnalytics> _buildItemBehaviorAnalytics({
+    required Map<_RootItemKey, _ItemBehaviorAccumulator> buckets,
+    required Map<int, _RootProductAccumulator> rootBuckets,
+    required String Function(int itemProductId) resolveItemName,
+  }) {
+    final List<SemanticItemBehaviorAnalytics> analytics = buckets.entries
+        .map((MapEntry<_RootItemKey, _ItemBehaviorAccumulator> entry) {
+          final int rootQuantitySold =
+              rootBuckets[entry.key.rootProductId]?.quantitySold ?? 0;
+          return SemanticItemBehaviorAnalytics(
+            rootProductId: entry.key.rootProductId,
+            rootProductName: entry.value.rootProductName,
+            itemProductId: entry.key.itemProductId,
+            itemName: resolveItemName(entry.key.itemProductId),
+            occurrenceCount: entry.value.occurrenceCount,
+            totalQuantity: entry.value.totalQuantity,
+            revenueMinor: entry.value.revenueMinor,
+            percentageOfRootSales: rootQuantitySold <= 0
+                ? 0
+                : (entry.value.occurrenceCount * 100) / rootQuantitySold,
+          );
+        })
+        .toList(growable: true);
+    analytics.sort((
+      SemanticItemBehaviorAnalytics a,
+      SemanticItemBehaviorAnalytics b,
+    ) {
+      final int occurrenceCompare = b.occurrenceCount.compareTo(
+        a.occurrenceCount,
+      );
+      if (occurrenceCompare != 0) {
+        return occurrenceCompare;
+      }
+      return b.totalQuantity.compareTo(a.totalQuantity);
+    });
+    return analytics;
+  }
+
+  int _compareRootProducts(
+    SemanticRootProductAnalytics a,
+    SemanticRootProductAnalytics b,
+  ) {
+    final int quantityCompare = b.quantitySold.compareTo(a.quantitySold);
+    if (quantityCompare != 0) {
+      return quantityCompare;
+    }
+    return b.revenueMinor.compareTo(a.revenueMinor);
+  }
+
+  int _compareChoiceSelections(
+    SemanticChoiceSelectionAnalytics a,
+    SemanticChoiceSelectionAnalytics b,
+  ) {
+    final int countCompare = b.totalSelectedQuantity.compareTo(
+      a.totalSelectedQuantity,
+    );
+    if (countCompare != 0) {
+      return countCompare;
+    }
+    final int rootCompare = a.rootProductId.compareTo(b.rootProductId);
+    if (rootCompare != 0) {
+      return rootCompare;
+    }
+    final int groupCompare = a.groupId.compareTo(b.groupId);
+    if (groupCompare != 0) {
+      return groupCompare;
+    }
+    return a.itemProductId.compareTo(b.itemProductId);
+  }
+
+  int _compareVariantItems(_VariantItem a, _VariantItem b) {
+    final int productCompare = a.productId.compareTo(b.productId);
+    if (productCompare != 0) {
+      return productCompare;
+    }
+    return a.quantity.compareTo(b.quantity);
+  }
+
+  String _buildVariantKey({
+    required List<_VariantItem> chosenItems,
+    required List<_VariantItem> removedItems,
+    required List<_VariantItem> addedItems,
+  }) {
+    String serialize(List<_VariantItem> items) {
+      if (items.isEmpty) {
+        return '-';
+      }
+      return items
+          .map((_VariantItem item) => '${item.productId}x${item.quantity}')
+          .join('|');
+    }
+
+    return 'choices:${serialize(chosenItems)};removed:${serialize(removedItems)};added:${serialize(addedItems)}';
+  }
+
+  _AnalyticsWindow _resolveAnalyticsWindow({
+    required AnalyticsPeriodSelection selection,
+    required DateTime now,
+  }) {
+    DateTime startOfDay(DateTime value) {
+      return DateTime(value.year, value.month, value.day);
+    }
+
+    final DateTime today = startOfDay(now);
+    if (selection.isCustom) {
+      final DateTime start = startOfDay(selection.start!);
+      final DateTime endInclusive = startOfDay(selection.end!);
+      return _AnalyticsWindow(
+        startInclusive: start,
+        endExclusive: endInclusive.add(const Duration(days: 1)),
+      );
+    }
+
+    switch (selection.preset) {
+      case AnalyticsPresetPeriod.today:
+        return _AnalyticsWindow(
+          startInclusive: today,
+          endExclusive: today.add(const Duration(days: 1)),
+        );
+      case AnalyticsPresetPeriod.thisWeek:
+        final int offset = today.weekday - DateTime.monday;
+        final DateTime weekStart = today.subtract(Duration(days: offset));
+        return _AnalyticsWindow(
+          startInclusive: weekStart,
+          endExclusive: today.add(const Duration(days: 1)),
+        );
+      case AnalyticsPresetPeriod.thisMonth:
+        final DateTime monthStart = DateTime(today.year, today.month);
+        return _AnalyticsWindow(
+          startInclusive: monthStart,
+          endExclusive: today.add(const Duration(days: 1)),
+        );
+      case AnalyticsPresetPeriod.last14Days:
+        return _AnalyticsWindow(
+          startInclusive: today.subtract(const Duration(days: 13)),
+          endExclusive: today.add(const Duration(days: 1)),
+        );
+      case null:
+        return _AnalyticsWindow(
+          startInclusive: today,
+          endExclusive: today.add(const Duration(days: 1)),
+        );
+    }
   }
 
   Future<Shift> _requireOpenShiftForRecovery(int shiftId) async {
@@ -666,4 +1408,188 @@ class ReportService {
       'counted_by_name': recovery.countedByName,
     };
   }
+}
+
+class _RootProductAccumulator {
+  _RootProductAccumulator({required this.rootProductName});
+
+  final String rootProductName;
+  int quantitySold = 0;
+  int revenueMinor = 0;
+}
+
+class _ChargeReasonAccumulator {
+  int eventCount = 0;
+  int totalQuantity = 0;
+  int revenueMinor = 0;
+}
+
+class _RootItemKey {
+  const _RootItemKey({
+    required this.rootProductId,
+    required this.itemProductId,
+  });
+
+  final int rootProductId;
+  final int itemProductId;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _RootItemKey &&
+        other.rootProductId == rootProductId &&
+        other.itemProductId == itemProductId;
+  }
+
+  @override
+  int get hashCode => Object.hash(rootProductId, itemProductId);
+}
+
+class _ItemBehaviorAccumulator {
+  _ItemBehaviorAccumulator({required this.rootProductName});
+
+  final String rootProductName;
+  int occurrenceCount = 0;
+  int totalQuantity = 0;
+  int revenueMinor = 0;
+}
+
+class _ChoiceAnalyticsKey {
+  const _ChoiceAnalyticsKey({
+    required this.rootProductId,
+    required this.groupId,
+    required this.itemProductId,
+  });
+
+  final int rootProductId;
+  final int groupId;
+  final int itemProductId;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _ChoiceAnalyticsKey &&
+        other.rootProductId == rootProductId &&
+        other.groupId == groupId &&
+        other.itemProductId == itemProductId;
+  }
+
+  @override
+  int get hashCode => Object.hash(rootProductId, groupId, itemProductId);
+}
+
+class _RootGroupKey {
+  const _RootGroupKey({required this.rootProductId, required this.groupId});
+
+  final int rootProductId;
+  final int groupId;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _RootGroupKey &&
+        other.rootProductId == rootProductId &&
+        other.groupId == groupId;
+  }
+
+  @override
+  int get hashCode => Object.hash(rootProductId, groupId);
+}
+
+class _ChoiceSelectionAccumulator {
+  _ChoiceSelectionAccumulator({
+    required this.rootProductName,
+    required this.groupName,
+  });
+
+  final String rootProductName;
+  final String groupName;
+  final Map<DateTime, _TrendAccumulator> _trendByDate =
+      <DateTime, _TrendAccumulator>{};
+  int selectionCount = 0;
+  int totalSelectedQuantity = 0;
+
+  void track(DateTime date, int quantity) {
+    final _TrendAccumulator accumulator = _trendByDate.putIfAbsent(
+      date,
+      _TrendAccumulator.new,
+    );
+    accumulator.count += 1;
+    accumulator.quantity += quantity;
+  }
+
+  List<SemanticAnalyticsTrendPoint> buildTrend() {
+    final List<MapEntry<DateTime, _TrendAccumulator>> entries =
+        _trendByDate.entries.toList(growable: true)..sort(
+          (
+            MapEntry<DateTime, _TrendAccumulator> a,
+            MapEntry<DateTime, _TrendAccumulator> b,
+          ) => a.key.compareTo(b.key),
+        );
+    return entries
+        .map(
+          (MapEntry<DateTime, _TrendAccumulator> entry) =>
+              SemanticAnalyticsTrendPoint(
+                date: entry.key,
+                count: entry.value.count,
+                quantity: entry.value.quantity,
+              ),
+        )
+        .toList(growable: false);
+  }
+}
+
+class _TrendAccumulator {
+  int count = 0;
+  int quantity = 0;
+}
+
+class _VariantAnalyticsKey {
+  const _VariantAnalyticsKey({
+    required this.rootProductId,
+    required this.variantKey,
+  });
+
+  final int rootProductId;
+  final String variantKey;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _VariantAnalyticsKey &&
+        other.rootProductId == rootProductId &&
+        other.variantKey == variantKey;
+  }
+
+  @override
+  int get hashCode => Object.hash(rootProductId, variantKey);
+}
+
+class _VariantAccumulator {
+  _VariantAccumulator({
+    required this.rootProductName,
+    required this.chosenItemProductIds,
+    required this.removedItemProductIds,
+    required this.addedItemProductIds,
+  });
+
+  final String rootProductName;
+  final List<int> chosenItemProductIds;
+  final List<int> removedItemProductIds;
+  final List<int> addedItemProductIds;
+  int orderCount = 0;
+  int revenueMinor = 0;
+}
+
+class _VariantItem {
+  const _VariantItem({required this.productId, required this.quantity});
+
+  final int productId;
+  final int quantity;
+}
+
+class _AnalyticsWindow {
+  const _AnalyticsWindow({
+    required this.startInclusive,
+    required this.endExclusive,
+  });
+
+  final DateTime startInclusive;
+  final DateTime endExclusive;
 }

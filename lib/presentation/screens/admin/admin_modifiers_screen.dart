@@ -10,6 +10,11 @@ import '../../../domain/models/product_modifier.dart';
 import '../../providers/admin_modifiers_provider.dart';
 import 'widgets/admin_scaffold.dart';
 
+const String _flatModifiersOnlyBanner =
+    'This screen manages legacy flat modifiers (included/extra). Set products are configured via Set Builder on the Products screen.';
+const String _semanticProductSelectedWarning =
+    'This product is configured as a set product. Manage its items and choices through the Set Builder on the Products screen instead.';
+
 class AdminModifiersScreen extends ConsumerStatefulWidget {
   const AdminModifiersScreen({super.key});
 
@@ -88,10 +93,17 @@ class _AdminModifiersScreenState extends ConsumerState<AdminModifiersScreen> {
                       message: state.errorMessage!,
                       color: AppColors.error,
                     ),
-                  _MessageBox(
-                    message: AppStrings.modifierInfoMessage,
+                  const _MessageBox(
+                    message: _flatModifiersOnlyBanner,
                     color: AppColors.primary,
                   ),
+                  if (state.modifiers.any(
+                    (ProductModifier m) => m.type == ModifierType.choice,
+                  ))
+                    const _MessageBox(
+                      message: _semanticProductSelectedWarning,
+                      color: AppColors.warning,
+                    ),
                   if (state.isLoading)
                     const Padding(
                       padding: EdgeInsets.all(AppSizes.spacingXl),
@@ -191,7 +203,7 @@ class _ModifierTile extends ConsumerWidget {
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         subtitle: Text(
-          '${modifier.type == ModifierType.included ? AppStrings.includedModifiers : AppStrings.extraModifiers} · ${CurrencyFormatter.fromMinor(modifier.extraPriceMinor)}',
+          '${_labelForType(modifier.type)} · ${CurrencyFormatter.fromMinor(modifier.extraPriceMinor)}',
         ),
         trailing: Wrap(
           spacing: AppSizes.spacingSm,
@@ -210,7 +222,7 @@ class _ModifierTile extends ConsumerWidget {
                     },
             ),
             OutlinedButton(
-              onPressed: isSaving ? null : onEdit,
+              onPressed: isSaving || !modifier.isLegacyFlat ? null : onEdit,
               child: Text(AppStrings.edit),
             ),
           ],
@@ -277,15 +289,11 @@ class _ModifierDialogState extends State<_ModifierDialog> {
             DropdownButtonFormField<ModifierType>(
               value: _type,
               decoration: InputDecoration(labelText: AppStrings.typeLabel),
-              items: ModifierType.values
+              items: ProductModifier.legacyFlatTypes
                   .map(
                     (ModifierType type) => DropdownMenuItem<ModifierType>(
                       value: type,
-                      child: Text(
-                        type == ModifierType.included
-                            ? AppStrings.includedModifiers
-                            : AppStrings.extraModifiers,
-                      ),
+                      child: Text(_labelForType(type)),
                     ),
                   )
                   .toList(growable: false),
@@ -325,9 +333,9 @@ class _ModifierDialogState extends State<_ModifierDialog> {
               _ModifierFormResult(
                 name: _nameController.text,
                 type: _type,
-                extraPriceMinor: _type == ModifierType.included
-                    ? 0
-                    : int.tryParse(_priceController.text) ?? -1,
+                extraPriceMinor: _type == ModifierType.extra
+                    ? int.tryParse(_priceController.text) ?? -1
+                    : 0,
                 isActive: _isActive,
               ),
             );
@@ -336,6 +344,17 @@ class _ModifierDialogState extends State<_ModifierDialog> {
         ),
       ],
     );
+  }
+}
+
+String _labelForType(ModifierType type) {
+  switch (type) {
+    case ModifierType.included:
+      return AppStrings.includedModifiers;
+    case ModifierType.extra:
+      return AppStrings.extraModifiers;
+    case ModifierType.choice:
+      return 'Set Choice (use Set Builder)';
   }
 }
 

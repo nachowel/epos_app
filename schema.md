@@ -1,451 +1,655 @@
-# EPOS Veritabanı Şeması — Drift (SQLite) Referans Belgesi
-
-> **Bu belge `CLAUDE.md` ile birebir uyumlu tek kaynak doğruluğudur.**
-> Bir geliştirici sadece bunu okuyarak `app_database.dart` dosyasını doğru yazabilmelidir.
+# EPOS Veritabanı Şeması — Human-Readable Summary (Authority Aligned)
 
 ---
 
-## Genel Kurallar
+## Authority Note
 
-### Proje Kapsamı
-- Tek lokasyon, küçük kafe/restoran.
-- Aynı anda yalnızca bir aktif shift vardır.
-- Gün içinde birden fazla kullanıcı login olabilir.
-- Tek Bluetooth ESC/POS yazıcı vardır.
-- Split payment YOK. Kısmi ödeme YOK.
-- Ayrı order type alanı YOK. `table_number` nullable: null = masa atanmamış sipariş.
-- Modifier group yapısı YOK. Düz modifier modeli.
-- Tax/VAT/discount/service charge YOK. Gerekirse migration ile eklenir.
+This document is a **human-readable schema summary** and **legacy/current reference baseline**.
 
-### Primary Key Stratejisi
-- Tüm tabloların primary key'i `INTEGER autoIncrement`.
-- FK ilişkileri INTEGER ID üzerinden kurulur.
-- Sync edilecek tablolarda ek `uuid TEXT UNIQUE NOT NULL` alanı bulunur.
-- Bu uuid kayıt oluşturulduğunda UUID v4 ile doldurulur.
-- Supabase'e uuid üzerinden UPSERT yapılır. Local integer ID gönderilmez.
+It is NOT the highest authority.
 
-### Para Birimi Kuralı — KRİTİK
-**Tüm para alanları INTEGER olarak minor units (kuruş/pence) cinsinden tutulur.**
+### 🔴 Always follow:
 
-```text
-£12.50 → 1250
-£0.00  → 0
-£1.00  → 100
-```
+1. `SYSTEM_OF_TRUTH.md`
+2. `lib/data/database/app_database.dart`
+3. `lib/data/database/migrations/*`
+4. breakfast/menu-engine contract chain:
+   * `docs/menu_product_role_contract.md`
+   * `docs/set_breakfast_configuration_contract.md`
+   * `docs/choice_group_mapping_contract.md`
+   * `docs/menu_eligibility_enforcement_contract.md`
+   * `docs/breakfast_domain_engine_contract.md`
+   * `docs/breakfast_persistence_schema_hardening_contract.md`
+   * `docs/breakfast_repository_service_integration_contract.md`
+5. `CLAUDE.md`
+6. `schema.md`
 
-- `REAL` / `double` / `float` para alanı için YASAKTIR.
-- Binary floating point sapması (`0.1 + 0.2 != 0.3`) raporları, toplam kontrollerini ve ödeme eşleştirmesini bozar.
-- UI'da gösterim için `currency_formatter.dart` kullanılır: `1250 → £12.50`.
+### Critical rule:
 
-### Text Enum Kuralı
-Tüm sınırlı değerli text alanları CHECK constraint ile korunur.  
-Drift'te `customConstraint` kullanılır.
+If this file conflicts with:
+
+* live schema
+* migration files
+* breakfast/menu-engine contracts
+
+👉 **THIS FILE IS WRONG → update it later**
 
 ---
 
-## Tablolar (12 Adet)
+## 📌 Purpose of this file
+
+This document exists to:
+
+* explain the database structure in plain language
+* give quick reference for tables and relationships
+* help developers understand the system
+
+It does NOT:
+
+* define final business rules
+* override domain contracts
+* guarantee full alignment with live schema without checking higher authority
+
+---
+
+## 🧠 SYSTEM MODEL OVERVIEW
+
+### Core design:
+
+* Local Drift/SQLite database = **operational source of truth for live EPOS data**
+* Supabase = **mirror/reporting only**
+* Business logic = **domain layer**
+* UI = **representation only**
+
+---
+
+## ⚠️ LEGACY vs CURRENT MODEL
+
+### Legacy baseline (historical only)
+
+* flat `product_modifiers`
+* `included / extra`
+* simple remove/add interpretation
+* older transaction language such as `open`
+
+### Current system (active live direction)
+
+* set engine
+* `set_items`
+* `modifier_groups`
+* semantic `order_modifiers`
+* choice / swap / extra separation
+* transaction statuses `draft / sent / paid / cancelled`
+
+👉 Legacy baseline sections below are historical context only
+👉 Only the current live model should be used for implementation
+
+---
+
+# 🗄 TABLE SUMMARY (CURRENT LIVE SCHEMA WITH LEGACY BASELINE NOTES)
+
+## Core operational tables
+
+---
 
 ### 1. users
 
-Admin ve cashier kullanıcıları.
+Stores system users.
 
-| Kolon | Tip | Constraint | Açıklama |
-|-------|-----|-----------|----------|
-| id | INTEGER | PK autoIncrement | |
-| name | TEXT | NOT NULL | |
-| pin | TEXT | nullable | Tüm operasyonel kullanıcılar PIN ile giriş yapar. Uygulama katmanında hashlenip yazılır. |
-| password | TEXT | nullable | Ayrı admin şifre akışı için rezerv alan; aktif operasyon girişi PIN ile yapılır. |
-| role | TEXT | NOT NULL, CHECK (role IN ('admin','cashier')) | |
-| is_active | BOOLEAN | DEFAULT true | |
-| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | |
-
-**Not:** `pin` ve `password` DB'de yalnızca hashlenmiş tutulur.
-
-**UUID:** Yok. Sync edilmeyen yerel sistem tablosu.
+```text id="p3b4rm"
+id
+name
+pin
+password
+role (admin | cashier)
+is_active
+created_at
+```
 
 ---
 
 ### 2. categories
 
-Ürün kategorileri.
+Product grouping plus removal-discount configuration.
 
-| Kolon | Tip | Constraint | Açıklama |
-|-------|-----|-----------|----------|
-| id | INTEGER | PK autoIncrement | |
-| name | TEXT | NOT NULL | |
-| image_url | TEXT | nullable | Supabase Storage URL |
-| sort_order | INTEGER | DEFAULT 0 | |
-| is_active | BOOLEAN | DEFAULT true | |
-
-**UUID:** Yok.
+```text id="f87hiy"
+id
+name
+image_url
+sort_order
+is_active
+removal_discount_1_minor
+removal_discount_2_minor
+```
 
 ---
 
 ### 3. products
 
-Satılabilir ürünler.
+Sellable catalog items.
 
-| Kolon | Tip | Constraint | Açıklama |
-|-------|-----|-----------|----------|
-| id | INTEGER | PK autoIncrement | |
-| category_id | INTEGER | NOT NULL, FK → categories.id | |
-| name | TEXT | NOT NULL | |
-| price_minor | INTEGER | NOT NULL, CHECK (price_minor >= 0) | Fiyat (pence). £8.50 → 850 |
-| image_url | TEXT | nullable | |
-| has_modifiers | BOOLEAN | DEFAULT false | |
-| is_active | BOOLEAN | DEFAULT true | |
-| sort_order | INTEGER | DEFAULT 0 | |
-
-**UUID:** Yok.
+```text id="mz3v3y"
+id
+category_id
+name
+price_minor
+image_url
+has_modifiers
+is_active
+is_visible_on_pos
+sort_order
+```
 
 ---
 
 ### 4. product_modifiers
 
-Ürüne bağlı düz modifier seçenekleri.
+Legacy baseline (historical interpretation only):
 
-| Kolon | Tip | Constraint | Açıklama |
-|-------|-----|-----------|----------|
-| id | INTEGER | PK autoIncrement | |
-| product_id | INTEGER | NOT NULL, FK → products.id | |
-| name | TEXT | NOT NULL | |
-| type | TEXT | NOT NULL, CHECK (type IN ('included','extra')) | |
-| extra_price_minor | INTEGER | DEFAULT 0, CHECK (extra_price_minor >= 0) | |
-| is_active | BOOLEAN | DEFAULT true | |
+```text id="zwr2hz"
+included
+extra
+```
 
-**UUID:** Yok.
+### Current live schema:
+
+```text id="yz8r4g"
+product_id
+group_id (nullable)
+item_product_id (nullable for non-choice, required for choice)
+name
+type (included | extra | choice)
+extra_price_minor
+is_active
+```
+
+Notes:
+
+* `type = 'choice'` members must reference real catalog products through `item_product_id`
+* breakfast choice members are owned through `modifier_groups`, not duplicated products
+* legacy flat interpretation is baseline only; the current live table shape is authoritative here
 
 ---
 
 ### 5. shifts
 
-Günlük operasyon kaydı.
-
-| Kolon | Tip | Constraint | Açıklama |
-|-------|-----|-----------|----------|
-| id | INTEGER | PK autoIncrement | |
-| opened_by | INTEGER | NOT NULL, FK → users.id | İlk başarılı login ile açan kullanıcı |
-| opened_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | |
-| closed_by | INTEGER | nullable, FK → users.id | Final close yapan admin |
-| closed_at | DATETIME | nullable | |
-| cashier_previewed_at | DATETIME | nullable | Cashier masked EOD zamanı |
-| cashier_previewed_by | INTEGER | nullable, FK → users.id | Cashier masked EOD alan kullanıcı |
-| status | TEXT | DEFAULT 'open', CHECK (status IN ('open','closed')) | |
-
-**Kritik Kurallar:**
-- Aynı anda SADECE BİR shift açık olabilir.
-- Aktif shift yoksa ilk başarılı login (admin veya cashier) shift açar.
-- Cashier preview alanları gerçek lifecycle state değildir; operasyonel preview flag'idir.
-- Gerçek shift kapanışı sadece admin final close ile olur.
-
-**UUID:** Yok.
+```text id="l7b03n"
+id
+opened_by
+opened_at
+closed_by
+closed_at
+cashier_previewed_by
+cashier_previewed_at
+status (open | closed)
+```
 
 ---
 
 ### 6. transactions
 
-Her sipariş kaydı. State machine: OPEN → PAID | CANCELLED.
+```text id="48cd3v"
+id
+uuid
+shift_id
+user_id
+table_number
+status (draft | sent | paid | cancelled)
+subtotal_minor
+modifier_total_minor
+total_amount_minor
+created_at
+paid_at
+updated_at
+cancelled_at
+cancelled_by
+idempotency_key
+kitchen_printed
+receipt_printed
+```
 
-| Kolon | Tip | Constraint | Açıklama |
-|-------|-----|-----------|----------|
-| id | INTEGER | PK autoIncrement | |
-| uuid | TEXT | UNIQUE NOT NULL | |
-| shift_id | INTEGER | NOT NULL, FK → shifts.id | Aktif shift'in ID'si |
-| user_id | INTEGER | NOT NULL, FK → users.id | Siparişi oluşturan kullanıcı |
-| table_number | INTEGER | nullable | Sipariş anında boş olabilir, sonradan eklenebilir |
-| status | TEXT | DEFAULT 'open', CHECK (status IN ('open','paid','cancelled')) | |
-| subtotal_minor | INTEGER | DEFAULT 0, CHECK (subtotal_minor >= 0) | Ürün satır toplamları (pence) |
-| modifier_total_minor | INTEGER | DEFAULT 0, CHECK (modifier_total_minor >= 0) | Modifier toplamı (pence) |
-| total_amount_minor | INTEGER | DEFAULT 0, CHECK (total_amount_minor >= 0) | Son toplam (pence) |
-| created_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | |
-| paid_at | DATETIME | nullable | |
-| updated_at | DATETIME | NOT NULL | |
-| cancelled_at | DATETIME | nullable | |
-| cancelled_by | INTEGER | nullable, FK → users.id | |
-| idempotency_key | TEXT | UNIQUE NOT NULL | |
-| kitchen_printed | BOOLEAN | DEFAULT false | |
-| receipt_printed | BOOLEAN | DEFAULT false | |
+### Current live status contract
 
-**Kurallar:**
-- `subtotal_minor`, `modifier_total_minor`, `total_amount_minor` snapshot'tır.
-- Sipariş finalize edilirken `order_service.dart` tarafından tek noktadan hesaplanır.
-- `table_number` nullable'dır; masa sipariş anında belli olmayabilir.
+```text id="c2r5sk"
+draft / sent / paid / cancelled
+```
 
-**UUID:** Var.
+Legacy baseline note:
+
+* older `open` wording is legacy / migration compatibility language
+* current live schema contract is `draft / sent / paid / cancelled`
 
 ---
 
 ### 7. transaction_lines
 
-Sipariş kalemleri.
-
-| Kolon | Tip | Constraint | Açıklama |
-|-------|-----|-----------|----------|
-| id | INTEGER | PK autoIncrement | |
-| uuid | TEXT | UNIQUE NOT NULL | |
-| transaction_id | INTEGER | NOT NULL, FK → transactions.id | |
-| product_id | INTEGER | NOT NULL, FK → products.id | |
-| product_name | TEXT | NOT NULL | Snapshot |
-| unit_price_minor | INTEGER | NOT NULL, CHECK (unit_price_minor >= 0) | Snapshot |
-| quantity | INTEGER | DEFAULT 1, CHECK (quantity > 0) | |
-| line_total_minor | INTEGER | NOT NULL, CHECK (line_total_minor >= 0) | `unit_price_minor * quantity + modifier extra'lar` |
-
-**UUID:** Var.
+```text id="2u7q2g"
+id
+uuid
+transaction_id
+product_id
+product_name
+unit_price_minor
+quantity
+line_total_minor
+pricing_mode (standard | set)
+removal_discount_total_minor
+```
 
 ---
 
-### 8. order_modifiers
+### 8. order_modifiers (CRITICAL TABLE)
 
-Sipariş modifier snapshot'ları.
+Legacy baseline (historical interpretation only):
 
-| Kolon | Tip | Constraint | Açıklama |
-|-------|-----|-----------|----------|
-| id | INTEGER | PK autoIncrement | |
-| uuid | TEXT | UNIQUE NOT NULL | |
-| transaction_line_id | INTEGER | NOT NULL, FK → transaction_lines.id | |
-| action | TEXT | NOT NULL, CHECK (action IN ('remove','add')) | |
-| item_name | TEXT | NOT NULL | Snapshot |
-| extra_price_minor | INTEGER | DEFAULT 0, CHECK (extra_price_minor >= 0) | Snapshot |
+```text id="o9d6il"
+action (remove | add)
+item_name
+extra_price_minor
+```
 
-**UUID:** Var.
+### Current live schema:
+
+```text id="svffhu"
+action (remove | add | choice)
+charge_reason (
+  null |
+  extra_add |
+  free_swap |
+  paid_swap |
+  included_choice |
+  removal_discount
+)
+item_product_id
+source_group_id
+quantity
+extra_price_minor
+unit_price_minor
+price_effect_minor
+sort_key
+```
+
+Notes:
+
+* `action = 'choice'` requires `charge_reason = 'included_choice'`
+* this table is semantic snapshot persistence, not cosmetic modifier text
+* breakfast contract semantics use the contract-defined subset; `removal_discount` remains live-schema-compatible
 
 ---
 
 ### 9. payments
 
-Ödeme kaydı. Transaction başına TAM OLARAK BİR payment.
-
-| Kolon | Tip | Constraint | Açıklama |
-|-------|-----|-----------|----------|
-| id | INTEGER | PK autoIncrement | |
-| uuid | TEXT | UNIQUE NOT NULL | |
-| transaction_id | INTEGER | UNIQUE NOT NULL, FK → transactions.id | |
-| method | TEXT | NOT NULL, CHECK (method IN ('cash','card')) | |
-| amount_minor | INTEGER | NOT NULL, CHECK (amount_minor > 0) | |
-| paid_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | |
-
-**Kurallar:**
-- `payments.amount_minor == transactions.total_amount_minor`
-- `transaction.status != OPEN` ise payment INSERT reddedilir
-- Payment + PAID transition aynı DB transaction içinde gerçekleşir
-
-**UUID:** Var.
-
----
-
-### 10. report_settings
-
-Cashier-visible Z report projection ayarı.
-
-| Kolon | Tip | Constraint | Açıklama |
-|-------|-----|-----------|----------|
-| id | INTEGER | PK autoIncrement | |
-| cashier_report_mode | TEXT | NOT NULL, DEFAULT 'percentage', CHECK (cashier_report_mode IN ('percentage','cap_amount')) | Cashier projection modu |
-| visibility_ratio | REAL | DEFAULT 1.0, CHECK (visibility_ratio >= 0.0 AND visibility_ratio <= 1.0) | `percentage` modunda görünür oran |
-| max_visible_total_minor | INTEGER | nullable, CHECK (max_visible_total_minor IS NULL OR max_visible_total_minor >= 0) | `cap_amount` modunda görünür üst toplam |
-| business_name | TEXT | nullable | Rapor başlığında gösterilecek işletme adı |
-| business_address | TEXT | nullable | Rapor başlığında gösterilecek işletme adresi |
-| updated_by | INTEGER | nullable, FK → users.id | |
-| updated_at | DATETIME | DEFAULT CURRENT_TIMESTAMP | |
-
-**Kullanım:**
-- Admin gerçek raporu görür.
-- Cashier, admin policy'sine göre projekte edilmiş Z report görür.
-- Aynı projection policy payment breakdown ve category breakdown için de kullanılır.
-- Presentation katmanında projection hesaplaması yapılmaz.
-
-**UUID:** Yok.
-
----
-
-### Cashier Z Report Projection Rules
-
-- Cashier Z report gerçek Z report iskeletine benzeyebilir; bu güvenlik ihlali değildir.
-- İşletme adı, adres, tarih, saat, shift no ve operator adı gibi kimlik alanları gerçek değerlerle gösterilebilir.
-- Parasal alanlar projection policy ile üretilir.
-- Payment breakdown ve category breakdown tutarlı yeniden dağıtılmalıdır.
-- Quantity veya admin-only accounting alanları cashier görünümünde zorunlu değildir; sızıntı riski varsa gösterilmez.
-
-### 11. printer_settings
-
-Bluetooth ESC/POS printer konfigürasyonu.
-
-| Kolon | Tip | Constraint | Açıklama |
-|-------|-----|-----------|----------|
-| id | INTEGER | PK autoIncrement | |
-| device_name | TEXT | NOT NULL | |
-| device_address | TEXT | NOT NULL | |
-| paper_width | INTEGER | DEFAULT 80, CHECK (paper_width IN (58,80)) | |
-| is_active | BOOLEAN | DEFAULT true | |
-
-**UUID:** Yok.
-
----
-
-### 12. sync_queue
-
-Offline-first sync kuyruğu.
-
-| Kolon | Tip | Constraint | Açıklama |
-|-------|-----|-----------|----------|
-| id | INTEGER | PK autoIncrement | |
-| table_name | TEXT | NOT NULL, CHECK (table_name IN ('transactions','transaction_lines','order_modifiers','payments')) | |
-| record_uuid | TEXT | NOT NULL | |
-| operation | TEXT | NOT NULL, DEFAULT 'upsert', CHECK (operation IN ('upsert')) | |
-| created_at | DATETIME | NOT NULL, DEFAULT CURRENT_TIMESTAMP | |
-| status | TEXT | NOT NULL, DEFAULT 'pending', CHECK (status IN ('pending','processing','synced','failed')) | |
-| attempt_count | INTEGER | NOT NULL, DEFAULT 0 | |
-| last_attempt_at | DATETIME | nullable | |
-| synced_at | DATETIME | nullable | |
-| error_message | TEXT | nullable | |
-
-**Kurallar:**
-- OPEN transaction'lar sync edilmez.
-- PAID ve CANCELLED transaction'lar sync edilir.
-
-**UUID:** Yok.
-
----
-
-## UUID Özeti
-
-| Tablo | UUID | Sync |
-|-------|------|------|
-| users | ❌ | ❌ |
-| categories | ❌ | ❌ |
-| products | ❌ | ❌ |
-| product_modifiers | ❌ | ❌ |
-| shifts | ❌ | ❌ |
-| transactions | ✅ | ✅ |
-| transaction_lines | ✅ | ✅ |
-| order_modifiers | ✅ | ✅ |
-| payments | ✅ | ✅ |
-| report_settings | ❌ | ❌ |
-| printer_settings | ❌ | ❌ |
-| sync_queue | ❌ | ❌ |
-
----
-
-## Index'ler
-
-```text
-idx_products_category       → products(category_id, is_active, sort_order)
-idx_product_modifiers_prod  → product_modifiers(product_id, is_active)
-idx_transactions_shift      → transactions(shift_id, status, created_at)
-idx_transactions_user       → transactions(user_id, created_at)
-idx_transaction_lines_tx    → transaction_lines(transaction_id)
-idx_order_modifiers_line    → order_modifiers(transaction_line_id)
-idx_payments_tx             → payments(transaction_id)
-idx_shifts_status           → shifts(status, opened_at)
-idx_sync_queue_status       → sync_queue(status, created_at)
+```text id="8jljj9"
+id
+uuid
+transaction_id (UNIQUE)
+method (cash | card)
+amount_minor
+paid_at
 ```
 
 ---
 
-## CHECK Constraint Özeti
+### 10. payment_adjustments
 
-```sql
--- users
-CHECK (role IN ('admin','cashier'))
-
--- products
-CHECK (price_minor >= 0)
-
--- product_modifiers
-CHECK (type IN ('included','extra'))
-CHECK (extra_price_minor >= 0)
-
--- shifts
-CHECK (status IN ('open','closed'))
-
--- transactions
-CHECK (status IN ('open','paid','cancelled'))
-CHECK (subtotal_minor >= 0)
-CHECK (modifier_total_minor >= 0)
-CHECK (total_amount_minor >= 0)
-
--- transaction_lines
-CHECK (unit_price_minor >= 0)
-CHECK (quantity > 0)
-CHECK (line_total_minor >= 0)
-
--- order_modifiers
-CHECK (action IN ('remove','add'))
-CHECK (extra_price_minor >= 0)
-
--- payments
-CHECK (method IN ('cash','card'))
-CHECK (amount_minor > 0)
-
--- report_settings
-CHECK (cashier_report_mode IN ('percentage','cap_amount'))
-CHECK (visibility_ratio >= 0.0 AND visibility_ratio <= 1.0)
-CHECK (max_visible_total_minor IS NULL OR max_visible_total_minor >= 0)
-
--- printer_settings
-CHECK (paper_width IN (58,80))
-
--- sync_queue
-CHECK (table_name IN ('transactions','transaction_lines','order_modifiers','payments'))
-CHECK (operation IN ('upsert'))
-CHECK (status IN ('pending','processing','synced','failed'))
+```text id="pm8j21"
+id
+uuid
+payment_id (UNIQUE)
+transaction_id
+type (refund | reversal)
+status (completed)
+amount_minor
+reason
+created_by
+created_at
 ```
 
 ---
 
-## Drift Implementasyon Notları
+### 11. shift_reconciliations
 
-### Para alanları Drift'te nasıl yazılır:
-```dart
-IntColumn get priceMinor => integer()();
-IntColumn get totalAmountMinor => integer().withDefault(const Constant(0))();
-```
-
-### CHECK constraint Drift'te nasıl yazılır:
-```dart
-TextColumn get role => text()
-    .customConstraint("NOT NULL CHECK (role IN ('admin','cashier'))")();
-
-TextColumn get status => text()
-    .withDefault(const Constant('open'))
-    .customConstraint("NOT NULL CHECK (status IN ('open','paid','cancelled'))")();
-
-IntColumn get totalAmountMinor => integer()
-    .withDefault(const Constant(0))
-    .customConstraint('NOT NULL CHECK (total_amount_minor >= 0)')();
-```
-
-### UNIQUE alanlar:
-```text
-transactions.uuid            → UNIQUE NOT NULL
-transactions.idempotency_key → UNIQUE NOT NULL
-transaction_lines.uuid       → UNIQUE NOT NULL
-order_modifiers.uuid         → UNIQUE NOT NULL
-payments.uuid                → UNIQUE NOT NULL
-payments.transaction_id      → UNIQUE NOT NULL
+```text id="sr7f0m"
+id
+uuid
+shift_id
+kind (final_close)
+expected_cash_minor
+counted_cash_minor
+variance_minor
+counted_cash_source
+counted_by
+counted_at
 ```
 
 ---
 
-## Kapsam Dışı — BİLİNÇLİ OLARAK DAHİL EDİLMEDİ
+### 12. cash_movements
 
-- `partially_paid` durumu
-- Çoklu payment akışı
-- Order type / takeaway / delivery ayrımı
-- Modifier group yapısı
-- Çoklu printer mimarisi
-- Tax / VAT / discount / service charge
-- Payment'ta `status`, `reference`, `provider`
-- Müşteri adı alanı (open orders için bilinçli olarak kullanılmaz)
+```text id="cm1d5n"
+id
+shift_id
+type (income | expense)
+category
+amount_minor
+payment_method (cash | card | other)
+note
+created_by_user_id
+created_at
+```
 
 ---
 
-## Schema Değişiklik Prosedürü
+### 13. audit_logs
 
-```text
-1. Migration planı çıkar: tablo, alan, constraint, mevcut veriye etki.
-2. Destructive değişikliklerde explicit onay al.
-3. schemaVersion artırma + migration dosyası oluşturma TEK ADIMDA.
-4. Migration'da hem UP hem rollback stratejisi belirt.
-5. app_database.dart güncellemesi migration dosyasından SONRA.
+```text id="al4t2v"
+id
+actor_user_id
+action
+entity_type
+entity_id
+metadata_json
+created_at
 ```
+
+---
+
+### 14. print_jobs
+
+```text id="pj6w8q"
+id
+transaction_id
+target (kitchen | receipt)
+status (pending | printing | printed | failed)
+created_at
+updated_at
+attempt_count
+last_attempt_at
+completed_at
+last_error
+```
+
+---
+
+### 15. report_settings
+
+```text id="kqgm3g"
+id
+cashier_report_mode
+visibility_ratio
+max_visible_total_minor
+business_name
+business_address
+updated_by
+updated_at
+```
+
+---
+
+### 16. printer_settings
+
+```text id="p4qntj"
+id
+device_name
+device_address
+paper_width
+is_active
+```
+
+---
+
+### 17. sync_queue
+
+```text id="b2qrrc"
+id
+table_name
+record_uuid
+operation
+created_at
+status
+attempt_count
+last_attempt_at
+synced_at
+error_message
+```
+
+---
+
+# 🧩 MENU ENGINE EXTENSIONS (CURRENT LIVE TABLES)
+
+These are current live schema concepts. Their business meaning follows the breakfast/menu-engine contract chain above.
+
+---
+
+## 1. set_items
+
+Defines removable default set contents.
+
+```text id="8q9d4c"
+product_id (set root)
+item_product_id (real component product)
+default_quantity
+is_removable
+sort_order
+```
+
+Notes:
+
+* only set-root products should own `set_items`
+* `set_items` represent removable components
+* choice-capable products must not be modeled here
+
+---
+
+## 2. modifier_groups
+
+Defines included choice groups for a set root.
+
+```text id="g9u5r0"
+product_id
+name
+min_select
+max_select
+included_quantity
+sort_order
+```
+
+Notes:
+
+* only set-root products should own breakfast `modifier_groups`
+* breakfast contracts require the `Tea or Coffee` and `Toast or Bread` group pattern for breakfast set roots
+* those group names are contract-level configuration examples, not a replacement for live menu data
+
+---
+
+## 3. menu_settings
+
+```text id="7m8dcv"
+free_swap_limit
+max_swaps
+updated_by
+updated_at
+```
+
+Note:
+
+* `max_swaps` exists in the schema but is NOT part of the active breakfast domain rule set
+* it must NOT be used in pricing or classification logic
+* current rule:
+  - first `free_swap_limit` replacements → `free_swap`
+  - all subsequent replacements → `paid_swap`
+* introducing a hard swap cap requires a new explicit contract and must not be inferred from schema residue
+
+---
+
+# 🍳 MENU ENGINE BEHAVIOR SUMMARY
+
+### Role summary
+
+* set-root products are normal sellable products that may own `set_items` and `modifier_groups`
+* set component products are removable and swap-eligible
+* choice-capable products are real products referenced through `product_modifiers(type = 'choice')`
+* choice-capable products may become `extra_add` but never swap replacements
+
+---
+
+### Modifier classification
+
+| Type            | Description                              |
+| --------------- | ---------------------------------------- |
+| remove          | removing default set item                |
+| included_choice | included choice within group allowance   |
+| free_swap       | matched replacement within free limit    |
+| paid_swap       | matched replacement after free limit     |
+| extra_add       | direct extra or choice overflow          |
+
+Live schema compatibility note:
+
+* `removal_discount` exists in the schema for future or category-based discount features
+* it is NOT part of the active breakfast domain-engine pricing flow
+* do not classify breakfast modifiers using `removal_discount` unless explicitly defined by a future contract
+
+---
+
+### Swap logic
+
+```text id="u1g8is"
+removed set-item units + eligible direct add units = swap matching
+```
+
+Rules:
+
+* pending replacement units come only from removed `set_items`
+* only eligible direct non-choice additions may consume that pool
+* first `free_swap_limit` matched units → `free_swap`
+* later matched units → `paid_swap`
+* choice-capable products never consume the swap pool
+
+Critical invariant:
+
+* choice-capable products MUST NEVER consume pending replacement units
+* violating this rule breaks swap accounting and pricing determinism
+
+---
+
+### Choice logic
+
+* choice groups are defined by `modifier_groups`
+* choice members are defined by `product_modifiers(type = 'choice')`
+* `item_product_id` is the real product identity
+* choice does NOT consume swap pool
+* choice can overflow → `extra_add`
+
+---
+
+### Extra logic
+
+* direct add with no eligible pending replacement → `extra_add`
+* choice overflow → `extra_add`
+
+---
+
+# 💰 MONEY RULE (CRITICAL)
+
+All money stored as INTEGER (minor units):
+
+```text id="3zhlxg"
+£12.50 → 1250
+```
+
+NEVER use float/double.
+
+---
+
+# 🔁 SYNC MODEL
+
+### Phase 1 synced tables:
+
+```text id="vsz70r"
+transactions
+transaction_lines
+order_modifiers
+payments
+```
+
+### Current local-only tables in this phase:
+
+* users
+* categories
+* products
+* menu_settings
+* set_items
+* modifier_groups
+* product_modifiers
+* shifts
+* payment_adjustments
+* shift_reconciliations
+* cash_movements
+* audit_logs
+* print_jobs
+* report_settings
+* printer_settings
+* sync_queue
+
+---
+
+### Rules:
+
+* Supabase receives mirror snapshots only
+* local Drift/SQLite remains the operational authority
+* only terminal transaction states sync: `paid`, `cancelled`
+* local editable states such as `draft` and `sent` stay local
+* local DB is never overwritten by mirror sync
+* `sync_queue_root_graph_snapshots` is a local checksum helper, not a remote authority
+
+---
+
+# ⚠️ IMPORTANT LIMITATIONS
+
+This file does NOT define:
+
+* pricing engine logic
+* swap algorithm details beyond summary
+* rebuild algorithm implementation
+* UI behavior
+
+👉 Those belong to higher-authority contract docs
+
+---
+
+# 🧠 FINAL MENTAL MODEL
+
+* Tables store facts
+* Domain decides meaning
+* Contracts define breakfast/menu-engine rules
+* UI displays result
+
+---
+
+## ✅ SUMMARY
+
+This file is:
+
+✔ readable
+✔ structured
+✔ useful
+
+But NOT:
+
+❌ final authority
+❌ complete truth
+❌ safe alone for implementation
+
+---
+
+## 🔴 FINAL RULE
+
+If unsure:
+
+```text id="6t3j9u"
+Follow SYSTEM_OF_TRUTH.md
+```
+
+---
+
+**End of file**

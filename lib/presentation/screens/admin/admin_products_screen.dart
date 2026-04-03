@@ -7,12 +7,27 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../domain/models/category.dart';
 import '../../../domain/models/product.dart';
+import '../../../domain/models/semantic_product_configuration.dart';
+import '../../../domain/services/admin_service.dart';
 import '../../providers/admin_products_provider.dart';
 import 'widgets/admin_scaffold.dart';
+import 'widgets/semantic_product_configuration_dialog.dart';
 
 const String _visibleOnPosLabel = 'Visible on POS';
 const String _hiddenOnPosLabel = 'Hidden on POS';
-const String _inactiveLabel = 'Inactive';
+const String _archivedLabel = 'Archived';
+const String _configureSemanticLabel = 'Set Builder';
+const String _roleLabel = 'Type';
+const String _semanticConfigSavedLabel = 'Set configuration saved.';
+const String _deleteProductTitle = 'Delete product?';
+const String _deleteProductMessage =
+    'Are you sure you want to delete this product?';
+const String _productDeletedMessage = 'Product deleted.';
+const String _setDeletedMessage = 'Set product deleted.';
+const String _productArchivedOnDeleteMessage =
+    'Product cannot be deleted because it exists in past orders. It has been archived instead.';
+const String _setArchivedOnDeleteMessage =
+    'This set exists in past orders. It has been archived instead.';
 
 class AdminProductsScreen extends ConsumerStatefulWidget {
   const AdminProductsScreen({super.key});
@@ -23,6 +38,8 @@ class AdminProductsScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
+  bool _pendingCategorySelectionRepair = false;
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +51,13 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(adminProductsNotifierProvider);
+    final int? safeSelectedCategoryId = _ensureValidSelection<int>(
+      current: state.selectedCategoryId,
+      items: state.categories.map((Category category) => category.id),
+    );
+    if (safeSelectedCategoryId != state.selectedCategoryId) {
+      _scheduleCategorySelectionRepair();
+    }
 
     return AdminScaffold(
       title: AppStrings.productManagementTitle,
@@ -44,7 +68,8 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
             children: <Widget>[
               Expanded(
                 child: DropdownButtonFormField<int?>(
-                  value: state.selectedCategoryId,
+                  key: const ValueKey<String>('product-category-filter'),
+                  value: safeSelectedCategoryId,
                   decoration: InputDecoration(
                     labelText: AppStrings.categoryFilterLabel,
                     filled: true,
@@ -81,6 +106,45 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
             ],
           ),
           const SizedBox(height: AppSizes.spacingMd),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: AppSizes.spacingSm,
+              children: <Widget>[
+                _StatusFilterChip(
+                  key: const ValueKey<String>('product-filter-active'),
+                  label: 'Active',
+                  selected:
+                      state.selectedStatusFilter ==
+                      AdminProductStatusFilter.active,
+                  onSelected: () => ref
+                      .read(adminProductsNotifierProvider.notifier)
+                      .selectStatusFilter(AdminProductStatusFilter.active),
+                ),
+                _StatusFilterChip(
+                  key: const ValueKey<String>('product-filter-archived'),
+                  label: 'Archived',
+                  selected:
+                      state.selectedStatusFilter ==
+                      AdminProductStatusFilter.archived,
+                  onSelected: () => ref
+                      .read(adminProductsNotifierProvider.notifier)
+                      .selectStatusFilter(AdminProductStatusFilter.archived),
+                ),
+                _StatusFilterChip(
+                  key: const ValueKey<String>('product-filter-all'),
+                  label: 'All',
+                  selected:
+                      state.selectedStatusFilter ==
+                      AdminProductStatusFilter.all,
+                  onSelected: () => ref
+                      .read(adminProductsNotifierProvider.notifier)
+                      .selectStatusFilter(AdminProductStatusFilter.all),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSizes.spacingMd),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () =>
@@ -103,19 +167,79 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                     )
                   else if (state.products.isEmpty)
                     _EmptyState(message: AppStrings.noProductsForSelection)
-                  else
-                    ...state.products.map(
-                      (Product product) => _ProductTile(
-                        product: product,
-                        categories: state.categories,
-                        isSaving: state.isSaving,
-                        onEdit: () => _openProductDialog(
-                          context,
-                          categories: state.categories,
-                          product: product,
-                        ),
-                      ),
+                  else ...<Widget>[
+                    _ProductSection(
+                      key: const ValueKey<String>('set-products-section'),
+                      title: 'Set Products',
+                      emptyMessage: 'No set products',
+                      children: state.setProducts
+                          .map(
+                            (Product product) => _ProductTile(
+                              product: product,
+                              profile:
+                                  state.profiles[product.id] ??
+                                  ProductMenuConfigurationProfile(
+                                    productId: product.id,
+                                    flatModifierCount: 0,
+                                    setItemCount: 0,
+                                    choiceGroupCount: 0,
+                                    choiceMemberCount: 0,
+                                  ),
+                              categories: state.categories,
+                              isSaving: state.isSaving,
+                              showSetBuilder: true,
+                              onEdit: () => _openProductDialog(
+                                context,
+                                categories: state.categories,
+                                product: product,
+                              ),
+                              onConfigureSemantic: () =>
+                                  _openSemanticConfigurationDialog(
+                                    context,
+                                    productId: product.id,
+                                  ),
+                              onDelete: () => _confirmDeleteProduct(product),
+                            ),
+                          )
+                          .toList(growable: false),
                     ),
+                    const SizedBox(height: AppSizes.spacingLg),
+                    _ProductSection(
+                      key: const ValueKey<String>('normal-products-section'),
+                      title: 'Items',
+                      emptyMessage: 'No items',
+                      children: state.normalProducts
+                          .map(
+                            (Product product) => _ProductTile(
+                              product: product,
+                              profile:
+                                  state.profiles[product.id] ??
+                                  ProductMenuConfigurationProfile(
+                                    productId: product.id,
+                                    flatModifierCount: 0,
+                                    setItemCount: 0,
+                                    choiceGroupCount: 0,
+                                    choiceMemberCount: 0,
+                                  ),
+                              categories: state.categories,
+                              isSaving: state.isSaving,
+                              showSetBuilder: false,
+                              onEdit: () => _openProductDialog(
+                                context,
+                                categories: state.categories,
+                                product: product,
+                              ),
+                              onConfigureSemantic: () =>
+                                  _openSemanticConfigurationDialog(
+                                    context,
+                                    productId: product.id,
+                                  ),
+                              onDelete: () => _confirmDeleteProduct(product),
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -123,6 +247,30 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
         ],
       ),
     );
+  }
+
+  void _scheduleCategorySelectionRepair() {
+    if (_pendingCategorySelectionRepair) {
+      return;
+    }
+    _pendingCategorySelectionRepair = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _pendingCategorySelectionRepair = false;
+      if (!mounted) {
+        return;
+      }
+      final state = ref.read(adminProductsNotifierProvider);
+      final int? safeSelectedCategoryId = _ensureValidSelection<int>(
+        current: state.selectedCategoryId,
+        items: state.categories.map((Category category) => category.id),
+      );
+      if (safeSelectedCategoryId == state.selectedCategoryId) {
+        return;
+      }
+      await ref
+          .read(adminProductsNotifierProvider.notifier)
+          .selectCategory(safeSelectedCategoryId);
+    });
   }
 
   Future<void> _openProductDialog(
@@ -177,20 +325,162 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
       ),
     );
   }
+
+  Future<void> _openSemanticConfigurationDialog(
+    BuildContext context, {
+    required int productId,
+  }) async {
+    final bool? changed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) =>
+          SemanticProductConfigurationDialog(productId: productId),
+    );
+    if (changed == true) {
+      await ref.read(adminProductsNotifierProvider.notifier).load();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        this.context,
+      ).showSnackBar(const SnackBar(content: Text(_semanticConfigSavedLabel)));
+    }
+  }
+
+  Future<void> _confirmDeleteProduct(Product product) async {
+    final AdminProductsNotifier notifier = ref.read(
+      adminProductsNotifierProvider.notifier,
+    );
+    final ProductDeletionAnalysis? analysis = await notifier.analyzeDeletion(
+      id: product.id,
+    );
+    if (analysis == null) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ref.read(adminProductsNotifierProvider).errorMessage ??
+                AppStrings.operationFailed,
+          ),
+        ),
+      );
+      return;
+    }
+
+    final _DeleteDecision? decision = await showDialog<_DeleteDecision>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(_deleteDialogTitle(analysis)),
+          content: Text(_deleteDialogBody(analysis)),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(AppStrings.cancel),
+            ),
+            ElevatedButton(
+              key: ValueKey<String>('product-delete-confirm-${product.id}'),
+              onPressed: () => Navigator.of(context).pop(
+                _DeleteDecision(
+                  confirmSemanticImpact:
+                      !analysis.isSetProduct && analysis.hasSemanticReferences,
+                ),
+              ),
+              child: Text(analysis.hasHistoricalUsage ? 'Archive' : 'Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (decision == null) {
+      return;
+    }
+
+    final ProductDeleteOutcome? outcome = decision.confirmSemanticImpact
+        ? await notifier.deleteProductWithImpactAcknowledged(id: product.id)
+        : await notifier.deleteProduct(id: product.id);
+
+    if (!mounted) {
+      return;
+    }
+    final String message;
+    if (outcome == null) {
+      message =
+          ref.read(adminProductsNotifierProvider).errorMessage ??
+          AppStrings.operationFailed;
+    } else {
+      message = _deleteOutcomeMessage(analysis, outcome);
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _deleteDialogTitle(ProductDeletionAnalysis analysis) {
+    if (analysis.isSetProduct) {
+      return analysis.hasHistoricalUsage
+          ? 'Archive set product?'
+          : 'Delete this set product?';
+    }
+    if (analysis.hasHistoricalUsage) {
+      return 'Archive product?';
+    }
+    return _deleteProductTitle;
+  }
+
+  String _deleteDialogBody(ProductDeletionAnalysis analysis) {
+    if (analysis.isSetProduct) {
+      if (analysis.hasHistoricalUsage) {
+        return _setArchivedOnDeleteMessage;
+      }
+      return 'This removes the set and its builder configuration.\nIncluded items, required choices, and extras will NOT delete the master products they reference.';
+    }
+    if (analysis.hasHistoricalUsage) {
+      return _productArchivedOnDeleteMessage;
+    }
+    if (analysis.hasSemanticReferences) {
+      return 'This product is used by other set configurations. Deleting it may affect those sets.\n\nUsed in ${analysis.setConfigReferenceCount} set configurations\nUsed in ${analysis.requiredChoiceReferenceCount} required choices\nUsed in ${analysis.extrasPoolReferenceCount} extras pools';
+    }
+    return _deleteProductMessage;
+  }
+
+  String _deleteOutcomeMessage(
+    ProductDeletionAnalysis analysis,
+    ProductDeleteOutcome outcome,
+  ) {
+    return switch (outcome) {
+      ProductDeleteOutcome.deleted =>
+        analysis.isSetProduct ? _setDeletedMessage : _productDeletedMessage,
+      ProductDeleteOutcome.deactivated =>
+        analysis.isSetProduct
+            ? _setArchivedOnDeleteMessage
+            : _productArchivedOnDeleteMessage,
+    };
+  }
 }
 
 class _ProductTile extends ConsumerWidget {
   const _ProductTile({
     required this.product,
+    required this.profile,
     required this.categories,
     required this.isSaving,
+    required this.showSetBuilder,
     required this.onEdit,
+    required this.onConfigureSemantic,
+    required this.onDelete,
   });
 
   final Product product;
+  final ProductMenuConfigurationProfile profile;
   final List<Category> categories;
   final bool isSaving;
+  final bool showSetBuilder;
   final VoidCallback onEdit;
+  final VoidCallback onConfigureSemantic;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -202,93 +492,141 @@ class _ProductTile extends ConsumerWidget {
       }
     }
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSizes.spacingSm),
-      child: ListTile(
-        title: Text(
-          product.name,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(
-              '$categoryName · ${CurrencyFormatter.fromMinor(product.priceMinor)} · ${AppStrings.hasModifiersLabel}=${product.hasModifiers}',
-            ),
-            const SizedBox(height: AppSizes.spacingXs),
-            Wrap(
-              spacing: AppSizes.spacingXs,
-              runSpacing: AppSizes.spacingXs,
-              children: <Widget>[
-                _StatusChip(
-                  label: product.isActive ? AppStrings.active : _inactiveLabel,
-                  color: product.isActive
-                      ? AppColors.success
-                      : AppColors.textSecondary,
+    final bool visibleInPos = product.isActive && product.isVisibleOnPos;
+
+    return Opacity(
+      opacity: product.isActive ? 1 : 0.62,
+      child: Card(
+        key: ValueKey<String>('product-tile-${product.id}'),
+        margin: const EdgeInsets.only(bottom: AppSizes.spacingSm),
+        child: ListTile(
+          title: Text(
+            product.name,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                '$categoryName · ${CurrencyFormatter.fromMinor(product.priceMinor)} · ${AppStrings.hasModifiersLabel}=${product.hasModifiers}',
+              ),
+              const SizedBox(height: AppSizes.spacingXs),
+              Wrap(
+                spacing: AppSizes.spacingXs,
+                runSpacing: AppSizes.spacingXs,
+                children: <Widget>[
+                  _StatusChip(
+                    label: product.isActive
+                        ? AppStrings.active
+                        : _archivedLabel,
+                    color: product.isActive
+                        ? AppColors.success
+                        : AppColors.textSecondary,
+                  ),
+                  _StatusChip(
+                    label: visibleInPos
+                        ? _visibleOnPosLabel
+                        : _hiddenOnPosLabel,
+                    color: visibleInPos ? AppColors.primary : AppColors.warning,
+                  ),
+                  _StatusChip(
+                    label: '$_roleLabel: ${_menuTypeLabel(profile.type)}',
+                    color: _menuTypeColor(profile.type),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          trailing: Wrap(
+            spacing: AppSizes.spacingSm,
+            runSpacing: AppSizes.spacingSm,
+            children: <Widget>[
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const Text(_visibleOnPosLabel),
+                  Switch(
+                    value: product.isVisibleOnPos,
+                    onChanged: isSaving
+                        ? null
+                        : (bool value) {
+                            ref
+                                .read(adminProductsNotifierProvider.notifier)
+                                .toggleProductVisibilityOnPos(
+                                  id: product.id,
+                                  isVisibleOnPos: value,
+                                );
+                          },
+                  ),
+                ],
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(AppStrings.active),
+                  Switch(
+                    value: product.isActive,
+                    onChanged: isSaving
+                        ? null
+                        : (bool value) {
+                            ref
+                                .read(adminProductsNotifierProvider.notifier)
+                                .toggleProductActive(
+                                  id: product.id,
+                                  isActive: value,
+                                );
+                          },
+                  ),
+                ],
+              ),
+              if (showSetBuilder)
+                OutlinedButton(
+                  key: ValueKey<String>('product-set-builder-${product.id}'),
+                  onPressed: isSaving ? null : onConfigureSemantic,
+                  child: const Text(_configureSemanticLabel),
                 ),
-                _StatusChip(
-                  label: product.isVisibleOnPos
-                      ? _visibleOnPosLabel
-                      : _hiddenOnPosLabel,
-                  color: product.isVisibleOnPos
-                      ? AppColors.primary
-                      : AppColors.warning,
-                ),
-              ],
-            ),
-          ],
-        ),
-        trailing: Wrap(
-          spacing: AppSizes.spacingSm,
-          runSpacing: AppSizes.spacingSm,
-          children: <Widget>[
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                const Text(_visibleOnPosLabel),
-                Switch(
-                  value: product.isVisibleOnPos,
-                  onChanged: isSaving
-                      ? null
-                      : (bool value) {
-                          ref
-                              .read(adminProductsNotifierProvider.notifier)
-                              .toggleProductVisibilityOnPos(
-                                id: product.id,
-                                isVisibleOnPos: value,
-                              );
-                        },
-                ),
-              ],
-            ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(AppStrings.active),
-                Switch(
-                  value: product.isActive,
-                  onChanged: isSaving
-                      ? null
-                      : (bool value) {
-                          ref
-                              .read(adminProductsNotifierProvider.notifier)
-                              .toggleProductActive(
-                                id: product.id,
-                                isActive: value,
-                              );
-                        },
-                ),
-              ],
-            ),
-            OutlinedButton(
-              onPressed: isSaving ? null : onEdit,
-              child: Text(AppStrings.edit),
-            ),
-          ],
+              OutlinedButton(
+                onPressed: isSaving ? null : onEdit,
+                child: Text(AppStrings.edit),
+              ),
+              TextButton(
+                key: ValueKey<String>('product-delete-${product.id}'),
+                onPressed: isSaving ? null : onDelete,
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+}
+
+String _menuTypeLabel(ProductMenuConfigType type) {
+  switch (type) {
+    case ProductMenuConfigType.standard:
+      return 'Standard';
+    case ProductMenuConfigType.legacyFlat:
+      return 'Flat Modifiers';
+    case ProductMenuConfigType.semanticSet:
+      return 'Set Product';
+    case ProductMenuConfigType.mixed:
+      return 'Mixed (conflict)';
+  }
+}
+
+Color _menuTypeColor(ProductMenuConfigType type) {
+  switch (type) {
+    case ProductMenuConfigType.standard:
+      return AppColors.textSecondary;
+    case ProductMenuConfigType.legacyFlat:
+      return AppColors.primary;
+    case ProductMenuConfigType.semanticSet:
+      return AppColors.success;
+    case ProductMenuConfigType.mixed:
+      return AppColors.warning;
   }
 }
 
@@ -482,6 +820,28 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
+class _StatusFilterChip extends StatelessWidget {
+  const _StatusFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+    );
+  }
+}
+
 class _MessageBox extends StatelessWidget {
   const _MessageBox({required this.message, required this.color});
 
@@ -498,6 +858,39 @@ class _MessageBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
       ),
       child: Text(message, style: TextStyle(color: color)),
+    );
+  }
+}
+
+class _ProductSection extends StatelessWidget {
+  const _ProductSection({
+    super.key,
+    required this.title,
+    required this.emptyMessage,
+    required this.children,
+  });
+
+  final String title;
+  final String emptyMessage;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          title,
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: AppSizes.spacingSm),
+        if (children.isEmpty)
+          _SectionEmptyState(message: emptyMessage)
+        else
+          ...children,
+      ],
     );
   }
 }
@@ -521,4 +914,38 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SectionEmptyState extends StatelessWidget {
+  const _SectionEmptyState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSizes.spacingSm),
+      child: Text(
+        message,
+        style: const TextStyle(color: AppColors.textSecondary),
+      ),
+    );
+  }
+}
+
+class _DeleteDecision {
+  const _DeleteDecision({required this.confirmSemanticImpact});
+
+  final bool confirmSemanticImpact;
+}
+
+T? _ensureValidSelection<T>({required T? current, required Iterable<T> items}) {
+  final List<T> availableItems = items.toList(growable: false);
+  if (availableItems.isEmpty) {
+    return null;
+  }
+  if (current != null && availableItems.contains(current)) {
+    return current;
+  }
+  return availableItems.first;
 }
