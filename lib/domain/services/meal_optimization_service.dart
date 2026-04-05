@@ -6,7 +6,6 @@ import '../../data/repositories/product_repository.dart';
 // Threshold constants
 const double kHighRemovalThreshold = 0.60; // >60% → default issue
 const double kHighDiscountFrequency = 0.40; // >40% → leakage risk
-const double kLowExtraAttachThreshold = 0.10; // <10% → upsell weak
 const double kHighFreeSwapUsageThreshold = 0.80; // >80% → always using free
 
 /// Phase 9 — Meal Optimization Service

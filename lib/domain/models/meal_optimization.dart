@@ -14,6 +14,9 @@ enum InsightConfidence { high, medium, low }
 const int kMinOrdersForHighConfidence = 30;
 const int kMinOrdersForMediumConfidence = 10;
 
+/// Extra attach rate below this fraction (e.g. 0.10 = 10%) → weak upsell signal.
+const double kLowExtraAttachThreshold = 0.10;
+
 InsightConfidence confidenceForSampleSize(int orderCount) {
   if (orderCount >= kMinOrdersForHighConfidence) return InsightConfidence.high;
   if (orderCount >= kMinOrdersForMediumConfidence) {
