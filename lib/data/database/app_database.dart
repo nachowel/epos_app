@@ -64,6 +64,10 @@ class Products extends Table {
   IntColumn get categoryId =>
       integer().customConstraint('NOT NULL REFERENCES "categories" ("id")')();
 
+  IntColumn get mealAdjustmentProfileId => integer()
+      .nullable()
+      .customConstraint('REFERENCES "meal_adjustment_profiles" ("id")')();
+
   TextColumn get name => text()();
 
   IntColumn get priceMinor => integer()();
@@ -81,6 +85,186 @@ class Products extends Table {
 
   @override
   List<String> get customConstraints => <String>['CHECK (price_minor >= 0)'];
+}
+
+class MealAdjustmentProfiles extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get name => text()();
+
+  TextColumn get description => text().nullable()();
+
+  IntColumn get freeSwapLimit =>
+      integer().named('free_swap_limit').withDefault(const Constant(0))();
+
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<String> get customConstraints => <String>[
+    'CHECK (length(trim(name)) > 0)',
+    'CHECK (free_swap_limit >= 0)',
+  ];
+}
+
+class MealAdjustmentProfileComponents extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get profileId => integer().customConstraint(
+    'NOT NULL REFERENCES "meal_adjustment_profiles" ("id")',
+  )();
+
+  TextColumn get componentKey => text().named('component_key')();
+
+  TextColumn get displayName => text().named('display_name')();
+
+  IntColumn get defaultItemProductId => integer()
+      .named('default_item_product_id')
+      .customConstraint('NOT NULL REFERENCES "products" ("id")')();
+
+  IntColumn get quantity => integer().withDefault(const Constant(1))();
+
+  BoolColumn get canRemove => boolean().withDefault(const Constant(true))();
+
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  @override
+  List<String> get customConstraints => <String>[
+    'CHECK (length(trim(component_key)) > 0)',
+    'CHECK (length(trim(display_name)) > 0)',
+    'CHECK (quantity > 0)',
+    'CHECK (sort_order >= 0)',
+    'UNIQUE(profile_id, component_key)',
+  ];
+}
+
+class MealAdjustmentComponentOptions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get profileComponentId => integer()
+      .named('profile_component_id')
+      .customConstraint(
+        'NOT NULL REFERENCES "meal_adjustment_profile_components" ("id")',
+      )();
+
+  IntColumn get optionItemProductId => integer()
+      .named('option_item_product_id')
+      .customConstraint('NOT NULL REFERENCES "products" ("id")')();
+
+  TextColumn get optionType => text().named('option_type')();
+
+  IntColumn get fixedPriceDeltaMinor =>
+      integer().named('fixed_price_delta_minor').nullable()();
+
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  @override
+  List<String> get customConstraints => <String>[
+    "CHECK (option_type IN ('swap'))",
+    'CHECK (fixed_price_delta_minor IS NULL OR fixed_price_delta_minor >= 0)',
+    'CHECK (sort_order >= 0)',
+    'UNIQUE(profile_component_id, option_item_product_id, option_type)',
+  ];
+}
+
+class MealAdjustmentProfileExtras extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get profileId => integer().customConstraint(
+    'NOT NULL REFERENCES "meal_adjustment_profiles" ("id")',
+  )();
+
+  IntColumn get itemProductId => integer()
+      .named('item_product_id')
+      .customConstraint('NOT NULL REFERENCES "products" ("id")')();
+
+  IntColumn get fixedPriceDeltaMinor =>
+      integer().named('fixed_price_delta_minor')();
+
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  @override
+  List<String> get customConstraints => <String>[
+    'CHECK (fixed_price_delta_minor >= 0)',
+    'CHECK (sort_order >= 0)',
+    'UNIQUE(profile_id, item_product_id)',
+  ];
+}
+
+class MealAdjustmentPricingRules extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get profileId => integer().customConstraint(
+    'NOT NULL REFERENCES "meal_adjustment_profiles" ("id")',
+  )();
+
+  TextColumn get name => text()();
+
+  TextColumn get ruleType => text().named('rule_type')();
+
+  IntColumn get priceDeltaMinor => integer().named('price_delta_minor')();
+
+  IntColumn get priority => integer().withDefault(const Constant(0))();
+
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  @override
+  List<String> get customConstraints => <String>[
+    'CHECK (length(trim(name)) > 0)',
+    "CHECK (rule_type IN ('remove_only','combo','swap','extra'))",
+    'CHECK (priority >= 0)',
+  ];
+}
+
+class MealAdjustmentPricingRuleConditions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get ruleId => integer()
+      .named('rule_id')
+      .customConstraint(
+        'NOT NULL REFERENCES "meal_adjustment_pricing_rules" ("id")',
+      )();
+
+  TextColumn get conditionType => text().named('condition_type')();
+
+  TextColumn get componentKey => text().named('component_key').nullable()();
+
+  IntColumn get itemProductId => integer()
+      .named('item_product_id')
+      .nullable()
+      .customConstraint('REFERENCES "products" ("id")')();
+
+  IntColumn get quantity => integer().withDefault(const Constant(1))();
+
+  @override
+  List<String> get customConstraints => <String>[
+    "CHECK (condition_type IN ('removed_component','swap_to_item','extra_item'))",
+    'CHECK (quantity > 0)',
+    '''CHECK (
+      (condition_type = 'removed_component'
+        AND component_key IS NOT NULL
+        AND length(trim(component_key)) > 0
+        AND item_product_id IS NULL)
+      OR
+      (condition_type = 'swap_to_item'
+        AND component_key IS NOT NULL
+        AND length(trim(component_key)) > 0
+        AND item_product_id IS NOT NULL)
+      OR
+      (condition_type = 'extra_item'
+        AND component_key IS NULL
+        AND item_product_id IS NOT NULL)
+    )''',
+  ];
 }
 
 class ProductModifiers extends Table {
@@ -111,6 +295,40 @@ class ProductModifiers extends Table {
     "CHECK (type IN ('included','extra','choice'))",
     'CHECK (extra_price_minor >= 0)',
     "CHECK ((type = 'choice' AND group_id IS NOT NULL AND item_product_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))",
+  ];
+}
+
+class BreakfastExtraPresets extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get name => text()();
+
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<String> get customConstraints => <String>[
+    'CHECK (length(trim(name)) > 0)',
+  ];
+}
+
+class BreakfastExtraPresetItems extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get presetId => integer().customConstraint(
+    'NOT NULL REFERENCES "breakfast_extra_presets" ("id")',
+  )();
+
+  IntColumn get itemProductId =>
+      integer().customConstraint('NOT NULL REFERENCES "products" ("id")')();
+
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  List<String> get customConstraints => <String>[
+    'CHECK (sort_order >= 0)',
+    'UNIQUE(preset_id, item_product_id)',
   ];
 }
 
@@ -259,7 +477,6 @@ class Transactions extends Table {
   List<String> get customConstraints => <String>[
     "CHECK (status IN ('draft','sent','paid','cancelled'))",
     'CHECK (subtotal_minor >= 0)',
-    'CHECK (modifier_total_minor >= 0)',
     'CHECK (total_amount_minor >= 0)',
   ];
 }
@@ -337,9 +554,40 @@ class OrderModifiers extends Table {
     'CHECK (quantity > 0)',
     'CHECK (extra_price_minor >= 0)',
     'CHECK (unit_price_minor >= 0)',
-    'CHECK (price_effect_minor >= 0)',
-    "CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount'))",
+    "CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount','combo_discount'))",
     "CHECK (\"action\" != 'choice' OR charge_reason = 'included_choice')",
+  ];
+}
+
+class BreakfastCookingInstructions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  TextColumn get uuid => text().unique()();
+
+  IntColumn get transactionLineId => integer().customConstraint(
+    'NOT NULL REFERENCES "transaction_lines" ("id")',
+  )();
+
+  IntColumn get itemProductId =>
+      integer().customConstraint('NOT NULL REFERENCES "products" ("id")')();
+
+  TextColumn get itemName => text()();
+
+  TextColumn get instructionCode => text()();
+
+  TextColumn get instructionLabel => text()();
+
+  IntColumn get appliedQuantity =>
+      integer().withDefault(const Constant(1)).named('applied_quantity')();
+
+  IntColumn get sortKey => integer().withDefault(const Constant(0))();
+
+  @override
+  List<String> get customConstraints => <String>[
+    'CHECK (length(trim(instruction_code)) > 0)',
+    'CHECK (length(trim(instruction_label)) > 0)',
+    'CHECK (applied_quantity > 0)',
+    'UNIQUE(transaction_line_id, item_product_id)',
   ];
 }
 
@@ -594,6 +842,14 @@ class SyncQueue extends Table {
     Users,
     Categories,
     Products,
+    MealAdjustmentProfiles,
+    MealAdjustmentProfileComponents,
+    MealAdjustmentComponentOptions,
+    MealAdjustmentProfileExtras,
+    MealAdjustmentPricingRules,
+    MealAdjustmentPricingRuleConditions,
+    BreakfastExtraPresets,
+    BreakfastExtraPresetItems,
     MenuSettings,
     SetItems,
     ModifierGroups,
@@ -602,6 +858,7 @@ class SyncQueue extends Table {
     Transactions,
     TransactionLines,
     OrderModifiers,
+    BreakfastCookingInstructions,
     Payments,
     PaymentAdjustments,
     ShiftReconciliations,
@@ -621,7 +878,7 @@ class AppDatabase extends _$AppDatabase {
     return AppDatabase(NativeDatabase(file));
   }
 
-  static const int currentSchemaVersion = 20;
+  static const int currentSchemaVersion = 25;
   final List<MigrationLogEntry> _migrationHistory = <MigrationLogEntry>[];
   MigrationLogEntry? _lastMigrationFailure;
 
@@ -652,7 +909,10 @@ class AppDatabase extends _$AppDatabase {
             await _createFreshPathFkEmulation();
           }
           await _seedDefaultMenuSettings();
+          await _createMealCustomizationSnapshotSchema();
           await _createIndexes();
+          await _createMealCustomizationSnapshotIndexes();
+          await _createMealCustomizationSnapshotFkEmulation();
         },
       );
     },
@@ -809,6 +1069,46 @@ class AppDatabase extends _$AppDatabase {
           action: _migrateToV20,
         );
       }
+      if (from < 21) {
+        await _runMigrationStep(
+          step: 'migrate_v21',
+          fromVersion: from < 20 ? 20 : from,
+          toVersion: 21,
+          action: _migrateToV21,
+        );
+      }
+      if (from < 22) {
+        await _runMigrationStep(
+          step: 'migrate_v22',
+          fromVersion: from < 21 ? 21 : from,
+          toVersion: 22,
+          action: _migrateToV22,
+        );
+      }
+      if (from < 23) {
+        await _runMigrationStep(
+          step: 'migrate_v23',
+          fromVersion: from < 22 ? 22 : from,
+          toVersion: 23,
+          action: _migrateToV23,
+        );
+      }
+      if (from < 24) {
+        await _runMigrationStep(
+          step: 'migrate_v24',
+          fromVersion: from < 23 ? 23 : from,
+          toVersion: 24,
+          action: _migrateToV24,
+        );
+      }
+      if (from < 25) {
+        await _runMigrationStep(
+          step: 'migrate_v25',
+          fromVersion: from < 24 ? 24 : from,
+          toVersion: 25,
+          action: _migrateToV25,
+        );
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
@@ -856,6 +1156,7 @@ class AppDatabase extends _$AppDatabase {
       CREATE TABLE IF NOT EXISTS products (
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         category_id INTEGER NOT NULL,
+        meal_adjustment_profile_id INTEGER NULL,
         name TEXT NOT NULL,
         price_minor INTEGER NOT NULL CHECK (price_minor >= 0),
         image_url TEXT NULL,
@@ -863,6 +1164,112 @@ class AppDatabase extends _$AppDatabase {
         is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
         is_visible_on_pos INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_on_pos IN (0, 1)),
         sort_order INTEGER NOT NULL DEFAULT 0
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_adjustment_profiles (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT NULL,
+        free_swap_limit INTEGER NOT NULL DEFAULT 0 CHECK (free_swap_limit >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CHECK (length(trim(name)) > 0)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_adjustment_profile_components (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
+        component_key TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        default_item_product_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+        can_remove INTEGER NOT NULL DEFAULT 1 CHECK (can_remove IN (0, 1)),
+        sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        CHECK (length(trim(component_key)) > 0),
+        CHECK (length(trim(display_name)) > 0),
+        UNIQUE(profile_id, component_key)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_adjustment_component_options (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_component_id INTEGER NOT NULL,
+        option_item_product_id INTEGER NOT NULL,
+        option_type TEXT NOT NULL CHECK (option_type IN ('swap')),
+        fixed_price_delta_minor INTEGER NULL CHECK (fixed_price_delta_minor IS NULL OR fixed_price_delta_minor >= 0),
+        sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        UNIQUE(profile_component_id, option_item_product_id, option_type)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_adjustment_profile_extras (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
+        item_product_id INTEGER NOT NULL,
+        fixed_price_delta_minor INTEGER NOT NULL CHECK (fixed_price_delta_minor >= 0),
+        sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        UNIQUE(profile_id, item_product_id)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_adjustment_pricing_rules (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        rule_type TEXT NOT NULL CHECK (rule_type IN ('remove_only','combo','swap','extra')),
+        price_delta_minor INTEGER NOT NULL,
+        priority INTEGER NOT NULL DEFAULT 0 CHECK (priority >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        CHECK (length(trim(name)) > 0)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_adjustment_pricing_rule_conditions (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        rule_id INTEGER NOT NULL,
+        condition_type TEXT NOT NULL CHECK (condition_type IN ('removed_component','swap_to_item','extra_item')),
+        component_key TEXT NULL,
+        item_product_id INTEGER NULL,
+        quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+        CHECK (
+          (condition_type = 'removed_component'
+            AND component_key IS NOT NULL
+            AND length(trim(component_key)) > 0
+            AND item_product_id IS NULL)
+          OR
+          (condition_type = 'swap_to_item'
+            AND component_key IS NOT NULL
+            AND length(trim(component_key)) > 0
+            AND item_product_id IS NOT NULL)
+          OR
+          (condition_type = 'extra_item'
+            AND component_key IS NULL
+            AND item_product_id IS NOT NULL)
+        )
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS breakfast_extra_presets (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CHECK (length(trim(name)) > 0)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS breakfast_extra_preset_items (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        preset_id INTEGER NOT NULL,
+        item_product_id INTEGER NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+        UNIQUE(preset_id, item_product_id)
       );
     ''');
     await customStatement('''
@@ -932,7 +1339,7 @@ class AppDatabase extends _$AppDatabase {
         table_number INTEGER NULL,
         status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid','cancelled')),
         subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
-        modifier_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (modifier_total_minor >= 0),
+        modifier_total_minor INTEGER NOT NULL DEFAULT 0,
         total_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_amount_minor >= 0),
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         paid_at INTEGER NULL,
@@ -969,11 +1376,25 @@ class AppDatabase extends _$AppDatabase {
         item_product_id INTEGER NULL,
         source_group_id INTEGER NULL,
         extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
-        charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount')),
+        charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount','combo_discount')),
         unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
-        price_effect_minor INTEGER NOT NULL DEFAULT 0 CHECK (price_effect_minor >= 0),
+        price_effect_minor INTEGER NOT NULL DEFAULT 0,
         sort_key INTEGER NOT NULL DEFAULT 0,
         CHECK (action != 'choice' OR charge_reason = 'included_choice')
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS breakfast_cooking_instructions (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT NOT NULL UNIQUE,
+        transaction_line_id INTEGER NOT NULL,
+        item_product_id INTEGER NOT NULL,
+        item_name TEXT NOT NULL,
+        instruction_code TEXT NOT NULL CHECK (length(trim(instruction_code)) > 0),
+        instruction_label TEXT NOT NULL CHECK (length(trim(instruction_label)) > 0),
+        applied_quantity INTEGER NOT NULL DEFAULT 1 CHECK (applied_quantity > 0),
+        sort_key INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(transaction_line_id, item_product_id)
       );
     ''');
     await customStatement('''
@@ -1092,11 +1513,88 @@ class AppDatabase extends _$AppDatabase {
     await _createSyncRootSnapshotTable();
   }
 
+  Future<void> _createMealCustomizationSnapshotSchema() async {
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_customization_line_snapshots (
+        transaction_line_id INTEGER NOT NULL PRIMARY KEY,
+        product_id INTEGER NOT NULL,
+        profile_id INTEGER NOT NULL,
+        customization_key TEXT NOT NULL,
+        snapshot_json TEXT NOT NULL,
+        total_adjustment_minor INTEGER NOT NULL,
+        free_swap_count_used INTEGER NOT NULL DEFAULT 0 CHECK (free_swap_count_used >= 0),
+        paid_swap_count_used INTEGER NOT NULL DEFAULT 0 CHECK (paid_swap_count_used >= 0)
+      );
+    ''');
+  }
+
   Future<void> _createFreshPathFkEmulation() async {
+    await _createMigrationFkTrigger(
+      table: 'breakfast_extra_preset_items',
+      column: 'preset_id',
+      referencedTable: 'breakfast_extra_presets',
+    );
+    await _createMigrationFkTrigger(
+      table: 'breakfast_extra_preset_items',
+      column: 'item_product_id',
+      referencedTable: 'products',
+    );
     await _createMigrationFkTrigger(
       table: 'products',
       column: 'category_id',
       referencedTable: 'categories',
+    );
+    await _createMigrationFkTrigger(
+      table: 'products',
+      column: 'meal_adjustment_profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_profile_components',
+      column: 'profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_profile_components',
+      column: 'default_item_product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_component_options',
+      column: 'profile_component_id',
+      referencedTable: 'meal_adjustment_profile_components',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_component_options',
+      column: 'option_item_product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_profile_extras',
+      column: 'profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_profile_extras',
+      column: 'item_product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_pricing_rules',
+      column: 'profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_pricing_rule_conditions',
+      column: 'rule_id',
+      referencedTable: 'meal_adjustment_pricing_rules',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_pricing_rule_conditions',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
     );
     await _createMigrationFkTrigger(
       table: 'menu_settings',
@@ -1180,6 +1678,21 @@ class AppDatabase extends _$AppDatabase {
       referencedTable: 'products',
     );
     await _createMigrationFkTrigger(
+      table: 'meal_customization_line_snapshots',
+      column: 'transaction_line_id',
+      referencedTable: 'transaction_lines',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_customization_line_snapshots',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_customization_line_snapshots',
+      column: 'profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+    );
+    await _createMigrationFkTrigger(
       table: 'order_modifiers',
       column: 'transaction_line_id',
       referencedTable: 'transaction_lines',
@@ -1189,6 +1702,16 @@ class AppDatabase extends _$AppDatabase {
       column: 'item_product_id',
       referencedTable: 'products',
       nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'breakfast_cooking_instructions',
+      column: 'transaction_line_id',
+      referencedTable: 'transaction_lines',
+    );
+    await _createMigrationFkTrigger(
+      table: 'breakfast_cooking_instructions',
+      column: 'item_product_id',
+      referencedTable: 'products',
     );
     await _createMigrationFkTrigger(
       table: 'payments',
@@ -1250,6 +1773,12 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _createIndexes() async {
     await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_breakfast_extra_presets_name ON breakfast_extra_presets(name, updated_at, id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_breakfast_extra_preset_items_preset ON breakfast_extra_preset_items(preset_id, sort_order, id);',
+    );
+    await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_menu_settings_updated_at ON menu_settings(updated_at, id);',
     );
     await customStatement(
@@ -1260,6 +1789,24 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id, is_active, is_visible_on_pos, sort_order);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_products_meal_adjustment_profile ON products(meal_adjustment_profile_id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_meal_adjustment_profile_components_profile ON meal_adjustment_profile_components(profile_id, is_active, sort_order);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_meal_adjustment_component_options_component ON meal_adjustment_component_options(profile_component_id, is_active, sort_order);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_meal_adjustment_profile_extras_profile ON meal_adjustment_profile_extras(profile_id, is_active, sort_order);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_meal_adjustment_pricing_rules_profile ON meal_adjustment_pricing_rules(profile_id, is_active, priority);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_meal_adjustment_pricing_rule_conditions_rule ON meal_adjustment_pricing_rule_conditions(rule_id);',
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_product_modifiers_prod ON product_modifiers(product_id, is_active);',
@@ -1290,6 +1837,12 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_order_modifiers_source_group ON order_modifiers(source_group_id, item_product_id, charge_reason);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_breakfast_cooking_instructions_line ON breakfast_cooking_instructions(transaction_line_id, sort_key, id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_breakfast_cooking_instructions_item ON breakfast_cooking_instructions(item_product_id, instruction_code);',
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_payments_tx ON payments(transaction_id);',
@@ -1864,6 +2417,33 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  Future<void> _createMealCustomizationSnapshotIndexes() async {
+    await customStatement(
+      'CREATE UNIQUE INDEX IF NOT EXISTS ux_meal_customization_line_snapshots_line ON meal_customization_line_snapshots(transaction_line_id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_meal_customization_line_snapshots_lookup ON meal_customization_line_snapshots(product_id, profile_id, customization_key, transaction_line_id);',
+    );
+  }
+
+  Future<void> _createMealCustomizationSnapshotFkEmulation() async {
+    await _createMigrationFkTrigger(
+      table: 'meal_customization_line_snapshots',
+      column: 'transaction_line_id',
+      referencedTable: 'transaction_lines',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_customization_line_snapshots',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_customization_line_snapshots',
+      column: 'profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+    );
+  }
+
   Future<void> _migrateToV16() async {
     await customStatement('''
       ALTER TABLE categories
@@ -2302,6 +2882,447 @@ class AppDatabase extends _$AppDatabase {
       referencedTable: 'modifier_groups',
       nullable: true,
     );
+  }
+
+  Future<void> _migrateToV21() async {
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS breakfast_extra_presets (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CHECK (length(trim(name)) > 0)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS breakfast_extra_preset_items (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        preset_id INTEGER NOT NULL,
+        item_product_id INTEGER NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+        UNIQUE(preset_id, item_product_id)
+      );
+    ''');
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_breakfast_extra_presets_name ON breakfast_extra_presets(name, updated_at, id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_breakfast_extra_preset_items_preset ON breakfast_extra_preset_items(preset_id, sort_order, id);',
+    );
+    await _createMigrationFkTrigger(
+      table: 'breakfast_extra_preset_items',
+      column: 'preset_id',
+      referencedTable: 'breakfast_extra_presets',
+    );
+    await _createMigrationFkTrigger(
+      table: 'breakfast_extra_preset_items',
+      column: 'item_product_id',
+      referencedTable: 'products',
+    );
+  }
+
+  Future<void> _migrateToV22() async {
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS breakfast_cooking_instructions (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT NOT NULL UNIQUE,
+        transaction_line_id INTEGER NOT NULL,
+        item_product_id INTEGER NOT NULL,
+        item_name TEXT NOT NULL,
+        instruction_code TEXT NOT NULL CHECK (length(trim(instruction_code)) > 0),
+        instruction_label TEXT NOT NULL CHECK (length(trim(instruction_label)) > 0),
+        applied_quantity INTEGER NOT NULL DEFAULT 1 CHECK (applied_quantity > 0),
+        sort_key INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(transaction_line_id, item_product_id)
+      );
+    ''');
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_breakfast_cooking_instructions_line ON breakfast_cooking_instructions(transaction_line_id, sort_key, id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_breakfast_cooking_instructions_item ON breakfast_cooking_instructions(item_product_id, instruction_code);',
+    );
+    await _createMigrationFkTrigger(
+      table: 'breakfast_cooking_instructions',
+      column: 'transaction_line_id',
+      referencedTable: 'transaction_lines',
+    );
+    await _createMigrationFkTrigger(
+      table: 'breakfast_cooking_instructions',
+      column: 'item_product_id',
+      referencedTable: 'products',
+    );
+  }
+
+  Future<void> _migrateToV23() async {
+    // Phase 1 meal-adjustment foundation:
+    // - add optional product -> profile binding
+    // - create profile/components/swaps/extras/pricing tables
+    // - keep existing breakfast and flat-modifier flows unchanged
+    final bool hasMealAdjustmentProfileId = await _tableHasColumn(
+      tableName: 'products',
+      columnName: 'meal_adjustment_profile_id',
+    );
+    if (!hasMealAdjustmentProfileId) {
+      await customStatement(
+        'ALTER TABLE products ADD COLUMN meal_adjustment_profile_id INTEGER NULL;',
+      );
+    }
+
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_adjustment_profiles (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT NULL,
+        free_swap_limit INTEGER NOT NULL DEFAULT 0 CHECK (free_swap_limit >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CHECK (length(trim(name)) > 0)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_adjustment_profile_components (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
+        component_key TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        default_item_product_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+        can_remove INTEGER NOT NULL DEFAULT 1 CHECK (can_remove IN (0, 1)),
+        sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        CHECK (length(trim(component_key)) > 0),
+        CHECK (length(trim(display_name)) > 0),
+        UNIQUE(profile_id, component_key)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_adjustment_component_options (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_component_id INTEGER NOT NULL,
+        option_item_product_id INTEGER NOT NULL,
+        option_type TEXT NOT NULL CHECK (option_type IN ('swap')),
+        fixed_price_delta_minor INTEGER NULL CHECK (fixed_price_delta_minor IS NULL OR fixed_price_delta_minor >= 0),
+        sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        UNIQUE(profile_component_id, option_item_product_id, option_type)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_adjustment_profile_extras (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
+        item_product_id INTEGER NOT NULL,
+        fixed_price_delta_minor INTEGER NOT NULL CHECK (fixed_price_delta_minor >= 0),
+        sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        UNIQUE(profile_id, item_product_id)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_adjustment_pricing_rules (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        rule_type TEXT NOT NULL CHECK (rule_type IN ('remove_only','combo','swap','extra')),
+        price_delta_minor INTEGER NOT NULL,
+        priority INTEGER NOT NULL DEFAULT 0 CHECK (priority >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        CHECK (length(trim(name)) > 0)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS meal_adjustment_pricing_rule_conditions (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        rule_id INTEGER NOT NULL,
+        condition_type TEXT NOT NULL CHECK (condition_type IN ('removed_component','swap_to_item','extra_item')),
+        component_key TEXT NULL,
+        item_product_id INTEGER NULL,
+        quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+        CHECK (
+          (condition_type = 'removed_component'
+            AND component_key IS NOT NULL
+            AND length(trim(component_key)) > 0
+            AND item_product_id IS NULL)
+          OR
+          (condition_type = 'swap_to_item'
+            AND component_key IS NOT NULL
+            AND length(trim(component_key)) > 0
+            AND item_product_id IS NOT NULL)
+          OR
+          (condition_type = 'extra_item'
+            AND component_key IS NULL
+            AND item_product_id IS NOT NULL)
+        )
+      );
+    ''');
+
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_products_meal_adjustment_profile ON products(meal_adjustment_profile_id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_meal_adjustment_profile_components_profile ON meal_adjustment_profile_components(profile_id, is_active, sort_order);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_meal_adjustment_component_options_component ON meal_adjustment_component_options(profile_component_id, is_active, sort_order);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_meal_adjustment_profile_extras_profile ON meal_adjustment_profile_extras(profile_id, is_active, sort_order);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_meal_adjustment_pricing_rules_profile ON meal_adjustment_pricing_rules(profile_id, is_active, priority);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_meal_adjustment_pricing_rule_conditions_rule ON meal_adjustment_pricing_rule_conditions(rule_id);',
+    );
+
+    await _createMigrationFkTrigger(
+      table: 'products',
+      column: 'meal_adjustment_profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_profile_components',
+      column: 'profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_profile_components',
+      column: 'default_item_product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_component_options',
+      column: 'profile_component_id',
+      referencedTable: 'meal_adjustment_profile_components',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_component_options',
+      column: 'option_item_product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_profile_extras',
+      column: 'profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_profile_extras',
+      column: 'item_product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_pricing_rules',
+      column: 'profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_pricing_rule_conditions',
+      column: 'rule_id',
+      referencedTable: 'meal_adjustment_pricing_rules',
+    );
+    await _createMigrationFkTrigger(
+      table: 'meal_adjustment_pricing_rule_conditions',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
+    );
+  }
+
+  Future<void> _migrateToV24() async {
+    // Phase 3 meal-adjustment order integration:
+    // - allow signed transaction modifier totals so discount rows can persist
+    // - allow signed order_modifiers.price_effect_minor for semantic discounts
+    // - add combo_discount as a first-class semantic charge reason
+    await customStatement('PRAGMA foreign_keys = OFF;');
+
+    try {
+      await customStatement('DROP INDEX IF EXISTS idx_transactions_shift;');
+      await customStatement('DROP INDEX IF EXISTS idx_transactions_user;');
+      await customStatement('ALTER TABLE transactions RENAME TO transactions_legacy_v24;');
+      await customStatement('''
+        CREATE TABLE transactions (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          shift_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          table_number INTEGER NULL,
+          status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid','cancelled')),
+          subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
+          modifier_total_minor INTEGER NOT NULL DEFAULT 0,
+          total_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_amount_minor >= 0),
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          paid_at INTEGER NULL,
+          updated_at INTEGER NOT NULL,
+          cancelled_at INTEGER NULL,
+          cancelled_by INTEGER NULL,
+          idempotency_key TEXT NOT NULL UNIQUE,
+          kitchen_printed INTEGER NOT NULL DEFAULT 0 CHECK (kitchen_printed IN (0, 1)),
+          receipt_printed INTEGER NOT NULL DEFAULT 0 CHECK (receipt_printed IN (0, 1))
+        );
+      ''');
+      await customStatement('''
+        INSERT INTO transactions (
+          id,
+          uuid,
+          shift_id,
+          user_id,
+          table_number,
+          status,
+          subtotal_minor,
+          modifier_total_minor,
+          total_amount_minor,
+          created_at,
+          paid_at,
+          updated_at,
+          cancelled_at,
+          cancelled_by,
+          idempotency_key,
+          kitchen_printed,
+          receipt_printed
+        )
+        SELECT
+          id,
+          uuid,
+          shift_id,
+          user_id,
+          table_number,
+          status,
+          subtotal_minor,
+          modifier_total_minor,
+          total_amount_minor,
+          created_at,
+          paid_at,
+          updated_at,
+          cancelled_at,
+          cancelled_by,
+          idempotency_key,
+          kitchen_printed,
+          receipt_printed
+        FROM transactions_legacy_v24;
+      ''');
+      await customStatement('DROP TABLE transactions_legacy_v24;');
+
+      await customStatement('DROP INDEX IF EXISTS idx_order_modifiers_line;');
+      await customStatement('DROP INDEX IF EXISTS idx_order_modifiers_item_product;');
+      await customStatement('DROP INDEX IF EXISTS idx_order_modifiers_item_product_semantics;');
+      await customStatement('DROP INDEX IF EXISTS idx_order_modifiers_source_group;');
+      await customStatement('ALTER TABLE order_modifiers RENAME TO order_modifiers_legacy_v24;');
+      await customStatement('''
+        CREATE TABLE order_modifiers (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          transaction_line_id INTEGER NOT NULL,
+          action TEXT NOT NULL CHECK (action IN ('remove','add','choice')),
+          item_name TEXT NOT NULL,
+          quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+          item_product_id INTEGER NULL,
+          source_group_id INTEGER NULL,
+          extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
+          charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount','combo_discount')),
+          unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
+          price_effect_minor INTEGER NOT NULL DEFAULT 0,
+          sort_key INTEGER NOT NULL DEFAULT 0,
+          CHECK (action != 'choice' OR charge_reason = 'included_choice')
+        );
+      ''');
+      await customStatement('''
+        INSERT INTO order_modifiers (
+          id,
+          uuid,
+          transaction_line_id,
+          action,
+          item_name,
+          quantity,
+          item_product_id,
+          source_group_id,
+          extra_price_minor,
+          charge_reason,
+          unit_price_minor,
+          price_effect_minor,
+          sort_key
+        )
+        SELECT
+          id,
+          uuid,
+          transaction_line_id,
+          action,
+          item_name,
+          quantity,
+          item_product_id,
+          source_group_id,
+          extra_price_minor,
+          charge_reason,
+          unit_price_minor,
+          price_effect_minor,
+          sort_key
+        FROM order_modifiers_legacy_v24;
+      ''');
+      await customStatement('DROP TABLE order_modifiers_legacy_v24;');
+    } finally {
+      await customStatement('PRAGMA foreign_keys = ON;');
+    }
+
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_shift ON transactions(shift_id, status, created_at);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id, created_at);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_line ON order_modifiers(transaction_line_id);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_item_product ON order_modifiers(item_product_id, charge_reason);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_item_product_semantics ON order_modifiers(item_product_id, action, charge_reason, sort_key);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_source_group ON order_modifiers(source_group_id, item_product_id, charge_reason);',
+    );
+
+    await _createMigrationFkTrigger(
+      table: 'transactions',
+      column: 'shift_id',
+      referencedTable: 'shifts',
+    );
+    await _createMigrationFkTrigger(
+      table: 'transactions',
+      column: 'user_id',
+      referencedTable: 'users',
+    );
+    await _createMigrationFkTrigger(
+      table: 'transactions',
+      column: 'cancelled_by',
+      referencedTable: 'users',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'order_modifiers',
+      column: 'transaction_line_id',
+      referencedTable: 'transaction_lines',
+    );
+    await _createMigrationFkTrigger(
+      table: 'order_modifiers',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'order_modifiers',
+      column: 'source_group_id',
+      referencedTable: 'modifier_groups',
+      nullable: true,
+    );
+  }
+
+  Future<void> _migrateToV25() async {
+    await _createMealCustomizationSnapshotSchema();
+    await _createMealCustomizationSnapshotIndexes();
+    await _createMealCustomizationSnapshotFkEmulation();
   }
 
   Future<void> _createSyncRootSnapshotTable() async {

@@ -12,6 +12,9 @@ import '../../../widgets/section_app_bar.dart';
 const String _cashMovementsLabel = 'Cash Movements';
 const String _auditLogsLabel = 'Audit Logs';
 const String _analyticsLabel = 'Analytics';
+const String _mealProfilesLabel = 'Meal Profiles';
+const String _mealOptimizationLabel = 'Meal Optimization';
+const String _breakfastSetsLabel = 'Breakfast Sets';
 
 class AdminScaffold extends ConsumerWidget {
   const AdminScaffold({
@@ -40,6 +43,21 @@ class AdminScaffold extends ConsumerWidget {
       label: AppStrings.products,
       route: '/admin/products',
       icon: Icons.inventory_2_rounded,
+    ),
+    _AdminDestination(
+      label: _mealProfilesLabel,
+      route: '/admin/meal-profiles',
+      icon: Icons.restaurant_menu_rounded,
+    ),
+    _AdminDestination(
+      label: _mealOptimizationLabel,
+      route: '/admin/meal-optimization',
+      icon: Icons.trending_up_rounded,
+    ),
+    _AdminDestination(
+      label: _breakfastSetsLabel,
+      route: '/admin/breakfast-sets',
+      icon: Icons.breakfast_dining_rounded,
     ),
     _AdminDestination(
       label: AppStrings.categories,

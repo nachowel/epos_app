@@ -116,6 +116,64 @@ void main() {
     );
 
     test(
+      'explicit none choice survives round-trip persistence for later edits',
+      () async {
+        final db = createTestDatabase();
+        addTearDown(db.close);
+        final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
+
+        final order = await fixture.service.createOrder(
+          currentUser: fixture.cashier,
+        );
+        final line = await fixture.service.addProductToOrder(
+          transactionId: order.id,
+          productId: fixture.set4ProductId,
+        );
+
+        final TransactionLine updatedLine = await fixture.service
+            .editBreakfastLine(
+              transactionLineId: line.id,
+              edit: BreakfastLineEdit.chooseGroup(
+                groupId: fixture.hotDrinkGroupId,
+                selectedItemProductId: null,
+                quantity: 1,
+              ),
+            );
+
+        final List<OrderModifier> modifiers = await fixture.service
+            .getLineModifiers(updatedLine.id);
+        expect(modifiers, hasLength(1));
+        expect(modifiers.single.itemProductId, isNull);
+        expect(modifiers.single.sourceGroupId, fixture.hotDrinkGroupId);
+        expect(
+          modifiers.single.chargeReason,
+          ModifierChargeReason.includedChoice,
+        );
+        expect(updatedLine.lineTotalMinor, 400);
+
+        final TransactionLine afterSwitchToTea = await fixture.service
+            .editBreakfastLine(
+              transactionLineId: updatedLine.id,
+              edit: BreakfastLineEdit.chooseGroup(
+                groupId: fixture.hotDrinkGroupId,
+                selectedItemProductId: fixture.teaProductId,
+                quantity: 1,
+              ),
+            );
+        final List<OrderModifier> refreshed = await fixture.service
+            .getLineModifiers(afterSwitchToTea.id);
+        expect(
+          refreshed.any(
+            (OrderModifier modifier) =>
+                modifier.itemProductId == fixture.teaProductId &&
+                modifier.chargeReason == ModifierChargeReason.includedChoice,
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test(
       'third replacement persists as paid_swap and totals use price_effect_minor',
       () async {
         final db = createTestDatabase();
@@ -513,7 +571,7 @@ Future<_BreakfastFixture> _seedBreakfastFixture(app_db.AppDatabase db) async {
           productId: set4ProductId,
           name: 'Toast or Bread',
           minSelect: const Value<int>(0),
-          maxSelect: const Value<int>(1),
+          maxSelect: const Value<int>(2),
           includedQuantity: const Value<int>(2),
           sortOrder: const Value<int>(2),
         ),

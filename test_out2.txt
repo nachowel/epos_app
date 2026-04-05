@@ -1,0 +1,794 @@
+00:00 +0: loading C:/Users/nacho/Desktop/EPOS/epos_app/test/domain/services/meal_customization_phase9_test.dart
+00:00 +0: G. Confidence thresholds high confidence when >= 30 orders
+00:00 +0 -1: G. Confidence thresholds high confidence when >= 30 orders [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428756, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -1: G. Confidence thresholds medium confidence when 10–29 orders
+00:00 +0 -2: G. Confidence thresholds medium confidence when 10–29 orders [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428756, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -2: G. Confidence thresholds low confidence when < 10 orders
+00:00 +0 -3: G. Confidence thresholds low confidence when < 10 orders [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -3: G. Confidence thresholds empty database produces empty report without errors
+00:00 +0 -4: G. Confidence thresholds empty database produces empty report without errors [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -4: G. Confidence thresholds low data case produces Low confidence insight
+00:00 +0 -5: G. Confidence thresholds low data case produces Low confidence insight [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -5: A. Discount Leakage discount frequency is calculated correctly
+00:00 +0 -6: A. Discount Leakage discount frequency is calculated correctly [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -6: A. Discount Leakage high removal detected adds highFrequency flag
+00:00 +0 -7: A. Discount Leakage high removal detected adds highFrequency flag [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -7: A. Discount Leakage combo discount order count is tracked
+00:00 +0 -8: A. Discount Leakage combo discount order count is tracked [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -8: B. Upsell Opportunity extra attach rate is calculated correctly
+00:00 +0 -9: B. Upsell Opportunity extra attach rate is calculated correctly [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -9: B. Upsell Opportunity top extra detection — highest count wins
+00:00 +0 -10: B. Upsell Opportunity top extra detection — highest count wins [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -10: C. Swap Behavior top swap pair is correctly identified
+00:00 +0 -11: C. Swap Behavior top swap pair is correctly identified [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -11: C. Swap Behavior swap frequency percent is correct
+00:00 +0 -12: C. Swap Behavior swap frequency percent is correct [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -12: C. Swap Behavior free vs paid swap counts are tracked separately
+00:00 +0 -13: C. Swap Behavior free vs paid swap counts are tracked separately [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:00 +0 -13: D. Profile Performance discount-heavy profile classified correctly
+00:00 +0 -14: D. Profile Performance discount-heavy profile classified correctly [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:01 +0 -14: D. Profile Performance balanced profile classification when discount ≈ extra
+00:01 +0 -15: D. Profile Performance balanced profile classification when discount ≈ extra [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:01 +0 -15: E. Recommendations high discount frequency triggers reduceDiscount recommendation
+00:01 +0 -16: E. Recommendations high discount frequency triggers reduceDiscount recommendation [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:01 +0 -16: E. Recommendations low extra attach rate triggers promoteExtra recommendation for medium+ confidence
+00:01 +0 -17: E. Recommendations low extra attach rate triggers promoteExtra recommendation for medium+ confidence [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:01 +0 -17: E. Recommendations high frequent swap triggers adjustDefaultComponent
+00:01 +0 -18: E. Recommendations high frequent swap triggers adjustDefaultComponent [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:01 +0 -18: E. Recommendations recommendations are deterministic across multiple calls
+00:01 +0 -19: E. Recommendations recommendations are deterministic across multiple calls [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:01 +0 -19: E. Recommendations no recommendations for products with very low data (low confidence)
+00:01 +0 -20: E. Recommendations no recommendations for products with very low data (low confidence) [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:01 +0 -20: Regression existing meal engine is unaffected
+00:01 +0 -21: Regression existing meal engine is unaffected [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:01 +0 -21: Regression report generation does not throw on new empty database
+00:01 +0 -22: Regression report generation does not throw on new empty database [E]
+  SqliteException(275): while executing statement, CHECK constraint failed: status IN ('draft','sent','paid','cancelled'), constraint failed (code 275)
+    Causing statement: INSERT INTO "transactions" ("uuid", "shift_id", "user_id", "table_number", "status", "subtotal_minor", "modifier_total_minor", "total_amount_minor", "paid_at", "updated_at", "cancelled_at", "cancelled_by", "idempotency_key") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?), parameters: tx-test, 1, 1, null, closed, 1200, 0, 1200, null, 1775428757, null, null, idem-tx-test
+  package:sqlite3/src/implementation/exception.dart 95:3                throwException
+  package:sqlite3/src/implementation/statement.dart 109:7               StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5               StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                              CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                        Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 431:7                                       _NativeDelegate.runInsert.<fn>
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            new Future.sync
+  package:drift/native.dart 430:19                                      _NativeDelegate.runInsert
+  package:drift/src/runtime/executor/helpers/engines.dart 106:19        _BaseExecutor.runInsert.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20         _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 103:12        _BaseExecutor.runInsert
+  package:drift/src/runtime/query_builder/statements/insert.dart 74:26  InsertStatement.insert.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16             DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50             DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 728:19             InternalConnectionUserApi.withCurrentExecutor
+  package:drift/src/runtime/query_builder/statements/insert.dart 73:27  InsertStatement.insert
+  test\support\test_database.dart 975:8                                 insertTransaction
+  test\domain\services\meal_customization_phase9_test.dart 119:27       main.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                            _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 90:28        main.<fn>
+  
+00:01 +0 -22: Some tests failed.

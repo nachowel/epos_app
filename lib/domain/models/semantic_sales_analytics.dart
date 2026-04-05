@@ -7,6 +7,8 @@ class SemanticSalesAnalytics {
     this.addedItems = const <SemanticItemBehaviorAnalytics>[],
     this.removedItems = const <SemanticItemBehaviorAnalytics>[],
     this.chargeReasonBreakdown = const <SemanticChargeReasonAnalytics>[],
+    this.mealRevenueBreakdown = const <SemanticMealRevenueAnalytics>[],
+    this.appliedMealRules = const <SemanticMealAppliedRuleAnalytics>[],
     this.bundleVariants = const <SemanticBundleVariantAnalytics>[],
     this.dataQualityNotes = const <String>[],
   });
@@ -17,6 +19,8 @@ class SemanticSalesAnalytics {
       addedItems = const <SemanticItemBehaviorAnalytics>[],
       removedItems = const <SemanticItemBehaviorAnalytics>[],
       chargeReasonBreakdown = const <SemanticChargeReasonAnalytics>[],
+      mealRevenueBreakdown = const <SemanticMealRevenueAnalytics>[],
+      appliedMealRules = const <SemanticMealAppliedRuleAnalytics>[],
       bundleVariants = const <SemanticBundleVariantAnalytics>[],
       dataQualityNotes = const <String>[];
 
@@ -25,6 +29,8 @@ class SemanticSalesAnalytics {
   final List<SemanticItemBehaviorAnalytics> addedItems;
   final List<SemanticItemBehaviorAnalytics> removedItems;
   final List<SemanticChargeReasonAnalytics> chargeReasonBreakdown;
+  final List<SemanticMealRevenueAnalytics> mealRevenueBreakdown;
+  final List<SemanticMealAppliedRuleAnalytics> appliedMealRules;
   final List<SemanticBundleVariantAnalytics> bundleVariants;
   final List<String> dataQualityNotes;
 
@@ -34,6 +40,8 @@ class SemanticSalesAnalytics {
       addedItems.isEmpty &&
       removedItems.isEmpty &&
       chargeReasonBreakdown.isEmpty &&
+      mealRevenueBreakdown.isEmpty &&
+      appliedMealRules.isEmpty &&
       bundleVariants.isEmpty;
 
   @override
@@ -47,6 +55,8 @@ class SemanticSalesAnalytics {
         _listEquals(other.addedItems, addedItems) &&
         _listEquals(other.removedItems, removedItems) &&
         _listEquals(other.chargeReasonBreakdown, chargeReasonBreakdown) &&
+        _listEquals(other.mealRevenueBreakdown, mealRevenueBreakdown) &&
+        _listEquals(other.appliedMealRules, appliedMealRules) &&
         _listEquals(other.bundleVariants, bundleVariants) &&
         _listEquals(other.dataQualityNotes, dataQualityNotes);
   }
@@ -58,6 +68,8 @@ class SemanticSalesAnalytics {
     Object.hashAll(addedItems),
     Object.hashAll(removedItems),
     Object.hashAll(chargeReasonBreakdown),
+    Object.hashAll(mealRevenueBreakdown),
+    Object.hashAll(appliedMealRules),
     Object.hashAll(bundleVariants),
     Object.hashAll(dataQualityNotes),
   );
@@ -240,6 +252,104 @@ class SemanticChargeReasonAnalytics {
   @override
   int get hashCode =>
       Object.hash(chargeReason, eventCount, totalQuantity, revenueMinor);
+}
+
+class SemanticMealRevenueAnalytics {
+  const SemanticMealRevenueAnalytics({
+    required this.rootProductId,
+    required this.rootProductName,
+    required this.quantitySold,
+    required this.baseRevenueMinor,
+    required this.extraRevenueMinor,
+    required this.paidSwapRevenueMinor,
+    required this.freeSwapCount,
+    required this.discountTotalMinor,
+    required this.netRevenueMinor,
+    required this.removeActionCount,
+    required this.swapActionCount,
+    required this.extraActionCount,
+    required this.discountActionCount,
+  });
+
+  final int rootProductId;
+  final String rootProductName;
+  final int quantitySold;
+  final int baseRevenueMinor;
+  final int extraRevenueMinor;
+  final int paidSwapRevenueMinor;
+  final int freeSwapCount;
+  final int discountTotalMinor;
+  final int netRevenueMinor;
+  final int removeActionCount;
+  final int swapActionCount;
+  final int extraActionCount;
+  final int discountActionCount;
+
+  @override
+  bool operator ==(Object other) {
+    return other is SemanticMealRevenueAnalytics &&
+        other.rootProductId == rootProductId &&
+        other.rootProductName == rootProductName &&
+        other.quantitySold == quantitySold &&
+        other.baseRevenueMinor == baseRevenueMinor &&
+        other.extraRevenueMinor == extraRevenueMinor &&
+        other.paidSwapRevenueMinor == paidSwapRevenueMinor &&
+        other.freeSwapCount == freeSwapCount &&
+        other.discountTotalMinor == discountTotalMinor &&
+        other.netRevenueMinor == netRevenueMinor &&
+        other.removeActionCount == removeActionCount &&
+        other.swapActionCount == swapActionCount &&
+        other.extraActionCount == extraActionCount &&
+        other.discountActionCount == discountActionCount;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    rootProductId,
+    rootProductName,
+    quantitySold,
+    baseRevenueMinor,
+    extraRevenueMinor,
+    paidSwapRevenueMinor,
+    freeSwapCount,
+    discountTotalMinor,
+    netRevenueMinor,
+    removeActionCount,
+    swapActionCount,
+    extraActionCount,
+    discountActionCount,
+  );
+}
+
+class SemanticMealAppliedRuleAnalytics {
+  const SemanticMealAppliedRuleAnalytics({
+    required this.ruleId,
+    required this.ruleType,
+    required this.applicationCount,
+    required this.totalImpactMinor,
+  });
+
+  final int ruleId;
+  final String ruleType;
+  final int applicationCount;
+  final int totalImpactMinor;
+
+  @override
+  bool operator ==(Object other) {
+    return other is SemanticMealAppliedRuleAnalytics &&
+        other.ruleId == ruleId &&
+        other.ruleType == ruleType &&
+        other.applicationCount == applicationCount &&
+        other.totalImpactMinor == totalImpactMinor;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ruleId,
+    ruleType,
+    applicationCount,
+    totalImpactMinor,
+  );
 }
 
 class SemanticBundleVariantAnalytics {

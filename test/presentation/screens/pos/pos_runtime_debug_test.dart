@@ -158,6 +158,63 @@ void main() {
     expect(firstCardSize.width, greaterThanOrEqualTo(150));
     expect(firstCardSize.height, lessThan(260));
   });
+
+  testWidgets('POS grid hides active products that are hidden from POS', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final db = createTestDatabase();
+    addTearDown(db.close);
+
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(const Size(1600, 900));
+
+    final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+    final int cashierId = await insertUser(
+      db,
+      name: 'Cashier',
+      role: 'cashier',
+    );
+    final int breakfastItemsCategoryId = await insertCategory(
+      db,
+      name: 'Breakfast Items',
+    );
+    await insertProduct(
+      db,
+      categoryId: breakfastItemsCategoryId,
+      name: 'Visible Egg',
+      priceMinor: 300,
+    );
+    await insertProduct(
+      db,
+      categoryId: breakfastItemsCategoryId,
+      name: 'Hidden Bacon',
+      priceMinor: 350,
+      isVisibleOnPos: false,
+    );
+    await insertShift(db, openedBy: adminId);
+
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        appDatabaseProvider.overrideWithValue(db),
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        ordersNotifierProvider.overrideWith(
+          (Ref ref) => _StaticOrdersNotifier(ref),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(authNotifierProvider.notifier).loadUserById(cashierId);
+    await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
+
+    await tester.pumpWidget(_localizedTestApp(container));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Visible Egg'), findsOneWidget);
+    expect(find.text('Hidden Bacon'), findsNothing);
+  });
 }
 
 class _StaticOrdersNotifier extends OrdersNotifier {

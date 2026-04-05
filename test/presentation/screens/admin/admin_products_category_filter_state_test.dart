@@ -192,6 +192,101 @@ void main() {
       );
     },
   );
+
+  testWidgets('add product dialog defaults to selected Extras category', (
+    WidgetTester tester,
+  ) async {
+    _setLargeView(tester);
+    final AppDatabase db = createTestDatabase();
+    addTearDown(db.close);
+
+    await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+    await insertCategory(db, name: 'Set Breakfast', sortOrder: 0);
+    final int extrasCategoryId = await insertCategory(
+      db,
+      name: 'Extras',
+      sortOrder: 1,
+    );
+
+    final ProviderContainer container = _makeContainer(db);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const _TestRouterApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _loginWithPin(tester, '9999');
+
+    container.read(appRouterProvider).go('/admin/products');
+    await tester.pumpAndSettle();
+
+    await container
+        .read(adminProductsNotifierProvider.notifier)
+        .selectCategory(extrasCategoryId);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text(AppStrings.addProduct).last);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Extras'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'add product dialog defaults to selected Set Breakfast category',
+    (WidgetTester tester) async {
+      _setLargeView(tester);
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+
+      await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+      final int setBreakfastCategoryId = await insertCategory(
+        db,
+        name: 'Set Breakfast',
+        sortOrder: 0,
+      );
+      await insertCategory(db, name: 'Extras', sortOrder: 1);
+
+      final ProviderContainer container = _makeContainer(db);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _TestRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _loginWithPin(tester, '9999');
+
+      container.read(appRouterProvider).go('/admin/products');
+      await tester.pumpAndSettle();
+
+      await container
+          .read(adminProductsNotifierProvider.notifier)
+          .selectCategory(setBreakfastCategoryId);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(AppStrings.addProduct).last);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Set Breakfast'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }
 
 ProviderContainer _makeContainer(AppDatabase db) {

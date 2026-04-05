@@ -24,9 +24,17 @@ class ValidationException extends AppException {
 }
 
 enum BreakfastEditBlockedReason { notDraft, sent, paid, cancelled }
+enum MealCustomizationEditBlockedReason {
+  notDraft,
+  sent,
+  paid,
+  cancelled,
+  legacySnapshotMissing,
+}
 
 enum BreakfastEditErrorCode {
   rootNotSetProduct,
+  invalidPricingMode,
   invalidChoiceGroup,
   choiceMemberNotAllowed,
   mixedToastBreadNotSupported,
@@ -39,19 +47,90 @@ enum BreakfastEditErrorCode {
   unsupportedLineSplitState,
 }
 
-class BreakfastEditRejectedException extends ValidationException {
-  BreakfastEditRejectedException({
-    required this.codes,
-    this.transactionLineId,
-  }) : super(
-         'Breakfast edit rejected: ${codes.map((BreakfastEditErrorCode code) => code.name).join(', ')}',
+enum BreakfastConfigurationErrorCode {
+  invalidSetRoot,
+  invalidChoiceGroup,
+  missingItemProductId,
+  invalidChoiceBounds,
+  invalidIncludedQuantity,
+  wrongProductRoleAssignment,
+  choiceCapableProductInSetItems,
+}
+
+class BreakfastConfigurationIssue {
+  const BreakfastConfigurationIssue({
+    required this.code,
+    this.groupId,
+    this.itemProductId,
+    this.productModifierId,
+  });
+
+  final BreakfastConfigurationErrorCode code;
+  final int? groupId;
+  final int? itemProductId;
+  final int? productModifierId;
+
+  String get dedupeKey =>
+      '${code.name}|g:${groupId ?? ''}|i:${itemProductId ?? ''}|m:${productModifierId ?? ''}';
+}
+
+class BreakfastConfigurationInvalidException extends ValidationException {
+  BreakfastConfigurationInvalidException({
+    required this.rootProductId,
+    required List<BreakfastConfigurationIssue> issues,
+  }) : issues = List<BreakfastConfigurationIssue>.unmodifiable(
+         _dedupeIssues(issues),
+       ),
+       super(
+         'Breakfast configuration invalid for product $rootProductId: ${_dedupeIssues(issues).map((BreakfastConfigurationIssue issue) => issue.code.name).join(', ')}',
        );
+
+  final int rootProductId;
+  final List<BreakfastConfigurationIssue> issues;
+
+  List<BreakfastConfigurationErrorCode> get codes => issues
+      .map((BreakfastConfigurationIssue issue) => issue.code)
+      .toSet()
+      .toList(growable: false);
+
+  static List<BreakfastConfigurationIssue> _dedupeIssues(
+    List<BreakfastConfigurationIssue> issues,
+  ) {
+    final Map<String, BreakfastConfigurationIssue> deduped =
+        <String, BreakfastConfigurationIssue>{};
+    for (final BreakfastConfigurationIssue issue in issues) {
+      deduped[issue.dedupeKey] = issue;
+    }
+    return deduped.values.toList(growable: false);
+  }
+}
+
+class BreakfastEditRejectedException extends ValidationException {
+  BreakfastEditRejectedException({required this.codes, this.transactionLineId})
+    : super(
+        'Breakfast edit rejected: ${codes.map((BreakfastEditErrorCode code) => code.name).join(', ')}',
+      );
 
   final List<BreakfastEditErrorCode> codes;
   final int? transactionLineId;
 }
 
-class BreakfastLineNotEditableException extends InvalidStateTransitionException {
+class MealCustomizationRuntimeConfigurationException
+    extends ValidationException {
+  MealCustomizationRuntimeConfigurationException({
+    required this.productId,
+    required this.profileId,
+    required String detail,
+  }) : super(
+         'Meal customization configuration invalid for product $productId and profile $profileId: $detail',
+       );
+
+  final int productId;
+  final int profileId;
+}
+
+class BreakfastLineNotEditableException
+    extends InvalidStateTransitionException {
   BreakfastLineNotEditableException({
     required this.reason,
     required this.transactionLineId,
@@ -80,8 +159,84 @@ class BreakfastLineNotEditableException extends InvalidStateTransitionException 
   }
 }
 
+class StaleBreakfastEditException extends AppException {
+  StaleBreakfastEditException({
+    required this.transactionLineId,
+    required this.transactionId,
+    required this.expectedUpdatedAt,
+    required this.actualUpdatedAt,
+  }) : super(
+         'Breakfast line $transactionLineId in transaction $transactionId is stale. expected_updated_at=${expectedUpdatedAt.toIso8601String()} actual_updated_at=${actualUpdatedAt.toIso8601String()}',
+       );
+
+  final int transactionLineId;
+  final int transactionId;
+  final DateTime expectedUpdatedAt;
+  final DateTime actualUpdatedAt;
+}
+
+class MealCustomizationLineNotEditableException
+    extends InvalidStateTransitionException {
+  MealCustomizationLineNotEditableException({
+    required this.reason,
+    required this.transactionLineId,
+    required this.transactionId,
+  }) : super(_buildMessage(reason, transactionLineId, transactionId));
+
+  final MealCustomizationEditBlockedReason reason;
+  final int transactionLineId;
+  final int transactionId;
+
+  static String _buildMessage(
+    MealCustomizationEditBlockedReason reason,
+    int transactionLineId,
+    int transactionId,
+  ) {
+    switch (reason) {
+      case MealCustomizationEditBlockedReason.notDraft:
+        return 'Meal customization line $transactionLineId in transaction $transactionId is not editable.';
+      case MealCustomizationEditBlockedReason.sent:
+        return 'Meal customization line $transactionLineId in transaction $transactionId belongs to a sent order and is not editable.';
+      case MealCustomizationEditBlockedReason.paid:
+        return 'Meal customization line $transactionLineId in transaction $transactionId belongs to a paid order and is not editable.';
+      case MealCustomizationEditBlockedReason.cancelled:
+        return 'Meal customization line $transactionLineId in transaction $transactionId belongs to a cancelled order and is not editable.';
+      case MealCustomizationEditBlockedReason.legacySnapshotMissing:
+        return 'Meal customization line $transactionLineId in transaction $transactionId was created before snapshot persistence and cannot be edited.';
+    }
+  }
+}
+
+class StaleMealCustomizationEditException extends AppException {
+  StaleMealCustomizationEditException({
+    required this.transactionLineId,
+    required this.transactionId,
+    required this.expectedUpdatedAt,
+    required this.actualUpdatedAt,
+  }) : super(
+         'Meal customization line $transactionLineId in transaction $transactionId is stale. expected_updated_at=${expectedUpdatedAt.toIso8601String()} actual_updated_at=${actualUpdatedAt.toIso8601String()}',
+       );
+
+  final int transactionLineId;
+  final int transactionId;
+  final DateTime expectedUpdatedAt;
+  final DateTime actualUpdatedAt;
+}
+
 class NotFoundException extends AppException {
   NotFoundException(super.message);
+}
+
+class MealAdjustmentProfileInUseException extends AppException {
+  MealAdjustmentProfileInUseException({
+    required this.profileId,
+    required this.productCount,
+  }) : super(
+         'Meal adjustment profile $profileId is still assigned to $productCount product(s). Unassign all products first.',
+       );
+
+  final int profileId;
+  final int productCount;
 }
 
 class ShiftAlreadyOpenException extends AppException {

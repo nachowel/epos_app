@@ -14,6 +14,7 @@ import '../../data/repositories/audit_log_repository.dart';
 import '../../data/repositories/breakfast_configuration_repository.dart';
 import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/cash_movement_repository.dart';
+import '../../data/repositories/drift_meal_adjustment_profile_repository.dart';
 import '../../data/repositories/modifier_repository.dart';
 import '../../data/repositories/payment_adjustment_repository.dart';
 import '../../data/repositories/payment_repository.dart';
@@ -47,6 +48,12 @@ import '../../domain/services/cashier_report_service.dart';
 import '../../domain/services/breakfast_pos_service.dart';
 import '../../domain/services/catalog_service.dart';
 import '../../domain/services/checkout_service.dart';
+import '../../domain/services/meal_adjustment_admin_service.dart';
+import '../../domain/services/meal_adjustment_profile_validation_service.dart';
+import '../../domain/services/meal_customization_engine.dart';
+import '../../domain/services/meal_customization_pos_service.dart';
+import '../../domain/services/meal_insights_service.dart';
+import '../../domain/services/meal_optimization_service.dart';
 import '../../domain/services/order_service.dart';
 import '../../domain/services/payment_service.dart';
 import '../../domain/services/printer_service.dart';
@@ -110,6 +117,13 @@ final Provider<ProductRepository> productRepositoryProvider =
 final Provider<ModifierRepository> modifierRepositoryProvider =
     Provider<ModifierRepository>(
       (Ref ref) => ModifierRepository(ref.watch(appDatabaseProvider)),
+    );
+
+final Provider<DriftMealAdjustmentProfileRepository>
+mealAdjustmentProfileRepositoryProvider =
+    Provider<DriftMealAdjustmentProfileRepository>(
+      (Ref ref) =>
+          DriftMealAdjustmentProfileRepository(ref.watch(appDatabaseProvider)),
     );
 
 final Provider<ShiftRepository> shiftRepositoryProvider =
@@ -336,16 +350,40 @@ final Provider<SemanticMenuAdminService> semanticMenuAdminServiceProvider =
     Provider<SemanticMenuAdminService>(
       (Ref ref) => SemanticMenuAdminService(
         productRepository: ref.watch(productRepositoryProvider),
+        categoryRepository: ref.watch(categoryRepositoryProvider),
         breakfastConfigurationRepository: ref.watch(
           breakfastConfigurationRepositoryProvider,
         ),
         policyService: ref.watch(semanticMenuPolicyServiceProvider),
+        logger: ref.watch(appLoggerProvider),
       ),
     );
 
 final Provider<SemanticMenuPolicyService> semanticMenuPolicyServiceProvider =
     Provider<SemanticMenuPolicyService>(
       (_) => const SemanticMenuPolicyService(),
+    );
+
+final Provider<MealAdjustmentProfileValidationService>
+mealAdjustmentProfileValidationServiceProvider =
+    Provider<MealAdjustmentProfileValidationService>(
+      (Ref ref) => MealAdjustmentProfileValidationService(
+        repository: ref.watch(mealAdjustmentProfileRepositoryProvider),
+      ),
+    );
+
+final Provider<MealCustomizationEngine> mealCustomizationEngineProvider =
+    Provider<MealCustomizationEngine>((_) => const MealCustomizationEngine());
+
+final Provider<MealAdjustmentAdminService> mealAdjustmentAdminServiceProvider =
+    Provider<MealAdjustmentAdminService>(
+      (Ref ref) => MealAdjustmentAdminService(
+        repository: ref.watch(mealAdjustmentProfileRepositoryProvider),
+        validationService: ref.watch(
+          mealAdjustmentProfileValidationServiceProvider,
+        ),
+        engine: ref.watch(mealCustomizationEngineProvider),
+      ),
     );
 
 final Provider<BreakfastPosService> breakfastPosServiceProvider =
@@ -355,6 +393,38 @@ final Provider<BreakfastPosService> breakfastPosServiceProvider =
           breakfastConfigurationRepositoryProvider,
         ),
         policyService: ref.watch(semanticMenuPolicyServiceProvider),
+      ),
+    );
+
+final Provider<MealCustomizationPosService> mealCustomizationPosServiceProvider =
+    Provider<MealCustomizationPosService>(
+      (Ref ref) => MealCustomizationPosService(
+        mealAdjustmentProfileRepository: ref.watch(
+          mealAdjustmentProfileRepositoryProvider,
+        ),
+        validationService: ref.watch(
+          mealAdjustmentProfileValidationServiceProvider,
+        ),
+        productRepository: ref.watch(productRepositoryProvider),
+        engine: ref.watch(mealCustomizationEngineProvider),
+      ),
+    );
+
+final Provider<MealInsightsService> mealInsightsServiceProvider =
+    Provider<MealInsightsService>(
+      (Ref ref) => MealInsightsService(
+        transactionRepository: ref.watch(transactionRepositoryProvider),
+        productRepository: ref.watch(productRepositoryProvider),
+        suggestionCacheTtl: const Duration(minutes: 5),
+        maxCacheSize: 50,
+      ),
+    );
+
+final Provider<MealOptimizationService> mealOptimizationServiceProvider =
+    Provider<MealOptimizationService>(
+      (Ref ref) => MealOptimizationService(
+        transactionRepository: ref.watch(transactionRepositoryProvider),
+        productRepository: ref.watch(productRepositoryProvider),
       ),
     );
 
@@ -400,6 +470,9 @@ final Provider<AdminService> adminServiceProvider = Provider<AdminService>(
   (Ref ref) => AdminService(
     categoryRepository: ref.watch(categoryRepositoryProvider),
     productRepository: ref.watch(productRepositoryProvider),
+    breakfastConfigurationRepository: ref.watch(
+      breakfastConfigurationRepositoryProvider,
+    ),
     modifierRepository: ref.watch(modifierRepositoryProvider),
     shiftRepository: ref.watch(shiftRepositoryProvider),
     transactionRepository: ref.watch(transactionRepositoryProvider),
@@ -428,9 +501,17 @@ final Provider<OrderService> orderServiceProvider = Provider<OrderService>(
     shiftSessionService: ref.watch(shiftSessionServiceProvider),
     transactionRepository: ref.watch(transactionRepositoryProvider),
     transactionStateRepository: ref.watch(transactionStateRepositoryProvider),
+    productRepository: ref.watch(productRepositoryProvider),
     breakfastConfigurationRepository: ref.watch(
       breakfastConfigurationRepositoryProvider,
     ),
+    mealAdjustmentProfileRepository: ref.watch(
+      mealAdjustmentProfileRepositoryProvider,
+    ),
+    mealAdjustmentProfileValidationService: ref.watch(
+      mealAdjustmentProfileValidationServiceProvider,
+    ),
+    mealCustomizationEngine: ref.watch(mealCustomizationEngineProvider),
     paymentRepository: ref.watch(paymentRepositoryProvider),
     printJobRepository: ref.watch(printJobRepositoryProvider),
     syncQueueRepository: ref.watch(syncQueueRepositoryProvider),

@@ -58,6 +58,42 @@ void main() {
       },
     );
 
+    test(
+      'explicit none satisfies required grouped choice validation',
+      () async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final _BreakfastPosFixture fixture = await _seedBreakfastPosFixture(db);
+        final BreakfastPosService service = BreakfastPosService(
+          breakfastConfigurationRepository: BreakfastConfigurationRepository(
+            db,
+          ),
+        );
+
+        final BreakfastPosEditorData initial = await service.loadEditorData(
+          product: fixture.rootProduct,
+        );
+
+        final BreakfastPosSelectionPreview preview = service.previewSelection(
+          product: fixture.rootProduct,
+          configuration: initial.configuration,
+          requestedState: BreakfastRequestedState(
+            chosenGroups: <BreakfastChosenGroupRequest>[
+              BreakfastChosenGroupRequest(
+                groupId: fixture.drinkGroupId,
+                selectedItemProductId: null,
+                requestedQuantity: 1,
+              ),
+            ],
+          ),
+        );
+
+        expect(preview.canConfirm, isTrue);
+        expect(preview.validationMessages, isEmpty);
+        expect(preview.rebuildResult.lineSnapshot.lineTotalMinor, 600);
+      },
+    );
+
     test('broken multi-select config is blocked before POS sale', () async {
       final app_db.AppDatabase db = createTestDatabase();
       addTearDown(db.close);
@@ -217,7 +253,10 @@ Future<_BreakfastPosFixture> _seedBreakfastPosFixture(
   app_db.AppDatabase db, {
   int groupMaxSelect = 1,
 }) async {
-  final int breakfastCategoryId = await insertCategory(db, name: 'Breakfast');
+  final int breakfastCategoryId = await insertCategory(
+    db,
+    name: 'Set Breakfast',
+  );
   final int drinkCategoryId = await insertCategory(db, name: 'Drinks');
 
   final int rootProductId = await insertProduct(

@@ -1,13 +1,20 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:epos_app/data/database/app_database.dart' hide User;
 import 'package:epos_app/data/repositories/breakfast_configuration_repository.dart';
+import 'package:epos_app/data/repositories/drift_meal_adjustment_profile_repository.dart';
 import 'package:epos_app/data/repositories/payment_repository.dart';
+import 'package:epos_app/data/repositories/product_repository.dart';
 import 'package:epos_app/data/repositories/settings_repository.dart';
 import 'package:epos_app/data/repositories/shift_repository.dart';
 import 'package:epos_app/data/repositories/transaction_repository.dart';
+import 'package:epos_app/data/repositories/transaction_state_repository.dart';
+import 'package:epos_app/domain/models/meal_adjustment_profile.dart';
+import 'package:epos_app/domain/models/meal_customization.dart';
 import 'package:epos_app/domain/models/order_modifier.dart';
 import 'package:epos_app/domain/models/semantic_sales_analytics.dart';
 import 'package:epos_app/domain/models/user.dart';
+import 'package:epos_app/domain/services/meal_adjustment_profile_validation_service.dart';
+import 'package:epos_app/domain/services/order_service.dart';
 import 'package:epos_app/domain/services/report_service.dart';
 import 'package:epos_app/domain/services/report_visibility_service.dart';
 import 'package:epos_app/domain/services/shift_session_service.dart';
@@ -212,6 +219,180 @@ void main() {
         );
       },
     );
+
+    test(
+      'grouped standard meal lines expand quantity for paid swap, extras, and discounts',
+      () async {
+        final AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+
+        final _StandardMealReportFixture fixture =
+            await _seedStandardMealReportFixture(
+              db,
+              freeSwapLimit: 0,
+              swapFixedDeltaMinor: 50,
+              addGroupedQuantity: 2,
+              includeExtra: true,
+              removeSide: true,
+            );
+        final ReportService service = _makeReportService(db);
+
+        final SemanticSalesAnalytics analytics =
+            (await service.getShiftReport(fixture.shiftId))
+                .semanticSalesAnalytics;
+        final SemanticRootProductAnalytics root = analytics.rootProducts
+            .singleWhere(
+              (SemanticRootProductAnalytics entry) =>
+                  entry.rootProductId == fixture.rootProductId,
+            );
+        final SemanticChargeReasonAnalytics paidSwapBreakdown = analytics
+            .chargeReasonBreakdown
+            .singleWhere(
+              (SemanticChargeReasonAnalytics entry) =>
+                  entry.chargeReason == ModifierChargeReason.paidSwap,
+            );
+        final SemanticChargeReasonAnalytics extraBreakdown = analytics
+            .chargeReasonBreakdown
+            .singleWhere(
+              (SemanticChargeReasonAnalytics entry) =>
+                  entry.chargeReason == ModifierChargeReason.extraAdd,
+            );
+        final SemanticChargeReasonAnalytics discountBreakdown = analytics
+            .chargeReasonBreakdown
+            .singleWhere(
+              (SemanticChargeReasonAnalytics entry) =>
+                  entry.chargeReason == ModifierChargeReason.removalDiscount,
+            );
+        final SemanticMealRevenueAnalytics mealRevenue = analytics
+            .mealRevenueBreakdown
+            .singleWhere(
+              (SemanticMealRevenueAnalytics entry) =>
+                  entry.rootProductId == fixture.rootProductId,
+            );
+        final SemanticMealAppliedRuleAnalytics appliedRule = analytics
+            .appliedMealRules
+            .single;
+        final SemanticBundleVariantAnalytics variant = analytics.bundleVariants
+            .singleWhere(
+              (SemanticBundleVariantAnalytics entry) =>
+                  entry.rootProductId == fixture.rootProductId,
+            );
+
+        expect(root.quantitySold, 2);
+        expect(root.revenueMinor, 2200);
+        expect(paidSwapBreakdown.eventCount, 2);
+        expect(paidSwapBreakdown.totalQuantity, 2);
+        expect(paidSwapBreakdown.revenueMinor, 100);
+        expect(extraBreakdown.eventCount, 2);
+        expect(extraBreakdown.totalQuantity, 2);
+        expect(extraBreakdown.revenueMinor, 200);
+        expect(discountBreakdown.eventCount, 2);
+        expect(discountBreakdown.totalQuantity, 2);
+        expect(discountBreakdown.revenueMinor, -100);
+        expect(mealRevenue.quantitySold, 2);
+        expect(mealRevenue.baseRevenueMinor, 2000);
+        expect(mealRevenue.extraRevenueMinor, 200);
+        expect(mealRevenue.paidSwapRevenueMinor, 100);
+        expect(mealRevenue.freeSwapCount, 0);
+        expect(mealRevenue.discountTotalMinor, -100);
+        expect(mealRevenue.netRevenueMinor, 2200);
+        expect(mealRevenue.removeActionCount, 2);
+        expect(mealRevenue.swapActionCount, 2);
+        expect(mealRevenue.extraActionCount, 2);
+        expect(mealRevenue.discountActionCount, 2);
+        expect(appliedRule.ruleType, MealAdjustmentPricingRuleType.removeOnly.name);
+        expect(appliedRule.applicationCount, 2);
+        expect(appliedRule.totalImpactMinor, -100);
+        expect(variant.orderCount, 2);
+        expect(variant.revenueMinor, 2200);
+      },
+    );
+
+    test('standard meal free swaps contribute zero revenue in analytics',
+        () async {
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+
+      final _StandardMealReportFixture fixture =
+          await _seedStandardMealReportFixture(
+            db,
+            freeSwapLimit: 1,
+            swapFixedDeltaMinor: 50,
+            addGroupedQuantity: 1,
+            includeExtra: false,
+            removeSide: false,
+          );
+      final ReportService service = _makeReportService(db);
+
+      final SemanticSalesAnalytics analytics =
+          (await service.getShiftReport(fixture.shiftId)).semanticSalesAnalytics;
+      final SemanticChargeReasonAnalytics freeSwapBreakdown = analytics
+          .chargeReasonBreakdown
+          .singleWhere(
+            (SemanticChargeReasonAnalytics entry) =>
+                entry.chargeReason == ModifierChargeReason.freeSwap,
+          );
+      final SemanticItemBehaviorAnalytics addedSwap = analytics.addedItems
+          .singleWhere(
+            (SemanticItemBehaviorAnalytics entry) =>
+                entry.itemProductId == fixture.swapItemProductId,
+          );
+
+      expect(freeSwapBreakdown.eventCount, 1);
+      expect(freeSwapBreakdown.totalQuantity, 1);
+      expect(freeSwapBreakdown.revenueMinor, 0);
+      expect(addedSwap.revenueMinor, 0);
+      expect(
+        analytics.mealRevenueBreakdown.single.freeSwapCount,
+        1,
+      );
+      expect(
+        analytics.mealRevenueBreakdown.single.paidSwapRevenueMinor,
+        0,
+      );
+      expect(analytics.appliedMealRules, isEmpty);
+    });
+
+    test(
+      'legacy standard meal lines stay in root revenue totals but emit data-quality notes',
+      () async {
+        final AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+
+        final _StandardMealReportFixture fixture =
+            await _seedStandardMealReportFixture(
+              db,
+              freeSwapLimit: 0,
+              swapFixedDeltaMinor: 50,
+              addGroupedQuantity: 1,
+              includeExtra: false,
+              removeSide: true,
+            );
+        await db.customStatement(
+          'DELETE FROM meal_customization_line_snapshots WHERE transaction_line_id = ?',
+          <Object?>[fixture.transactionLineId],
+        );
+        final ReportService service = _makeReportService(db);
+
+        final SemanticSalesAnalytics analytics =
+            (await service.getShiftReport(fixture.shiftId)).semanticSalesAnalytics;
+
+        expect(
+          analytics.rootProducts.singleWhere(
+            (SemanticRootProductAnalytics entry) =>
+                entry.rootProductId == fixture.rootProductId,
+          ).revenueMinor,
+          1000,
+        );
+        expect(analytics.mealRevenueBreakdown, isEmpty);
+        expect(analytics.appliedMealRules, isEmpty);
+        expect(
+          analytics.dataQualityNotes,
+          contains(
+            contains('Legacy standard meal lines without persisted snapshots'),
+          ),
+        );
+      });
   });
 }
 
@@ -234,7 +415,10 @@ Future<_SemanticReportFixture> _seedSemanticReportFixture(
 }) async {
   final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
   final int shiftId = await insertShift(db, openedBy: cashierId);
-  final int breakfastCategoryId = await insertCategory(db, name: 'Breakfast');
+  final int breakfastCategoryId = await insertCategory(
+    db,
+    name: 'Set Breakfast',
+  );
   final int drinkCategoryId = await insertCategory(db, name: 'Drinks');
   final int sideCategoryId = await insertCategory(db, name: 'Sides');
 
@@ -551,6 +735,213 @@ Future<_SemanticReportFixture> _seedSemanticReportFixture(
       createdAt: DateTime.now(),
     ),
   );
+}
+
+Future<_StandardMealReportFixture> _seedStandardMealReportFixture(
+  AppDatabase db, {
+  required int freeSwapLimit,
+  required int swapFixedDeltaMinor,
+  required int addGroupedQuantity,
+  required bool includeExtra,
+  required bool removeSide,
+}) async {
+  final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
+  final int shiftId = await insertShift(db, openedBy: cashierId);
+  final int categoryId = await insertCategory(db, name: 'Meals');
+  final int rootProductId = await insertProduct(
+    db,
+    categoryId: categoryId,
+    name: 'Burger Meal',
+    priceMinor: 1000,
+  );
+  final int defaultMainId = await insertProduct(
+    db,
+    categoryId: categoryId,
+    name: 'Chicken Fillet',
+    priceMinor: 0,
+  );
+  final int swapItemProductId = await insertProduct(
+    db,
+    categoryId: categoryId,
+    name: 'Beef Patty',
+    priceMinor: 0,
+  );
+  final int sideProductId = await insertProduct(
+    db,
+    categoryId: categoryId,
+    name: 'Fries',
+    priceMinor: 0,
+  );
+  final int extraItemProductId = await insertProduct(
+    db,
+    categoryId: categoryId,
+    name: 'Cheese',
+    priceMinor: 0,
+  );
+
+  final DriftMealAdjustmentProfileRepository repository =
+      DriftMealAdjustmentProfileRepository(db);
+  final int profileId = await repository.saveProfileDraft(
+    MealAdjustmentProfileDraft(
+      name: 'Meal analytics profile',
+      freeSwapLimit: freeSwapLimit,
+      isActive: true,
+      components: <MealAdjustmentComponentDraft>[
+        MealAdjustmentComponentDraft(
+          componentKey: 'main',
+          displayName: 'Main',
+          defaultItemProductId: defaultMainId,
+          quantity: 1,
+          canRemove: false,
+          sortOrder: 0,
+          isActive: true,
+          swapOptions: <MealAdjustmentComponentOptionDraft>[
+            MealAdjustmentComponentOptionDraft(
+              optionItemProductId: swapItemProductId,
+              fixedPriceDeltaMinor: swapFixedDeltaMinor,
+              sortOrder: 0,
+              isActive: true,
+            ),
+          ],
+        ),
+        MealAdjustmentComponentDraft(
+          componentKey: 'side',
+          displayName: 'Side',
+          defaultItemProductId: sideProductId,
+          quantity: 1,
+          canRemove: true,
+          sortOrder: 1,
+          isActive: true,
+        ),
+      ],
+      extraOptions: includeExtra
+          ? <MealAdjustmentExtraOptionDraft>[
+              MealAdjustmentExtraOptionDraft(
+                itemProductId: extraItemProductId,
+                fixedPriceDeltaMinor: 100,
+                sortOrder: 0,
+                isActive: true,
+              ),
+            ]
+          : const <MealAdjustmentExtraOptionDraft>[],
+      pricingRules: removeSide
+          ? <MealAdjustmentPricingRuleDraft>[
+              MealAdjustmentPricingRuleDraft(
+                name: 'No side discount',
+                ruleType: MealAdjustmentPricingRuleType.removeOnly,
+                priceDeltaMinor: -50,
+                priority: 0,
+                isActive: true,
+                conditions: const <MealAdjustmentPricingRuleConditionDraft>[
+                  MealAdjustmentPricingRuleConditionDraft(
+                    conditionType:
+                        MealAdjustmentPricingRuleConditionType.removedComponent,
+                    componentKey: 'side',
+                    quantity: 1,
+                  ),
+                ],
+              ),
+            ]
+          : const <MealAdjustmentPricingRuleDraft>[],
+    ),
+  );
+  await repository.assignProfileToProduct(
+    productId: rootProductId,
+    profileId: profileId,
+  );
+
+  final User cashierUser = User(
+    id: cashierId,
+    name: 'Cashier',
+    pin: null,
+    password: null,
+    role: UserRole.cashier,
+    isActive: true,
+    createdAt: DateTime.now(),
+  );
+  final OrderService orderService = OrderService(
+    shiftSessionService: ShiftSessionService(ShiftRepository(db)),
+    transactionRepository: TransactionRepository(db),
+    transactionStateRepository: TransactionStateRepository(db),
+    productRepository: ProductRepository(db),
+    mealAdjustmentProfileRepository: repository,
+    mealAdjustmentProfileValidationService:
+        MealAdjustmentProfileValidationService(repository: repository),
+  );
+  final transaction = await orderService.createOrder(currentUser: cashierUser);
+  final MealCustomizationRequest request = MealCustomizationRequest(
+    productId: rootProductId,
+    profileId: profileId,
+    removedComponentKeys: removeSide ? const <String>['side'] : const <String>[],
+    swapSelections: <MealCustomizationComponentSelection>[
+      MealCustomizationComponentSelection(
+        componentKey: 'main',
+        targetItemProductId: swapItemProductId,
+      ),
+    ],
+    extraSelections: includeExtra
+        ? <MealCustomizationExtraSelection>[
+            MealCustomizationExtraSelection(
+              itemProductId: extraItemProductId,
+              quantity: 1,
+            ),
+          ]
+        : const <MealCustomizationExtraSelection>[],
+  );
+
+  for (int index = 0; index < addGroupedQuantity; index++) {
+    await orderService.addProductToOrder(
+      transactionId: transaction.id,
+      productId: rootProductId,
+      mealCustomizationRequest: request,
+    );
+  }
+
+  final transactionRepository = TransactionRepository(db);
+  final updatedTransaction = (await transactionRepository.getById(
+    transaction.id,
+  ))!;
+  final DateTime paidAt = DateTime(2026, 4, 3, 12, 0);
+  await (db.update(db.transactions)
+        ..where(
+          ($TransactionsTable table) => table.id.equals(transaction.id),
+        ))
+      .write(
+        TransactionsCompanion(
+          status: const Value<String>('paid'),
+          paidAt: Value<DateTime>(paidAt),
+          updatedAt: Value<DateTime>(paidAt),
+        ),
+      );
+  await insertPayment(
+    db,
+    uuid: 'meal-report-payment-${transaction.id}',
+    transactionId: transaction.id,
+    method: 'cash',
+    amountMinor: updatedTransaction.totalAmountMinor,
+    paidAt: paidAt,
+  );
+
+  return _StandardMealReportFixture(
+    shiftId: shiftId,
+    rootProductId: rootProductId,
+    swapItemProductId: swapItemProductId,
+    transactionLineId: (await transactionRepository.getLines(transaction.id)).single.id,
+  );
+}
+
+class _StandardMealReportFixture {
+  const _StandardMealReportFixture({
+    required this.shiftId,
+    required this.rootProductId,
+    required this.swapItemProductId,
+    required this.transactionLineId,
+  });
+
+  final int shiftId;
+  final int rootProductId;
+  final int swapItemProductId;
+  final int transactionLineId;
 }
 
 Future<void> _insertSemanticLine(

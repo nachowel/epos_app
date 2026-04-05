@@ -215,7 +215,7 @@ void main() {
         await tester.pumpWidget(_testPosApp(container));
         await tester.pumpAndSettle();
 
-        await tester.tap(find.text('Set Breakfast'));
+        await tester.tap(find.text('Set Breakfast').last);
         await tester.pumpAndSettle();
 
         // Opens semantic editor, not flat modifier popup
@@ -275,7 +275,7 @@ void main() {
         await tester.pumpWidget(_testPosApp(container));
         await tester.pumpAndSettle();
 
-        await tester.tap(find.text('Set Breakfast'));
+        await tester.tap(find.text('Set Breakfast').last);
         await tester.pumpAndSettle();
 
         // Confirm button should be disabled
@@ -335,7 +335,10 @@ Future<_PosFixture> _seedPosFixture(AppDatabase db) async {
   final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
   await insertShift(db, openedBy: cashierId);
 
-  final int breakfastCategoryId = await insertCategory(db, name: 'Breakfast');
+  final int breakfastCategoryId = await insertCategory(
+    db,
+    name: 'Set Breakfast',
+  );
   final int drinkCategoryId = await insertCategory(db, name: 'Drinks');
 
   final int rootProductId = await insertProduct(

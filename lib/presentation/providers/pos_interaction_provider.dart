@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/models/interaction_block_reason.dart';
+import '../../domain/models/meal_customization.dart';
 import '../../domain/models/payment.dart';
 import '../../domain/models/product.dart';
 import '../../domain/models/breakfast_cart_selection.dart';
@@ -102,6 +103,7 @@ class PosInteractionController {
     int quantity = 1,
     List<CartModifier> modifiers = const <CartModifier>[],
     BreakfastCartSelection? breakfastSelection,
+    MealCustomizationCartSelection? mealCustomizationSelection,
   }) {
     if (!_policy.canMutateCart) {
       return false;
@@ -114,6 +116,7 @@ class PosInteractionController {
           quantity: quantity,
           modifiers: modifiers,
           breakfastSelection: breakfastSelection,
+          mealCustomizationSelection: mealCustomizationSelection,
         );
     return true;
   }

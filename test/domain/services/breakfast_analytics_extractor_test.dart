@@ -5,7 +5,7 @@ import 'package:epos_app/domain/services/breakfast_analytics_extractor.dart';
 void main() {
   const BreakfastAnalyticsExtractor extractor = BreakfastAnalyticsExtractor();
 
-  OrderModifier _modifier({
+  OrderModifier modifierFixture({
     ModifierAction action = ModifierAction.add,
     ModifierChargeReason? chargeReason,
     String itemName = 'Item',
@@ -30,42 +30,47 @@ void main() {
   }
 
   group('BreakfastAnalyticsExtractor', () {
-    test('same product under different charge_reason produces separate entries', () {
-      final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
-        _modifier(
-          action: ModifierAction.choice,
-          chargeReason: ModifierChargeReason.includedChoice,
-          itemName: 'Toast',
-          itemProductId: 50,
-          quantity: 2,
-        ),
-        _modifier(
-          chargeReason: ModifierChargeReason.extraAdd,
-          itemName: 'Toast',
-          itemProductId: 50,
-          quantity: 2,
-          priceEffectMinor: 200,
-        ),
-      ]);
+    test(
+      'same product under different charge_reason produces separate entries',
+      () {
+        final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
+          modifierFixture(
+            action: ModifierAction.choice,
+            chargeReason: ModifierChargeReason.includedChoice,
+            itemName: 'Toast',
+            itemProductId: 50,
+            quantity: 2,
+          ),
+          modifierFixture(
+            chargeReason: ModifierChargeReason.extraAdd,
+            itemName: 'Toast',
+            itemProductId: 50,
+            quantity: 2,
+            priceEffectMinor: 200,
+          ),
+        ]);
 
-      expect(snapshot.entries, hasLength(2));
-      final BreakfastModifierAnalyticsEntry included = snapshot.entries
-          .firstWhere((e) => e.chargeReason == ModifierChargeReason.includedChoice);
-      final BreakfastModifierAnalyticsEntry extra = snapshot.entries
-          .firstWhere((e) => e.chargeReason == ModifierChargeReason.extraAdd);
+        expect(snapshot.entries, hasLength(2));
+        final BreakfastModifierAnalyticsEntry included = snapshot.entries
+            .firstWhere(
+              (e) => e.chargeReason == ModifierChargeReason.includedChoice,
+            );
+        final BreakfastModifierAnalyticsEntry extra = snapshot.entries
+            .firstWhere((e) => e.chargeReason == ModifierChargeReason.extraAdd);
 
-      expect(included.itemProductId, 50);
-      expect(included.totalQuantity, 2);
-      expect(included.totalRevenueMinor, 0);
+        expect(included.itemProductId, 50);
+        expect(included.totalQuantity, 2);
+        expect(included.totalRevenueMinor, 0);
 
-      expect(extra.itemProductId, 50);
-      expect(extra.totalQuantity, 2);
-      expect(extra.totalRevenueMinor, 200);
-    });
+        expect(extra.itemProductId, 50);
+        expect(extra.totalQuantity, 2);
+        expect(extra.totalRevenueMinor, 200);
+      },
+    );
 
     test('item_product_id is preserved', () {
       final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
-        _modifier(
+        modifierFixture(
           chargeReason: ModifierChargeReason.freeSwap,
           itemProductId: 77,
           itemName: 'Black Pudding',
@@ -77,13 +82,13 @@ void main() {
 
     test('paid_swap revenue sums correctly', () {
       final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
-        _modifier(
+        modifierFixture(
           chargeReason: ModifierChargeReason.paidSwap,
           itemProductId: 10,
           priceEffectMinor: 150,
           quantity: 1,
         ),
-        _modifier(
+        modifierFixture(
           chargeReason: ModifierChargeReason.paidSwap,
           itemProductId: 20,
           priceEffectMinor: 200,
@@ -97,7 +102,7 @@ void main() {
 
     test('extra_add revenue sums correctly', () {
       final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
-        _modifier(
+        modifierFixture(
           chargeReason: ModifierChargeReason.extraAdd,
           itemProductId: 30,
           priceEffectMinor: 100,
@@ -111,13 +116,13 @@ void main() {
 
     test('does not merge included_choice and extra_add', () {
       final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
-        _modifier(
+        modifierFixture(
           action: ModifierAction.choice,
           chargeReason: ModifierChargeReason.includedChoice,
           itemProductId: 50,
           quantity: 1,
         ),
-        _modifier(
+        modifierFixture(
           chargeReason: ModifierChargeReason.extraAdd,
           itemProductId: 50,
           quantity: 1,
@@ -132,12 +137,12 @@ void main() {
 
     test('does not merge free_swap and paid_swap', () {
       final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
-        _modifier(
+        modifierFixture(
           chargeReason: ModifierChargeReason.freeSwap,
           itemProductId: 60,
           quantity: 1,
         ),
-        _modifier(
+        modifierFixture(
           chargeReason: ModifierChargeReason.paidSwap,
           itemProductId: 60,
           quantity: 1,
@@ -152,7 +157,7 @@ void main() {
 
     test('counts removed items', () {
       final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
-        _modifier(
+        modifierFixture(
           action: ModifierAction.remove,
           chargeReason: null,
           itemProductId: 40,
@@ -165,7 +170,7 @@ void main() {
 
     test('skips modifiers without item_product_id', () {
       final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
-        _modifier(
+        modifierFixture(
           chargeReason: ModifierChargeReason.extraAdd,
           itemProductId: null,
           priceEffectMinor: 100,
@@ -177,7 +182,7 @@ void main() {
 
     test('skips modifiers without charge_reason', () {
       final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
-        _modifier(
+        modifierFixture(
           chargeReason: null,
           itemProductId: 100,
           priceEffectMinor: 100,
@@ -189,7 +194,7 @@ void main() {
 
     test('removalDiscount entries are excluded from analytics entries', () {
       final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
-        _modifier(
+        modifierFixture(
           action: ModifierAction.remove,
           chargeReason: ModifierChargeReason.removalDiscount,
           itemProductId: 40,
@@ -208,25 +213,28 @@ void main() {
       expect(snapshot.extraAddRevenueMinor, 0);
     });
 
-    test('same product same charge_reason across multiple modifiers aggregates', () {
-      final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
-        _modifier(
-          chargeReason: ModifierChargeReason.extraAdd,
-          itemProductId: 10,
-          priceEffectMinor: 100,
-          quantity: 1,
-        ),
-        _modifier(
-          chargeReason: ModifierChargeReason.extraAdd,
-          itemProductId: 10,
-          priceEffectMinor: 100,
-          quantity: 2,
-        ),
-      ]);
+    test(
+      'same product same charge_reason across multiple modifiers aggregates',
+      () {
+        final BreakfastAnalyticsSnapshot snapshot = extractor.extract([
+          modifierFixture(
+            chargeReason: ModifierChargeReason.extraAdd,
+            itemProductId: 10,
+            priceEffectMinor: 100,
+            quantity: 1,
+          ),
+          modifierFixture(
+            chargeReason: ModifierChargeReason.extraAdd,
+            itemProductId: 10,
+            priceEffectMinor: 100,
+            quantity: 2,
+          ),
+        ]);
 
-      expect(snapshot.entries, hasLength(1));
-      expect(snapshot.entries.first.totalQuantity, 3);
-      expect(snapshot.entries.first.totalRevenueMinor, 200);
-    });
+        expect(snapshot.entries, hasLength(1));
+        expect(snapshot.entries.first.totalQuantity, 3);
+        expect(snapshot.entries.first.totalRevenueMinor, 200);
+      },
+    );
   });
 }

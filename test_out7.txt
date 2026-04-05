@@ -1,0 +1,32 @@
+00:00 +0: loading C:/Users/nacho/Desktop/EPOS/epos_app/test/domain/services/meal_customization_phase9_test.dart
+00:00 +0: G. Confidence thresholds high confidence when >= 30 orders
+00:00 +1: G. Confidence thresholds medium confidence when 10–29 orders
+00:00 +2: G. Confidence thresholds low confidence when < 10 orders
+00:00 +3: G. Confidence thresholds empty database produces empty report without errors
+00:00 +4: G. Confidence thresholds low data case produces Low confidence insight
+00:00 +5: A. Discount Leakage discount frequency is calculated correctly
+00:01 +6: A. Discount Leakage high removal detected adds highFrequency flag
+00:01 +7: A. Discount Leakage combo discount order count is tracked
+00:01 +8: B. Upsell Opportunity extra attach rate is calculated correctly
+00:01 +9: B. Upsell Opportunity top extra detection — highest count wins
+00:02 +10: C. Swap Behavior top swap pair is correctly identified
+00:02 +11: C. Swap Behavior swap frequency percent is correct
+00:02 +12: C. Swap Behavior free vs paid swap counts are tracked separately
+00:03 +13: D. Profile Performance discount-heavy profile classified correctly
+00:03 +14: D. Profile Performance balanced profile classification when discount ≈ extra
+00:03 +14 -1: D. Profile Performance balanced profile classification when discount ≈ extra [E]
+  Expected: ProfileHealthLabel:<ProfileHealthLabel.balanced>
+    Actual: ProfileHealthLabel:<ProfileHealthLabel.overCustomized>
+  
+  package:matcher                                                 expect
+  package:flutter_test/src/widget_tester.dart 474:18              expect
+  test\domain\services\meal_customization_phase9_test.dart 732:7  main.<fn>.<fn>
+  
+00:03 +14 -1: E. Recommendations high discount frequency triggers reduceDiscount recommendation
+00:04 +15 -1: E. Recommendations low extra attach rate triggers promoteExtra recommendation for medium+ confidence
+00:04 +16 -1: E. Recommendations high frequent swap triggers adjustDefaultComponent
+00:04 +17 -1: E. Recommendations recommendations are deterministic across multiple calls
+00:04 +18 -1: E. Recommendations no recommendations for products with very low data (low confidence)
+00:04 +19 -1: Regression existing meal engine is unaffected
+00:05 +20 -1: Regression report generation does not throw on new empty database
+00:05 +21 -1: Some tests failed.

@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/errors/exceptions.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../domain/models/authorization_policy.dart';
 import '../../../domain/models/draft_order_policy.dart';
+import '../../../domain/models/meal_customization.dart';
 import '../../../domain/models/order_lifecycle_policy.dart';
 import '../../../domain/models/order_modifier.dart';
 import '../../../domain/models/order_payment_policy.dart';
@@ -18,14 +21,20 @@ import '../../../domain/models/payment.dart';
 import '../../../domain/models/payment_adjustment.dart';
 import '../../../domain/models/print_job.dart';
 import '../../../domain/models/transaction.dart';
+import '../../../domain/models/transaction_line.dart';
 import '../../../domain/models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/orders_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../widgets/section_app_bar.dart';
 import '../pos/widgets/payment_dialog.dart';
+import '../pos/widgets/standard_meal_customization_dialog.dart';
+import '../../../domain/models/product.dart';
+import '../../../domain/services/meal_customization_pos_service.dart';
 import 'widgets/breakfast_modifier_popup.dart';
 import 'widgets/order_modifier_presentation.dart';
+
+enum _MealEditScope { editAll, editOne }
 
 class OrderDetailScreen extends ConsumerStatefulWidget {
   const OrderDetailScreen({required this.transactionId, super.key});
@@ -363,6 +372,220 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     await _loadDetails();
   }
 
+  Future<void> _handleMealCustomizationEdit(OrderDetailLine detailLine) async {
+    final MealCustomizationOrderEditorData? initialData = await ref
+        .read(ordersNotifierProvider.notifier)
+        .loadMealCustomizationEditorData(
+          transactionId: widget.transactionId,
+          transactionLineId: detailLine.line.id,
+        );
+    if (!mounted || initialData == null) {
+      _showMessage(
+        ref.read(ordersNotifierProvider).errorMessage ??
+            AppStrings.operationFailed,
+      );
+      return;
+    }
+
+    // Edit granularity: if qty > 1, ask the user to choose edit scope.
+    final int lineQuantity = initialData.rehydration.lineQuantity;
+    bool editOneMode = false;
+    if (lineQuantity > 1) {
+      final _MealEditScope? scope = await showDialog<_MealEditScope>(
+        context: context,
+        builder: (_) {
+          return AlertDialog(
+            key: const ValueKey<String>('meal-edit-scope-dialog'),
+            title: const Text('Edit scope'),
+            content: Text(
+              'This line has $lineQuantity identical items. '
+              'Would you like to edit all of them or just one?',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              OutlinedButton(
+                key: const ValueKey<String>('meal-edit-scope-one'),
+                onPressed: () =>
+                    Navigator.of(context).pop(_MealEditScope.editOne),
+                child: const Text('Edit one item'),
+              ),
+              ElevatedButton(
+                key: const ValueKey<String>('meal-edit-scope-all'),
+                onPressed: () =>
+                    Navigator.of(context).pop(_MealEditScope.editAll),
+                child: const Text('Edit all'),
+              ),
+            ],
+          );
+        },
+      );
+      if (!mounted || scope == null) {
+        return;
+      }
+      editOneMode = scope == _MealEditScope.editOne;
+    }
+
+    List<MealQuickSuggestion> suggestions = const <MealQuickSuggestion>[];
+    try {
+      suggestions = await ref
+          .read(mealInsightsServiceProvider)
+          .loadSuggestionsForProduct(
+            productId: initialData.product.id,
+            productNamesById: initialData.editorData.productNamesById,
+            limit: 5,
+          );
+    } catch (_) {
+      // Suggestions are optional.
+    }
+
+    if (!mounted) return;
+
+    final MealCustomizationCartSelection? selection =
+        await showDialog<MealCustomizationCartSelection>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) {
+            return StandardMealCustomizationDialog(
+              product: initialData.product,
+              initialEditorData: initialData.editorData,
+              isEditMode: true,
+              lineQuantity: editOneMode ? 1 : lineQuantity,
+              editOneMode: editOneMode,
+              suggestions: suggestions,
+            );
+          },
+        );
+    if (!mounted || selection == null) {
+      return;
+    }
+
+    TransactionLine? updatedLine;
+    try {
+      if (editOneMode) {
+        updatedLine = await ref
+            .read(ordersNotifierProvider.notifier)
+            .editOneMealCustomizationLine(
+              transactionId: widget.transactionId,
+              transactionLineId: detailLine.line.id,
+              request: selection.request,
+              expectedTransactionUpdatedAt: initialData.transaction.updatedAt,
+            );
+      } else {
+        updatedLine = await ref
+            .read(ordersNotifierProvider.notifier)
+            .editMealCustomizationLine(
+              transactionId: widget.transactionId,
+              transactionLineId: detailLine.line.id,
+              request: selection.request,
+              expectedTransactionUpdatedAt: initialData.transaction.updatedAt,
+            );
+      }
+    } on StaleMealCustomizationEditException {
+      if (!mounted) return;
+      await _showMealEditConflictDialog();
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    if (updatedLine == null) {
+      _showMessage(
+        ref.read(ordersNotifierProvider).errorMessage ??
+            AppStrings.operationFailed,
+      );
+      return;
+    }
+    await ref.read(ordersNotifierProvider.notifier).refreshOpenOrders();
+    await _loadDetails();
+  }
+
+  Future<void> _showMealEditConflictDialog() async {
+    final bool? reload = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) {
+        return AlertDialog(
+          key: const ValueKey<String>('meal-edit-conflict-dialog'),
+          title: const Text('Item changed'),
+          content: const Text(
+            'This item was changed by another action. '
+            'Please review the updated order and try again.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              key: const ValueKey<String>('meal-edit-conflict-reload'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Reload order'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) return;
+    if (reload == true) {
+      await _loadDetails();
+    }
+  }
+
+  Future<void> _handleLegacyMealRecreate(OrderDetailLine detailLine) async {
+    final MealCustomizationPosEditorData? editorData;
+    try {
+      final Product product = detailLine.line.productId > 0
+          ? (await ref.read(ordersNotifierProvider.notifier)
+                  .loadProductForRecreate(detailLine.line.productId)) ??
+              (throw Exception('Product not found'))
+          : throw Exception('Invalid product ID');
+      editorData = await ref
+          .read(mealCustomizationPosServiceProvider)
+          .loadEditorData(product: product);
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Unable to load meal configuration for this product.');
+      return;
+    }
+    if (!mounted) return;
+
+    final MealCustomizationCartSelection? selection =
+        await showDialog<MealCustomizationCartSelection>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) {
+            return StandardMealCustomizationDialog(
+              product: editorData!.product,
+              initialEditorData: editorData,
+              isEditMode: false,
+              isLegacyRecreateMode: true,
+            );
+          },
+        );
+    if (!mounted || selection == null) return;
+
+    final TransactionLine? result = await ref
+        .read(ordersNotifierProvider.notifier)
+        .recreateLegacyMealLine(
+          transactionId: widget.transactionId,
+          transactionLineId: detailLine.line.id,
+          request: selection.request,
+        );
+    if (!mounted) return;
+    if (result == null) {
+      _showMessage(
+        ref.read(ordersNotifierProvider).errorMessage ??
+            AppStrings.operationFailed,
+      );
+      return;
+    }
+    await ref.read(ordersNotifierProvider.notifier).refreshOpenOrders();
+    await _loadDetails();
+  }
+
   Future<bool> _confirmCancel() async {
     final bool? result = await showDialog<bool>(
       context: context,
@@ -645,6 +868,26 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                                   !isActionLocked
                               ? () => _handleBreakfastEdit(details.lines[index])
                               : null,
+                          onEditMeal:
+                              details.lines[index]
+                                          .isMealCustomizationConfigurable &&
+                                      details.transaction.status ==
+                                          TransactionStatus.draft &&
+                                      !isActionLocked
+                                  ? () => _handleMealCustomizationEdit(
+                                      details.lines[index],
+                                    )
+                                  : null,
+                          onRecreateLegacyMeal:
+                              details.lines[index]
+                                          .isLegacyMealCustomizationLine &&
+                                      details.transaction.status ==
+                                          TransactionStatus.draft &&
+                                      !isActionLocked
+                                  ? () => _handleLegacyMealRecreate(
+                                      details.lines[index],
+                                    )
+                                  : null,
                         ),
                       ],
                     ],
@@ -981,10 +1224,17 @@ class _InlineNotice extends StatelessWidget {
 }
 
 class _OrderLineRow extends StatelessWidget {
-  const _OrderLineRow({required this.detailLine, this.onEditBreakfast});
+  const _OrderLineRow({
+    required this.detailLine,
+    this.onEditBreakfast,
+    this.onEditMeal,
+    this.onRecreateLegacyMeal,
+  });
 
   final OrderDetailLine detailLine;
   final VoidCallback? onEditBreakfast;
+  final VoidCallback? onEditMeal;
+  final VoidCallback? onRecreateLegacyMeal;
 
   @override
   Widget build(BuildContext context) {
@@ -1020,6 +1270,33 @@ class _OrderLineRow extends StatelessWidget {
               ),
             ],
           ),
+          if (detailLine.isLegacyMealCustomizationLine) ...<Widget>[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    'Legacy meal line',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (onEditBreakfast != null) ...<Widget>[
             const SizedBox(height: 8),
             Align(
@@ -1031,6 +1308,39 @@ class _OrderLineRow extends StatelessWidget {
                 onPressed: onEditBreakfast,
                 child: const Text('Edit breakfast'),
               ),
+            ),
+          ],
+          if (detailLine.isMealCustomizationConfigurable) ...<Widget>[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton(
+                key: ValueKey<String>('detail-edit-meal-${detailLine.line.id}'),
+                onPressed: onEditMeal,
+                child: const Text('Edit meal'),
+              ),
+            ),
+          ],
+          if (detailLine.isLegacyMealCustomizationLine &&
+              onRecreateLegacyMeal != null) ...<Widget>[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton(
+                key: ValueKey<String>(
+                  'detail-recreate-meal-${detailLine.line.id}',
+                ),
+                onPressed: onRecreateLegacyMeal,
+                child: const Text('Recreate with new system'),
+              ),
+            ),
+          ],
+          if (detailLine.mealCustomizationLegacyMessage != null) ...<Widget>[
+            const SizedBox(height: 6),
+            _InlineNotice(
+              message: detailLine.mealCustomizationLegacyMessage!,
+              color: AppColors.warning,
+              useTint: true,
             ),
           ],
           if (detailLine.modifiers.isNotEmpty) ...<Widget>[

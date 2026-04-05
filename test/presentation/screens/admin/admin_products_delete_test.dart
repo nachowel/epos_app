@@ -4,7 +4,9 @@ import 'package:epos_app/core/providers/app_providers.dart';
 import 'package:epos_app/core/router/app_router.dart';
 import 'package:epos_app/data/database/app_database.dart';
 import 'package:epos_app/data/repositories/category_repository.dart';
+import 'package:epos_app/data/repositories/drift_meal_adjustment_profile_repository.dart';
 import 'package:epos_app/data/repositories/product_repository.dart';
+import 'package:epos_app/domain/models/meal_adjustment_profile.dart';
 import 'package:epos_app/presentation/providers/products_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -223,6 +225,116 @@ void main() {
       isTrue,
     );
   });
+
+  testWidgets(
+    'meal engine dialog shows health and preview and saves assignment',
+    (WidgetTester tester) async {
+      _setLargeView(tester);
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+
+      await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+      final int categoryId = await insertCategory(db, name: 'Meals');
+      final int productId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Burger Meal',
+        priceMinor: 1000,
+      );
+      final int mainDefaultId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Chicken Fillet',
+        priceMinor: 0,
+      );
+      final int mainSwapId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Beef Patty',
+        priceMinor: 0,
+      );
+      final int extraId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Cheese',
+        priceMinor: 0,
+      );
+
+      final DriftMealAdjustmentProfileRepository repository =
+          DriftMealAdjustmentProfileRepository(db);
+      final int profileId = await repository.saveProfileDraft(
+        MealAdjustmentProfileDraft(
+          name: 'Burger profile',
+          freeSwapLimit: 1,
+          isActive: true,
+          components: <MealAdjustmentComponentDraft>[
+            MealAdjustmentComponentDraft(
+              componentKey: 'main',
+              displayName: 'Main',
+              defaultItemProductId: mainDefaultId,
+              quantity: 1,
+              canRemove: true,
+              sortOrder: 0,
+              isActive: true,
+              swapOptions: <MealAdjustmentComponentOptionDraft>[
+                MealAdjustmentComponentOptionDraft(
+                  optionItemProductId: mainSwapId,
+                  fixedPriceDeltaMinor: 25,
+                  sortOrder: 0,
+                  isActive: true,
+                ),
+              ],
+            ),
+          ],
+          extraOptions: <MealAdjustmentExtraOptionDraft>[
+            MealAdjustmentExtraOptionDraft(
+              itemProductId: extraId,
+              fixedPriceDeltaMinor: 50,
+              sortOrder: 0,
+              isActive: true,
+            ),
+          ],
+        ),
+      );
+      await repository.assignProfileToProduct(
+        productId: productId,
+        profileId: profileId,
+      );
+
+      final ProviderContainer container = _makeContainer(db);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _TestRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _loginWithPin(tester, '9999');
+
+      container.read(appRouterProvider).go('/admin/products');
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(
+        find.byKey(ValueKey<String>('product-meal-engine-$productId')),
+      );
+      await tester.tap(
+        find.byKey(ValueKey<String>('product-meal-engine-$productId')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Meal Engine: Burger Meal'), findsOneWidget);
+
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Meal customization assignment saved.'), findsOneWidget);
+      final product = await ProductRepository(db).getById(productId);
+      expect(product, isNotNull);
+      expect(product!.mealAdjustmentProfileId, profileId);
+    },
+  );
 
   testWidgets(
     'standard products show delete impact warning and set builder is only shown for set products',

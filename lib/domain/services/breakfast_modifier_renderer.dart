@@ -162,6 +162,7 @@ class BreakfastModifierRenderer {
         );
 
       case ModifierChargeReason.removalDiscount:
+      case ModifierChargeReason.comboDiscount:
         return BreakfastModifierRendered(
           label: '${modifier.itemName}$quantitySuffix',
           priceLabel: '',
@@ -251,6 +252,8 @@ class BreakfastModifierRenderer {
         return 3;
       case ModifierChargeReason.extraAdd:
         return 4;
+      case ModifierChargeReason.comboDiscount:
+        return 0;
     }
   }
 
@@ -277,6 +280,7 @@ class BreakfastModifierRenderer {
       case ModifierChargeReason.extraAdd:
         return 'extra ${modifier.itemName}$quantitySuffix';
       case ModifierChargeReason.removalDiscount:
+      case ModifierChargeReason.comboDiscount:
         return '${modifier.itemName}$quantitySuffix';
       case null:
         switch (modifier.action) {

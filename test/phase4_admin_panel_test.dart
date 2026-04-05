@@ -8,6 +8,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:epos_app/data/database/app_database.dart'
     show AppDatabase, SyncQueueCompanion;
 import 'package:epos_app/data/repositories/audit_log_repository.dart';
+import 'package:epos_app/data/repositories/breakfast_configuration_repository.dart';
 import 'package:epos_app/data/repositories/category_repository.dart';
 import 'package:epos_app/data/repositories/cash_movement_repository.dart';
 import 'package:epos_app/data/repositories/modifier_repository.dart';
@@ -41,6 +42,8 @@ import 'package:epos_app/presentation/providers/admin_sync_provider.dart';
 import 'package:epos_app/presentation/providers/auth_provider.dart';
 import 'package:epos_app/presentation/providers/products_provider.dart';
 import 'package:epos_app/presentation/screens/admin/admin_audit_logs_screen.dart';
+import 'package:epos_app/presentation/screens/admin/admin_breakfast_set_editor_screen.dart';
+import 'package:epos_app/presentation/screens/admin/admin_breakfast_sets_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_categories_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_dashboard_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_modifiers_screen.dart';
@@ -116,7 +119,7 @@ void main() {
       },
     );
 
-    testWidgets('admin navigation settings item opens report settings screen', (
+    testWidgets('admin settings route opens report settings screen', (
       WidgetTester tester,
     ) async {
       tester.view.physicalSize = const Size(1400, 900);
@@ -149,9 +152,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AdminDashboardScreen), findsOneWidget);
-      expect(find.text(AppStrings.navSettings), findsOneWidget);
 
-      await tester.tap(find.text(AppStrings.navSettings));
+      container.read(appRouterProvider).go('/admin/settings');
       await tester.pumpAndSettle();
 
       expect(find.byType(AdminReportSettingsScreen), findsOneWidget);
@@ -1010,6 +1012,7 @@ void main() {
       final AdminService adminService = AdminService(
         categoryRepository: CategoryRepository(db),
         productRepository: ProductRepository(db),
+        breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
         modifierRepository: ModifierRepository(db),
         shiftRepository: shiftRepository,
         transactionRepository: transactionRepository,
@@ -1200,6 +1203,11 @@ const List<_AdminRouteExpectation> _adminRoutes = <_AdminRouteExpectation>[
   _AdminRouteExpectation('/admin', AdminDashboardScreen),
   _AdminRouteExpectation('/admin/analytics', AdminRevenueAnalyticsScreen),
   _AdminRouteExpectation('/admin/products', AdminProductsScreen),
+  _AdminRouteExpectation('/admin/breakfast-sets', AdminBreakfastSetsScreen),
+  _AdminRouteExpectation(
+    '/admin/breakfast-sets/1',
+    AdminBreakfastSetEditorScreen,
+  ),
   _AdminRouteExpectation('/admin/categories', AdminCategoriesScreen),
   _AdminRouteExpectation('/admin/modifiers', AdminModifiersScreen),
   _AdminRouteExpectation('/admin/audit', AdminAuditLogsScreen),
@@ -1321,6 +1329,7 @@ AdminService _makeAdminService(AppDatabase db) {
   return AdminService(
     categoryRepository: CategoryRepository(db),
     productRepository: ProductRepository(db),
+    breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
     modifierRepository: ModifierRepository(db),
     shiftRepository: shiftRepository,
     transactionRepository: transactionRepository,

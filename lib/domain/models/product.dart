@@ -2,6 +2,7 @@ class Product {
   const Product({
     required this.id,
     required this.categoryId,
+    this.mealAdjustmentProfileId,
     required this.name,
     required this.priceMinor,
     required this.imageUrl,
@@ -13,6 +14,7 @@ class Product {
 
   final int id;
   final int categoryId;
+  final int? mealAdjustmentProfileId;
   final String name;
   final int priceMinor;
   final String? imageUrl;
@@ -24,6 +26,7 @@ class Product {
   Product copyWith({
     int? id,
     int? categoryId,
+    Object? mealAdjustmentProfileId = _unset,
     String? name,
     int? priceMinor,
     Object? imageUrl = _unset,
@@ -35,6 +38,9 @@ class Product {
     return Product(
       id: id ?? this.id,
       categoryId: categoryId ?? this.categoryId,
+      mealAdjustmentProfileId: mealAdjustmentProfileId == _unset
+          ? this.mealAdjustmentProfileId
+          : mealAdjustmentProfileId as int?,
       name: name ?? this.name,
       priceMinor: priceMinor ?? this.priceMinor,
       imageUrl: imageUrl == _unset ? this.imageUrl : imageUrl as String?,
@@ -53,6 +59,7 @@ class Product {
     return other is Product &&
         other.id == id &&
         other.categoryId == categoryId &&
+        other.mealAdjustmentProfileId == mealAdjustmentProfileId &&
         other.name == name &&
         other.priceMinor == priceMinor &&
         other.imageUrl == imageUrl &&
@@ -66,6 +73,7 @@ class Product {
   int get hashCode => Object.hash(
     id,
     categoryId,
+    mealAdjustmentProfileId,
     name,
     priceMinor,
     imageUrl,

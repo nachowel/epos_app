@@ -60,6 +60,20 @@ must follow this contract chain.
 
 If `CLAUDE.md` or `schema.md` conflicts with these docs, the contract docs win.
 
+For standard products outside breakfast, the authoritative meal-adjustment
+foundation contract is:
+
+1. `docs/meal_adjustment_engine_contract.md`
+
+Interpretation:
+
+- profile-based standard meal customization
+- standard engine semantic core boundaries
+- future request/resolved snapshot contract
+
+Breakfast contracts remain separate and must not be collapsed into the standard
+meal-adjustment contract.
+
 ---
 
 ## 3. Supabase sync truth

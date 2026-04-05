@@ -910,6 +910,468 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
   }
 }
 
+class $MealAdjustmentProfilesTable extends MealAdjustmentProfiles
+    with TableInfo<$MealAdjustmentProfilesTable, MealAdjustmentProfile> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MealAdjustmentProfilesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _freeSwapLimitMeta = const VerificationMeta(
+    'freeSwapLimit',
+  );
+  @override
+  late final GeneratedColumn<int> freeSwapLimit = GeneratedColumn<int>(
+    'free_swap_limit',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    description,
+    freeSwapLimit,
+    isActive,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'meal_adjustment_profiles';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MealAdjustmentProfile> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('free_swap_limit')) {
+      context.handle(
+        _freeSwapLimitMeta,
+        freeSwapLimit.isAcceptableOrUnknown(
+          data['free_swap_limit']!,
+          _freeSwapLimitMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MealAdjustmentProfile map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MealAdjustmentProfile(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      freeSwapLimit: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}free_swap_limit'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $MealAdjustmentProfilesTable createAlias(String alias) {
+    return $MealAdjustmentProfilesTable(attachedDatabase, alias);
+  }
+}
+
+class MealAdjustmentProfile extends DataClass
+    implements Insertable<MealAdjustmentProfile> {
+  final int id;
+  final String name;
+  final String? description;
+  final int freeSwapLimit;
+  final bool isActive;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const MealAdjustmentProfile({
+    required this.id,
+    required this.name,
+    this.description,
+    required this.freeSwapLimit,
+    required this.isActive,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['free_swap_limit'] = Variable<int>(freeSwapLimit);
+    map['is_active'] = Variable<bool>(isActive);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  MealAdjustmentProfilesCompanion toCompanion(bool nullToAbsent) {
+    return MealAdjustmentProfilesCompanion(
+      id: Value(id),
+      name: Value(name),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      freeSwapLimit: Value(freeSwapLimit),
+      isActive: Value(isActive),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory MealAdjustmentProfile.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MealAdjustmentProfile(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      description: serializer.fromJson<String?>(json['description']),
+      freeSwapLimit: serializer.fromJson<int>(json['freeSwapLimit']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'description': serializer.toJson<String?>(description),
+      'freeSwapLimit': serializer.toJson<int>(freeSwapLimit),
+      'isActive': serializer.toJson<bool>(isActive),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  MealAdjustmentProfile copyWith({
+    int? id,
+    String? name,
+    Value<String?> description = const Value.absent(),
+    int? freeSwapLimit,
+    bool? isActive,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => MealAdjustmentProfile(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    description: description.present ? description.value : this.description,
+    freeSwapLimit: freeSwapLimit ?? this.freeSwapLimit,
+    isActive: isActive ?? this.isActive,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  MealAdjustmentProfile copyWithCompanion(
+    MealAdjustmentProfilesCompanion data,
+  ) {
+    return MealAdjustmentProfile(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      freeSwapLimit: data.freeSwapLimit.present
+          ? data.freeSwapLimit.value
+          : this.freeSwapLimit,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealAdjustmentProfile(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('freeSwapLimit: $freeSwapLimit, ')
+          ..write('isActive: $isActive, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    name,
+    description,
+    freeSwapLimit,
+    isActive,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MealAdjustmentProfile &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.description == this.description &&
+          other.freeSwapLimit == this.freeSwapLimit &&
+          other.isActive == this.isActive &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class MealAdjustmentProfilesCompanion
+    extends UpdateCompanion<MealAdjustmentProfile> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<String?> description;
+  final Value<int> freeSwapLimit;
+  final Value<bool> isActive;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  const MealAdjustmentProfilesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.description = const Value.absent(),
+    this.freeSwapLimit = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  MealAdjustmentProfilesCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.description = const Value.absent(),
+    this.freeSwapLimit = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<MealAdjustmentProfile> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<String>? description,
+    Expression<int>? freeSwapLimit,
+    Expression<bool>? isActive,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (description != null) 'description': description,
+      if (freeSwapLimit != null) 'free_swap_limit': freeSwapLimit,
+      if (isActive != null) 'is_active': isActive,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  MealAdjustmentProfilesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? name,
+    Value<String?>? description,
+    Value<int>? freeSwapLimit,
+    Value<bool>? isActive,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+  }) {
+    return MealAdjustmentProfilesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      freeSwapLimit: freeSwapLimit ?? this.freeSwapLimit,
+      isActive: isActive ?? this.isActive,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (freeSwapLimit.present) {
+      map['free_swap_limit'] = Variable<int>(freeSwapLimit.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealAdjustmentProfilesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('freeSwapLimit: $freeSwapLimit, ')
+          ..write('isActive: $isActive, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -940,6 +1402,18 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     requiredDuringInsert: true,
     $customConstraints: 'NOT NULL REFERENCES "categories" ("id")',
   );
+  static const VerificationMeta _mealAdjustmentProfileIdMeta =
+      const VerificationMeta('mealAdjustmentProfileId');
+  @override
+  late final GeneratedColumn<int> mealAdjustmentProfileId =
+      GeneratedColumn<int>(
+        'meal_adjustment_profile_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        $customConstraints: 'REFERENCES "meal_adjustment_profiles" ("id")',
+      );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
@@ -1032,6 +1506,7 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
   List<GeneratedColumn> get $columns => [
     id,
     categoryId,
+    mealAdjustmentProfileId,
     name,
     priceMinor,
     imageUrl,
@@ -1062,6 +1537,15 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
       );
     } else if (isInserting) {
       context.missing(_categoryIdMeta);
+    }
+    if (data.containsKey('meal_adjustment_profile_id')) {
+      context.handle(
+        _mealAdjustmentProfileIdMeta,
+        mealAdjustmentProfileId.isAcceptableOrUnknown(
+          data['meal_adjustment_profile_id']!,
+          _mealAdjustmentProfileIdMeta,
+        ),
+      );
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -1132,6 +1616,10 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         DriftSqlType.int,
         data['${effectivePrefix}category_id'],
       )!,
+      mealAdjustmentProfileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}meal_adjustment_profile_id'],
+      ),
       name: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}name'],
@@ -1172,6 +1660,7 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
 class Product extends DataClass implements Insertable<Product> {
   final int id;
   final int categoryId;
+  final int? mealAdjustmentProfileId;
   final String name;
   final int priceMinor;
   final String? imageUrl;
@@ -1182,6 +1671,7 @@ class Product extends DataClass implements Insertable<Product> {
   const Product({
     required this.id,
     required this.categoryId,
+    this.mealAdjustmentProfileId,
     required this.name,
     required this.priceMinor,
     this.imageUrl,
@@ -1195,6 +1685,11 @@ class Product extends DataClass implements Insertable<Product> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['category_id'] = Variable<int>(categoryId);
+    if (!nullToAbsent || mealAdjustmentProfileId != null) {
+      map['meal_adjustment_profile_id'] = Variable<int>(
+        mealAdjustmentProfileId,
+      );
+    }
     map['name'] = Variable<String>(name);
     map['price_minor'] = Variable<int>(priceMinor);
     if (!nullToAbsent || imageUrl != null) {
@@ -1211,6 +1706,9 @@ class Product extends DataClass implements Insertable<Product> {
     return ProductsCompanion(
       id: Value(id),
       categoryId: Value(categoryId),
+      mealAdjustmentProfileId: mealAdjustmentProfileId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mealAdjustmentProfileId),
       name: Value(name),
       priceMinor: Value(priceMinor),
       imageUrl: imageUrl == null && nullToAbsent
@@ -1231,6 +1729,9 @@ class Product extends DataClass implements Insertable<Product> {
     return Product(
       id: serializer.fromJson<int>(json['id']),
       categoryId: serializer.fromJson<int>(json['categoryId']),
+      mealAdjustmentProfileId: serializer.fromJson<int?>(
+        json['mealAdjustmentProfileId'],
+      ),
       name: serializer.fromJson<String>(json['name']),
       priceMinor: serializer.fromJson<int>(json['priceMinor']),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
@@ -1246,6 +1747,9 @@ class Product extends DataClass implements Insertable<Product> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'categoryId': serializer.toJson<int>(categoryId),
+      'mealAdjustmentProfileId': serializer.toJson<int?>(
+        mealAdjustmentProfileId,
+      ),
       'name': serializer.toJson<String>(name),
       'priceMinor': serializer.toJson<int>(priceMinor),
       'imageUrl': serializer.toJson<String?>(imageUrl),
@@ -1259,6 +1763,7 @@ class Product extends DataClass implements Insertable<Product> {
   Product copyWith({
     int? id,
     int? categoryId,
+    Value<int?> mealAdjustmentProfileId = const Value.absent(),
     String? name,
     int? priceMinor,
     Value<String?> imageUrl = const Value.absent(),
@@ -1269,6 +1774,9 @@ class Product extends DataClass implements Insertable<Product> {
   }) => Product(
     id: id ?? this.id,
     categoryId: categoryId ?? this.categoryId,
+    mealAdjustmentProfileId: mealAdjustmentProfileId.present
+        ? mealAdjustmentProfileId.value
+        : this.mealAdjustmentProfileId,
     name: name ?? this.name,
     priceMinor: priceMinor ?? this.priceMinor,
     imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
@@ -1283,6 +1791,9 @@ class Product extends DataClass implements Insertable<Product> {
       categoryId: data.categoryId.present
           ? data.categoryId.value
           : this.categoryId,
+      mealAdjustmentProfileId: data.mealAdjustmentProfileId.present
+          ? data.mealAdjustmentProfileId.value
+          : this.mealAdjustmentProfileId,
       name: data.name.present ? data.name.value : this.name,
       priceMinor: data.priceMinor.present
           ? data.priceMinor.value
@@ -1304,6 +1815,7 @@ class Product extends DataClass implements Insertable<Product> {
     return (StringBuffer('Product(')
           ..write('id: $id, ')
           ..write('categoryId: $categoryId, ')
+          ..write('mealAdjustmentProfileId: $mealAdjustmentProfileId, ')
           ..write('name: $name, ')
           ..write('priceMinor: $priceMinor, ')
           ..write('imageUrl: $imageUrl, ')
@@ -1319,6 +1831,7 @@ class Product extends DataClass implements Insertable<Product> {
   int get hashCode => Object.hash(
     id,
     categoryId,
+    mealAdjustmentProfileId,
     name,
     priceMinor,
     imageUrl,
@@ -1333,6 +1846,7 @@ class Product extends DataClass implements Insertable<Product> {
       (other is Product &&
           other.id == this.id &&
           other.categoryId == this.categoryId &&
+          other.mealAdjustmentProfileId == this.mealAdjustmentProfileId &&
           other.name == this.name &&
           other.priceMinor == this.priceMinor &&
           other.imageUrl == this.imageUrl &&
@@ -1345,6 +1859,7 @@ class Product extends DataClass implements Insertable<Product> {
 class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<int> id;
   final Value<int> categoryId;
+  final Value<int?> mealAdjustmentProfileId;
   final Value<String> name;
   final Value<int> priceMinor;
   final Value<String?> imageUrl;
@@ -1355,6 +1870,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   const ProductsCompanion({
     this.id = const Value.absent(),
     this.categoryId = const Value.absent(),
+    this.mealAdjustmentProfileId = const Value.absent(),
     this.name = const Value.absent(),
     this.priceMinor = const Value.absent(),
     this.imageUrl = const Value.absent(),
@@ -1366,6 +1882,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   ProductsCompanion.insert({
     this.id = const Value.absent(),
     required int categoryId,
+    this.mealAdjustmentProfileId = const Value.absent(),
     required String name,
     required int priceMinor,
     this.imageUrl = const Value.absent(),
@@ -1379,6 +1896,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   static Insertable<Product> custom({
     Expression<int>? id,
     Expression<int>? categoryId,
+    Expression<int>? mealAdjustmentProfileId,
     Expression<String>? name,
     Expression<int>? priceMinor,
     Expression<String>? imageUrl,
@@ -1390,6 +1908,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (categoryId != null) 'category_id': categoryId,
+      if (mealAdjustmentProfileId != null)
+        'meal_adjustment_profile_id': mealAdjustmentProfileId,
       if (name != null) 'name': name,
       if (priceMinor != null) 'price_minor': priceMinor,
       if (imageUrl != null) 'image_url': imageUrl,
@@ -1403,6 +1923,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   ProductsCompanion copyWith({
     Value<int>? id,
     Value<int>? categoryId,
+    Value<int?>? mealAdjustmentProfileId,
     Value<String>? name,
     Value<int>? priceMinor,
     Value<String?>? imageUrl,
@@ -1414,6 +1935,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     return ProductsCompanion(
       id: id ?? this.id,
       categoryId: categoryId ?? this.categoryId,
+      mealAdjustmentProfileId:
+          mealAdjustmentProfileId ?? this.mealAdjustmentProfileId,
       name: name ?? this.name,
       priceMinor: priceMinor ?? this.priceMinor,
       imageUrl: imageUrl ?? this.imageUrl,
@@ -1432,6 +1955,11 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     }
     if (categoryId.present) {
       map['category_id'] = Variable<int>(categoryId.value);
+    }
+    if (mealAdjustmentProfileId.present) {
+      map['meal_adjustment_profile_id'] = Variable<int>(
+        mealAdjustmentProfileId.value,
+      );
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -1462,12 +1990,3037 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     return (StringBuffer('ProductsCompanion(')
           ..write('id: $id, ')
           ..write('categoryId: $categoryId, ')
+          ..write('mealAdjustmentProfileId: $mealAdjustmentProfileId, ')
           ..write('name: $name, ')
           ..write('priceMinor: $priceMinor, ')
           ..write('imageUrl: $imageUrl, ')
           ..write('hasModifiers: $hasModifiers, ')
           ..write('isActive: $isActive, ')
           ..write('isVisibleOnPos: $isVisibleOnPos, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MealAdjustmentProfileComponentsTable
+    extends MealAdjustmentProfileComponents
+    with
+        TableInfo<
+          $MealAdjustmentProfileComponentsTable,
+          MealAdjustmentProfileComponent
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MealAdjustmentProfileComponentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _profileIdMeta = const VerificationMeta(
+    'profileId',
+  );
+  @override
+  late final GeneratedColumn<int> profileId = GeneratedColumn<int>(
+    'profile_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES "meal_adjustment_profiles" ("id")',
+  );
+  static const VerificationMeta _componentKeyMeta = const VerificationMeta(
+    'componentKey',
+  );
+  @override
+  late final GeneratedColumn<String> componentKey = GeneratedColumn<String>(
+    'component_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _displayNameMeta = const VerificationMeta(
+    'displayName',
+  );
+  @override
+  late final GeneratedColumn<String> displayName = GeneratedColumn<String>(
+    'display_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _defaultItemProductIdMeta =
+      const VerificationMeta('defaultItemProductId');
+  @override
+  late final GeneratedColumn<int> defaultItemProductId = GeneratedColumn<int>(
+    'default_item_product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES "products" ("id")',
+  );
+  static const VerificationMeta _quantityMeta = const VerificationMeta(
+    'quantity',
+  );
+  @override
+  late final GeneratedColumn<int> quantity = GeneratedColumn<int>(
+    'quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _canRemoveMeta = const VerificationMeta(
+    'canRemove',
+  );
+  @override
+  late final GeneratedColumn<bool> canRemove = GeneratedColumn<bool>(
+    'can_remove',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("can_remove" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    profileId,
+    componentKey,
+    displayName,
+    defaultItemProductId,
+    quantity,
+    canRemove,
+    sortOrder,
+    isActive,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'meal_adjustment_profile_components';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MealAdjustmentProfileComponent> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('profile_id')) {
+      context.handle(
+        _profileIdMeta,
+        profileId.isAcceptableOrUnknown(data['profile_id']!, _profileIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_profileIdMeta);
+    }
+    if (data.containsKey('component_key')) {
+      context.handle(
+        _componentKeyMeta,
+        componentKey.isAcceptableOrUnknown(
+          data['component_key']!,
+          _componentKeyMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_componentKeyMeta);
+    }
+    if (data.containsKey('display_name')) {
+      context.handle(
+        _displayNameMeta,
+        displayName.isAcceptableOrUnknown(
+          data['display_name']!,
+          _displayNameMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_displayNameMeta);
+    }
+    if (data.containsKey('default_item_product_id')) {
+      context.handle(
+        _defaultItemProductIdMeta,
+        defaultItemProductId.isAcceptableOrUnknown(
+          data['default_item_product_id']!,
+          _defaultItemProductIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_defaultItemProductIdMeta);
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(
+        _quantityMeta,
+        quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta),
+      );
+    }
+    if (data.containsKey('can_remove')) {
+      context.handle(
+        _canRemoveMeta,
+        canRemove.isAcceptableOrUnknown(data['can_remove']!, _canRemoveMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MealAdjustmentProfileComponent map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MealAdjustmentProfileComponent(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      profileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}profile_id'],
+      )!,
+      componentKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}component_key'],
+      )!,
+      displayName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}display_name'],
+      )!,
+      defaultItemProductId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}default_item_product_id'],
+      )!,
+      quantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}quantity'],
+      )!,
+      canRemove: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}can_remove'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+    );
+  }
+
+  @override
+  $MealAdjustmentProfileComponentsTable createAlias(String alias) {
+    return $MealAdjustmentProfileComponentsTable(attachedDatabase, alias);
+  }
+}
+
+class MealAdjustmentProfileComponent extends DataClass
+    implements Insertable<MealAdjustmentProfileComponent> {
+  final int id;
+  final int profileId;
+  final String componentKey;
+  final String displayName;
+  final int defaultItemProductId;
+  final int quantity;
+  final bool canRemove;
+  final int sortOrder;
+  final bool isActive;
+  const MealAdjustmentProfileComponent({
+    required this.id,
+    required this.profileId,
+    required this.componentKey,
+    required this.displayName,
+    required this.defaultItemProductId,
+    required this.quantity,
+    required this.canRemove,
+    required this.sortOrder,
+    required this.isActive,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['profile_id'] = Variable<int>(profileId);
+    map['component_key'] = Variable<String>(componentKey);
+    map['display_name'] = Variable<String>(displayName);
+    map['default_item_product_id'] = Variable<int>(defaultItemProductId);
+    map['quantity'] = Variable<int>(quantity);
+    map['can_remove'] = Variable<bool>(canRemove);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['is_active'] = Variable<bool>(isActive);
+    return map;
+  }
+
+  MealAdjustmentProfileComponentsCompanion toCompanion(bool nullToAbsent) {
+    return MealAdjustmentProfileComponentsCompanion(
+      id: Value(id),
+      profileId: Value(profileId),
+      componentKey: Value(componentKey),
+      displayName: Value(displayName),
+      defaultItemProductId: Value(defaultItemProductId),
+      quantity: Value(quantity),
+      canRemove: Value(canRemove),
+      sortOrder: Value(sortOrder),
+      isActive: Value(isActive),
+    );
+  }
+
+  factory MealAdjustmentProfileComponent.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MealAdjustmentProfileComponent(
+      id: serializer.fromJson<int>(json['id']),
+      profileId: serializer.fromJson<int>(json['profileId']),
+      componentKey: serializer.fromJson<String>(json['componentKey']),
+      displayName: serializer.fromJson<String>(json['displayName']),
+      defaultItemProductId: serializer.fromJson<int>(
+        json['defaultItemProductId'],
+      ),
+      quantity: serializer.fromJson<int>(json['quantity']),
+      canRemove: serializer.fromJson<bool>(json['canRemove']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'profileId': serializer.toJson<int>(profileId),
+      'componentKey': serializer.toJson<String>(componentKey),
+      'displayName': serializer.toJson<String>(displayName),
+      'defaultItemProductId': serializer.toJson<int>(defaultItemProductId),
+      'quantity': serializer.toJson<int>(quantity),
+      'canRemove': serializer.toJson<bool>(canRemove),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'isActive': serializer.toJson<bool>(isActive),
+    };
+  }
+
+  MealAdjustmentProfileComponent copyWith({
+    int? id,
+    int? profileId,
+    String? componentKey,
+    String? displayName,
+    int? defaultItemProductId,
+    int? quantity,
+    bool? canRemove,
+    int? sortOrder,
+    bool? isActive,
+  }) => MealAdjustmentProfileComponent(
+    id: id ?? this.id,
+    profileId: profileId ?? this.profileId,
+    componentKey: componentKey ?? this.componentKey,
+    displayName: displayName ?? this.displayName,
+    defaultItemProductId: defaultItemProductId ?? this.defaultItemProductId,
+    quantity: quantity ?? this.quantity,
+    canRemove: canRemove ?? this.canRemove,
+    sortOrder: sortOrder ?? this.sortOrder,
+    isActive: isActive ?? this.isActive,
+  );
+  MealAdjustmentProfileComponent copyWithCompanion(
+    MealAdjustmentProfileComponentsCompanion data,
+  ) {
+    return MealAdjustmentProfileComponent(
+      id: data.id.present ? data.id.value : this.id,
+      profileId: data.profileId.present ? data.profileId.value : this.profileId,
+      componentKey: data.componentKey.present
+          ? data.componentKey.value
+          : this.componentKey,
+      displayName: data.displayName.present
+          ? data.displayName.value
+          : this.displayName,
+      defaultItemProductId: data.defaultItemProductId.present
+          ? data.defaultItemProductId.value
+          : this.defaultItemProductId,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      canRemove: data.canRemove.present ? data.canRemove.value : this.canRemove,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealAdjustmentProfileComponent(')
+          ..write('id: $id, ')
+          ..write('profileId: $profileId, ')
+          ..write('componentKey: $componentKey, ')
+          ..write('displayName: $displayName, ')
+          ..write('defaultItemProductId: $defaultItemProductId, ')
+          ..write('quantity: $quantity, ')
+          ..write('canRemove: $canRemove, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    profileId,
+    componentKey,
+    displayName,
+    defaultItemProductId,
+    quantity,
+    canRemove,
+    sortOrder,
+    isActive,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MealAdjustmentProfileComponent &&
+          other.id == this.id &&
+          other.profileId == this.profileId &&
+          other.componentKey == this.componentKey &&
+          other.displayName == this.displayName &&
+          other.defaultItemProductId == this.defaultItemProductId &&
+          other.quantity == this.quantity &&
+          other.canRemove == this.canRemove &&
+          other.sortOrder == this.sortOrder &&
+          other.isActive == this.isActive);
+}
+
+class MealAdjustmentProfileComponentsCompanion
+    extends UpdateCompanion<MealAdjustmentProfileComponent> {
+  final Value<int> id;
+  final Value<int> profileId;
+  final Value<String> componentKey;
+  final Value<String> displayName;
+  final Value<int> defaultItemProductId;
+  final Value<int> quantity;
+  final Value<bool> canRemove;
+  final Value<int> sortOrder;
+  final Value<bool> isActive;
+  const MealAdjustmentProfileComponentsCompanion({
+    this.id = const Value.absent(),
+    this.profileId = const Value.absent(),
+    this.componentKey = const Value.absent(),
+    this.displayName = const Value.absent(),
+    this.defaultItemProductId = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.canRemove = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.isActive = const Value.absent(),
+  });
+  MealAdjustmentProfileComponentsCompanion.insert({
+    this.id = const Value.absent(),
+    required int profileId,
+    required String componentKey,
+    required String displayName,
+    required int defaultItemProductId,
+    this.quantity = const Value.absent(),
+    this.canRemove = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.isActive = const Value.absent(),
+  }) : profileId = Value(profileId),
+       componentKey = Value(componentKey),
+       displayName = Value(displayName),
+       defaultItemProductId = Value(defaultItemProductId);
+  static Insertable<MealAdjustmentProfileComponent> custom({
+    Expression<int>? id,
+    Expression<int>? profileId,
+    Expression<String>? componentKey,
+    Expression<String>? displayName,
+    Expression<int>? defaultItemProductId,
+    Expression<int>? quantity,
+    Expression<bool>? canRemove,
+    Expression<int>? sortOrder,
+    Expression<bool>? isActive,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (profileId != null) 'profile_id': profileId,
+      if (componentKey != null) 'component_key': componentKey,
+      if (displayName != null) 'display_name': displayName,
+      if (defaultItemProductId != null)
+        'default_item_product_id': defaultItemProductId,
+      if (quantity != null) 'quantity': quantity,
+      if (canRemove != null) 'can_remove': canRemove,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (isActive != null) 'is_active': isActive,
+    });
+  }
+
+  MealAdjustmentProfileComponentsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? profileId,
+    Value<String>? componentKey,
+    Value<String>? displayName,
+    Value<int>? defaultItemProductId,
+    Value<int>? quantity,
+    Value<bool>? canRemove,
+    Value<int>? sortOrder,
+    Value<bool>? isActive,
+  }) {
+    return MealAdjustmentProfileComponentsCompanion(
+      id: id ?? this.id,
+      profileId: profileId ?? this.profileId,
+      componentKey: componentKey ?? this.componentKey,
+      displayName: displayName ?? this.displayName,
+      defaultItemProductId: defaultItemProductId ?? this.defaultItemProductId,
+      quantity: quantity ?? this.quantity,
+      canRemove: canRemove ?? this.canRemove,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isActive: isActive ?? this.isActive,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (profileId.present) {
+      map['profile_id'] = Variable<int>(profileId.value);
+    }
+    if (componentKey.present) {
+      map['component_key'] = Variable<String>(componentKey.value);
+    }
+    if (displayName.present) {
+      map['display_name'] = Variable<String>(displayName.value);
+    }
+    if (defaultItemProductId.present) {
+      map['default_item_product_id'] = Variable<int>(
+        defaultItemProductId.value,
+      );
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<int>(quantity.value);
+    }
+    if (canRemove.present) {
+      map['can_remove'] = Variable<bool>(canRemove.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealAdjustmentProfileComponentsCompanion(')
+          ..write('id: $id, ')
+          ..write('profileId: $profileId, ')
+          ..write('componentKey: $componentKey, ')
+          ..write('displayName: $displayName, ')
+          ..write('defaultItemProductId: $defaultItemProductId, ')
+          ..write('quantity: $quantity, ')
+          ..write('canRemove: $canRemove, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MealAdjustmentComponentOptionsTable
+    extends MealAdjustmentComponentOptions
+    with
+        TableInfo<
+          $MealAdjustmentComponentOptionsTable,
+          MealAdjustmentComponentOption
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MealAdjustmentComponentOptionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _profileComponentIdMeta =
+      const VerificationMeta('profileComponentId');
+  @override
+  late final GeneratedColumn<int> profileComponentId = GeneratedColumn<int>(
+    'profile_component_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL REFERENCES "meal_adjustment_profile_components" ("id")',
+  );
+  static const VerificationMeta _optionItemProductIdMeta =
+      const VerificationMeta('optionItemProductId');
+  @override
+  late final GeneratedColumn<int> optionItemProductId = GeneratedColumn<int>(
+    'option_item_product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES "products" ("id")',
+  );
+  static const VerificationMeta _optionTypeMeta = const VerificationMeta(
+    'optionType',
+  );
+  @override
+  late final GeneratedColumn<String> optionType = GeneratedColumn<String>(
+    'option_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fixedPriceDeltaMinorMeta =
+      const VerificationMeta('fixedPriceDeltaMinor');
+  @override
+  late final GeneratedColumn<int> fixedPriceDeltaMinor = GeneratedColumn<int>(
+    'fixed_price_delta_minor',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    profileComponentId,
+    optionItemProductId,
+    optionType,
+    fixedPriceDeltaMinor,
+    sortOrder,
+    isActive,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'meal_adjustment_component_options';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MealAdjustmentComponentOption> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('profile_component_id')) {
+      context.handle(
+        _profileComponentIdMeta,
+        profileComponentId.isAcceptableOrUnknown(
+          data['profile_component_id']!,
+          _profileComponentIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_profileComponentIdMeta);
+    }
+    if (data.containsKey('option_item_product_id')) {
+      context.handle(
+        _optionItemProductIdMeta,
+        optionItemProductId.isAcceptableOrUnknown(
+          data['option_item_product_id']!,
+          _optionItemProductIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_optionItemProductIdMeta);
+    }
+    if (data.containsKey('option_type')) {
+      context.handle(
+        _optionTypeMeta,
+        optionType.isAcceptableOrUnknown(data['option_type']!, _optionTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_optionTypeMeta);
+    }
+    if (data.containsKey('fixed_price_delta_minor')) {
+      context.handle(
+        _fixedPriceDeltaMinorMeta,
+        fixedPriceDeltaMinor.isAcceptableOrUnknown(
+          data['fixed_price_delta_minor']!,
+          _fixedPriceDeltaMinorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MealAdjustmentComponentOption map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MealAdjustmentComponentOption(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      profileComponentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}profile_component_id'],
+      )!,
+      optionItemProductId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}option_item_product_id'],
+      )!,
+      optionType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}option_type'],
+      )!,
+      fixedPriceDeltaMinor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}fixed_price_delta_minor'],
+      ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+    );
+  }
+
+  @override
+  $MealAdjustmentComponentOptionsTable createAlias(String alias) {
+    return $MealAdjustmentComponentOptionsTable(attachedDatabase, alias);
+  }
+}
+
+class MealAdjustmentComponentOption extends DataClass
+    implements Insertable<MealAdjustmentComponentOption> {
+  final int id;
+  final int profileComponentId;
+  final int optionItemProductId;
+  final String optionType;
+  final int? fixedPriceDeltaMinor;
+  final int sortOrder;
+  final bool isActive;
+  const MealAdjustmentComponentOption({
+    required this.id,
+    required this.profileComponentId,
+    required this.optionItemProductId,
+    required this.optionType,
+    this.fixedPriceDeltaMinor,
+    required this.sortOrder,
+    required this.isActive,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['profile_component_id'] = Variable<int>(profileComponentId);
+    map['option_item_product_id'] = Variable<int>(optionItemProductId);
+    map['option_type'] = Variable<String>(optionType);
+    if (!nullToAbsent || fixedPriceDeltaMinor != null) {
+      map['fixed_price_delta_minor'] = Variable<int>(fixedPriceDeltaMinor);
+    }
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['is_active'] = Variable<bool>(isActive);
+    return map;
+  }
+
+  MealAdjustmentComponentOptionsCompanion toCompanion(bool nullToAbsent) {
+    return MealAdjustmentComponentOptionsCompanion(
+      id: Value(id),
+      profileComponentId: Value(profileComponentId),
+      optionItemProductId: Value(optionItemProductId),
+      optionType: Value(optionType),
+      fixedPriceDeltaMinor: fixedPriceDeltaMinor == null && nullToAbsent
+          ? const Value.absent()
+          : Value(fixedPriceDeltaMinor),
+      sortOrder: Value(sortOrder),
+      isActive: Value(isActive),
+    );
+  }
+
+  factory MealAdjustmentComponentOption.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MealAdjustmentComponentOption(
+      id: serializer.fromJson<int>(json['id']),
+      profileComponentId: serializer.fromJson<int>(json['profileComponentId']),
+      optionItemProductId: serializer.fromJson<int>(
+        json['optionItemProductId'],
+      ),
+      optionType: serializer.fromJson<String>(json['optionType']),
+      fixedPriceDeltaMinor: serializer.fromJson<int?>(
+        json['fixedPriceDeltaMinor'],
+      ),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'profileComponentId': serializer.toJson<int>(profileComponentId),
+      'optionItemProductId': serializer.toJson<int>(optionItemProductId),
+      'optionType': serializer.toJson<String>(optionType),
+      'fixedPriceDeltaMinor': serializer.toJson<int?>(fixedPriceDeltaMinor),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'isActive': serializer.toJson<bool>(isActive),
+    };
+  }
+
+  MealAdjustmentComponentOption copyWith({
+    int? id,
+    int? profileComponentId,
+    int? optionItemProductId,
+    String? optionType,
+    Value<int?> fixedPriceDeltaMinor = const Value.absent(),
+    int? sortOrder,
+    bool? isActive,
+  }) => MealAdjustmentComponentOption(
+    id: id ?? this.id,
+    profileComponentId: profileComponentId ?? this.profileComponentId,
+    optionItemProductId: optionItemProductId ?? this.optionItemProductId,
+    optionType: optionType ?? this.optionType,
+    fixedPriceDeltaMinor: fixedPriceDeltaMinor.present
+        ? fixedPriceDeltaMinor.value
+        : this.fixedPriceDeltaMinor,
+    sortOrder: sortOrder ?? this.sortOrder,
+    isActive: isActive ?? this.isActive,
+  );
+  MealAdjustmentComponentOption copyWithCompanion(
+    MealAdjustmentComponentOptionsCompanion data,
+  ) {
+    return MealAdjustmentComponentOption(
+      id: data.id.present ? data.id.value : this.id,
+      profileComponentId: data.profileComponentId.present
+          ? data.profileComponentId.value
+          : this.profileComponentId,
+      optionItemProductId: data.optionItemProductId.present
+          ? data.optionItemProductId.value
+          : this.optionItemProductId,
+      optionType: data.optionType.present
+          ? data.optionType.value
+          : this.optionType,
+      fixedPriceDeltaMinor: data.fixedPriceDeltaMinor.present
+          ? data.fixedPriceDeltaMinor.value
+          : this.fixedPriceDeltaMinor,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealAdjustmentComponentOption(')
+          ..write('id: $id, ')
+          ..write('profileComponentId: $profileComponentId, ')
+          ..write('optionItemProductId: $optionItemProductId, ')
+          ..write('optionType: $optionType, ')
+          ..write('fixedPriceDeltaMinor: $fixedPriceDeltaMinor, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    profileComponentId,
+    optionItemProductId,
+    optionType,
+    fixedPriceDeltaMinor,
+    sortOrder,
+    isActive,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MealAdjustmentComponentOption &&
+          other.id == this.id &&
+          other.profileComponentId == this.profileComponentId &&
+          other.optionItemProductId == this.optionItemProductId &&
+          other.optionType == this.optionType &&
+          other.fixedPriceDeltaMinor == this.fixedPriceDeltaMinor &&
+          other.sortOrder == this.sortOrder &&
+          other.isActive == this.isActive);
+}
+
+class MealAdjustmentComponentOptionsCompanion
+    extends UpdateCompanion<MealAdjustmentComponentOption> {
+  final Value<int> id;
+  final Value<int> profileComponentId;
+  final Value<int> optionItemProductId;
+  final Value<String> optionType;
+  final Value<int?> fixedPriceDeltaMinor;
+  final Value<int> sortOrder;
+  final Value<bool> isActive;
+  const MealAdjustmentComponentOptionsCompanion({
+    this.id = const Value.absent(),
+    this.profileComponentId = const Value.absent(),
+    this.optionItemProductId = const Value.absent(),
+    this.optionType = const Value.absent(),
+    this.fixedPriceDeltaMinor = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.isActive = const Value.absent(),
+  });
+  MealAdjustmentComponentOptionsCompanion.insert({
+    this.id = const Value.absent(),
+    required int profileComponentId,
+    required int optionItemProductId,
+    required String optionType,
+    this.fixedPriceDeltaMinor = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.isActive = const Value.absent(),
+  }) : profileComponentId = Value(profileComponentId),
+       optionItemProductId = Value(optionItemProductId),
+       optionType = Value(optionType);
+  static Insertable<MealAdjustmentComponentOption> custom({
+    Expression<int>? id,
+    Expression<int>? profileComponentId,
+    Expression<int>? optionItemProductId,
+    Expression<String>? optionType,
+    Expression<int>? fixedPriceDeltaMinor,
+    Expression<int>? sortOrder,
+    Expression<bool>? isActive,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (profileComponentId != null)
+        'profile_component_id': profileComponentId,
+      if (optionItemProductId != null)
+        'option_item_product_id': optionItemProductId,
+      if (optionType != null) 'option_type': optionType,
+      if (fixedPriceDeltaMinor != null)
+        'fixed_price_delta_minor': fixedPriceDeltaMinor,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (isActive != null) 'is_active': isActive,
+    });
+  }
+
+  MealAdjustmentComponentOptionsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? profileComponentId,
+    Value<int>? optionItemProductId,
+    Value<String>? optionType,
+    Value<int?>? fixedPriceDeltaMinor,
+    Value<int>? sortOrder,
+    Value<bool>? isActive,
+  }) {
+    return MealAdjustmentComponentOptionsCompanion(
+      id: id ?? this.id,
+      profileComponentId: profileComponentId ?? this.profileComponentId,
+      optionItemProductId: optionItemProductId ?? this.optionItemProductId,
+      optionType: optionType ?? this.optionType,
+      fixedPriceDeltaMinor: fixedPriceDeltaMinor ?? this.fixedPriceDeltaMinor,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isActive: isActive ?? this.isActive,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (profileComponentId.present) {
+      map['profile_component_id'] = Variable<int>(profileComponentId.value);
+    }
+    if (optionItemProductId.present) {
+      map['option_item_product_id'] = Variable<int>(optionItemProductId.value);
+    }
+    if (optionType.present) {
+      map['option_type'] = Variable<String>(optionType.value);
+    }
+    if (fixedPriceDeltaMinor.present) {
+      map['fixed_price_delta_minor'] = Variable<int>(
+        fixedPriceDeltaMinor.value,
+      );
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealAdjustmentComponentOptionsCompanion(')
+          ..write('id: $id, ')
+          ..write('profileComponentId: $profileComponentId, ')
+          ..write('optionItemProductId: $optionItemProductId, ')
+          ..write('optionType: $optionType, ')
+          ..write('fixedPriceDeltaMinor: $fixedPriceDeltaMinor, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MealAdjustmentProfileExtrasTable extends MealAdjustmentProfileExtras
+    with
+        TableInfo<
+          $MealAdjustmentProfileExtrasTable,
+          MealAdjustmentProfileExtra
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MealAdjustmentProfileExtrasTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _profileIdMeta = const VerificationMeta(
+    'profileId',
+  );
+  @override
+  late final GeneratedColumn<int> profileId = GeneratedColumn<int>(
+    'profile_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES "meal_adjustment_profiles" ("id")',
+  );
+  static const VerificationMeta _itemProductIdMeta = const VerificationMeta(
+    'itemProductId',
+  );
+  @override
+  late final GeneratedColumn<int> itemProductId = GeneratedColumn<int>(
+    'item_product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES "products" ("id")',
+  );
+  static const VerificationMeta _fixedPriceDeltaMinorMeta =
+      const VerificationMeta('fixedPriceDeltaMinor');
+  @override
+  late final GeneratedColumn<int> fixedPriceDeltaMinor = GeneratedColumn<int>(
+    'fixed_price_delta_minor',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    profileId,
+    itemProductId,
+    fixedPriceDeltaMinor,
+    sortOrder,
+    isActive,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'meal_adjustment_profile_extras';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MealAdjustmentProfileExtra> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('profile_id')) {
+      context.handle(
+        _profileIdMeta,
+        profileId.isAcceptableOrUnknown(data['profile_id']!, _profileIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_profileIdMeta);
+    }
+    if (data.containsKey('item_product_id')) {
+      context.handle(
+        _itemProductIdMeta,
+        itemProductId.isAcceptableOrUnknown(
+          data['item_product_id']!,
+          _itemProductIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_itemProductIdMeta);
+    }
+    if (data.containsKey('fixed_price_delta_minor')) {
+      context.handle(
+        _fixedPriceDeltaMinorMeta,
+        fixedPriceDeltaMinor.isAcceptableOrUnknown(
+          data['fixed_price_delta_minor']!,
+          _fixedPriceDeltaMinorMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_fixedPriceDeltaMinorMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MealAdjustmentProfileExtra map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MealAdjustmentProfileExtra(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      profileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}profile_id'],
+      )!,
+      itemProductId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}item_product_id'],
+      )!,
+      fixedPriceDeltaMinor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}fixed_price_delta_minor'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+    );
+  }
+
+  @override
+  $MealAdjustmentProfileExtrasTable createAlias(String alias) {
+    return $MealAdjustmentProfileExtrasTable(attachedDatabase, alias);
+  }
+}
+
+class MealAdjustmentProfileExtra extends DataClass
+    implements Insertable<MealAdjustmentProfileExtra> {
+  final int id;
+  final int profileId;
+  final int itemProductId;
+  final int fixedPriceDeltaMinor;
+  final int sortOrder;
+  final bool isActive;
+  const MealAdjustmentProfileExtra({
+    required this.id,
+    required this.profileId,
+    required this.itemProductId,
+    required this.fixedPriceDeltaMinor,
+    required this.sortOrder,
+    required this.isActive,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['profile_id'] = Variable<int>(profileId);
+    map['item_product_id'] = Variable<int>(itemProductId);
+    map['fixed_price_delta_minor'] = Variable<int>(fixedPriceDeltaMinor);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['is_active'] = Variable<bool>(isActive);
+    return map;
+  }
+
+  MealAdjustmentProfileExtrasCompanion toCompanion(bool nullToAbsent) {
+    return MealAdjustmentProfileExtrasCompanion(
+      id: Value(id),
+      profileId: Value(profileId),
+      itemProductId: Value(itemProductId),
+      fixedPriceDeltaMinor: Value(fixedPriceDeltaMinor),
+      sortOrder: Value(sortOrder),
+      isActive: Value(isActive),
+    );
+  }
+
+  factory MealAdjustmentProfileExtra.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MealAdjustmentProfileExtra(
+      id: serializer.fromJson<int>(json['id']),
+      profileId: serializer.fromJson<int>(json['profileId']),
+      itemProductId: serializer.fromJson<int>(json['itemProductId']),
+      fixedPriceDeltaMinor: serializer.fromJson<int>(
+        json['fixedPriceDeltaMinor'],
+      ),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'profileId': serializer.toJson<int>(profileId),
+      'itemProductId': serializer.toJson<int>(itemProductId),
+      'fixedPriceDeltaMinor': serializer.toJson<int>(fixedPriceDeltaMinor),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'isActive': serializer.toJson<bool>(isActive),
+    };
+  }
+
+  MealAdjustmentProfileExtra copyWith({
+    int? id,
+    int? profileId,
+    int? itemProductId,
+    int? fixedPriceDeltaMinor,
+    int? sortOrder,
+    bool? isActive,
+  }) => MealAdjustmentProfileExtra(
+    id: id ?? this.id,
+    profileId: profileId ?? this.profileId,
+    itemProductId: itemProductId ?? this.itemProductId,
+    fixedPriceDeltaMinor: fixedPriceDeltaMinor ?? this.fixedPriceDeltaMinor,
+    sortOrder: sortOrder ?? this.sortOrder,
+    isActive: isActive ?? this.isActive,
+  );
+  MealAdjustmentProfileExtra copyWithCompanion(
+    MealAdjustmentProfileExtrasCompanion data,
+  ) {
+    return MealAdjustmentProfileExtra(
+      id: data.id.present ? data.id.value : this.id,
+      profileId: data.profileId.present ? data.profileId.value : this.profileId,
+      itemProductId: data.itemProductId.present
+          ? data.itemProductId.value
+          : this.itemProductId,
+      fixedPriceDeltaMinor: data.fixedPriceDeltaMinor.present
+          ? data.fixedPriceDeltaMinor.value
+          : this.fixedPriceDeltaMinor,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealAdjustmentProfileExtra(')
+          ..write('id: $id, ')
+          ..write('profileId: $profileId, ')
+          ..write('itemProductId: $itemProductId, ')
+          ..write('fixedPriceDeltaMinor: $fixedPriceDeltaMinor, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    profileId,
+    itemProductId,
+    fixedPriceDeltaMinor,
+    sortOrder,
+    isActive,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MealAdjustmentProfileExtra &&
+          other.id == this.id &&
+          other.profileId == this.profileId &&
+          other.itemProductId == this.itemProductId &&
+          other.fixedPriceDeltaMinor == this.fixedPriceDeltaMinor &&
+          other.sortOrder == this.sortOrder &&
+          other.isActive == this.isActive);
+}
+
+class MealAdjustmentProfileExtrasCompanion
+    extends UpdateCompanion<MealAdjustmentProfileExtra> {
+  final Value<int> id;
+  final Value<int> profileId;
+  final Value<int> itemProductId;
+  final Value<int> fixedPriceDeltaMinor;
+  final Value<int> sortOrder;
+  final Value<bool> isActive;
+  const MealAdjustmentProfileExtrasCompanion({
+    this.id = const Value.absent(),
+    this.profileId = const Value.absent(),
+    this.itemProductId = const Value.absent(),
+    this.fixedPriceDeltaMinor = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.isActive = const Value.absent(),
+  });
+  MealAdjustmentProfileExtrasCompanion.insert({
+    this.id = const Value.absent(),
+    required int profileId,
+    required int itemProductId,
+    required int fixedPriceDeltaMinor,
+    this.sortOrder = const Value.absent(),
+    this.isActive = const Value.absent(),
+  }) : profileId = Value(profileId),
+       itemProductId = Value(itemProductId),
+       fixedPriceDeltaMinor = Value(fixedPriceDeltaMinor);
+  static Insertable<MealAdjustmentProfileExtra> custom({
+    Expression<int>? id,
+    Expression<int>? profileId,
+    Expression<int>? itemProductId,
+    Expression<int>? fixedPriceDeltaMinor,
+    Expression<int>? sortOrder,
+    Expression<bool>? isActive,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (profileId != null) 'profile_id': profileId,
+      if (itemProductId != null) 'item_product_id': itemProductId,
+      if (fixedPriceDeltaMinor != null)
+        'fixed_price_delta_minor': fixedPriceDeltaMinor,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (isActive != null) 'is_active': isActive,
+    });
+  }
+
+  MealAdjustmentProfileExtrasCompanion copyWith({
+    Value<int>? id,
+    Value<int>? profileId,
+    Value<int>? itemProductId,
+    Value<int>? fixedPriceDeltaMinor,
+    Value<int>? sortOrder,
+    Value<bool>? isActive,
+  }) {
+    return MealAdjustmentProfileExtrasCompanion(
+      id: id ?? this.id,
+      profileId: profileId ?? this.profileId,
+      itemProductId: itemProductId ?? this.itemProductId,
+      fixedPriceDeltaMinor: fixedPriceDeltaMinor ?? this.fixedPriceDeltaMinor,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isActive: isActive ?? this.isActive,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (profileId.present) {
+      map['profile_id'] = Variable<int>(profileId.value);
+    }
+    if (itemProductId.present) {
+      map['item_product_id'] = Variable<int>(itemProductId.value);
+    }
+    if (fixedPriceDeltaMinor.present) {
+      map['fixed_price_delta_minor'] = Variable<int>(
+        fixedPriceDeltaMinor.value,
+      );
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealAdjustmentProfileExtrasCompanion(')
+          ..write('id: $id, ')
+          ..write('profileId: $profileId, ')
+          ..write('itemProductId: $itemProductId, ')
+          ..write('fixedPriceDeltaMinor: $fixedPriceDeltaMinor, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MealAdjustmentPricingRulesTable extends MealAdjustmentPricingRules
+    with
+        TableInfo<$MealAdjustmentPricingRulesTable, MealAdjustmentPricingRule> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MealAdjustmentPricingRulesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _profileIdMeta = const VerificationMeta(
+    'profileId',
+  );
+  @override
+  late final GeneratedColumn<int> profileId = GeneratedColumn<int>(
+    'profile_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES "meal_adjustment_profiles" ("id")',
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _ruleTypeMeta = const VerificationMeta(
+    'ruleType',
+  );
+  @override
+  late final GeneratedColumn<String> ruleType = GeneratedColumn<String>(
+    'rule_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _priceDeltaMinorMeta = const VerificationMeta(
+    'priceDeltaMinor',
+  );
+  @override
+  late final GeneratedColumn<int> priceDeltaMinor = GeneratedColumn<int>(
+    'price_delta_minor',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _priorityMeta = const VerificationMeta(
+    'priority',
+  );
+  @override
+  late final GeneratedColumn<int> priority = GeneratedColumn<int>(
+    'priority',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    profileId,
+    name,
+    ruleType,
+    priceDeltaMinor,
+    priority,
+    isActive,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'meal_adjustment_pricing_rules';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MealAdjustmentPricingRule> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('profile_id')) {
+      context.handle(
+        _profileIdMeta,
+        profileId.isAcceptableOrUnknown(data['profile_id']!, _profileIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_profileIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('rule_type')) {
+      context.handle(
+        _ruleTypeMeta,
+        ruleType.isAcceptableOrUnknown(data['rule_type']!, _ruleTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ruleTypeMeta);
+    }
+    if (data.containsKey('price_delta_minor')) {
+      context.handle(
+        _priceDeltaMinorMeta,
+        priceDeltaMinor.isAcceptableOrUnknown(
+          data['price_delta_minor']!,
+          _priceDeltaMinorMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_priceDeltaMinorMeta);
+    }
+    if (data.containsKey('priority')) {
+      context.handle(
+        _priorityMeta,
+        priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MealAdjustmentPricingRule map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MealAdjustmentPricingRule(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      profileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}profile_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      ruleType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}rule_type'],
+      )!,
+      priceDeltaMinor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}price_delta_minor'],
+      )!,
+      priority: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}priority'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+    );
+  }
+
+  @override
+  $MealAdjustmentPricingRulesTable createAlias(String alias) {
+    return $MealAdjustmentPricingRulesTable(attachedDatabase, alias);
+  }
+}
+
+class MealAdjustmentPricingRule extends DataClass
+    implements Insertable<MealAdjustmentPricingRule> {
+  final int id;
+  final int profileId;
+  final String name;
+  final String ruleType;
+  final int priceDeltaMinor;
+  final int priority;
+  final bool isActive;
+  const MealAdjustmentPricingRule({
+    required this.id,
+    required this.profileId,
+    required this.name,
+    required this.ruleType,
+    required this.priceDeltaMinor,
+    required this.priority,
+    required this.isActive,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['profile_id'] = Variable<int>(profileId);
+    map['name'] = Variable<String>(name);
+    map['rule_type'] = Variable<String>(ruleType);
+    map['price_delta_minor'] = Variable<int>(priceDeltaMinor);
+    map['priority'] = Variable<int>(priority);
+    map['is_active'] = Variable<bool>(isActive);
+    return map;
+  }
+
+  MealAdjustmentPricingRulesCompanion toCompanion(bool nullToAbsent) {
+    return MealAdjustmentPricingRulesCompanion(
+      id: Value(id),
+      profileId: Value(profileId),
+      name: Value(name),
+      ruleType: Value(ruleType),
+      priceDeltaMinor: Value(priceDeltaMinor),
+      priority: Value(priority),
+      isActive: Value(isActive),
+    );
+  }
+
+  factory MealAdjustmentPricingRule.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MealAdjustmentPricingRule(
+      id: serializer.fromJson<int>(json['id']),
+      profileId: serializer.fromJson<int>(json['profileId']),
+      name: serializer.fromJson<String>(json['name']),
+      ruleType: serializer.fromJson<String>(json['ruleType']),
+      priceDeltaMinor: serializer.fromJson<int>(json['priceDeltaMinor']),
+      priority: serializer.fromJson<int>(json['priority']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'profileId': serializer.toJson<int>(profileId),
+      'name': serializer.toJson<String>(name),
+      'ruleType': serializer.toJson<String>(ruleType),
+      'priceDeltaMinor': serializer.toJson<int>(priceDeltaMinor),
+      'priority': serializer.toJson<int>(priority),
+      'isActive': serializer.toJson<bool>(isActive),
+    };
+  }
+
+  MealAdjustmentPricingRule copyWith({
+    int? id,
+    int? profileId,
+    String? name,
+    String? ruleType,
+    int? priceDeltaMinor,
+    int? priority,
+    bool? isActive,
+  }) => MealAdjustmentPricingRule(
+    id: id ?? this.id,
+    profileId: profileId ?? this.profileId,
+    name: name ?? this.name,
+    ruleType: ruleType ?? this.ruleType,
+    priceDeltaMinor: priceDeltaMinor ?? this.priceDeltaMinor,
+    priority: priority ?? this.priority,
+    isActive: isActive ?? this.isActive,
+  );
+  MealAdjustmentPricingRule copyWithCompanion(
+    MealAdjustmentPricingRulesCompanion data,
+  ) {
+    return MealAdjustmentPricingRule(
+      id: data.id.present ? data.id.value : this.id,
+      profileId: data.profileId.present ? data.profileId.value : this.profileId,
+      name: data.name.present ? data.name.value : this.name,
+      ruleType: data.ruleType.present ? data.ruleType.value : this.ruleType,
+      priceDeltaMinor: data.priceDeltaMinor.present
+          ? data.priceDeltaMinor.value
+          : this.priceDeltaMinor,
+      priority: data.priority.present ? data.priority.value : this.priority,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealAdjustmentPricingRule(')
+          ..write('id: $id, ')
+          ..write('profileId: $profileId, ')
+          ..write('name: $name, ')
+          ..write('ruleType: $ruleType, ')
+          ..write('priceDeltaMinor: $priceDeltaMinor, ')
+          ..write('priority: $priority, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    profileId,
+    name,
+    ruleType,
+    priceDeltaMinor,
+    priority,
+    isActive,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MealAdjustmentPricingRule &&
+          other.id == this.id &&
+          other.profileId == this.profileId &&
+          other.name == this.name &&
+          other.ruleType == this.ruleType &&
+          other.priceDeltaMinor == this.priceDeltaMinor &&
+          other.priority == this.priority &&
+          other.isActive == this.isActive);
+}
+
+class MealAdjustmentPricingRulesCompanion
+    extends UpdateCompanion<MealAdjustmentPricingRule> {
+  final Value<int> id;
+  final Value<int> profileId;
+  final Value<String> name;
+  final Value<String> ruleType;
+  final Value<int> priceDeltaMinor;
+  final Value<int> priority;
+  final Value<bool> isActive;
+  const MealAdjustmentPricingRulesCompanion({
+    this.id = const Value.absent(),
+    this.profileId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.ruleType = const Value.absent(),
+    this.priceDeltaMinor = const Value.absent(),
+    this.priority = const Value.absent(),
+    this.isActive = const Value.absent(),
+  });
+  MealAdjustmentPricingRulesCompanion.insert({
+    this.id = const Value.absent(),
+    required int profileId,
+    required String name,
+    required String ruleType,
+    required int priceDeltaMinor,
+    this.priority = const Value.absent(),
+    this.isActive = const Value.absent(),
+  }) : profileId = Value(profileId),
+       name = Value(name),
+       ruleType = Value(ruleType),
+       priceDeltaMinor = Value(priceDeltaMinor);
+  static Insertable<MealAdjustmentPricingRule> custom({
+    Expression<int>? id,
+    Expression<int>? profileId,
+    Expression<String>? name,
+    Expression<String>? ruleType,
+    Expression<int>? priceDeltaMinor,
+    Expression<int>? priority,
+    Expression<bool>? isActive,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (profileId != null) 'profile_id': profileId,
+      if (name != null) 'name': name,
+      if (ruleType != null) 'rule_type': ruleType,
+      if (priceDeltaMinor != null) 'price_delta_minor': priceDeltaMinor,
+      if (priority != null) 'priority': priority,
+      if (isActive != null) 'is_active': isActive,
+    });
+  }
+
+  MealAdjustmentPricingRulesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? profileId,
+    Value<String>? name,
+    Value<String>? ruleType,
+    Value<int>? priceDeltaMinor,
+    Value<int>? priority,
+    Value<bool>? isActive,
+  }) {
+    return MealAdjustmentPricingRulesCompanion(
+      id: id ?? this.id,
+      profileId: profileId ?? this.profileId,
+      name: name ?? this.name,
+      ruleType: ruleType ?? this.ruleType,
+      priceDeltaMinor: priceDeltaMinor ?? this.priceDeltaMinor,
+      priority: priority ?? this.priority,
+      isActive: isActive ?? this.isActive,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (profileId.present) {
+      map['profile_id'] = Variable<int>(profileId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (ruleType.present) {
+      map['rule_type'] = Variable<String>(ruleType.value);
+    }
+    if (priceDeltaMinor.present) {
+      map['price_delta_minor'] = Variable<int>(priceDeltaMinor.value);
+    }
+    if (priority.present) {
+      map['priority'] = Variable<int>(priority.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealAdjustmentPricingRulesCompanion(')
+          ..write('id: $id, ')
+          ..write('profileId: $profileId, ')
+          ..write('name: $name, ')
+          ..write('ruleType: $ruleType, ')
+          ..write('priceDeltaMinor: $priceDeltaMinor, ')
+          ..write('priority: $priority, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MealAdjustmentPricingRuleConditionsTable
+    extends MealAdjustmentPricingRuleConditions
+    with
+        TableInfo<
+          $MealAdjustmentPricingRuleConditionsTable,
+          MealAdjustmentPricingRuleCondition
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MealAdjustmentPricingRuleConditionsTable(
+    this.attachedDatabase, [
+    this._alias,
+  ]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _ruleIdMeta = const VerificationMeta('ruleId');
+  @override
+  late final GeneratedColumn<int> ruleId = GeneratedColumn<int>(
+    'rule_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL REFERENCES "meal_adjustment_pricing_rules" ("id")',
+  );
+  static const VerificationMeta _conditionTypeMeta = const VerificationMeta(
+    'conditionType',
+  );
+  @override
+  late final GeneratedColumn<String> conditionType = GeneratedColumn<String>(
+    'condition_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _componentKeyMeta = const VerificationMeta(
+    'componentKey',
+  );
+  @override
+  late final GeneratedColumn<String> componentKey = GeneratedColumn<String>(
+    'component_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _itemProductIdMeta = const VerificationMeta(
+    'itemProductId',
+  );
+  @override
+  late final GeneratedColumn<int> itemProductId = GeneratedColumn<int>(
+    'item_product_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'REFERENCES "products" ("id")',
+  );
+  static const VerificationMeta _quantityMeta = const VerificationMeta(
+    'quantity',
+  );
+  @override
+  late final GeneratedColumn<int> quantity = GeneratedColumn<int>(
+    'quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    ruleId,
+    conditionType,
+    componentKey,
+    itemProductId,
+    quantity,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'meal_adjustment_pricing_rule_conditions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MealAdjustmentPricingRuleCondition> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('rule_id')) {
+      context.handle(
+        _ruleIdMeta,
+        ruleId.isAcceptableOrUnknown(data['rule_id']!, _ruleIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ruleIdMeta);
+    }
+    if (data.containsKey('condition_type')) {
+      context.handle(
+        _conditionTypeMeta,
+        conditionType.isAcceptableOrUnknown(
+          data['condition_type']!,
+          _conditionTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conditionTypeMeta);
+    }
+    if (data.containsKey('component_key')) {
+      context.handle(
+        _componentKeyMeta,
+        componentKey.isAcceptableOrUnknown(
+          data['component_key']!,
+          _componentKeyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('item_product_id')) {
+      context.handle(
+        _itemProductIdMeta,
+        itemProductId.isAcceptableOrUnknown(
+          data['item_product_id']!,
+          _itemProductIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(
+        _quantityMeta,
+        quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MealAdjustmentPricingRuleCondition map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MealAdjustmentPricingRuleCondition(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      ruleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rule_id'],
+      )!,
+      conditionType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}condition_type'],
+      )!,
+      componentKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}component_key'],
+      ),
+      itemProductId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}item_product_id'],
+      ),
+      quantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}quantity'],
+      )!,
+    );
+  }
+
+  @override
+  $MealAdjustmentPricingRuleConditionsTable createAlias(String alias) {
+    return $MealAdjustmentPricingRuleConditionsTable(attachedDatabase, alias);
+  }
+}
+
+class MealAdjustmentPricingRuleCondition extends DataClass
+    implements Insertable<MealAdjustmentPricingRuleCondition> {
+  final int id;
+  final int ruleId;
+  final String conditionType;
+  final String? componentKey;
+  final int? itemProductId;
+  final int quantity;
+  const MealAdjustmentPricingRuleCondition({
+    required this.id,
+    required this.ruleId,
+    required this.conditionType,
+    this.componentKey,
+    this.itemProductId,
+    required this.quantity,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['rule_id'] = Variable<int>(ruleId);
+    map['condition_type'] = Variable<String>(conditionType);
+    if (!nullToAbsent || componentKey != null) {
+      map['component_key'] = Variable<String>(componentKey);
+    }
+    if (!nullToAbsent || itemProductId != null) {
+      map['item_product_id'] = Variable<int>(itemProductId);
+    }
+    map['quantity'] = Variable<int>(quantity);
+    return map;
+  }
+
+  MealAdjustmentPricingRuleConditionsCompanion toCompanion(bool nullToAbsent) {
+    return MealAdjustmentPricingRuleConditionsCompanion(
+      id: Value(id),
+      ruleId: Value(ruleId),
+      conditionType: Value(conditionType),
+      componentKey: componentKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(componentKey),
+      itemProductId: itemProductId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(itemProductId),
+      quantity: Value(quantity),
+    );
+  }
+
+  factory MealAdjustmentPricingRuleCondition.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MealAdjustmentPricingRuleCondition(
+      id: serializer.fromJson<int>(json['id']),
+      ruleId: serializer.fromJson<int>(json['ruleId']),
+      conditionType: serializer.fromJson<String>(json['conditionType']),
+      componentKey: serializer.fromJson<String?>(json['componentKey']),
+      itemProductId: serializer.fromJson<int?>(json['itemProductId']),
+      quantity: serializer.fromJson<int>(json['quantity']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'ruleId': serializer.toJson<int>(ruleId),
+      'conditionType': serializer.toJson<String>(conditionType),
+      'componentKey': serializer.toJson<String?>(componentKey),
+      'itemProductId': serializer.toJson<int?>(itemProductId),
+      'quantity': serializer.toJson<int>(quantity),
+    };
+  }
+
+  MealAdjustmentPricingRuleCondition copyWith({
+    int? id,
+    int? ruleId,
+    String? conditionType,
+    Value<String?> componentKey = const Value.absent(),
+    Value<int?> itemProductId = const Value.absent(),
+    int? quantity,
+  }) => MealAdjustmentPricingRuleCondition(
+    id: id ?? this.id,
+    ruleId: ruleId ?? this.ruleId,
+    conditionType: conditionType ?? this.conditionType,
+    componentKey: componentKey.present ? componentKey.value : this.componentKey,
+    itemProductId: itemProductId.present
+        ? itemProductId.value
+        : this.itemProductId,
+    quantity: quantity ?? this.quantity,
+  );
+  MealAdjustmentPricingRuleCondition copyWithCompanion(
+    MealAdjustmentPricingRuleConditionsCompanion data,
+  ) {
+    return MealAdjustmentPricingRuleCondition(
+      id: data.id.present ? data.id.value : this.id,
+      ruleId: data.ruleId.present ? data.ruleId.value : this.ruleId,
+      conditionType: data.conditionType.present
+          ? data.conditionType.value
+          : this.conditionType,
+      componentKey: data.componentKey.present
+          ? data.componentKey.value
+          : this.componentKey,
+      itemProductId: data.itemProductId.present
+          ? data.itemProductId.value
+          : this.itemProductId,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealAdjustmentPricingRuleCondition(')
+          ..write('id: $id, ')
+          ..write('ruleId: $ruleId, ')
+          ..write('conditionType: $conditionType, ')
+          ..write('componentKey: $componentKey, ')
+          ..write('itemProductId: $itemProductId, ')
+          ..write('quantity: $quantity')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    ruleId,
+    conditionType,
+    componentKey,
+    itemProductId,
+    quantity,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MealAdjustmentPricingRuleCondition &&
+          other.id == this.id &&
+          other.ruleId == this.ruleId &&
+          other.conditionType == this.conditionType &&
+          other.componentKey == this.componentKey &&
+          other.itemProductId == this.itemProductId &&
+          other.quantity == this.quantity);
+}
+
+class MealAdjustmentPricingRuleConditionsCompanion
+    extends UpdateCompanion<MealAdjustmentPricingRuleCondition> {
+  final Value<int> id;
+  final Value<int> ruleId;
+  final Value<String> conditionType;
+  final Value<String?> componentKey;
+  final Value<int?> itemProductId;
+  final Value<int> quantity;
+  const MealAdjustmentPricingRuleConditionsCompanion({
+    this.id = const Value.absent(),
+    this.ruleId = const Value.absent(),
+    this.conditionType = const Value.absent(),
+    this.componentKey = const Value.absent(),
+    this.itemProductId = const Value.absent(),
+    this.quantity = const Value.absent(),
+  });
+  MealAdjustmentPricingRuleConditionsCompanion.insert({
+    this.id = const Value.absent(),
+    required int ruleId,
+    required String conditionType,
+    this.componentKey = const Value.absent(),
+    this.itemProductId = const Value.absent(),
+    this.quantity = const Value.absent(),
+  }) : ruleId = Value(ruleId),
+       conditionType = Value(conditionType);
+  static Insertable<MealAdjustmentPricingRuleCondition> custom({
+    Expression<int>? id,
+    Expression<int>? ruleId,
+    Expression<String>? conditionType,
+    Expression<String>? componentKey,
+    Expression<int>? itemProductId,
+    Expression<int>? quantity,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (ruleId != null) 'rule_id': ruleId,
+      if (conditionType != null) 'condition_type': conditionType,
+      if (componentKey != null) 'component_key': componentKey,
+      if (itemProductId != null) 'item_product_id': itemProductId,
+      if (quantity != null) 'quantity': quantity,
+    });
+  }
+
+  MealAdjustmentPricingRuleConditionsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? ruleId,
+    Value<String>? conditionType,
+    Value<String?>? componentKey,
+    Value<int?>? itemProductId,
+    Value<int>? quantity,
+  }) {
+    return MealAdjustmentPricingRuleConditionsCompanion(
+      id: id ?? this.id,
+      ruleId: ruleId ?? this.ruleId,
+      conditionType: conditionType ?? this.conditionType,
+      componentKey: componentKey ?? this.componentKey,
+      itemProductId: itemProductId ?? this.itemProductId,
+      quantity: quantity ?? this.quantity,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (ruleId.present) {
+      map['rule_id'] = Variable<int>(ruleId.value);
+    }
+    if (conditionType.present) {
+      map['condition_type'] = Variable<String>(conditionType.value);
+    }
+    if (componentKey.present) {
+      map['component_key'] = Variable<String>(componentKey.value);
+    }
+    if (itemProductId.present) {
+      map['item_product_id'] = Variable<int>(itemProductId.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<int>(quantity.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealAdjustmentPricingRuleConditionsCompanion(')
+          ..write('id: $id, ')
+          ..write('ruleId: $ruleId, ')
+          ..write('conditionType: $conditionType, ')
+          ..write('componentKey: $componentKey, ')
+          ..write('itemProductId: $itemProductId, ')
+          ..write('quantity: $quantity')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $BreakfastExtraPresetsTable extends BreakfastExtraPresets
+    with TableInfo<$BreakfastExtraPresetsTable, BreakfastExtraPreset> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BreakfastExtraPresetsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, createdAt, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'breakfast_extra_presets';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BreakfastExtraPreset> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BreakfastExtraPreset map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BreakfastExtraPreset(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $BreakfastExtraPresetsTable createAlias(String alias) {
+    return $BreakfastExtraPresetsTable(attachedDatabase, alias);
+  }
+}
+
+class BreakfastExtraPreset extends DataClass
+    implements Insertable<BreakfastExtraPreset> {
+  final int id;
+  final String name;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const BreakfastExtraPreset({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  BreakfastExtraPresetsCompanion toCompanion(bool nullToAbsent) {
+    return BreakfastExtraPresetsCompanion(
+      id: Value(id),
+      name: Value(name),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory BreakfastExtraPreset.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BreakfastExtraPreset(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  BreakfastExtraPreset copyWith({
+    int? id,
+    String? name,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => BreakfastExtraPreset(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  BreakfastExtraPreset copyWithCompanion(BreakfastExtraPresetsCompanion data) {
+    return BreakfastExtraPreset(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BreakfastExtraPreset(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BreakfastExtraPreset &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class BreakfastExtraPresetsCompanion
+    extends UpdateCompanion<BreakfastExtraPreset> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  const BreakfastExtraPresetsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  BreakfastExtraPresetsCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<BreakfastExtraPreset> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  BreakfastExtraPresetsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? name,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+  }) {
+    return BreakfastExtraPresetsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BreakfastExtraPresetsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $BreakfastExtraPresetItemsTable extends BreakfastExtraPresetItems
+    with TableInfo<$BreakfastExtraPresetItemsTable, BreakfastExtraPresetItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BreakfastExtraPresetItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _presetIdMeta = const VerificationMeta(
+    'presetId',
+  );
+  @override
+  late final GeneratedColumn<int> presetId = GeneratedColumn<int>(
+    'preset_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES "breakfast_extra_presets" ("id")',
+  );
+  static const VerificationMeta _itemProductIdMeta = const VerificationMeta(
+    'itemProductId',
+  );
+  @override
+  late final GeneratedColumn<int> itemProductId = GeneratedColumn<int>(
+    'item_product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES "products" ("id")',
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    presetId,
+    itemProductId,
+    sortOrder,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'breakfast_extra_preset_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BreakfastExtraPresetItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('preset_id')) {
+      context.handle(
+        _presetIdMeta,
+        presetId.isAcceptableOrUnknown(data['preset_id']!, _presetIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_presetIdMeta);
+    }
+    if (data.containsKey('item_product_id')) {
+      context.handle(
+        _itemProductIdMeta,
+        itemProductId.isAcceptableOrUnknown(
+          data['item_product_id']!,
+          _itemProductIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_itemProductIdMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BreakfastExtraPresetItem map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BreakfastExtraPresetItem(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      presetId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}preset_id'],
+      )!,
+      itemProductId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}item_product_id'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+    );
+  }
+
+  @override
+  $BreakfastExtraPresetItemsTable createAlias(String alias) {
+    return $BreakfastExtraPresetItemsTable(attachedDatabase, alias);
+  }
+}
+
+class BreakfastExtraPresetItem extends DataClass
+    implements Insertable<BreakfastExtraPresetItem> {
+  final int id;
+  final int presetId;
+  final int itemProductId;
+  final int sortOrder;
+  const BreakfastExtraPresetItem({
+    required this.id,
+    required this.presetId,
+    required this.itemProductId,
+    required this.sortOrder,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['preset_id'] = Variable<int>(presetId);
+    map['item_product_id'] = Variable<int>(itemProductId);
+    map['sort_order'] = Variable<int>(sortOrder);
+    return map;
+  }
+
+  BreakfastExtraPresetItemsCompanion toCompanion(bool nullToAbsent) {
+    return BreakfastExtraPresetItemsCompanion(
+      id: Value(id),
+      presetId: Value(presetId),
+      itemProductId: Value(itemProductId),
+      sortOrder: Value(sortOrder),
+    );
+  }
+
+  factory BreakfastExtraPresetItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BreakfastExtraPresetItem(
+      id: serializer.fromJson<int>(json['id']),
+      presetId: serializer.fromJson<int>(json['presetId']),
+      itemProductId: serializer.fromJson<int>(json['itemProductId']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'presetId': serializer.toJson<int>(presetId),
+      'itemProductId': serializer.toJson<int>(itemProductId),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+    };
+  }
+
+  BreakfastExtraPresetItem copyWith({
+    int? id,
+    int? presetId,
+    int? itemProductId,
+    int? sortOrder,
+  }) => BreakfastExtraPresetItem(
+    id: id ?? this.id,
+    presetId: presetId ?? this.presetId,
+    itemProductId: itemProductId ?? this.itemProductId,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
+  BreakfastExtraPresetItem copyWithCompanion(
+    BreakfastExtraPresetItemsCompanion data,
+  ) {
+    return BreakfastExtraPresetItem(
+      id: data.id.present ? data.id.value : this.id,
+      presetId: data.presetId.present ? data.presetId.value : this.presetId,
+      itemProductId: data.itemProductId.present
+          ? data.itemProductId.value
+          : this.itemProductId,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BreakfastExtraPresetItem(')
+          ..write('id: $id, ')
+          ..write('presetId: $presetId, ')
+          ..write('itemProductId: $itemProductId, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, presetId, itemProductId, sortOrder);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BreakfastExtraPresetItem &&
+          other.id == this.id &&
+          other.presetId == this.presetId &&
+          other.itemProductId == this.itemProductId &&
+          other.sortOrder == this.sortOrder);
+}
+
+class BreakfastExtraPresetItemsCompanion
+    extends UpdateCompanion<BreakfastExtraPresetItem> {
+  final Value<int> id;
+  final Value<int> presetId;
+  final Value<int> itemProductId;
+  final Value<int> sortOrder;
+  const BreakfastExtraPresetItemsCompanion({
+    this.id = const Value.absent(),
+    this.presetId = const Value.absent(),
+    this.itemProductId = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+  });
+  BreakfastExtraPresetItemsCompanion.insert({
+    this.id = const Value.absent(),
+    required int presetId,
+    required int itemProductId,
+    this.sortOrder = const Value.absent(),
+  }) : presetId = Value(presetId),
+       itemProductId = Value(itemProductId);
+  static Insertable<BreakfastExtraPresetItem> custom({
+    Expression<int>? id,
+    Expression<int>? presetId,
+    Expression<int>? itemProductId,
+    Expression<int>? sortOrder,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (presetId != null) 'preset_id': presetId,
+      if (itemProductId != null) 'item_product_id': itemProductId,
+      if (sortOrder != null) 'sort_order': sortOrder,
+    });
+  }
+
+  BreakfastExtraPresetItemsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? presetId,
+    Value<int>? itemProductId,
+    Value<int>? sortOrder,
+  }) {
+    return BreakfastExtraPresetItemsCompanion(
+      id: id ?? this.id,
+      presetId: presetId ?? this.presetId,
+      itemProductId: itemProductId ?? this.itemProductId,
+      sortOrder: sortOrder ?? this.sortOrder,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (presetId.present) {
+      map['preset_id'] = Variable<int>(presetId.value);
+    }
+    if (itemProductId.present) {
+      map['item_product_id'] = Variable<int>(itemProductId.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BreakfastExtraPresetItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('presetId: $presetId, ')
+          ..write('itemProductId: $itemProductId, ')
           ..write('sortOrder: $sortOrder')
           ..write(')'))
         .toString();
@@ -6107,6 +9660,589 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
           ..write('chargeReason: $chargeReason, ')
           ..write('unitPriceMinor: $unitPriceMinor, ')
           ..write('priceEffectMinor: $priceEffectMinor, ')
+          ..write('sortKey: $sortKey')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $BreakfastCookingInstructionsTable extends BreakfastCookingInstructions
+    with
+        TableInfo<
+          $BreakfastCookingInstructionsTable,
+          BreakfastCookingInstruction
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BreakfastCookingInstructionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _uuidMeta = const VerificationMeta('uuid');
+  @override
+  late final GeneratedColumn<String> uuid = GeneratedColumn<String>(
+    'uuid',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  static const VerificationMeta _transactionLineIdMeta = const VerificationMeta(
+    'transactionLineId',
+  );
+  @override
+  late final GeneratedColumn<int> transactionLineId = GeneratedColumn<int>(
+    'transaction_line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES "transaction_lines" ("id")',
+  );
+  static const VerificationMeta _itemProductIdMeta = const VerificationMeta(
+    'itemProductId',
+  );
+  @override
+  late final GeneratedColumn<int> itemProductId = GeneratedColumn<int>(
+    'item_product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL REFERENCES "products" ("id")',
+  );
+  static const VerificationMeta _itemNameMeta = const VerificationMeta(
+    'itemName',
+  );
+  @override
+  late final GeneratedColumn<String> itemName = GeneratedColumn<String>(
+    'item_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _instructionCodeMeta = const VerificationMeta(
+    'instructionCode',
+  );
+  @override
+  late final GeneratedColumn<String> instructionCode = GeneratedColumn<String>(
+    'instruction_code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _instructionLabelMeta = const VerificationMeta(
+    'instructionLabel',
+  );
+  @override
+  late final GeneratedColumn<String> instructionLabel = GeneratedColumn<String>(
+    'instruction_label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _appliedQuantityMeta = const VerificationMeta(
+    'appliedQuantity',
+  );
+  @override
+  late final GeneratedColumn<int> appliedQuantity = GeneratedColumn<int>(
+    'applied_quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _sortKeyMeta = const VerificationMeta(
+    'sortKey',
+  );
+  @override
+  late final GeneratedColumn<int> sortKey = GeneratedColumn<int>(
+    'sort_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    uuid,
+    transactionLineId,
+    itemProductId,
+    itemName,
+    instructionCode,
+    instructionLabel,
+    appliedQuantity,
+    sortKey,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'breakfast_cooking_instructions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BreakfastCookingInstruction> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('uuid')) {
+      context.handle(
+        _uuidMeta,
+        uuid.isAcceptableOrUnknown(data['uuid']!, _uuidMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_uuidMeta);
+    }
+    if (data.containsKey('transaction_line_id')) {
+      context.handle(
+        _transactionLineIdMeta,
+        transactionLineId.isAcceptableOrUnknown(
+          data['transaction_line_id']!,
+          _transactionLineIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_transactionLineIdMeta);
+    }
+    if (data.containsKey('item_product_id')) {
+      context.handle(
+        _itemProductIdMeta,
+        itemProductId.isAcceptableOrUnknown(
+          data['item_product_id']!,
+          _itemProductIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_itemProductIdMeta);
+    }
+    if (data.containsKey('item_name')) {
+      context.handle(
+        _itemNameMeta,
+        itemName.isAcceptableOrUnknown(data['item_name']!, _itemNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_itemNameMeta);
+    }
+    if (data.containsKey('instruction_code')) {
+      context.handle(
+        _instructionCodeMeta,
+        instructionCode.isAcceptableOrUnknown(
+          data['instruction_code']!,
+          _instructionCodeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_instructionCodeMeta);
+    }
+    if (data.containsKey('instruction_label')) {
+      context.handle(
+        _instructionLabelMeta,
+        instructionLabel.isAcceptableOrUnknown(
+          data['instruction_label']!,
+          _instructionLabelMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_instructionLabelMeta);
+    }
+    if (data.containsKey('applied_quantity')) {
+      context.handle(
+        _appliedQuantityMeta,
+        appliedQuantity.isAcceptableOrUnknown(
+          data['applied_quantity']!,
+          _appliedQuantityMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sort_key')) {
+      context.handle(
+        _sortKeyMeta,
+        sortKey.isAcceptableOrUnknown(data['sort_key']!, _sortKeyMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BreakfastCookingInstruction map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BreakfastCookingInstruction(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      uuid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}uuid'],
+      )!,
+      transactionLineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}transaction_line_id'],
+      )!,
+      itemProductId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}item_product_id'],
+      )!,
+      itemName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}item_name'],
+      )!,
+      instructionCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}instruction_code'],
+      )!,
+      instructionLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}instruction_label'],
+      )!,
+      appliedQuantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}applied_quantity'],
+      )!,
+      sortKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_key'],
+      )!,
+    );
+  }
+
+  @override
+  $BreakfastCookingInstructionsTable createAlias(String alias) {
+    return $BreakfastCookingInstructionsTable(attachedDatabase, alias);
+  }
+}
+
+class BreakfastCookingInstruction extends DataClass
+    implements Insertable<BreakfastCookingInstruction> {
+  final int id;
+  final String uuid;
+  final int transactionLineId;
+  final int itemProductId;
+  final String itemName;
+  final String instructionCode;
+  final String instructionLabel;
+  final int appliedQuantity;
+  final int sortKey;
+  const BreakfastCookingInstruction({
+    required this.id,
+    required this.uuid,
+    required this.transactionLineId,
+    required this.itemProductId,
+    required this.itemName,
+    required this.instructionCode,
+    required this.instructionLabel,
+    required this.appliedQuantity,
+    required this.sortKey,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['uuid'] = Variable<String>(uuid);
+    map['transaction_line_id'] = Variable<int>(transactionLineId);
+    map['item_product_id'] = Variable<int>(itemProductId);
+    map['item_name'] = Variable<String>(itemName);
+    map['instruction_code'] = Variable<String>(instructionCode);
+    map['instruction_label'] = Variable<String>(instructionLabel);
+    map['applied_quantity'] = Variable<int>(appliedQuantity);
+    map['sort_key'] = Variable<int>(sortKey);
+    return map;
+  }
+
+  BreakfastCookingInstructionsCompanion toCompanion(bool nullToAbsent) {
+    return BreakfastCookingInstructionsCompanion(
+      id: Value(id),
+      uuid: Value(uuid),
+      transactionLineId: Value(transactionLineId),
+      itemProductId: Value(itemProductId),
+      itemName: Value(itemName),
+      instructionCode: Value(instructionCode),
+      instructionLabel: Value(instructionLabel),
+      appliedQuantity: Value(appliedQuantity),
+      sortKey: Value(sortKey),
+    );
+  }
+
+  factory BreakfastCookingInstruction.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BreakfastCookingInstruction(
+      id: serializer.fromJson<int>(json['id']),
+      uuid: serializer.fromJson<String>(json['uuid']),
+      transactionLineId: serializer.fromJson<int>(json['transactionLineId']),
+      itemProductId: serializer.fromJson<int>(json['itemProductId']),
+      itemName: serializer.fromJson<String>(json['itemName']),
+      instructionCode: serializer.fromJson<String>(json['instructionCode']),
+      instructionLabel: serializer.fromJson<String>(json['instructionLabel']),
+      appliedQuantity: serializer.fromJson<int>(json['appliedQuantity']),
+      sortKey: serializer.fromJson<int>(json['sortKey']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'uuid': serializer.toJson<String>(uuid),
+      'transactionLineId': serializer.toJson<int>(transactionLineId),
+      'itemProductId': serializer.toJson<int>(itemProductId),
+      'itemName': serializer.toJson<String>(itemName),
+      'instructionCode': serializer.toJson<String>(instructionCode),
+      'instructionLabel': serializer.toJson<String>(instructionLabel),
+      'appliedQuantity': serializer.toJson<int>(appliedQuantity),
+      'sortKey': serializer.toJson<int>(sortKey),
+    };
+  }
+
+  BreakfastCookingInstruction copyWith({
+    int? id,
+    String? uuid,
+    int? transactionLineId,
+    int? itemProductId,
+    String? itemName,
+    String? instructionCode,
+    String? instructionLabel,
+    int? appliedQuantity,
+    int? sortKey,
+  }) => BreakfastCookingInstruction(
+    id: id ?? this.id,
+    uuid: uuid ?? this.uuid,
+    transactionLineId: transactionLineId ?? this.transactionLineId,
+    itemProductId: itemProductId ?? this.itemProductId,
+    itemName: itemName ?? this.itemName,
+    instructionCode: instructionCode ?? this.instructionCode,
+    instructionLabel: instructionLabel ?? this.instructionLabel,
+    appliedQuantity: appliedQuantity ?? this.appliedQuantity,
+    sortKey: sortKey ?? this.sortKey,
+  );
+  BreakfastCookingInstruction copyWithCompanion(
+    BreakfastCookingInstructionsCompanion data,
+  ) {
+    return BreakfastCookingInstruction(
+      id: data.id.present ? data.id.value : this.id,
+      uuid: data.uuid.present ? data.uuid.value : this.uuid,
+      transactionLineId: data.transactionLineId.present
+          ? data.transactionLineId.value
+          : this.transactionLineId,
+      itemProductId: data.itemProductId.present
+          ? data.itemProductId.value
+          : this.itemProductId,
+      itemName: data.itemName.present ? data.itemName.value : this.itemName,
+      instructionCode: data.instructionCode.present
+          ? data.instructionCode.value
+          : this.instructionCode,
+      instructionLabel: data.instructionLabel.present
+          ? data.instructionLabel.value
+          : this.instructionLabel,
+      appliedQuantity: data.appliedQuantity.present
+          ? data.appliedQuantity.value
+          : this.appliedQuantity,
+      sortKey: data.sortKey.present ? data.sortKey.value : this.sortKey,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BreakfastCookingInstruction(')
+          ..write('id: $id, ')
+          ..write('uuid: $uuid, ')
+          ..write('transactionLineId: $transactionLineId, ')
+          ..write('itemProductId: $itemProductId, ')
+          ..write('itemName: $itemName, ')
+          ..write('instructionCode: $instructionCode, ')
+          ..write('instructionLabel: $instructionLabel, ')
+          ..write('appliedQuantity: $appliedQuantity, ')
+          ..write('sortKey: $sortKey')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    uuid,
+    transactionLineId,
+    itemProductId,
+    itemName,
+    instructionCode,
+    instructionLabel,
+    appliedQuantity,
+    sortKey,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BreakfastCookingInstruction &&
+          other.id == this.id &&
+          other.uuid == this.uuid &&
+          other.transactionLineId == this.transactionLineId &&
+          other.itemProductId == this.itemProductId &&
+          other.itemName == this.itemName &&
+          other.instructionCode == this.instructionCode &&
+          other.instructionLabel == this.instructionLabel &&
+          other.appliedQuantity == this.appliedQuantity &&
+          other.sortKey == this.sortKey);
+}
+
+class BreakfastCookingInstructionsCompanion
+    extends UpdateCompanion<BreakfastCookingInstruction> {
+  final Value<int> id;
+  final Value<String> uuid;
+  final Value<int> transactionLineId;
+  final Value<int> itemProductId;
+  final Value<String> itemName;
+  final Value<String> instructionCode;
+  final Value<String> instructionLabel;
+  final Value<int> appliedQuantity;
+  final Value<int> sortKey;
+  const BreakfastCookingInstructionsCompanion({
+    this.id = const Value.absent(),
+    this.uuid = const Value.absent(),
+    this.transactionLineId = const Value.absent(),
+    this.itemProductId = const Value.absent(),
+    this.itemName = const Value.absent(),
+    this.instructionCode = const Value.absent(),
+    this.instructionLabel = const Value.absent(),
+    this.appliedQuantity = const Value.absent(),
+    this.sortKey = const Value.absent(),
+  });
+  BreakfastCookingInstructionsCompanion.insert({
+    this.id = const Value.absent(),
+    required String uuid,
+    required int transactionLineId,
+    required int itemProductId,
+    required String itemName,
+    required String instructionCode,
+    required String instructionLabel,
+    this.appliedQuantity = const Value.absent(),
+    this.sortKey = const Value.absent(),
+  }) : uuid = Value(uuid),
+       transactionLineId = Value(transactionLineId),
+       itemProductId = Value(itemProductId),
+       itemName = Value(itemName),
+       instructionCode = Value(instructionCode),
+       instructionLabel = Value(instructionLabel);
+  static Insertable<BreakfastCookingInstruction> custom({
+    Expression<int>? id,
+    Expression<String>? uuid,
+    Expression<int>? transactionLineId,
+    Expression<int>? itemProductId,
+    Expression<String>? itemName,
+    Expression<String>? instructionCode,
+    Expression<String>? instructionLabel,
+    Expression<int>? appliedQuantity,
+    Expression<int>? sortKey,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (uuid != null) 'uuid': uuid,
+      if (transactionLineId != null) 'transaction_line_id': transactionLineId,
+      if (itemProductId != null) 'item_product_id': itemProductId,
+      if (itemName != null) 'item_name': itemName,
+      if (instructionCode != null) 'instruction_code': instructionCode,
+      if (instructionLabel != null) 'instruction_label': instructionLabel,
+      if (appliedQuantity != null) 'applied_quantity': appliedQuantity,
+      if (sortKey != null) 'sort_key': sortKey,
+    });
+  }
+
+  BreakfastCookingInstructionsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? uuid,
+    Value<int>? transactionLineId,
+    Value<int>? itemProductId,
+    Value<String>? itemName,
+    Value<String>? instructionCode,
+    Value<String>? instructionLabel,
+    Value<int>? appliedQuantity,
+    Value<int>? sortKey,
+  }) {
+    return BreakfastCookingInstructionsCompanion(
+      id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
+      transactionLineId: transactionLineId ?? this.transactionLineId,
+      itemProductId: itemProductId ?? this.itemProductId,
+      itemName: itemName ?? this.itemName,
+      instructionCode: instructionCode ?? this.instructionCode,
+      instructionLabel: instructionLabel ?? this.instructionLabel,
+      appliedQuantity: appliedQuantity ?? this.appliedQuantity,
+      sortKey: sortKey ?? this.sortKey,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (uuid.present) {
+      map['uuid'] = Variable<String>(uuid.value);
+    }
+    if (transactionLineId.present) {
+      map['transaction_line_id'] = Variable<int>(transactionLineId.value);
+    }
+    if (itemProductId.present) {
+      map['item_product_id'] = Variable<int>(itemProductId.value);
+    }
+    if (itemName.present) {
+      map['item_name'] = Variable<String>(itemName.value);
+    }
+    if (instructionCode.present) {
+      map['instruction_code'] = Variable<String>(instructionCode.value);
+    }
+    if (instructionLabel.present) {
+      map['instruction_label'] = Variable<String>(instructionLabel.value);
+    }
+    if (appliedQuantity.present) {
+      map['applied_quantity'] = Variable<int>(appliedQuantity.value);
+    }
+    if (sortKey.present) {
+      map['sort_key'] = Variable<int>(sortKey.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BreakfastCookingInstructionsCompanion(')
+          ..write('id: $id, ')
+          ..write('uuid: $uuid, ')
+          ..write('transactionLineId: $transactionLineId, ')
+          ..write('itemProductId: $itemProductId, ')
+          ..write('itemName: $itemName, ')
+          ..write('instructionCode: $instructionCode, ')
+          ..write('instructionLabel: $instructionLabel, ')
+          ..write('appliedQuantity: $appliedQuantity, ')
           ..write('sortKey: $sortKey')
           ..write(')'))
         .toString();
@@ -10883,7 +15019,24 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $UsersTable users = $UsersTable(this);
   late final $CategoriesTable categories = $CategoriesTable(this);
+  late final $MealAdjustmentProfilesTable mealAdjustmentProfiles =
+      $MealAdjustmentProfilesTable(this);
   late final $ProductsTable products = $ProductsTable(this);
+  late final $MealAdjustmentProfileComponentsTable
+  mealAdjustmentProfileComponents = $MealAdjustmentProfileComponentsTable(this);
+  late final $MealAdjustmentComponentOptionsTable
+  mealAdjustmentComponentOptions = $MealAdjustmentComponentOptionsTable(this);
+  late final $MealAdjustmentProfileExtrasTable mealAdjustmentProfileExtras =
+      $MealAdjustmentProfileExtrasTable(this);
+  late final $MealAdjustmentPricingRulesTable mealAdjustmentPricingRules =
+      $MealAdjustmentPricingRulesTable(this);
+  late final $MealAdjustmentPricingRuleConditionsTable
+  mealAdjustmentPricingRuleConditions =
+      $MealAdjustmentPricingRuleConditionsTable(this);
+  late final $BreakfastExtraPresetsTable breakfastExtraPresets =
+      $BreakfastExtraPresetsTable(this);
+  late final $BreakfastExtraPresetItemsTable breakfastExtraPresetItems =
+      $BreakfastExtraPresetItemsTable(this);
   late final $MenuSettingsTable menuSettings = $MenuSettingsTable(this);
   late final $SetItemsTable setItems = $SetItemsTable(this);
   late final $ModifierGroupsTable modifierGroups = $ModifierGroupsTable(this);
@@ -10896,6 +15049,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $OrderModifiersTable orderModifiers = $OrderModifiersTable(this);
+  late final $BreakfastCookingInstructionsTable breakfastCookingInstructions =
+      $BreakfastCookingInstructionsTable(this);
   late final $PaymentsTable payments = $PaymentsTable(this);
   late final $PaymentAdjustmentsTable paymentAdjustments =
       $PaymentAdjustmentsTable(this);
@@ -10916,7 +15071,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     users,
     categories,
+    mealAdjustmentProfiles,
     products,
+    mealAdjustmentProfileComponents,
+    mealAdjustmentComponentOptions,
+    mealAdjustmentProfileExtras,
+    mealAdjustmentPricingRules,
+    mealAdjustmentPricingRuleConditions,
+    breakfastExtraPresets,
+    breakfastExtraPresetItems,
     menuSettings,
     setItems,
     modifierGroups,
@@ -10925,6 +15088,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     transactions,
     transactionLines,
     orderModifiers,
+    breakfastCookingInstructions,
     payments,
     paymentAdjustments,
     shiftReconciliations,
@@ -12566,10 +16730,722 @@ typedef $$CategoriesTableProcessedTableManager =
       Category,
       PrefetchHooks Function({bool productsRefs})
     >;
+typedef $$MealAdjustmentProfilesTableCreateCompanionBuilder =
+    MealAdjustmentProfilesCompanion Function({
+      Value<int> id,
+      required String name,
+      Value<String?> description,
+      Value<int> freeSwapLimit,
+      Value<bool> isActive,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+typedef $$MealAdjustmentProfilesTableUpdateCompanionBuilder =
+    MealAdjustmentProfilesCompanion Function({
+      Value<int> id,
+      Value<String> name,
+      Value<String?> description,
+      Value<int> freeSwapLimit,
+      Value<bool> isActive,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+
+final class $$MealAdjustmentProfilesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $MealAdjustmentProfilesTable,
+          MealAdjustmentProfile
+        > {
+  $$MealAdjustmentProfilesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<$ProductsTable, List<Product>> _productsRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.products,
+    aliasName: $_aliasNameGenerator(
+      db.mealAdjustmentProfiles.id,
+      db.products.mealAdjustmentProfileId,
+    ),
+  );
+
+  $$ProductsTableProcessedTableManager get productsRefs {
+    final manager = $$ProductsTableTableManager($_db, $_db.products).filter(
+      (f) => f.mealAdjustmentProfileId.id.sqlEquals($_itemColumn<int>('id')!),
+    );
+
+    final cache = $_typedResult.readTableOrNull(_productsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $MealAdjustmentProfileComponentsTable,
+    List<MealAdjustmentProfileComponent>
+  >
+  _mealAdjustmentProfileComponentsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.mealAdjustmentProfileComponents,
+        aliasName: $_aliasNameGenerator(
+          db.mealAdjustmentProfiles.id,
+          db.mealAdjustmentProfileComponents.profileId,
+        ),
+      );
+
+  $$MealAdjustmentProfileComponentsTableProcessedTableManager
+  get mealAdjustmentProfileComponentsRefs {
+    final manager = $$MealAdjustmentProfileComponentsTableTableManager(
+      $_db,
+      $_db.mealAdjustmentProfileComponents,
+    ).filter((f) => f.profileId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _mealAdjustmentProfileComponentsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $MealAdjustmentProfileExtrasTable,
+    List<MealAdjustmentProfileExtra>
+  >
+  _mealAdjustmentProfileExtrasRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.mealAdjustmentProfileExtras,
+        aliasName: $_aliasNameGenerator(
+          db.mealAdjustmentProfiles.id,
+          db.mealAdjustmentProfileExtras.profileId,
+        ),
+      );
+
+  $$MealAdjustmentProfileExtrasTableProcessedTableManager
+  get mealAdjustmentProfileExtrasRefs {
+    final manager = $$MealAdjustmentProfileExtrasTableTableManager(
+      $_db,
+      $_db.mealAdjustmentProfileExtras,
+    ).filter((f) => f.profileId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _mealAdjustmentProfileExtrasRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $MealAdjustmentPricingRulesTable,
+    List<MealAdjustmentPricingRule>
+  >
+  _mealAdjustmentPricingRulesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.mealAdjustmentPricingRules,
+        aliasName: $_aliasNameGenerator(
+          db.mealAdjustmentProfiles.id,
+          db.mealAdjustmentPricingRules.profileId,
+        ),
+      );
+
+  $$MealAdjustmentPricingRulesTableProcessedTableManager
+  get mealAdjustmentPricingRulesRefs {
+    final manager = $$MealAdjustmentPricingRulesTableTableManager(
+      $_db,
+      $_db.mealAdjustmentPricingRules,
+    ).filter((f) => f.profileId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _mealAdjustmentPricingRulesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$MealAdjustmentProfilesTableFilterComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentProfilesTable> {
+  $$MealAdjustmentProfilesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get freeSwapLimit => $composableBuilder(
+    column: $table.freeSwapLimit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> productsRefs(
+    Expression<bool> Function($$ProductsTableFilterComposer f) f,
+  ) {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.mealAdjustmentProfileId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> mealAdjustmentProfileComponentsRefs(
+    Expression<bool> Function(
+      $$MealAdjustmentProfileComponentsTableFilterComposer f,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentProfileComponentsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentProfileComponents,
+          getReferencedColumn: (t) => t.profileId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfileComponentsTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfileComponents,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<bool> mealAdjustmentProfileExtrasRefs(
+    Expression<bool> Function(
+      $$MealAdjustmentProfileExtrasTableFilterComposer f,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentProfileExtrasTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentProfileExtras,
+          getReferencedColumn: (t) => t.profileId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfileExtrasTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfileExtras,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<bool> mealAdjustmentPricingRulesRefs(
+    Expression<bool> Function($$MealAdjustmentPricingRulesTableFilterComposer f)
+    f,
+  ) {
+    final $$MealAdjustmentPricingRulesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentPricingRules,
+          getReferencedColumn: (t) => t.profileId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentPricingRulesTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentPricingRules,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$MealAdjustmentProfilesTableOrderingComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentProfilesTable> {
+  $$MealAdjustmentProfilesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get freeSwapLimit => $composableBuilder(
+    column: $table.freeSwapLimit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$MealAdjustmentProfilesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentProfilesTable> {
+  $$MealAdjustmentProfilesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get freeSwapLimit => $composableBuilder(
+    column: $table.freeSwapLimit,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> productsRefs<T extends Object>(
+    Expression<T> Function($$ProductsTableAnnotationComposer a) f,
+  ) {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.mealAdjustmentProfileId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> mealAdjustmentProfileComponentsRefs<T extends Object>(
+    Expression<T> Function(
+      $$MealAdjustmentProfileComponentsTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentProfileComponentsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentProfileComponents,
+          getReferencedColumn: (t) => t.profileId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfileComponentsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfileComponents,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> mealAdjustmentProfileExtrasRefs<T extends Object>(
+    Expression<T> Function(
+      $$MealAdjustmentProfileExtrasTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentProfileExtrasTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentProfileExtras,
+          getReferencedColumn: (t) => t.profileId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfileExtrasTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfileExtras,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> mealAdjustmentPricingRulesRefs<T extends Object>(
+    Expression<T> Function(
+      $$MealAdjustmentPricingRulesTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentPricingRulesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentPricingRules,
+          getReferencedColumn: (t) => t.profileId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentPricingRulesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentPricingRules,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$MealAdjustmentProfilesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MealAdjustmentProfilesTable,
+          MealAdjustmentProfile,
+          $$MealAdjustmentProfilesTableFilterComposer,
+          $$MealAdjustmentProfilesTableOrderingComposer,
+          $$MealAdjustmentProfilesTableAnnotationComposer,
+          $$MealAdjustmentProfilesTableCreateCompanionBuilder,
+          $$MealAdjustmentProfilesTableUpdateCompanionBuilder,
+          (MealAdjustmentProfile, $$MealAdjustmentProfilesTableReferences),
+          MealAdjustmentProfile,
+          PrefetchHooks Function({
+            bool productsRefs,
+            bool mealAdjustmentProfileComponentsRefs,
+            bool mealAdjustmentProfileExtrasRefs,
+            bool mealAdjustmentPricingRulesRefs,
+          })
+        > {
+  $$MealAdjustmentProfilesTableTableManager(
+    _$AppDatabase db,
+    $MealAdjustmentProfilesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MealAdjustmentProfilesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$MealAdjustmentProfilesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$MealAdjustmentProfilesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<int> freeSwapLimit = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => MealAdjustmentProfilesCompanion(
+                id: id,
+                name: name,
+                description: description,
+                freeSwapLimit: freeSwapLimit,
+                isActive: isActive,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String name,
+                Value<String?> description = const Value.absent(),
+                Value<int> freeSwapLimit = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => MealAdjustmentProfilesCompanion.insert(
+                id: id,
+                name: name,
+                description: description,
+                freeSwapLimit: freeSwapLimit,
+                isActive: isActive,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MealAdjustmentProfilesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                productsRefs = false,
+                mealAdjustmentProfileComponentsRefs = false,
+                mealAdjustmentProfileExtrasRefs = false,
+                mealAdjustmentPricingRulesRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (productsRefs) db.products,
+                    if (mealAdjustmentProfileComponentsRefs)
+                      db.mealAdjustmentProfileComponents,
+                    if (mealAdjustmentProfileExtrasRefs)
+                      db.mealAdjustmentProfileExtras,
+                    if (mealAdjustmentPricingRulesRefs)
+                      db.mealAdjustmentPricingRules,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (productsRefs)
+                        await $_getPrefetchedData<
+                          MealAdjustmentProfile,
+                          $MealAdjustmentProfilesTable,
+                          Product
+                        >(
+                          currentTable: table,
+                          referencedTable:
+                              $$MealAdjustmentProfilesTableReferences
+                                  ._productsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$MealAdjustmentProfilesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).productsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.mealAdjustmentProfileId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (mealAdjustmentProfileComponentsRefs)
+                        await $_getPrefetchedData<
+                          MealAdjustmentProfile,
+                          $MealAdjustmentProfilesTable,
+                          MealAdjustmentProfileComponent
+                        >(
+                          currentTable: table,
+                          referencedTable:
+                              $$MealAdjustmentProfilesTableReferences
+                                  ._mealAdjustmentProfileComponentsRefsTable(
+                                    db,
+                                  ),
+                          managerFromTypedResult: (p0) =>
+                              $$MealAdjustmentProfilesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).mealAdjustmentProfileComponentsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.profileId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (mealAdjustmentProfileExtrasRefs)
+                        await $_getPrefetchedData<
+                          MealAdjustmentProfile,
+                          $MealAdjustmentProfilesTable,
+                          MealAdjustmentProfileExtra
+                        >(
+                          currentTable: table,
+                          referencedTable:
+                              $$MealAdjustmentProfilesTableReferences
+                                  ._mealAdjustmentProfileExtrasRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$MealAdjustmentProfilesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).mealAdjustmentProfileExtrasRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.profileId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (mealAdjustmentPricingRulesRefs)
+                        await $_getPrefetchedData<
+                          MealAdjustmentProfile,
+                          $MealAdjustmentProfilesTable,
+                          MealAdjustmentPricingRule
+                        >(
+                          currentTable: table,
+                          referencedTable:
+                              $$MealAdjustmentProfilesTableReferences
+                                  ._mealAdjustmentPricingRulesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$MealAdjustmentProfilesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).mealAdjustmentPricingRulesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.profileId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$MealAdjustmentProfilesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MealAdjustmentProfilesTable,
+      MealAdjustmentProfile,
+      $$MealAdjustmentProfilesTableFilterComposer,
+      $$MealAdjustmentProfilesTableOrderingComposer,
+      $$MealAdjustmentProfilesTableAnnotationComposer,
+      $$MealAdjustmentProfilesTableCreateCompanionBuilder,
+      $$MealAdjustmentProfilesTableUpdateCompanionBuilder,
+      (MealAdjustmentProfile, $$MealAdjustmentProfilesTableReferences),
+      MealAdjustmentProfile,
+      PrefetchHooks Function({
+        bool productsRefs,
+        bool mealAdjustmentProfileComponentsRefs,
+        bool mealAdjustmentProfileExtrasRefs,
+        bool mealAdjustmentPricingRulesRefs,
+      })
+    >;
 typedef $$ProductsTableCreateCompanionBuilder =
     ProductsCompanion Function({
       Value<int> id,
       required int categoryId,
+      Value<int?> mealAdjustmentProfileId,
       required String name,
       required int priceMinor,
       Value<String?> imageUrl,
@@ -12582,6 +17458,7 @@ typedef $$ProductsTableUpdateCompanionBuilder =
     ProductsCompanion Function({
       Value<int> id,
       Value<int> categoryId,
+      Value<int?> mealAdjustmentProfileId,
       Value<String> name,
       Value<int> priceMinor,
       Value<String?> imageUrl,
@@ -12611,6 +17488,178 @@ final class $$ProductsTableReferences
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $MealAdjustmentProfilesTable _mealAdjustmentProfileIdTable(
+    _$AppDatabase db,
+  ) => db.mealAdjustmentProfiles.createAlias(
+    $_aliasNameGenerator(
+      db.products.mealAdjustmentProfileId,
+      db.mealAdjustmentProfiles.id,
+    ),
+  );
+
+  $$MealAdjustmentProfilesTableProcessedTableManager?
+  get mealAdjustmentProfileId {
+    final $_column = $_itemColumn<int>('meal_adjustment_profile_id');
+    if ($_column == null) return null;
+    final manager = $$MealAdjustmentProfilesTableTableManager(
+      $_db,
+      $_db.mealAdjustmentProfiles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(
+      _mealAdjustmentProfileIdTable($_db),
+    );
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $MealAdjustmentProfileComponentsTable,
+    List<MealAdjustmentProfileComponent>
+  >
+  _mealAdjustmentProfileComponentsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.mealAdjustmentProfileComponents,
+        aliasName: $_aliasNameGenerator(
+          db.products.id,
+          db.mealAdjustmentProfileComponents.defaultItemProductId,
+        ),
+      );
+
+  $$MealAdjustmentProfileComponentsTableProcessedTableManager
+  get mealAdjustmentProfileComponentsRefs {
+    final manager =
+        $$MealAdjustmentProfileComponentsTableTableManager(
+          $_db,
+          $_db.mealAdjustmentProfileComponents,
+        ).filter(
+          (f) => f.defaultItemProductId.id.sqlEquals($_itemColumn<int>('id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _mealAdjustmentProfileComponentsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $MealAdjustmentComponentOptionsTable,
+    List<MealAdjustmentComponentOption>
+  >
+  _mealAdjustmentComponentOptionsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.mealAdjustmentComponentOptions,
+        aliasName: $_aliasNameGenerator(
+          db.products.id,
+          db.mealAdjustmentComponentOptions.optionItemProductId,
+        ),
+      );
+
+  $$MealAdjustmentComponentOptionsTableProcessedTableManager
+  get mealAdjustmentComponentOptionsRefs {
+    final manager =
+        $$MealAdjustmentComponentOptionsTableTableManager(
+          $_db,
+          $_db.mealAdjustmentComponentOptions,
+        ).filter(
+          (f) => f.optionItemProductId.id.sqlEquals($_itemColumn<int>('id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _mealAdjustmentComponentOptionsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $MealAdjustmentProfileExtrasTable,
+    List<MealAdjustmentProfileExtra>
+  >
+  _mealAdjustmentProfileExtrasRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.mealAdjustmentProfileExtras,
+        aliasName: $_aliasNameGenerator(
+          db.products.id,
+          db.mealAdjustmentProfileExtras.itemProductId,
+        ),
+      );
+
+  $$MealAdjustmentProfileExtrasTableProcessedTableManager
+  get mealAdjustmentProfileExtrasRefs {
+    final manager = $$MealAdjustmentProfileExtrasTableTableManager(
+      $_db,
+      $_db.mealAdjustmentProfileExtras,
+    ).filter((f) => f.itemProductId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _mealAdjustmentProfileExtrasRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $MealAdjustmentPricingRuleConditionsTable,
+    List<MealAdjustmentPricingRuleCondition>
+  >
+  _mealAdjustmentPricingRuleConditionsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.mealAdjustmentPricingRuleConditions,
+        aliasName: $_aliasNameGenerator(
+          db.products.id,
+          db.mealAdjustmentPricingRuleConditions.itemProductId,
+        ),
+      );
+
+  $$MealAdjustmentPricingRuleConditionsTableProcessedTableManager
+  get mealAdjustmentPricingRuleConditionsRefs {
+    final manager = $$MealAdjustmentPricingRuleConditionsTableTableManager(
+      $_db,
+      $_db.mealAdjustmentPricingRuleConditions,
+    ).filter((f) => f.itemProductId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _mealAdjustmentPricingRuleConditionsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $BreakfastExtraPresetItemsTable,
+    List<BreakfastExtraPresetItem>
+  >
+  _breakfastExtraPresetItemsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.breakfastExtraPresetItems,
+        aliasName: $_aliasNameGenerator(
+          db.products.id,
+          db.breakfastExtraPresetItems.itemProductId,
+        ),
+      );
+
+  $$BreakfastExtraPresetItemsTableProcessedTableManager
+  get breakfastExtraPresetItemsRefs {
+    final manager = $$BreakfastExtraPresetItemsTableTableManager(
+      $_db,
+      $_db.breakfastExtraPresetItems,
+    ).filter((f) => f.itemProductId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _breakfastExtraPresetItemsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
     );
   }
 
@@ -12762,6 +17811,34 @@ final class $$ProductsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<
+    $BreakfastCookingInstructionsTable,
+    List<BreakfastCookingInstruction>
+  >
+  _breakfastCookingInstructionsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.breakfastCookingInstructions,
+        aliasName: $_aliasNameGenerator(
+          db.products.id,
+          db.breakfastCookingInstructions.itemProductId,
+        ),
+      );
+
+  $$BreakfastCookingInstructionsTableProcessedTableManager
+  get breakfastCookingInstructionsRefs {
+    final manager = $$BreakfastCookingInstructionsTableTableManager(
+      $_db,
+      $_db.breakfastCookingInstructions,
+    ).filter((f) => f.itemProductId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _breakfastCookingInstructionsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$ProductsTableFilterComposer
@@ -12834,6 +17911,173 @@ class $$ProductsTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  $$MealAdjustmentProfilesTableFilterComposer get mealAdjustmentProfileId {
+    final $$MealAdjustmentProfilesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.mealAdjustmentProfileId,
+          referencedTable: $db.mealAdjustmentProfiles,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfilesTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfiles,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  Expression<bool> mealAdjustmentProfileComponentsRefs(
+    Expression<bool> Function(
+      $$MealAdjustmentProfileComponentsTableFilterComposer f,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentProfileComponentsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentProfileComponents,
+          getReferencedColumn: (t) => t.defaultItemProductId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfileComponentsTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfileComponents,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<bool> mealAdjustmentComponentOptionsRefs(
+    Expression<bool> Function(
+      $$MealAdjustmentComponentOptionsTableFilterComposer f,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentComponentOptionsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentComponentOptions,
+          getReferencedColumn: (t) => t.optionItemProductId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentComponentOptionsTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentComponentOptions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<bool> mealAdjustmentProfileExtrasRefs(
+    Expression<bool> Function(
+      $$MealAdjustmentProfileExtrasTableFilterComposer f,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentProfileExtrasTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentProfileExtras,
+          getReferencedColumn: (t) => t.itemProductId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfileExtrasTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfileExtras,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<bool> mealAdjustmentPricingRuleConditionsRefs(
+    Expression<bool> Function(
+      $$MealAdjustmentPricingRuleConditionsTableFilterComposer f,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentPricingRuleConditionsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentPricingRuleConditions,
+          getReferencedColumn: (t) => t.itemProductId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentPricingRuleConditionsTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentPricingRuleConditions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<bool> breakfastExtraPresetItemsRefs(
+    Expression<bool> Function($$BreakfastExtraPresetItemsTableFilterComposer f)
+    f,
+  ) {
+    final $$BreakfastExtraPresetItemsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.breakfastExtraPresetItems,
+          getReferencedColumn: (t) => t.itemProductId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BreakfastExtraPresetItemsTableFilterComposer(
+                $db: $db,
+                $table: $db.breakfastExtraPresetItems,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
   }
 
   Expression<bool> setProducts(
@@ -13010,6 +18254,35 @@ class $$ProductsTableFilterComposer
     );
     return f(composer);
   }
+
+  Expression<bool> breakfastCookingInstructionsRefs(
+    Expression<bool> Function(
+      $$BreakfastCookingInstructionsTableFilterComposer f,
+    )
+    f,
+  ) {
+    final $$BreakfastCookingInstructionsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.breakfastCookingInstructions,
+          getReferencedColumn: (t) => t.itemProductId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BreakfastCookingInstructionsTableFilterComposer(
+                $db: $db,
+                $table: $db.breakfastCookingInstructions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$ProductsTableOrderingComposer
@@ -13083,6 +18356,30 @@ class $$ProductsTableOrderingComposer
     );
     return composer;
   }
+
+  $$MealAdjustmentProfilesTableOrderingComposer get mealAdjustmentProfileId {
+    final $$MealAdjustmentProfilesTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.mealAdjustmentProfileId,
+          referencedTable: $db.mealAdjustmentProfiles,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfilesTableOrderingComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfiles,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
 }
 
 class $$ProductsTableAnnotationComposer
@@ -13145,6 +18442,173 @@ class $$ProductsTableAnnotationComposer
           ),
     );
     return composer;
+  }
+
+  $$MealAdjustmentProfilesTableAnnotationComposer get mealAdjustmentProfileId {
+    final $$MealAdjustmentProfilesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.mealAdjustmentProfileId,
+          referencedTable: $db.mealAdjustmentProfiles,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfilesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfiles,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  Expression<T> mealAdjustmentProfileComponentsRefs<T extends Object>(
+    Expression<T> Function(
+      $$MealAdjustmentProfileComponentsTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentProfileComponentsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentProfileComponents,
+          getReferencedColumn: (t) => t.defaultItemProductId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfileComponentsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfileComponents,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> mealAdjustmentComponentOptionsRefs<T extends Object>(
+    Expression<T> Function(
+      $$MealAdjustmentComponentOptionsTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentComponentOptionsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentComponentOptions,
+          getReferencedColumn: (t) => t.optionItemProductId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentComponentOptionsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentComponentOptions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> mealAdjustmentProfileExtrasRefs<T extends Object>(
+    Expression<T> Function(
+      $$MealAdjustmentProfileExtrasTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentProfileExtrasTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentProfileExtras,
+          getReferencedColumn: (t) => t.itemProductId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfileExtrasTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfileExtras,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> mealAdjustmentPricingRuleConditionsRefs<T extends Object>(
+    Expression<T> Function(
+      $$MealAdjustmentPricingRuleConditionsTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentPricingRuleConditionsTableAnnotationComposer
+    composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.mealAdjustmentPricingRuleConditions,
+      getReferencedColumn: (t) => t.itemProductId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MealAdjustmentPricingRuleConditionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.mealAdjustmentPricingRuleConditions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> breakfastExtraPresetItemsRefs<T extends Object>(
+    Expression<T> Function($$BreakfastExtraPresetItemsTableAnnotationComposer a)
+    f,
+  ) {
+    final $$BreakfastExtraPresetItemsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.breakfastExtraPresetItems,
+          getReferencedColumn: (t) => t.itemProductId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BreakfastExtraPresetItemsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.breakfastExtraPresetItems,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
   }
 
   Expression<T> setProducts<T extends Object>(
@@ -13321,6 +18785,35 @@ class $$ProductsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> breakfastCookingInstructionsRefs<T extends Object>(
+    Expression<T> Function(
+      $$BreakfastCookingInstructionsTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$BreakfastCookingInstructionsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.breakfastCookingInstructions,
+          getReferencedColumn: (t) => t.itemProductId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BreakfastCookingInstructionsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.breakfastCookingInstructions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$ProductsTableTableManager
@@ -13338,6 +18831,12 @@ class $$ProductsTableTableManager
           Product,
           PrefetchHooks Function({
             bool categoryId,
+            bool mealAdjustmentProfileId,
+            bool mealAdjustmentProfileComponentsRefs,
+            bool mealAdjustmentComponentOptionsRefs,
+            bool mealAdjustmentProfileExtrasRefs,
+            bool mealAdjustmentPricingRuleConditionsRefs,
+            bool breakfastExtraPresetItemsRefs,
             bool setProducts,
             bool setItemProducts,
             bool modifierGroupsRefs,
@@ -13345,6 +18844,7 @@ class $$ProductsTableTableManager
             bool modifierItemProducts,
             bool transactionLinesRefs,
             bool orderModifiersRefs,
+            bool breakfastCookingInstructionsRefs,
           })
         > {
   $$ProductsTableTableManager(_$AppDatabase db, $ProductsTable table)
@@ -13362,6 +18862,7 @@ class $$ProductsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<int> categoryId = const Value.absent(),
+                Value<int?> mealAdjustmentProfileId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<int> priceMinor = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
@@ -13372,6 +18873,7 @@ class $$ProductsTableTableManager
               }) => ProductsCompanion(
                 id: id,
                 categoryId: categoryId,
+                mealAdjustmentProfileId: mealAdjustmentProfileId,
                 name: name,
                 priceMinor: priceMinor,
                 imageUrl: imageUrl,
@@ -13384,6 +18886,7 @@ class $$ProductsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required int categoryId,
+                Value<int?> mealAdjustmentProfileId = const Value.absent(),
                 required String name,
                 required int priceMinor,
                 Value<String?> imageUrl = const Value.absent(),
@@ -13394,6 +18897,7 @@ class $$ProductsTableTableManager
               }) => ProductsCompanion.insert(
                 id: id,
                 categoryId: categoryId,
+                mealAdjustmentProfileId: mealAdjustmentProfileId,
                 name: name,
                 priceMinor: priceMinor,
                 imageUrl: imageUrl,
@@ -13413,6 +18917,12 @@ class $$ProductsTableTableManager
           prefetchHooksCallback:
               ({
                 categoryId = false,
+                mealAdjustmentProfileId = false,
+                mealAdjustmentProfileComponentsRefs = false,
+                mealAdjustmentComponentOptionsRefs = false,
+                mealAdjustmentProfileExtrasRefs = false,
+                mealAdjustmentPricingRuleConditionsRefs = false,
+                breakfastExtraPresetItemsRefs = false,
                 setProducts = false,
                 setItemProducts = false,
                 modifierGroupsRefs = false,
@@ -13420,10 +18930,21 @@ class $$ProductsTableTableManager
                 modifierItemProducts = false,
                 transactionLinesRefs = false,
                 orderModifiersRefs = false,
+                breakfastCookingInstructionsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
+                    if (mealAdjustmentProfileComponentsRefs)
+                      db.mealAdjustmentProfileComponents,
+                    if (mealAdjustmentComponentOptionsRefs)
+                      db.mealAdjustmentComponentOptions,
+                    if (mealAdjustmentProfileExtrasRefs)
+                      db.mealAdjustmentProfileExtras,
+                    if (mealAdjustmentPricingRuleConditionsRefs)
+                      db.mealAdjustmentPricingRuleConditions,
+                    if (breakfastExtraPresetItemsRefs)
+                      db.breakfastExtraPresetItems,
                     if (setProducts) db.setItems,
                     if (setItemProducts) db.setItems,
                     if (modifierGroupsRefs) db.modifierGroups,
@@ -13431,6 +18952,8 @@ class $$ProductsTableTableManager
                     if (modifierItemProducts) db.productModifiers,
                     if (transactionLinesRefs) db.transactionLines,
                     if (orderModifiersRefs) db.orderModifiers,
+                    if (breakfastCookingInstructionsRefs)
+                      db.breakfastCookingInstructions,
                   ],
                   addJoins:
                       <
@@ -13461,11 +18984,132 @@ class $$ProductsTableTableManager
                                   )
                                   as T;
                         }
+                        if (mealAdjustmentProfileId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn:
+                                        table.mealAdjustmentProfileId,
+                                    referencedTable: $$ProductsTableReferences
+                                        ._mealAdjustmentProfileIdTable(db),
+                                    referencedColumn: $$ProductsTableReferences
+                                        ._mealAdjustmentProfileIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
 
                         return state;
                       },
                   getPrefetchedDataCallback: (items) async {
                     return [
+                      if (mealAdjustmentProfileComponentsRefs)
+                        await $_getPrefetchedData<
+                          Product,
+                          $ProductsTable,
+                          MealAdjustmentProfileComponent
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ProductsTableReferences
+                              ._mealAdjustmentProfileComponentsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ProductsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).mealAdjustmentProfileComponentsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.defaultItemProductId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (mealAdjustmentComponentOptionsRefs)
+                        await $_getPrefetchedData<
+                          Product,
+                          $ProductsTable,
+                          MealAdjustmentComponentOption
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ProductsTableReferences
+                              ._mealAdjustmentComponentOptionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ProductsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).mealAdjustmentComponentOptionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.optionItemProductId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (mealAdjustmentProfileExtrasRefs)
+                        await $_getPrefetchedData<
+                          Product,
+                          $ProductsTable,
+                          MealAdjustmentProfileExtra
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ProductsTableReferences
+                              ._mealAdjustmentProfileExtrasRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ProductsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).mealAdjustmentProfileExtrasRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.itemProductId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (mealAdjustmentPricingRuleConditionsRefs)
+                        await $_getPrefetchedData<
+                          Product,
+                          $ProductsTable,
+                          MealAdjustmentPricingRuleCondition
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ProductsTableReferences
+                              ._mealAdjustmentPricingRuleConditionsRefsTable(
+                                db,
+                              ),
+                          managerFromTypedResult: (p0) =>
+                              $$ProductsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).mealAdjustmentPricingRuleConditionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.itemProductId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (breakfastExtraPresetItemsRefs)
+                        await $_getPrefetchedData<
+                          Product,
+                          $ProductsTable,
+                          BreakfastExtraPresetItem
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ProductsTableReferences
+                              ._breakfastExtraPresetItemsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ProductsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).breakfastExtraPresetItemsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.itemProductId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (setProducts)
                         await $_getPrefetchedData<
                           Product,
@@ -13613,6 +19257,27 @@ class $$ProductsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (breakfastCookingInstructionsRefs)
+                        await $_getPrefetchedData<
+                          Product,
+                          $ProductsTable,
+                          BreakfastCookingInstruction
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ProductsTableReferences
+                              ._breakfastCookingInstructionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ProductsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).breakfastCookingInstructionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.itemProductId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -13635,6 +19300,12 @@ typedef $$ProductsTableProcessedTableManager =
       Product,
       PrefetchHooks Function({
         bool categoryId,
+        bool mealAdjustmentProfileId,
+        bool mealAdjustmentProfileComponentsRefs,
+        bool mealAdjustmentComponentOptionsRefs,
+        bool mealAdjustmentProfileExtrasRefs,
+        bool mealAdjustmentPricingRuleConditionsRefs,
+        bool breakfastExtraPresetItemsRefs,
         bool setProducts,
         bool setItemProducts,
         bool modifierGroupsRefs,
@@ -13642,7 +19313,3320 @@ typedef $$ProductsTableProcessedTableManager =
         bool modifierItemProducts,
         bool transactionLinesRefs,
         bool orderModifiersRefs,
+        bool breakfastCookingInstructionsRefs,
       })
+    >;
+typedef $$MealAdjustmentProfileComponentsTableCreateCompanionBuilder =
+    MealAdjustmentProfileComponentsCompanion Function({
+      Value<int> id,
+      required int profileId,
+      required String componentKey,
+      required String displayName,
+      required int defaultItemProductId,
+      Value<int> quantity,
+      Value<bool> canRemove,
+      Value<int> sortOrder,
+      Value<bool> isActive,
+    });
+typedef $$MealAdjustmentProfileComponentsTableUpdateCompanionBuilder =
+    MealAdjustmentProfileComponentsCompanion Function({
+      Value<int> id,
+      Value<int> profileId,
+      Value<String> componentKey,
+      Value<String> displayName,
+      Value<int> defaultItemProductId,
+      Value<int> quantity,
+      Value<bool> canRemove,
+      Value<int> sortOrder,
+      Value<bool> isActive,
+    });
+
+final class $$MealAdjustmentProfileComponentsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $MealAdjustmentProfileComponentsTable,
+          MealAdjustmentProfileComponent
+        > {
+  $$MealAdjustmentProfileComponentsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $MealAdjustmentProfilesTable _profileIdTable(_$AppDatabase db) =>
+      db.mealAdjustmentProfiles.createAlias(
+        $_aliasNameGenerator(
+          db.mealAdjustmentProfileComponents.profileId,
+          db.mealAdjustmentProfiles.id,
+        ),
+      );
+
+  $$MealAdjustmentProfilesTableProcessedTableManager get profileId {
+    final $_column = $_itemColumn<int>('profile_id')!;
+
+    final manager = $$MealAdjustmentProfilesTableTableManager(
+      $_db,
+      $_db.mealAdjustmentProfiles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_profileIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ProductsTable _defaultItemProductIdTable(_$AppDatabase db) =>
+      db.products.createAlias(
+        $_aliasNameGenerator(
+          db.mealAdjustmentProfileComponents.defaultItemProductId,
+          db.products.id,
+        ),
+      );
+
+  $$ProductsTableProcessedTableManager get defaultItemProductId {
+    final $_column = $_itemColumn<int>('default_item_product_id')!;
+
+    final manager = $$ProductsTableTableManager(
+      $_db,
+      $_db.products,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(
+      _defaultItemProductIdTable($_db),
+    );
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $MealAdjustmentComponentOptionsTable,
+    List<MealAdjustmentComponentOption>
+  >
+  _mealAdjustmentComponentOptionsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.mealAdjustmentComponentOptions,
+        aliasName: $_aliasNameGenerator(
+          db.mealAdjustmentProfileComponents.id,
+          db.mealAdjustmentComponentOptions.profileComponentId,
+        ),
+      );
+
+  $$MealAdjustmentComponentOptionsTableProcessedTableManager
+  get mealAdjustmentComponentOptionsRefs {
+    final manager =
+        $$MealAdjustmentComponentOptionsTableTableManager(
+          $_db,
+          $_db.mealAdjustmentComponentOptions,
+        ).filter(
+          (f) => f.profileComponentId.id.sqlEquals($_itemColumn<int>('id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _mealAdjustmentComponentOptionsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$MealAdjustmentProfileComponentsTableFilterComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentProfileComponentsTable> {
+  $$MealAdjustmentProfileComponentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get componentKey => $composableBuilder(
+    column: $table.componentKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get canRemove => $composableBuilder(
+    column: $table.canRemove,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$MealAdjustmentProfilesTableFilterComposer get profileId {
+    final $$MealAdjustmentProfilesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.profileId,
+          referencedTable: $db.mealAdjustmentProfiles,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfilesTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfiles,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableFilterComposer get defaultItemProductId {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.defaultItemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> mealAdjustmentComponentOptionsRefs(
+    Expression<bool> Function(
+      $$MealAdjustmentComponentOptionsTableFilterComposer f,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentComponentOptionsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentComponentOptions,
+          getReferencedColumn: (t) => t.profileComponentId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentComponentOptionsTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentComponentOptions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$MealAdjustmentProfileComponentsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentProfileComponentsTable> {
+  $$MealAdjustmentProfileComponentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get componentKey => $composableBuilder(
+    column: $table.componentKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get canRemove => $composableBuilder(
+    column: $table.canRemove,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$MealAdjustmentProfilesTableOrderingComposer get profileId {
+    final $$MealAdjustmentProfilesTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.profileId,
+          referencedTable: $db.mealAdjustmentProfiles,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfilesTableOrderingComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfiles,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableOrderingComposer get defaultItemProductId {
+    final $$ProductsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.defaultItemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableOrderingComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MealAdjustmentProfileComponentsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentProfileComponentsTable> {
+  $$MealAdjustmentProfileComponentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get componentKey => $composableBuilder(
+    column: $table.componentKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<bool> get canRemove =>
+      $composableBuilder(column: $table.canRemove, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  $$MealAdjustmentProfilesTableAnnotationComposer get profileId {
+    final $$MealAdjustmentProfilesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.profileId,
+          referencedTable: $db.mealAdjustmentProfiles,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfilesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfiles,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableAnnotationComposer get defaultItemProductId {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.defaultItemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> mealAdjustmentComponentOptionsRefs<T extends Object>(
+    Expression<T> Function(
+      $$MealAdjustmentComponentOptionsTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentComponentOptionsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentComponentOptions,
+          getReferencedColumn: (t) => t.profileComponentId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentComponentOptionsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentComponentOptions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$MealAdjustmentProfileComponentsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MealAdjustmentProfileComponentsTable,
+          MealAdjustmentProfileComponent,
+          $$MealAdjustmentProfileComponentsTableFilterComposer,
+          $$MealAdjustmentProfileComponentsTableOrderingComposer,
+          $$MealAdjustmentProfileComponentsTableAnnotationComposer,
+          $$MealAdjustmentProfileComponentsTableCreateCompanionBuilder,
+          $$MealAdjustmentProfileComponentsTableUpdateCompanionBuilder,
+          (
+            MealAdjustmentProfileComponent,
+            $$MealAdjustmentProfileComponentsTableReferences,
+          ),
+          MealAdjustmentProfileComponent,
+          PrefetchHooks Function({
+            bool profileId,
+            bool defaultItemProductId,
+            bool mealAdjustmentComponentOptionsRefs,
+          })
+        > {
+  $$MealAdjustmentProfileComponentsTableTableManager(
+    _$AppDatabase db,
+    $MealAdjustmentProfileComponentsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MealAdjustmentProfileComponentsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$MealAdjustmentProfileComponentsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$MealAdjustmentProfileComponentsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> profileId = const Value.absent(),
+                Value<String> componentKey = const Value.absent(),
+                Value<String> displayName = const Value.absent(),
+                Value<int> defaultItemProductId = const Value.absent(),
+                Value<int> quantity = const Value.absent(),
+                Value<bool> canRemove = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+              }) => MealAdjustmentProfileComponentsCompanion(
+                id: id,
+                profileId: profileId,
+                componentKey: componentKey,
+                displayName: displayName,
+                defaultItemProductId: defaultItemProductId,
+                quantity: quantity,
+                canRemove: canRemove,
+                sortOrder: sortOrder,
+                isActive: isActive,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int profileId,
+                required String componentKey,
+                required String displayName,
+                required int defaultItemProductId,
+                Value<int> quantity = const Value.absent(),
+                Value<bool> canRemove = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+              }) => MealAdjustmentProfileComponentsCompanion.insert(
+                id: id,
+                profileId: profileId,
+                componentKey: componentKey,
+                displayName: displayName,
+                defaultItemProductId: defaultItemProductId,
+                quantity: quantity,
+                canRemove: canRemove,
+                sortOrder: sortOrder,
+                isActive: isActive,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MealAdjustmentProfileComponentsTableReferences(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                profileId = false,
+                defaultItemProductId = false,
+                mealAdjustmentComponentOptionsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (mealAdjustmentComponentOptionsRefs)
+                      db.mealAdjustmentComponentOptions,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (profileId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.profileId,
+                                    referencedTable:
+                                        $$MealAdjustmentProfileComponentsTableReferences
+                                            ._profileIdTable(db),
+                                    referencedColumn:
+                                        $$MealAdjustmentProfileComponentsTableReferences
+                                            ._profileIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (defaultItemProductId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.defaultItemProductId,
+                                    referencedTable:
+                                        $$MealAdjustmentProfileComponentsTableReferences
+                                            ._defaultItemProductIdTable(db),
+                                    referencedColumn:
+                                        $$MealAdjustmentProfileComponentsTableReferences
+                                            ._defaultItemProductIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (mealAdjustmentComponentOptionsRefs)
+                        await $_getPrefetchedData<
+                          MealAdjustmentProfileComponent,
+                          $MealAdjustmentProfileComponentsTable,
+                          MealAdjustmentComponentOption
+                        >(
+                          currentTable: table,
+                          referencedTable:
+                              $$MealAdjustmentProfileComponentsTableReferences
+                                  ._mealAdjustmentComponentOptionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$MealAdjustmentProfileComponentsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).mealAdjustmentComponentOptionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.profileComponentId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$MealAdjustmentProfileComponentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MealAdjustmentProfileComponentsTable,
+      MealAdjustmentProfileComponent,
+      $$MealAdjustmentProfileComponentsTableFilterComposer,
+      $$MealAdjustmentProfileComponentsTableOrderingComposer,
+      $$MealAdjustmentProfileComponentsTableAnnotationComposer,
+      $$MealAdjustmentProfileComponentsTableCreateCompanionBuilder,
+      $$MealAdjustmentProfileComponentsTableUpdateCompanionBuilder,
+      (
+        MealAdjustmentProfileComponent,
+        $$MealAdjustmentProfileComponentsTableReferences,
+      ),
+      MealAdjustmentProfileComponent,
+      PrefetchHooks Function({
+        bool profileId,
+        bool defaultItemProductId,
+        bool mealAdjustmentComponentOptionsRefs,
+      })
+    >;
+typedef $$MealAdjustmentComponentOptionsTableCreateCompanionBuilder =
+    MealAdjustmentComponentOptionsCompanion Function({
+      Value<int> id,
+      required int profileComponentId,
+      required int optionItemProductId,
+      required String optionType,
+      Value<int?> fixedPriceDeltaMinor,
+      Value<int> sortOrder,
+      Value<bool> isActive,
+    });
+typedef $$MealAdjustmentComponentOptionsTableUpdateCompanionBuilder =
+    MealAdjustmentComponentOptionsCompanion Function({
+      Value<int> id,
+      Value<int> profileComponentId,
+      Value<int> optionItemProductId,
+      Value<String> optionType,
+      Value<int?> fixedPriceDeltaMinor,
+      Value<int> sortOrder,
+      Value<bool> isActive,
+    });
+
+final class $$MealAdjustmentComponentOptionsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $MealAdjustmentComponentOptionsTable,
+          MealAdjustmentComponentOption
+        > {
+  $$MealAdjustmentComponentOptionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $MealAdjustmentProfileComponentsTable _profileComponentIdTable(
+    _$AppDatabase db,
+  ) => db.mealAdjustmentProfileComponents.createAlias(
+    $_aliasNameGenerator(
+      db.mealAdjustmentComponentOptions.profileComponentId,
+      db.mealAdjustmentProfileComponents.id,
+    ),
+  );
+
+  $$MealAdjustmentProfileComponentsTableProcessedTableManager
+  get profileComponentId {
+    final $_column = $_itemColumn<int>('profile_component_id')!;
+
+    final manager = $$MealAdjustmentProfileComponentsTableTableManager(
+      $_db,
+      $_db.mealAdjustmentProfileComponents,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_profileComponentIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ProductsTable _optionItemProductIdTable(_$AppDatabase db) =>
+      db.products.createAlias(
+        $_aliasNameGenerator(
+          db.mealAdjustmentComponentOptions.optionItemProductId,
+          db.products.id,
+        ),
+      );
+
+  $$ProductsTableProcessedTableManager get optionItemProductId {
+    final $_column = $_itemColumn<int>('option_item_product_id')!;
+
+    final manager = $$ProductsTableTableManager(
+      $_db,
+      $_db.products,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_optionItemProductIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MealAdjustmentComponentOptionsTableFilterComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentComponentOptionsTable> {
+  $$MealAdjustmentComponentOptionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get optionType => $composableBuilder(
+    column: $table.optionType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get fixedPriceDeltaMinor => $composableBuilder(
+    column: $table.fixedPriceDeltaMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$MealAdjustmentProfileComponentsTableFilterComposer get profileComponentId {
+    final $$MealAdjustmentProfileComponentsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.profileComponentId,
+          referencedTable: $db.mealAdjustmentProfileComponents,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfileComponentsTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfileComponents,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableFilterComposer get optionItemProductId {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.optionItemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MealAdjustmentComponentOptionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentComponentOptionsTable> {
+  $$MealAdjustmentComponentOptionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get optionType => $composableBuilder(
+    column: $table.optionType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get fixedPriceDeltaMinor => $composableBuilder(
+    column: $table.fixedPriceDeltaMinor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$MealAdjustmentProfileComponentsTableOrderingComposer
+  get profileComponentId {
+    final $$MealAdjustmentProfileComponentsTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.profileComponentId,
+          referencedTable: $db.mealAdjustmentProfileComponents,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfileComponentsTableOrderingComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfileComponents,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableOrderingComposer get optionItemProductId {
+    final $$ProductsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.optionItemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableOrderingComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MealAdjustmentComponentOptionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentComponentOptionsTable> {
+  $$MealAdjustmentComponentOptionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get optionType => $composableBuilder(
+    column: $table.optionType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get fixedPriceDeltaMinor => $composableBuilder(
+    column: $table.fixedPriceDeltaMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  $$MealAdjustmentProfileComponentsTableAnnotationComposer
+  get profileComponentId {
+    final $$MealAdjustmentProfileComponentsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.profileComponentId,
+          referencedTable: $db.mealAdjustmentProfileComponents,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfileComponentsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfileComponents,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableAnnotationComposer get optionItemProductId {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.optionItemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MealAdjustmentComponentOptionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MealAdjustmentComponentOptionsTable,
+          MealAdjustmentComponentOption,
+          $$MealAdjustmentComponentOptionsTableFilterComposer,
+          $$MealAdjustmentComponentOptionsTableOrderingComposer,
+          $$MealAdjustmentComponentOptionsTableAnnotationComposer,
+          $$MealAdjustmentComponentOptionsTableCreateCompanionBuilder,
+          $$MealAdjustmentComponentOptionsTableUpdateCompanionBuilder,
+          (
+            MealAdjustmentComponentOption,
+            $$MealAdjustmentComponentOptionsTableReferences,
+          ),
+          MealAdjustmentComponentOption,
+          PrefetchHooks Function({
+            bool profileComponentId,
+            bool optionItemProductId,
+          })
+        > {
+  $$MealAdjustmentComponentOptionsTableTableManager(
+    _$AppDatabase db,
+    $MealAdjustmentComponentOptionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MealAdjustmentComponentOptionsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$MealAdjustmentComponentOptionsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$MealAdjustmentComponentOptionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> profileComponentId = const Value.absent(),
+                Value<int> optionItemProductId = const Value.absent(),
+                Value<String> optionType = const Value.absent(),
+                Value<int?> fixedPriceDeltaMinor = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+              }) => MealAdjustmentComponentOptionsCompanion(
+                id: id,
+                profileComponentId: profileComponentId,
+                optionItemProductId: optionItemProductId,
+                optionType: optionType,
+                fixedPriceDeltaMinor: fixedPriceDeltaMinor,
+                sortOrder: sortOrder,
+                isActive: isActive,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int profileComponentId,
+                required int optionItemProductId,
+                required String optionType,
+                Value<int?> fixedPriceDeltaMinor = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+              }) => MealAdjustmentComponentOptionsCompanion.insert(
+                id: id,
+                profileComponentId: profileComponentId,
+                optionItemProductId: optionItemProductId,
+                optionType: optionType,
+                fixedPriceDeltaMinor: fixedPriceDeltaMinor,
+                sortOrder: sortOrder,
+                isActive: isActive,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MealAdjustmentComponentOptionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({profileComponentId = false, optionItemProductId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (profileComponentId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.profileComponentId,
+                                referencedTable:
+                                    $$MealAdjustmentComponentOptionsTableReferences
+                                        ._profileComponentIdTable(db),
+                                referencedColumn:
+                                    $$MealAdjustmentComponentOptionsTableReferences
+                                        ._profileComponentIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+                    if (optionItemProductId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.optionItemProductId,
+                                referencedTable:
+                                    $$MealAdjustmentComponentOptionsTableReferences
+                                        ._optionItemProductIdTable(db),
+                                referencedColumn:
+                                    $$MealAdjustmentComponentOptionsTableReferences
+                                        ._optionItemProductIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MealAdjustmentComponentOptionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MealAdjustmentComponentOptionsTable,
+      MealAdjustmentComponentOption,
+      $$MealAdjustmentComponentOptionsTableFilterComposer,
+      $$MealAdjustmentComponentOptionsTableOrderingComposer,
+      $$MealAdjustmentComponentOptionsTableAnnotationComposer,
+      $$MealAdjustmentComponentOptionsTableCreateCompanionBuilder,
+      $$MealAdjustmentComponentOptionsTableUpdateCompanionBuilder,
+      (
+        MealAdjustmentComponentOption,
+        $$MealAdjustmentComponentOptionsTableReferences,
+      ),
+      MealAdjustmentComponentOption,
+      PrefetchHooks Function({
+        bool profileComponentId,
+        bool optionItemProductId,
+      })
+    >;
+typedef $$MealAdjustmentProfileExtrasTableCreateCompanionBuilder =
+    MealAdjustmentProfileExtrasCompanion Function({
+      Value<int> id,
+      required int profileId,
+      required int itemProductId,
+      required int fixedPriceDeltaMinor,
+      Value<int> sortOrder,
+      Value<bool> isActive,
+    });
+typedef $$MealAdjustmentProfileExtrasTableUpdateCompanionBuilder =
+    MealAdjustmentProfileExtrasCompanion Function({
+      Value<int> id,
+      Value<int> profileId,
+      Value<int> itemProductId,
+      Value<int> fixedPriceDeltaMinor,
+      Value<int> sortOrder,
+      Value<bool> isActive,
+    });
+
+final class $$MealAdjustmentProfileExtrasTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $MealAdjustmentProfileExtrasTable,
+          MealAdjustmentProfileExtra
+        > {
+  $$MealAdjustmentProfileExtrasTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $MealAdjustmentProfilesTable _profileIdTable(_$AppDatabase db) =>
+      db.mealAdjustmentProfiles.createAlias(
+        $_aliasNameGenerator(
+          db.mealAdjustmentProfileExtras.profileId,
+          db.mealAdjustmentProfiles.id,
+        ),
+      );
+
+  $$MealAdjustmentProfilesTableProcessedTableManager get profileId {
+    final $_column = $_itemColumn<int>('profile_id')!;
+
+    final manager = $$MealAdjustmentProfilesTableTableManager(
+      $_db,
+      $_db.mealAdjustmentProfiles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_profileIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ProductsTable _itemProductIdTable(_$AppDatabase db) =>
+      db.products.createAlias(
+        $_aliasNameGenerator(
+          db.mealAdjustmentProfileExtras.itemProductId,
+          db.products.id,
+        ),
+      );
+
+  $$ProductsTableProcessedTableManager get itemProductId {
+    final $_column = $_itemColumn<int>('item_product_id')!;
+
+    final manager = $$ProductsTableTableManager(
+      $_db,
+      $_db.products,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_itemProductIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MealAdjustmentProfileExtrasTableFilterComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentProfileExtrasTable> {
+  $$MealAdjustmentProfileExtrasTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get fixedPriceDeltaMinor => $composableBuilder(
+    column: $table.fixedPriceDeltaMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$MealAdjustmentProfilesTableFilterComposer get profileId {
+    final $$MealAdjustmentProfilesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.profileId,
+          referencedTable: $db.mealAdjustmentProfiles,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfilesTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfiles,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableFilterComposer get itemProductId {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.itemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MealAdjustmentProfileExtrasTableOrderingComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentProfileExtrasTable> {
+  $$MealAdjustmentProfileExtrasTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get fixedPriceDeltaMinor => $composableBuilder(
+    column: $table.fixedPriceDeltaMinor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$MealAdjustmentProfilesTableOrderingComposer get profileId {
+    final $$MealAdjustmentProfilesTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.profileId,
+          referencedTable: $db.mealAdjustmentProfiles,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfilesTableOrderingComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfiles,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableOrderingComposer get itemProductId {
+    final $$ProductsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.itemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableOrderingComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MealAdjustmentProfileExtrasTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentProfileExtrasTable> {
+  $$MealAdjustmentProfileExtrasTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get fixedPriceDeltaMinor => $composableBuilder(
+    column: $table.fixedPriceDeltaMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  $$MealAdjustmentProfilesTableAnnotationComposer get profileId {
+    final $$MealAdjustmentProfilesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.profileId,
+          referencedTable: $db.mealAdjustmentProfiles,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfilesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfiles,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableAnnotationComposer get itemProductId {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.itemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MealAdjustmentProfileExtrasTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MealAdjustmentProfileExtrasTable,
+          MealAdjustmentProfileExtra,
+          $$MealAdjustmentProfileExtrasTableFilterComposer,
+          $$MealAdjustmentProfileExtrasTableOrderingComposer,
+          $$MealAdjustmentProfileExtrasTableAnnotationComposer,
+          $$MealAdjustmentProfileExtrasTableCreateCompanionBuilder,
+          $$MealAdjustmentProfileExtrasTableUpdateCompanionBuilder,
+          (
+            MealAdjustmentProfileExtra,
+            $$MealAdjustmentProfileExtrasTableReferences,
+          ),
+          MealAdjustmentProfileExtra,
+          PrefetchHooks Function({bool profileId, bool itemProductId})
+        > {
+  $$MealAdjustmentProfileExtrasTableTableManager(
+    _$AppDatabase db,
+    $MealAdjustmentProfileExtrasTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MealAdjustmentProfileExtrasTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$MealAdjustmentProfileExtrasTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$MealAdjustmentProfileExtrasTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> profileId = const Value.absent(),
+                Value<int> itemProductId = const Value.absent(),
+                Value<int> fixedPriceDeltaMinor = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+              }) => MealAdjustmentProfileExtrasCompanion(
+                id: id,
+                profileId: profileId,
+                itemProductId: itemProductId,
+                fixedPriceDeltaMinor: fixedPriceDeltaMinor,
+                sortOrder: sortOrder,
+                isActive: isActive,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int profileId,
+                required int itemProductId,
+                required int fixedPriceDeltaMinor,
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+              }) => MealAdjustmentProfileExtrasCompanion.insert(
+                id: id,
+                profileId: profileId,
+                itemProductId: itemProductId,
+                fixedPriceDeltaMinor: fixedPriceDeltaMinor,
+                sortOrder: sortOrder,
+                isActive: isActive,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MealAdjustmentProfileExtrasTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({profileId = false, itemProductId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (profileId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.profileId,
+                                referencedTable:
+                                    $$MealAdjustmentProfileExtrasTableReferences
+                                        ._profileIdTable(db),
+                                referencedColumn:
+                                    $$MealAdjustmentProfileExtrasTableReferences
+                                        ._profileIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+                    if (itemProductId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.itemProductId,
+                                referencedTable:
+                                    $$MealAdjustmentProfileExtrasTableReferences
+                                        ._itemProductIdTable(db),
+                                referencedColumn:
+                                    $$MealAdjustmentProfileExtrasTableReferences
+                                        ._itemProductIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MealAdjustmentProfileExtrasTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MealAdjustmentProfileExtrasTable,
+      MealAdjustmentProfileExtra,
+      $$MealAdjustmentProfileExtrasTableFilterComposer,
+      $$MealAdjustmentProfileExtrasTableOrderingComposer,
+      $$MealAdjustmentProfileExtrasTableAnnotationComposer,
+      $$MealAdjustmentProfileExtrasTableCreateCompanionBuilder,
+      $$MealAdjustmentProfileExtrasTableUpdateCompanionBuilder,
+      (
+        MealAdjustmentProfileExtra,
+        $$MealAdjustmentProfileExtrasTableReferences,
+      ),
+      MealAdjustmentProfileExtra,
+      PrefetchHooks Function({bool profileId, bool itemProductId})
+    >;
+typedef $$MealAdjustmentPricingRulesTableCreateCompanionBuilder =
+    MealAdjustmentPricingRulesCompanion Function({
+      Value<int> id,
+      required int profileId,
+      required String name,
+      required String ruleType,
+      required int priceDeltaMinor,
+      Value<int> priority,
+      Value<bool> isActive,
+    });
+typedef $$MealAdjustmentPricingRulesTableUpdateCompanionBuilder =
+    MealAdjustmentPricingRulesCompanion Function({
+      Value<int> id,
+      Value<int> profileId,
+      Value<String> name,
+      Value<String> ruleType,
+      Value<int> priceDeltaMinor,
+      Value<int> priority,
+      Value<bool> isActive,
+    });
+
+final class $$MealAdjustmentPricingRulesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $MealAdjustmentPricingRulesTable,
+          MealAdjustmentPricingRule
+        > {
+  $$MealAdjustmentPricingRulesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $MealAdjustmentProfilesTable _profileIdTable(_$AppDatabase db) =>
+      db.mealAdjustmentProfiles.createAlias(
+        $_aliasNameGenerator(
+          db.mealAdjustmentPricingRules.profileId,
+          db.mealAdjustmentProfiles.id,
+        ),
+      );
+
+  $$MealAdjustmentProfilesTableProcessedTableManager get profileId {
+    final $_column = $_itemColumn<int>('profile_id')!;
+
+    final manager = $$MealAdjustmentProfilesTableTableManager(
+      $_db,
+      $_db.mealAdjustmentProfiles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_profileIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $MealAdjustmentPricingRuleConditionsTable,
+    List<MealAdjustmentPricingRuleCondition>
+  >
+  _mealAdjustmentPricingRuleConditionsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.mealAdjustmentPricingRuleConditions,
+        aliasName: $_aliasNameGenerator(
+          db.mealAdjustmentPricingRules.id,
+          db.mealAdjustmentPricingRuleConditions.ruleId,
+        ),
+      );
+
+  $$MealAdjustmentPricingRuleConditionsTableProcessedTableManager
+  get mealAdjustmentPricingRuleConditionsRefs {
+    final manager = $$MealAdjustmentPricingRuleConditionsTableTableManager(
+      $_db,
+      $_db.mealAdjustmentPricingRuleConditions,
+    ).filter((f) => f.ruleId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _mealAdjustmentPricingRuleConditionsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$MealAdjustmentPricingRulesTableFilterComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentPricingRulesTable> {
+  $$MealAdjustmentPricingRulesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ruleType => $composableBuilder(
+    column: $table.ruleType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get priceDeltaMinor => $composableBuilder(
+    column: $table.priceDeltaMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$MealAdjustmentProfilesTableFilterComposer get profileId {
+    final $$MealAdjustmentProfilesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.profileId,
+          referencedTable: $db.mealAdjustmentProfiles,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfilesTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfiles,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  Expression<bool> mealAdjustmentPricingRuleConditionsRefs(
+    Expression<bool> Function(
+      $$MealAdjustmentPricingRuleConditionsTableFilterComposer f,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentPricingRuleConditionsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.mealAdjustmentPricingRuleConditions,
+          getReferencedColumn: (t) => t.ruleId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentPricingRuleConditionsTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentPricingRuleConditions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$MealAdjustmentPricingRulesTableOrderingComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentPricingRulesTable> {
+  $$MealAdjustmentPricingRulesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ruleType => $composableBuilder(
+    column: $table.ruleType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get priceDeltaMinor => $composableBuilder(
+    column: $table.priceDeltaMinor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get priority => $composableBuilder(
+    column: $table.priority,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$MealAdjustmentProfilesTableOrderingComposer get profileId {
+    final $$MealAdjustmentProfilesTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.profileId,
+          referencedTable: $db.mealAdjustmentProfiles,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfilesTableOrderingComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfiles,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+}
+
+class $$MealAdjustmentPricingRulesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentPricingRulesTable> {
+  $$MealAdjustmentPricingRulesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get ruleType =>
+      $composableBuilder(column: $table.ruleType, builder: (column) => column);
+
+  GeneratedColumn<int> get priceDeltaMinor => $composableBuilder(
+    column: $table.priceDeltaMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get priority =>
+      $composableBuilder(column: $table.priority, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  $$MealAdjustmentProfilesTableAnnotationComposer get profileId {
+    final $$MealAdjustmentProfilesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.profileId,
+          referencedTable: $db.mealAdjustmentProfiles,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentProfilesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentProfiles,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  Expression<T> mealAdjustmentPricingRuleConditionsRefs<T extends Object>(
+    Expression<T> Function(
+      $$MealAdjustmentPricingRuleConditionsTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$MealAdjustmentPricingRuleConditionsTableAnnotationComposer
+    composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.mealAdjustmentPricingRuleConditions,
+      getReferencedColumn: (t) => t.ruleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MealAdjustmentPricingRuleConditionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.mealAdjustmentPricingRuleConditions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$MealAdjustmentPricingRulesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MealAdjustmentPricingRulesTable,
+          MealAdjustmentPricingRule,
+          $$MealAdjustmentPricingRulesTableFilterComposer,
+          $$MealAdjustmentPricingRulesTableOrderingComposer,
+          $$MealAdjustmentPricingRulesTableAnnotationComposer,
+          $$MealAdjustmentPricingRulesTableCreateCompanionBuilder,
+          $$MealAdjustmentPricingRulesTableUpdateCompanionBuilder,
+          (
+            MealAdjustmentPricingRule,
+            $$MealAdjustmentPricingRulesTableReferences,
+          ),
+          MealAdjustmentPricingRule,
+          PrefetchHooks Function({
+            bool profileId,
+            bool mealAdjustmentPricingRuleConditionsRefs,
+          })
+        > {
+  $$MealAdjustmentPricingRulesTableTableManager(
+    _$AppDatabase db,
+    $MealAdjustmentPricingRulesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MealAdjustmentPricingRulesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$MealAdjustmentPricingRulesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$MealAdjustmentPricingRulesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> profileId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> ruleType = const Value.absent(),
+                Value<int> priceDeltaMinor = const Value.absent(),
+                Value<int> priority = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+              }) => MealAdjustmentPricingRulesCompanion(
+                id: id,
+                profileId: profileId,
+                name: name,
+                ruleType: ruleType,
+                priceDeltaMinor: priceDeltaMinor,
+                priority: priority,
+                isActive: isActive,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int profileId,
+                required String name,
+                required String ruleType,
+                required int priceDeltaMinor,
+                Value<int> priority = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+              }) => MealAdjustmentPricingRulesCompanion.insert(
+                id: id,
+                profileId: profileId,
+                name: name,
+                ruleType: ruleType,
+                priceDeltaMinor: priceDeltaMinor,
+                priority: priority,
+                isActive: isActive,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MealAdjustmentPricingRulesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                profileId = false,
+                mealAdjustmentPricingRuleConditionsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (mealAdjustmentPricingRuleConditionsRefs)
+                      db.mealAdjustmentPricingRuleConditions,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (profileId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.profileId,
+                                    referencedTable:
+                                        $$MealAdjustmentPricingRulesTableReferences
+                                            ._profileIdTable(db),
+                                    referencedColumn:
+                                        $$MealAdjustmentPricingRulesTableReferences
+                                            ._profileIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (mealAdjustmentPricingRuleConditionsRefs)
+                        await $_getPrefetchedData<
+                          MealAdjustmentPricingRule,
+                          $MealAdjustmentPricingRulesTable,
+                          MealAdjustmentPricingRuleCondition
+                        >(
+                          currentTable: table,
+                          referencedTable:
+                              $$MealAdjustmentPricingRulesTableReferences
+                                  ._mealAdjustmentPricingRuleConditionsRefsTable(
+                                    db,
+                                  ),
+                          managerFromTypedResult: (p0) =>
+                              $$MealAdjustmentPricingRulesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).mealAdjustmentPricingRuleConditionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.ruleId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$MealAdjustmentPricingRulesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MealAdjustmentPricingRulesTable,
+      MealAdjustmentPricingRule,
+      $$MealAdjustmentPricingRulesTableFilterComposer,
+      $$MealAdjustmentPricingRulesTableOrderingComposer,
+      $$MealAdjustmentPricingRulesTableAnnotationComposer,
+      $$MealAdjustmentPricingRulesTableCreateCompanionBuilder,
+      $$MealAdjustmentPricingRulesTableUpdateCompanionBuilder,
+      (MealAdjustmentPricingRule, $$MealAdjustmentPricingRulesTableReferences),
+      MealAdjustmentPricingRule,
+      PrefetchHooks Function({
+        bool profileId,
+        bool mealAdjustmentPricingRuleConditionsRefs,
+      })
+    >;
+typedef $$MealAdjustmentPricingRuleConditionsTableCreateCompanionBuilder =
+    MealAdjustmentPricingRuleConditionsCompanion Function({
+      Value<int> id,
+      required int ruleId,
+      required String conditionType,
+      Value<String?> componentKey,
+      Value<int?> itemProductId,
+      Value<int> quantity,
+    });
+typedef $$MealAdjustmentPricingRuleConditionsTableUpdateCompanionBuilder =
+    MealAdjustmentPricingRuleConditionsCompanion Function({
+      Value<int> id,
+      Value<int> ruleId,
+      Value<String> conditionType,
+      Value<String?> componentKey,
+      Value<int?> itemProductId,
+      Value<int> quantity,
+    });
+
+final class $$MealAdjustmentPricingRuleConditionsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $MealAdjustmentPricingRuleConditionsTable,
+          MealAdjustmentPricingRuleCondition
+        > {
+  $$MealAdjustmentPricingRuleConditionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $MealAdjustmentPricingRulesTable _ruleIdTable(_$AppDatabase db) =>
+      db.mealAdjustmentPricingRules.createAlias(
+        $_aliasNameGenerator(
+          db.mealAdjustmentPricingRuleConditions.ruleId,
+          db.mealAdjustmentPricingRules.id,
+        ),
+      );
+
+  $$MealAdjustmentPricingRulesTableProcessedTableManager get ruleId {
+    final $_column = $_itemColumn<int>('rule_id')!;
+
+    final manager = $$MealAdjustmentPricingRulesTableTableManager(
+      $_db,
+      $_db.mealAdjustmentPricingRules,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_ruleIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ProductsTable _itemProductIdTable(_$AppDatabase db) =>
+      db.products.createAlias(
+        $_aliasNameGenerator(
+          db.mealAdjustmentPricingRuleConditions.itemProductId,
+          db.products.id,
+        ),
+      );
+
+  $$ProductsTableProcessedTableManager? get itemProductId {
+    final $_column = $_itemColumn<int>('item_product_id');
+    if ($_column == null) return null;
+    final manager = $$ProductsTableTableManager(
+      $_db,
+      $_db.products,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_itemProductIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MealAdjustmentPricingRuleConditionsTableFilterComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentPricingRuleConditionsTable> {
+  $$MealAdjustmentPricingRuleConditionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get conditionType => $composableBuilder(
+    column: $table.conditionType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get componentKey => $composableBuilder(
+    column: $table.componentKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$MealAdjustmentPricingRulesTableFilterComposer get ruleId {
+    final $$MealAdjustmentPricingRulesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.ruleId,
+          referencedTable: $db.mealAdjustmentPricingRules,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentPricingRulesTableFilterComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentPricingRules,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableFilterComposer get itemProductId {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.itemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MealAdjustmentPricingRuleConditionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentPricingRuleConditionsTable> {
+  $$MealAdjustmentPricingRuleConditionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get conditionType => $composableBuilder(
+    column: $table.conditionType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get componentKey => $composableBuilder(
+    column: $table.componentKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$MealAdjustmentPricingRulesTableOrderingComposer get ruleId {
+    final $$MealAdjustmentPricingRulesTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.ruleId,
+          referencedTable: $db.mealAdjustmentPricingRules,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentPricingRulesTableOrderingComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentPricingRules,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableOrderingComposer get itemProductId {
+    final $$ProductsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.itemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableOrderingComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MealAdjustmentPricingRuleConditionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MealAdjustmentPricingRuleConditionsTable> {
+  $$MealAdjustmentPricingRuleConditionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get conditionType => $composableBuilder(
+    column: $table.conditionType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get componentKey => $composableBuilder(
+    column: $table.componentKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  $$MealAdjustmentPricingRulesTableAnnotationComposer get ruleId {
+    final $$MealAdjustmentPricingRulesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.ruleId,
+          referencedTable: $db.mealAdjustmentPricingRules,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MealAdjustmentPricingRulesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.mealAdjustmentPricingRules,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableAnnotationComposer get itemProductId {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.itemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MealAdjustmentPricingRuleConditionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MealAdjustmentPricingRuleConditionsTable,
+          MealAdjustmentPricingRuleCondition,
+          $$MealAdjustmentPricingRuleConditionsTableFilterComposer,
+          $$MealAdjustmentPricingRuleConditionsTableOrderingComposer,
+          $$MealAdjustmentPricingRuleConditionsTableAnnotationComposer,
+          $$MealAdjustmentPricingRuleConditionsTableCreateCompanionBuilder,
+          $$MealAdjustmentPricingRuleConditionsTableUpdateCompanionBuilder,
+          (
+            MealAdjustmentPricingRuleCondition,
+            $$MealAdjustmentPricingRuleConditionsTableReferences,
+          ),
+          MealAdjustmentPricingRuleCondition,
+          PrefetchHooks Function({bool ruleId, bool itemProductId})
+        > {
+  $$MealAdjustmentPricingRuleConditionsTableTableManager(
+    _$AppDatabase db,
+    $MealAdjustmentPricingRuleConditionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MealAdjustmentPricingRuleConditionsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$MealAdjustmentPricingRuleConditionsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$MealAdjustmentPricingRuleConditionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> ruleId = const Value.absent(),
+                Value<String> conditionType = const Value.absent(),
+                Value<String?> componentKey = const Value.absent(),
+                Value<int?> itemProductId = const Value.absent(),
+                Value<int> quantity = const Value.absent(),
+              }) => MealAdjustmentPricingRuleConditionsCompanion(
+                id: id,
+                ruleId: ruleId,
+                conditionType: conditionType,
+                componentKey: componentKey,
+                itemProductId: itemProductId,
+                quantity: quantity,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int ruleId,
+                required String conditionType,
+                Value<String?> componentKey = const Value.absent(),
+                Value<int?> itemProductId = const Value.absent(),
+                Value<int> quantity = const Value.absent(),
+              }) => MealAdjustmentPricingRuleConditionsCompanion.insert(
+                id: id,
+                ruleId: ruleId,
+                conditionType: conditionType,
+                componentKey: componentKey,
+                itemProductId: itemProductId,
+                quantity: quantity,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MealAdjustmentPricingRuleConditionsTableReferences(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({ruleId = false, itemProductId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (ruleId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.ruleId,
+                                referencedTable:
+                                    $$MealAdjustmentPricingRuleConditionsTableReferences
+                                        ._ruleIdTable(db),
+                                referencedColumn:
+                                    $$MealAdjustmentPricingRuleConditionsTableReferences
+                                        ._ruleIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+                    if (itemProductId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.itemProductId,
+                                referencedTable:
+                                    $$MealAdjustmentPricingRuleConditionsTableReferences
+                                        ._itemProductIdTable(db),
+                                referencedColumn:
+                                    $$MealAdjustmentPricingRuleConditionsTableReferences
+                                        ._itemProductIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MealAdjustmentPricingRuleConditionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MealAdjustmentPricingRuleConditionsTable,
+      MealAdjustmentPricingRuleCondition,
+      $$MealAdjustmentPricingRuleConditionsTableFilterComposer,
+      $$MealAdjustmentPricingRuleConditionsTableOrderingComposer,
+      $$MealAdjustmentPricingRuleConditionsTableAnnotationComposer,
+      $$MealAdjustmentPricingRuleConditionsTableCreateCompanionBuilder,
+      $$MealAdjustmentPricingRuleConditionsTableUpdateCompanionBuilder,
+      (
+        MealAdjustmentPricingRuleCondition,
+        $$MealAdjustmentPricingRuleConditionsTableReferences,
+      ),
+      MealAdjustmentPricingRuleCondition,
+      PrefetchHooks Function({bool ruleId, bool itemProductId})
+    >;
+typedef $$BreakfastExtraPresetsTableCreateCompanionBuilder =
+    BreakfastExtraPresetsCompanion Function({
+      Value<int> id,
+      required String name,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+typedef $$BreakfastExtraPresetsTableUpdateCompanionBuilder =
+    BreakfastExtraPresetsCompanion Function({
+      Value<int> id,
+      Value<String> name,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+
+final class $$BreakfastExtraPresetsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $BreakfastExtraPresetsTable,
+          BreakfastExtraPreset
+        > {
+  $$BreakfastExtraPresetsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<
+    $BreakfastExtraPresetItemsTable,
+    List<BreakfastExtraPresetItem>
+  >
+  _breakfastExtraPresetItemsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.breakfastExtraPresetItems,
+        aliasName: $_aliasNameGenerator(
+          db.breakfastExtraPresets.id,
+          db.breakfastExtraPresetItems.presetId,
+        ),
+      );
+
+  $$BreakfastExtraPresetItemsTableProcessedTableManager
+  get breakfastExtraPresetItemsRefs {
+    final manager = $$BreakfastExtraPresetItemsTableTableManager(
+      $_db,
+      $_db.breakfastExtraPresetItems,
+    ).filter((f) => f.presetId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _breakfastExtraPresetItemsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$BreakfastExtraPresetsTableFilterComposer
+    extends Composer<_$AppDatabase, $BreakfastExtraPresetsTable> {
+  $$BreakfastExtraPresetsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> breakfastExtraPresetItemsRefs(
+    Expression<bool> Function($$BreakfastExtraPresetItemsTableFilterComposer f)
+    f,
+  ) {
+    final $$BreakfastExtraPresetItemsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.breakfastExtraPresetItems,
+          getReferencedColumn: (t) => t.presetId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BreakfastExtraPresetItemsTableFilterComposer(
+                $db: $db,
+                $table: $db.breakfastExtraPresetItems,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$BreakfastExtraPresetsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BreakfastExtraPresetsTable> {
+  $$BreakfastExtraPresetsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$BreakfastExtraPresetsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BreakfastExtraPresetsTable> {
+  $$BreakfastExtraPresetsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> breakfastExtraPresetItemsRefs<T extends Object>(
+    Expression<T> Function($$BreakfastExtraPresetItemsTableAnnotationComposer a)
+    f,
+  ) {
+    final $$BreakfastExtraPresetItemsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.breakfastExtraPresetItems,
+          getReferencedColumn: (t) => t.presetId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BreakfastExtraPresetItemsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.breakfastExtraPresetItems,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$BreakfastExtraPresetsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BreakfastExtraPresetsTable,
+          BreakfastExtraPreset,
+          $$BreakfastExtraPresetsTableFilterComposer,
+          $$BreakfastExtraPresetsTableOrderingComposer,
+          $$BreakfastExtraPresetsTableAnnotationComposer,
+          $$BreakfastExtraPresetsTableCreateCompanionBuilder,
+          $$BreakfastExtraPresetsTableUpdateCompanionBuilder,
+          (BreakfastExtraPreset, $$BreakfastExtraPresetsTableReferences),
+          BreakfastExtraPreset,
+          PrefetchHooks Function({bool breakfastExtraPresetItemsRefs})
+        > {
+  $$BreakfastExtraPresetsTableTableManager(
+    _$AppDatabase db,
+    $BreakfastExtraPresetsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BreakfastExtraPresetsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$BreakfastExtraPresetsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$BreakfastExtraPresetsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => BreakfastExtraPresetsCompanion(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String name,
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => BreakfastExtraPresetsCompanion.insert(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$BreakfastExtraPresetsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({breakfastExtraPresetItemsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (breakfastExtraPresetItemsRefs) db.breakfastExtraPresetItems,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (breakfastExtraPresetItemsRefs)
+                    await $_getPrefetchedData<
+                      BreakfastExtraPreset,
+                      $BreakfastExtraPresetsTable,
+                      BreakfastExtraPresetItem
+                    >(
+                      currentTable: table,
+                      referencedTable: $$BreakfastExtraPresetsTableReferences
+                          ._breakfastExtraPresetItemsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$BreakfastExtraPresetsTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).breakfastExtraPresetItemsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.presetId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$BreakfastExtraPresetsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BreakfastExtraPresetsTable,
+      BreakfastExtraPreset,
+      $$BreakfastExtraPresetsTableFilterComposer,
+      $$BreakfastExtraPresetsTableOrderingComposer,
+      $$BreakfastExtraPresetsTableAnnotationComposer,
+      $$BreakfastExtraPresetsTableCreateCompanionBuilder,
+      $$BreakfastExtraPresetsTableUpdateCompanionBuilder,
+      (BreakfastExtraPreset, $$BreakfastExtraPresetsTableReferences),
+      BreakfastExtraPreset,
+      PrefetchHooks Function({bool breakfastExtraPresetItemsRefs})
+    >;
+typedef $$BreakfastExtraPresetItemsTableCreateCompanionBuilder =
+    BreakfastExtraPresetItemsCompanion Function({
+      Value<int> id,
+      required int presetId,
+      required int itemProductId,
+      Value<int> sortOrder,
+    });
+typedef $$BreakfastExtraPresetItemsTableUpdateCompanionBuilder =
+    BreakfastExtraPresetItemsCompanion Function({
+      Value<int> id,
+      Value<int> presetId,
+      Value<int> itemProductId,
+      Value<int> sortOrder,
+    });
+
+final class $$BreakfastExtraPresetItemsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $BreakfastExtraPresetItemsTable,
+          BreakfastExtraPresetItem
+        > {
+  $$BreakfastExtraPresetItemsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $BreakfastExtraPresetsTable _presetIdTable(_$AppDatabase db) =>
+      db.breakfastExtraPresets.createAlias(
+        $_aliasNameGenerator(
+          db.breakfastExtraPresetItems.presetId,
+          db.breakfastExtraPresets.id,
+        ),
+      );
+
+  $$BreakfastExtraPresetsTableProcessedTableManager get presetId {
+    final $_column = $_itemColumn<int>('preset_id')!;
+
+    final manager = $$BreakfastExtraPresetsTableTableManager(
+      $_db,
+      $_db.breakfastExtraPresets,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_presetIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ProductsTable _itemProductIdTable(_$AppDatabase db) =>
+      db.products.createAlias(
+        $_aliasNameGenerator(
+          db.breakfastExtraPresetItems.itemProductId,
+          db.products.id,
+        ),
+      );
+
+  $$ProductsTableProcessedTableManager get itemProductId {
+    final $_column = $_itemColumn<int>('item_product_id')!;
+
+    final manager = $$ProductsTableTableManager(
+      $_db,
+      $_db.products,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_itemProductIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$BreakfastExtraPresetItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $BreakfastExtraPresetItemsTable> {
+  $$BreakfastExtraPresetItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$BreakfastExtraPresetsTableFilterComposer get presetId {
+    final $$BreakfastExtraPresetsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.presetId,
+          referencedTable: $db.breakfastExtraPresets,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BreakfastExtraPresetsTableFilterComposer(
+                $db: $db,
+                $table: $db.breakfastExtraPresets,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableFilterComposer get itemProductId {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.itemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BreakfastExtraPresetItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BreakfastExtraPresetItemsTable> {
+  $$BreakfastExtraPresetItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$BreakfastExtraPresetsTableOrderingComposer get presetId {
+    final $$BreakfastExtraPresetsTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.presetId,
+          referencedTable: $db.breakfastExtraPresets,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BreakfastExtraPresetsTableOrderingComposer(
+                $db: $db,
+                $table: $db.breakfastExtraPresets,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableOrderingComposer get itemProductId {
+    final $$ProductsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.itemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableOrderingComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BreakfastExtraPresetItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BreakfastExtraPresetItemsTable> {
+  $$BreakfastExtraPresetItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  $$BreakfastExtraPresetsTableAnnotationComposer get presetId {
+    final $$BreakfastExtraPresetsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.presetId,
+          referencedTable: $db.breakfastExtraPresets,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BreakfastExtraPresetsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.breakfastExtraPresets,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ProductsTableAnnotationComposer get itemProductId {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.itemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BreakfastExtraPresetItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BreakfastExtraPresetItemsTable,
+          BreakfastExtraPresetItem,
+          $$BreakfastExtraPresetItemsTableFilterComposer,
+          $$BreakfastExtraPresetItemsTableOrderingComposer,
+          $$BreakfastExtraPresetItemsTableAnnotationComposer,
+          $$BreakfastExtraPresetItemsTableCreateCompanionBuilder,
+          $$BreakfastExtraPresetItemsTableUpdateCompanionBuilder,
+          (
+            BreakfastExtraPresetItem,
+            $$BreakfastExtraPresetItemsTableReferences,
+          ),
+          BreakfastExtraPresetItem,
+          PrefetchHooks Function({bool presetId, bool itemProductId})
+        > {
+  $$BreakfastExtraPresetItemsTableTableManager(
+    _$AppDatabase db,
+    $BreakfastExtraPresetItemsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BreakfastExtraPresetItemsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$BreakfastExtraPresetItemsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$BreakfastExtraPresetItemsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> presetId = const Value.absent(),
+                Value<int> itemProductId = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+              }) => BreakfastExtraPresetItemsCompanion(
+                id: id,
+                presetId: presetId,
+                itemProductId: itemProductId,
+                sortOrder: sortOrder,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int presetId,
+                required int itemProductId,
+                Value<int> sortOrder = const Value.absent(),
+              }) => BreakfastExtraPresetItemsCompanion.insert(
+                id: id,
+                presetId: presetId,
+                itemProductId: itemProductId,
+                sortOrder: sortOrder,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$BreakfastExtraPresetItemsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({presetId = false, itemProductId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (presetId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.presetId,
+                                referencedTable:
+                                    $$BreakfastExtraPresetItemsTableReferences
+                                        ._presetIdTable(db),
+                                referencedColumn:
+                                    $$BreakfastExtraPresetItemsTableReferences
+                                        ._presetIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+                    if (itemProductId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.itemProductId,
+                                referencedTable:
+                                    $$BreakfastExtraPresetItemsTableReferences
+                                        ._itemProductIdTable(db),
+                                referencedColumn:
+                                    $$BreakfastExtraPresetItemsTableReferences
+                                        ._itemProductIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$BreakfastExtraPresetItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BreakfastExtraPresetItemsTable,
+      BreakfastExtraPresetItem,
+      $$BreakfastExtraPresetItemsTableFilterComposer,
+      $$BreakfastExtraPresetItemsTableOrderingComposer,
+      $$BreakfastExtraPresetItemsTableAnnotationComposer,
+      $$BreakfastExtraPresetItemsTableCreateCompanionBuilder,
+      $$BreakfastExtraPresetItemsTableUpdateCompanionBuilder,
+      (BreakfastExtraPresetItem, $$BreakfastExtraPresetItemsTableReferences),
+      BreakfastExtraPresetItem,
+      PrefetchHooks Function({bool presetId, bool itemProductId})
     >;
 typedef $$MenuSettingsTableCreateCompanionBuilder =
     MenuSettingsCompanion Function({
@@ -17599,6 +26583,34 @@ final class $$TransactionLinesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<
+    $BreakfastCookingInstructionsTable,
+    List<BreakfastCookingInstruction>
+  >
+  _breakfastCookingInstructionsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.breakfastCookingInstructions,
+        aliasName: $_aliasNameGenerator(
+          db.transactionLines.id,
+          db.breakfastCookingInstructions.transactionLineId,
+        ),
+      );
+
+  $$BreakfastCookingInstructionsTableProcessedTableManager
+  get breakfastCookingInstructionsRefs {
+    final manager = $$BreakfastCookingInstructionsTableTableManager(
+      $_db,
+      $_db.breakfastCookingInstructions,
+    ).filter((f) => f.transactionLineId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _breakfastCookingInstructionsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$TransactionLinesTableFilterComposer
@@ -17718,6 +26730,35 @@ class $$TransactionLinesTableFilterComposer
                 $removeJoinBuilderFromRootComposer,
           ),
     );
+    return f(composer);
+  }
+
+  Expression<bool> breakfastCookingInstructionsRefs(
+    Expression<bool> Function(
+      $$BreakfastCookingInstructionsTableFilterComposer f,
+    )
+    f,
+  ) {
+    final $$BreakfastCookingInstructionsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.breakfastCookingInstructions,
+          getReferencedColumn: (t) => t.transactionLineId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BreakfastCookingInstructionsTableFilterComposer(
+                $db: $db,
+                $table: $db.breakfastCookingInstructions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
     return f(composer);
   }
 }
@@ -17931,6 +26972,35 @@ class $$TransactionLinesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> breakfastCookingInstructionsRefs<T extends Object>(
+    Expression<T> Function(
+      $$BreakfastCookingInstructionsTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$BreakfastCookingInstructionsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.breakfastCookingInstructions,
+          getReferencedColumn: (t) => t.transactionLineId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BreakfastCookingInstructionsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.breakfastCookingInstructions,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$TransactionLinesTableTableManager
@@ -17950,6 +27020,7 @@ class $$TransactionLinesTableTableManager
             bool transactionId,
             bool productId,
             bool orderModifiersRefs,
+            bool breakfastCookingInstructionsRefs,
           })
         > {
   $$TransactionLinesTableTableManager(
@@ -18026,11 +27097,14 @@ class $$TransactionLinesTableTableManager
                 transactionId = false,
                 productId = false,
                 orderModifiersRefs = false,
+                breakfastCookingInstructionsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (orderModifiersRefs) db.orderModifiers,
+                    if (breakfastCookingInstructionsRefs)
+                      db.breakfastCookingInstructions,
                   ],
                   addJoins:
                       <
@@ -18104,6 +27178,27 @@ class $$TransactionLinesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (breakfastCookingInstructionsRefs)
+                        await $_getPrefetchedData<
+                          TransactionLine,
+                          $TransactionLinesTable,
+                          BreakfastCookingInstruction
+                        >(
+                          currentTable: table,
+                          referencedTable: $$TransactionLinesTableReferences
+                              ._breakfastCookingInstructionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$TransactionLinesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).breakfastCookingInstructionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.transactionLineId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -18128,6 +27223,7 @@ typedef $$TransactionLinesTableProcessedTableManager =
         bool transactionId,
         bool productId,
         bool orderModifiersRefs,
+        bool breakfastCookingInstructionsRefs,
       })
     >;
 typedef $$OrderModifiersTableCreateCompanionBuilder =
@@ -18809,6 +27905,525 @@ typedef $$OrderModifiersTableProcessedTableManager =
         bool itemProductId,
         bool sourceGroupId,
       })
+    >;
+typedef $$BreakfastCookingInstructionsTableCreateCompanionBuilder =
+    BreakfastCookingInstructionsCompanion Function({
+      Value<int> id,
+      required String uuid,
+      required int transactionLineId,
+      required int itemProductId,
+      required String itemName,
+      required String instructionCode,
+      required String instructionLabel,
+      Value<int> appliedQuantity,
+      Value<int> sortKey,
+    });
+typedef $$BreakfastCookingInstructionsTableUpdateCompanionBuilder =
+    BreakfastCookingInstructionsCompanion Function({
+      Value<int> id,
+      Value<String> uuid,
+      Value<int> transactionLineId,
+      Value<int> itemProductId,
+      Value<String> itemName,
+      Value<String> instructionCode,
+      Value<String> instructionLabel,
+      Value<int> appliedQuantity,
+      Value<int> sortKey,
+    });
+
+final class $$BreakfastCookingInstructionsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $BreakfastCookingInstructionsTable,
+          BreakfastCookingInstruction
+        > {
+  $$BreakfastCookingInstructionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $TransactionLinesTable _transactionLineIdTable(_$AppDatabase db) =>
+      db.transactionLines.createAlias(
+        $_aliasNameGenerator(
+          db.breakfastCookingInstructions.transactionLineId,
+          db.transactionLines.id,
+        ),
+      );
+
+  $$TransactionLinesTableProcessedTableManager get transactionLineId {
+    final $_column = $_itemColumn<int>('transaction_line_id')!;
+
+    final manager = $$TransactionLinesTableTableManager(
+      $_db,
+      $_db.transactionLines,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_transactionLineIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ProductsTable _itemProductIdTable(_$AppDatabase db) =>
+      db.products.createAlias(
+        $_aliasNameGenerator(
+          db.breakfastCookingInstructions.itemProductId,
+          db.products.id,
+        ),
+      );
+
+  $$ProductsTableProcessedTableManager get itemProductId {
+    final $_column = $_itemColumn<int>('item_product_id')!;
+
+    final manager = $$ProductsTableTableManager(
+      $_db,
+      $_db.products,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_itemProductIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$BreakfastCookingInstructionsTableFilterComposer
+    extends Composer<_$AppDatabase, $BreakfastCookingInstructionsTable> {
+  $$BreakfastCookingInstructionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get uuid => $composableBuilder(
+    column: $table.uuid,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get itemName => $composableBuilder(
+    column: $table.itemName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get instructionCode => $composableBuilder(
+    column: $table.instructionCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get instructionLabel => $composableBuilder(
+    column: $table.instructionLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get appliedQuantity => $composableBuilder(
+    column: $table.appliedQuantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortKey => $composableBuilder(
+    column: $table.sortKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$TransactionLinesTableFilterComposer get transactionLineId {
+    final $$TransactionLinesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.transactionLineId,
+      referencedTable: $db.transactionLines,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TransactionLinesTableFilterComposer(
+            $db: $db,
+            $table: $db.transactionLines,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProductsTableFilterComposer get itemProductId {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.itemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BreakfastCookingInstructionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BreakfastCookingInstructionsTable> {
+  $$BreakfastCookingInstructionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get uuid => $composableBuilder(
+    column: $table.uuid,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get itemName => $composableBuilder(
+    column: $table.itemName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get instructionCode => $composableBuilder(
+    column: $table.instructionCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get instructionLabel => $composableBuilder(
+    column: $table.instructionLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get appliedQuantity => $composableBuilder(
+    column: $table.appliedQuantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortKey => $composableBuilder(
+    column: $table.sortKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$TransactionLinesTableOrderingComposer get transactionLineId {
+    final $$TransactionLinesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.transactionLineId,
+      referencedTable: $db.transactionLines,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TransactionLinesTableOrderingComposer(
+            $db: $db,
+            $table: $db.transactionLines,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProductsTableOrderingComposer get itemProductId {
+    final $$ProductsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.itemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableOrderingComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BreakfastCookingInstructionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BreakfastCookingInstructionsTable> {
+  $$BreakfastCookingInstructionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get uuid =>
+      $composableBuilder(column: $table.uuid, builder: (column) => column);
+
+  GeneratedColumn<String> get itemName =>
+      $composableBuilder(column: $table.itemName, builder: (column) => column);
+
+  GeneratedColumn<String> get instructionCode => $composableBuilder(
+    column: $table.instructionCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get instructionLabel => $composableBuilder(
+    column: $table.instructionLabel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get appliedQuantity => $composableBuilder(
+    column: $table.appliedQuantity,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sortKey =>
+      $composableBuilder(column: $table.sortKey, builder: (column) => column);
+
+  $$TransactionLinesTableAnnotationComposer get transactionLineId {
+    final $$TransactionLinesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.transactionLineId,
+      referencedTable: $db.transactionLines,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TransactionLinesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.transactionLines,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProductsTableAnnotationComposer get itemProductId {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.itemProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BreakfastCookingInstructionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BreakfastCookingInstructionsTable,
+          BreakfastCookingInstruction,
+          $$BreakfastCookingInstructionsTableFilterComposer,
+          $$BreakfastCookingInstructionsTableOrderingComposer,
+          $$BreakfastCookingInstructionsTableAnnotationComposer,
+          $$BreakfastCookingInstructionsTableCreateCompanionBuilder,
+          $$BreakfastCookingInstructionsTableUpdateCompanionBuilder,
+          (
+            BreakfastCookingInstruction,
+            $$BreakfastCookingInstructionsTableReferences,
+          ),
+          BreakfastCookingInstruction,
+          PrefetchHooks Function({bool transactionLineId, bool itemProductId})
+        > {
+  $$BreakfastCookingInstructionsTableTableManager(
+    _$AppDatabase db,
+    $BreakfastCookingInstructionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BreakfastCookingInstructionsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$BreakfastCookingInstructionsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$BreakfastCookingInstructionsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> uuid = const Value.absent(),
+                Value<int> transactionLineId = const Value.absent(),
+                Value<int> itemProductId = const Value.absent(),
+                Value<String> itemName = const Value.absent(),
+                Value<String> instructionCode = const Value.absent(),
+                Value<String> instructionLabel = const Value.absent(),
+                Value<int> appliedQuantity = const Value.absent(),
+                Value<int> sortKey = const Value.absent(),
+              }) => BreakfastCookingInstructionsCompanion(
+                id: id,
+                uuid: uuid,
+                transactionLineId: transactionLineId,
+                itemProductId: itemProductId,
+                itemName: itemName,
+                instructionCode: instructionCode,
+                instructionLabel: instructionLabel,
+                appliedQuantity: appliedQuantity,
+                sortKey: sortKey,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String uuid,
+                required int transactionLineId,
+                required int itemProductId,
+                required String itemName,
+                required String instructionCode,
+                required String instructionLabel,
+                Value<int> appliedQuantity = const Value.absent(),
+                Value<int> sortKey = const Value.absent(),
+              }) => BreakfastCookingInstructionsCompanion.insert(
+                id: id,
+                uuid: uuid,
+                transactionLineId: transactionLineId,
+                itemProductId: itemProductId,
+                itemName: itemName,
+                instructionCode: instructionCode,
+                instructionLabel: instructionLabel,
+                appliedQuantity: appliedQuantity,
+                sortKey: sortKey,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$BreakfastCookingInstructionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({transactionLineId = false, itemProductId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (transactionLineId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.transactionLineId,
+                                referencedTable:
+                                    $$BreakfastCookingInstructionsTableReferences
+                                        ._transactionLineIdTable(db),
+                                referencedColumn:
+                                    $$BreakfastCookingInstructionsTableReferences
+                                        ._transactionLineIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+                    if (itemProductId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.itemProductId,
+                                referencedTable:
+                                    $$BreakfastCookingInstructionsTableReferences
+                                        ._itemProductIdTable(db),
+                                referencedColumn:
+                                    $$BreakfastCookingInstructionsTableReferences
+                                        ._itemProductIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$BreakfastCookingInstructionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BreakfastCookingInstructionsTable,
+      BreakfastCookingInstruction,
+      $$BreakfastCookingInstructionsTableFilterComposer,
+      $$BreakfastCookingInstructionsTableOrderingComposer,
+      $$BreakfastCookingInstructionsTableAnnotationComposer,
+      $$BreakfastCookingInstructionsTableCreateCompanionBuilder,
+      $$BreakfastCookingInstructionsTableUpdateCompanionBuilder,
+      (
+        BreakfastCookingInstruction,
+        $$BreakfastCookingInstructionsTableReferences,
+      ),
+      BreakfastCookingInstruction,
+      PrefetchHooks Function({bool transactionLineId, bool itemProductId})
     >;
 typedef $$PaymentsTableCreateCompanionBuilder =
     PaymentsCompanion Function({
@@ -22537,8 +32152,50 @@ class $AppDatabaseManager {
       $$UsersTableTableManager(_db, _db.users);
   $$CategoriesTableTableManager get categories =>
       $$CategoriesTableTableManager(_db, _db.categories);
+  $$MealAdjustmentProfilesTableTableManager get mealAdjustmentProfiles =>
+      $$MealAdjustmentProfilesTableTableManager(
+        _db,
+        _db.mealAdjustmentProfiles,
+      );
   $$ProductsTableTableManager get products =>
       $$ProductsTableTableManager(_db, _db.products);
+  $$MealAdjustmentProfileComponentsTableTableManager
+  get mealAdjustmentProfileComponents =>
+      $$MealAdjustmentProfileComponentsTableTableManager(
+        _db,
+        _db.mealAdjustmentProfileComponents,
+      );
+  $$MealAdjustmentComponentOptionsTableTableManager
+  get mealAdjustmentComponentOptions =>
+      $$MealAdjustmentComponentOptionsTableTableManager(
+        _db,
+        _db.mealAdjustmentComponentOptions,
+      );
+  $$MealAdjustmentProfileExtrasTableTableManager
+  get mealAdjustmentProfileExtras =>
+      $$MealAdjustmentProfileExtrasTableTableManager(
+        _db,
+        _db.mealAdjustmentProfileExtras,
+      );
+  $$MealAdjustmentPricingRulesTableTableManager
+  get mealAdjustmentPricingRules =>
+      $$MealAdjustmentPricingRulesTableTableManager(
+        _db,
+        _db.mealAdjustmentPricingRules,
+      );
+  $$MealAdjustmentPricingRuleConditionsTableTableManager
+  get mealAdjustmentPricingRuleConditions =>
+      $$MealAdjustmentPricingRuleConditionsTableTableManager(
+        _db,
+        _db.mealAdjustmentPricingRuleConditions,
+      );
+  $$BreakfastExtraPresetsTableTableManager get breakfastExtraPresets =>
+      $$BreakfastExtraPresetsTableTableManager(_db, _db.breakfastExtraPresets);
+  $$BreakfastExtraPresetItemsTableTableManager get breakfastExtraPresetItems =>
+      $$BreakfastExtraPresetItemsTableTableManager(
+        _db,
+        _db.breakfastExtraPresetItems,
+      );
   $$MenuSettingsTableTableManager get menuSettings =>
       $$MenuSettingsTableTableManager(_db, _db.menuSettings);
   $$SetItemsTableTableManager get setItems =>
@@ -22555,6 +32212,12 @@ class $AppDatabaseManager {
       $$TransactionLinesTableTableManager(_db, _db.transactionLines);
   $$OrderModifiersTableTableManager get orderModifiers =>
       $$OrderModifiersTableTableManager(_db, _db.orderModifiers);
+  $$BreakfastCookingInstructionsTableTableManager
+  get breakfastCookingInstructions =>
+      $$BreakfastCookingInstructionsTableTableManager(
+        _db,
+        _db.breakfastCookingInstructions,
+      );
   $$PaymentsTableTableManager get payments =>
       $$PaymentsTableTableManager(_db, _db.payments);
   $$PaymentAdjustmentsTableTableManager get paymentAdjustments =>

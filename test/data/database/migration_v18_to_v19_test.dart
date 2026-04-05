@@ -57,6 +57,37 @@ void main() {
     );
 
     test(
+      'migrated database preserves broader compatibility rows without reinterpreting them as semantic breakfast rows',
+      () async {
+        final AppDatabase db = _createV18ThenMigrateToCurrent();
+        addTearDown(db.close);
+
+        final QueryRow row = await db.customSelect('''
+          SELECT
+            action,
+            quantity,
+            item_product_id,
+            extra_price_minor,
+            charge_reason,
+            unit_price_minor,
+            price_effect_minor,
+            sort_key
+          FROM order_modifiers
+          WHERE id = 2
+        ''').getSingle();
+
+        expect(row.read<String>('action'), 'remove');
+        expect(row.read<int>('quantity'), 2);
+        expect(row.read<int>('item_product_id'), 7);
+        expect(row.read<int>('extra_price_minor'), 35);
+        expect(row.read<String>('charge_reason'), 'removal_discount');
+        expect(row.read<int>('unit_price_minor'), 35);
+        expect(row.read<int>('price_effect_minor'), 35);
+        expect(row.read<int>('sort_key'), 0);
+      },
+    );
+
+    test(
       'fresh and migrated order_modifiers schemas expose the same columns',
       () async {
         final AppDatabase freshDb = createTestDatabase();
@@ -74,6 +105,60 @@ void main() {
         );
 
         expect(freshColumns, unorderedEquals(migratedColumns));
+      },
+    );
+
+    test(
+      'migrated schema keeps semantic index and broader charge_reason compatibility',
+      () async {
+        final AppDatabase db = _createV18ThenMigrateToCurrent();
+        addTearDown(db.close);
+
+        final List<String> indexes = await _readTableIndexes(
+          db,
+          'order_modifiers',
+        );
+        expect(indexes, contains('idx_order_modifiers_item_product_semantics'));
+
+        await db.customStatement('''
+          INSERT INTO order_modifiers (
+            uuid,
+            transaction_line_id,
+            action,
+            item_name,
+            quantity,
+            item_product_id,
+            extra_price_minor,
+            charge_reason,
+            unit_price_minor,
+            price_effect_minor,
+            sort_key,
+            source_group_id
+          ) VALUES (
+            'modifier-compat-removal-discount',
+            1,
+            'remove',
+            'Legacy removal discount',
+            1,
+            NULL,
+            0,
+            'removal_discount',
+            0,
+            0,
+            0,
+            NULL
+          );
+        ''');
+
+        final QueryRow inserted = await db.customSelect('''
+          SELECT charge_reason, unit_price_minor, price_effect_minor, sort_key
+          FROM order_modifiers
+          WHERE uuid = 'modifier-compat-removal-discount'
+        ''').getSingle();
+        expect(inserted.read<String>('charge_reason'), 'removal_discount');
+        expect(inserted.read<int>('unit_price_minor'), 0);
+        expect(inserted.read<int>('price_effect_minor'), 0);
+        expect(inserted.read<int>('sort_key'), 0);
       },
     );
   });
@@ -124,11 +209,27 @@ AppDatabase _createV18ThenMigrateToCurrent() {
           sort_order INTEGER NOT NULL DEFAULT 0
         );
       ''');
+      database.execute('''
+        CREATE TABLE modifier_groups (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          min_select INTEGER NOT NULL DEFAULT 1 CHECK (min_select >= 0),
+          max_select INTEGER NOT NULL DEFAULT 1 CHECK (max_select > 0),
+          included_quantity INTEGER NOT NULL DEFAULT 1 CHECK (included_quantity > 0),
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          CHECK (max_select >= min_select),
+          UNIQUE(product_id, name)
+        );
+      ''');
       database.execute(
         "INSERT INTO transaction_lines (id, uuid, transaction_id, product_id, product_name, unit_price_minor, quantity, line_total_minor, pricing_mode, removal_discount_total_minor) VALUES (1, 'line-1', 1, 1, 'Set 4', 400, 1, 550, 'set', 0);",
       );
       database.execute(
         "INSERT INTO order_modifiers (id, uuid, transaction_line_id, action, item_name, quantity, item_product_id, extra_price_minor, charge_reason) VALUES (1, 'modifier-1', 1, 'add', 'Extra Bacon', 1, NULL, 150, NULL);",
+      );
+      database.execute(
+        "INSERT INTO order_modifiers (id, uuid, transaction_line_id, action, item_name, quantity, item_product_id, extra_price_minor, charge_reason) VALUES (2, 'modifier-2', 1, 'remove', 'Legacy Discount Row', 2, 7, 35, 'removal_discount');",
       );
       database.execute(
         'CREATE INDEX idx_order_modifiers_line ON order_modifiers(transaction_line_id);',
@@ -146,6 +247,15 @@ AppDatabase _createV18ThenMigrateToCurrent() {
 Future<List<String>> _readTableColumns(AppDatabase db, String tableName) async {
   final List<QueryRow> rows = await db
       .customSelect('PRAGMA table_info($tableName)')
+      .get();
+  return rows
+      .map((QueryRow row) => row.read<String>('name'))
+      .toList(growable: false);
+}
+
+Future<List<String>> _readTableIndexes(AppDatabase db, String tableName) async {
+  final List<QueryRow> rows = await db
+      .customSelect('PRAGMA index_list($tableName)')
       .get();
   return rows
       .map((QueryRow row) => row.read<String>('name'))

@@ -6,6 +6,11 @@ import '../../domain/models/analytics/analytics_period.dart';
 import '../../presentation/providers/auth_provider.dart';
 import '../../presentation/screens/admin/admin_categories_screen.dart';
 import '../../presentation/screens/admin/admin_cash_movements_screen.dart';
+import '../../presentation/screens/admin/admin_breakfast_set_editor_screen.dart';
+import '../../presentation/screens/admin/admin_breakfast_sets_screen.dart';
+import '../../presentation/screens/admin/admin_meal_profiles_screen.dart';
+import '../../presentation/screens/admin/admin_meal_profile_editor_screen.dart';
+import '../../presentation/screens/admin/admin_meal_optimization_screen.dart';
 import '../../presentation/screens/admin/admin_dashboard_screen.dart';
 import '../../presentation/screens/admin/admin_revenue_analytics_screen.dart';
 import '../../presentation/screens/admin/admin_audit_logs_screen.dart';
@@ -74,6 +79,30 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: '/admin/products',
         builder: (_, __) => const AdminProductsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/meal-profiles',
+        builder: (_, __) => const AdminMealProfilesScreen(),
+      ),
+      GoRoute(
+        path: '/admin/meal-profiles/:profileId',
+        builder: (_, GoRouterState state) => AdminMealProfileEditorScreen(
+          profileId: int.parse(state.pathParameters['profileId']!),
+        ),
+      ),
+      GoRoute(
+        path: '/admin/meal-optimization',
+        builder: (_, __) => const AdminMealOptimizationScreen(),
+      ),
+      GoRoute(
+        path: '/admin/breakfast-sets',
+        builder: (_, __) => const AdminBreakfastSetsScreen(),
+      ),
+      GoRoute(
+        path: '/admin/breakfast-sets/:productId',
+        builder: (_, GoRouterState state) => AdminBreakfastSetEditorScreen(
+          productId: int.parse(state.pathParameters['productId']!),
+        ),
       ),
       GoRoute(
         path: '/admin/categories',

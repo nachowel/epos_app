@@ -1,10 +1,13 @@
 import '../../core/errors/error_mapper.dart';
 import '../../core/errors/exceptions.dart';
+import '../models/breakfast_cooking_instruction.dart';
 import '../../data/repositories/breakfast_configuration_repository.dart';
 import '../models/breakfast_cart_selection.dart';
 import '../models/breakfast_rebuild.dart';
 import '../models/product.dart';
 import '../models/semantic_product_configuration.dart';
+import '../models/transaction_line.dart';
+import 'breakfast_cooking_instruction_service.dart';
 import 'breakfast_rebuild_engine.dart';
 import 'semantic_menu_policy_service.dart';
 
@@ -34,23 +37,116 @@ class BreakfastPosSelectionPreview {
     required this.rebuildResult,
     required this.validationMessages,
     required this.addableProducts,
+    required this.cookingTargets,
   });
 
   final BreakfastRequestedState requestedState;
   final BreakfastRebuildResult rebuildResult;
   final List<String> validationMessages;
   final List<BreakfastPosAddableProduct> addableProducts;
+  final List<BreakfastCookingInstructionTarget> cookingTargets;
 
   bool get canConfirm => validationMessages.isEmpty;
 
-  BreakfastCartSelection toCartSelection() {
+  BreakfastCartSelection toCartSelection({
+    required BreakfastSetConfiguration configuration,
+  }) {
     if (!canConfirm) {
       throw ValidationException(validationMessages.join('\n'));
     }
     return BreakfastCartSelection(
       requestedState: requestedState,
       rebuildResult: rebuildResult,
+      modifierDisplayLines: _buildModifierDisplayLines(),
+      choiceDisplayLines: _buildChoiceDisplayLines(
+        configuration: configuration,
+      ),
+      cookingDisplayLines: cookingTargets
+          .where(
+            (BreakfastCookingInstructionTarget target) => target.hasSelection,
+          )
+          .map(
+            (BreakfastCookingInstructionTarget target) =>
+                BreakfastCookingInstructionDisplayLine(
+                  itemName: target.itemName,
+                  instructionLabel: target.selectedInstructionLabel!,
+                ),
+          )
+          .toList(growable: false),
     );
+  }
+
+  List<BreakfastCartModifierDisplayLine> _buildModifierDisplayLines() {
+    final List<BreakfastCartModifierDisplayLine> lines =
+        <BreakfastCartModifierDisplayLine>[];
+    for (final BreakfastClassifiedModifier modifier
+        in rebuildResult.classifiedModifiers) {
+      final String quantitySuffix = modifier.quantity > 1
+          ? ' x${modifier.quantity}'
+          : '';
+      switch (modifier.kind) {
+        case BreakfastModifierKind.setRemove:
+          lines.add(
+            BreakfastCartModifierDisplayLine(
+              prefix: '-',
+              itemName: '${modifier.displayName}$quantitySuffix',
+              tone: BreakfastCartModifierTone.removed,
+            ),
+          );
+        case BreakfastModifierKind.choiceIncluded:
+          break;
+        case BreakfastModifierKind.extraAdd:
+        case BreakfastModifierKind.freeSwap:
+        case BreakfastModifierKind.paidSwap:
+          lines.add(
+            BreakfastCartModifierDisplayLine(
+              prefix: '+',
+              itemName: '${modifier.displayName}$quantitySuffix',
+              tone: BreakfastCartModifierTone.added,
+            ),
+          );
+      }
+    }
+    return lines;
+  }
+
+  List<BreakfastCartChoiceDisplayLine> _buildChoiceDisplayLines({
+    required BreakfastSetConfiguration configuration,
+  }) {
+    final List<BreakfastCartChoiceDisplayLine> lines =
+        <BreakfastCartChoiceDisplayLine>[];
+    for (final BreakfastChoiceGroupConfig group in configuration.choiceGroups) {
+      BreakfastChosenGroupRequest? selectedChoice;
+      for (final BreakfastChosenGroupRequest choice
+          in requestedState.chosenGroups) {
+        if (choice.groupId == group.groupId) {
+          selectedChoice = choice;
+          break;
+        }
+      }
+      if (selectedChoice == null) {
+        continue;
+      }
+      String selectedLabel = breakfastNoneChoiceDisplayName;
+      if (!selectedChoice.isExplicitNone) {
+        for (final BreakfastChoiceGroupMemberConfig member in group.members) {
+          if (member.itemProductId == selectedChoice.selectedItemProductId) {
+            selectedLabel = member.displayName;
+            break;
+          }
+        }
+      }
+      lines.add(
+        BreakfastCartChoiceDisplayLine(
+          groupName: group.groupName.replaceAll(
+            RegExp(r'\s+choice$', caseSensitive: false),
+            '',
+          ),
+          selectedLabel: selectedLabel,
+        ),
+      );
+    }
+    return lines;
   }
 }
 
@@ -73,13 +169,17 @@ class BreakfastPosService {
     required BreakfastConfigurationRepository breakfastConfigurationRepository,
     BreakfastRebuildEngine breakfastRebuildEngine =
         const BreakfastRebuildEngine(),
+    BreakfastCookingInstructionService cookingInstructionService =
+        const BreakfastCookingInstructionService(),
     SemanticMenuPolicyService policyService = const SemanticMenuPolicyService(),
   }) : _breakfastConfigurationRepository = breakfastConfigurationRepository,
        _breakfastRebuildEngine = breakfastRebuildEngine,
+       _cookingInstructionService = cookingInstructionService,
        _policyService = policyService;
 
   final BreakfastConfigurationRepository _breakfastConfigurationRepository;
   final BreakfastRebuildEngine _breakfastRebuildEngine;
+  final BreakfastCookingInstructionService _cookingInstructionService;
   final SemanticMenuPolicyService _policyService;
 
   Future<PosProductSelectionPath> getSelectionPath(Product product) async {
@@ -138,6 +238,11 @@ class BreakfastPosService {
     required BreakfastSetConfiguration configuration,
     required BreakfastRequestedState requestedState,
   }) {
+    final BreakfastRequestedState normalizedRequestedState =
+        _cookingInstructionService.sanitizeRequestedState(
+          configuration: configuration,
+          requestedState: requestedState,
+        );
     final BreakfastRebuildResult rebuildResult = _breakfastRebuildEngine
         .rebuild(
           BreakfastRebuildInput(
@@ -148,29 +253,31 @@ class BreakfastPosService {
               rootProductName: product.name,
               baseUnitPriceMinor: product.priceMinor,
               lineQuantity: 1,
+              pricingMode: TransactionLinePricingMode.set,
             ),
             setConfiguration: configuration,
-            requestedState: requestedState,
+            requestedState: normalizedRequestedState,
           ),
         );
 
-    final List<String> validationMessages = <String>[
+    final validationMessages = {
       ..._toOperatorValidationMessages(
         configuration: configuration,
-        requestedState: requestedState,
+        requestedState: normalizedRequestedState,
       ),
       ...rebuildResult.validationErrors
           .map(ErrorMapper.toUserMessage)
           .whereType<String>(),
-    ].toSet().toList(growable: false);
+    }.toList(growable: false);
 
     return BreakfastPosSelectionPreview(
-      requestedState: requestedState,
+      requestedState: normalizedRequestedState,
       rebuildResult: rebuildResult,
       validationMessages: validationMessages,
-      addableProducts: _buildAddableProducts(
+      addableProducts: _buildAddableProducts(configuration: configuration),
+      cookingTargets: _cookingInstructionService.buildTargets(
         configuration: configuration,
-        requestedState: requestedState,
+        requestedState: normalizedRequestedState,
       ),
     );
   }
@@ -183,7 +290,9 @@ class BreakfastPosService {
       product: product,
       requestedState: requestedState,
     );
-    return editorData.preview.toCartSelection();
+    return editorData.preview.toCartSelection(
+      configuration: editorData.configuration,
+    );
   }
 
   Future<ProductMenuConfigurationProfile> _loadProfile(int productId) async {
@@ -251,9 +360,7 @@ class BreakfastPosService {
     for (final BreakfastChoiceGroupConfig group in configuration.choiceGroups) {
       final BreakfastChosenGroupRequest? choice =
           choicesByGroupId[group.groupId];
-      final bool hasSelection =
-          choice?.selectedItemProductId != null &&
-          (choice?.requestedQuantity ?? 0) > 0;
+      final bool hasSelection = choice?.hasSelection ?? false;
 
       if (group.maxSelect > 1) {
         messages.add(
@@ -301,7 +408,6 @@ class BreakfastPosService {
 
   List<BreakfastPosAddableProduct> _buildAddableProducts({
     required BreakfastSetConfiguration configuration,
-    required BreakfastRequestedState requestedState,
   }) {
     final List<BreakfastPosAddableProduct> products = configuration.extras
         .map((BreakfastExtraItemConfig extra) {

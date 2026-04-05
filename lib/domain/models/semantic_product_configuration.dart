@@ -1,4 +1,5 @@
 import 'product.dart';
+import 'breakfast_extra_preset.dart';
 
 enum ProductMenuConfigType { standard, legacyFlat, semanticSet, mixed }
 
@@ -194,6 +195,8 @@ class SemanticProductConfigurationEditorData {
     required this.rootProduct,
     required this.profile,
     required this.availableProducts,
+    required this.availableSetItemProducts,
+    required this.extraPresets,
     required this.configuration,
     required this.validationResult,
   });
@@ -201,8 +204,31 @@ class SemanticProductConfigurationEditorData {
   final Product rootProduct;
   final ProductMenuConfigurationProfile profile;
   final List<Product> availableProducts;
+  final List<Product> availableSetItemProducts;
+  final List<BreakfastExtraPreset> extraPresets;
   final SemanticProductConfigurationDraft configuration;
   final SemanticMenuValidationResult validationResult;
+
+  SemanticProductConfigurationEditorData copyWith({
+    Product? rootProduct,
+    ProductMenuConfigurationProfile? profile,
+    List<Product>? availableProducts,
+    List<Product>? availableSetItemProducts,
+    List<BreakfastExtraPreset>? extraPresets,
+    SemanticProductConfigurationDraft? configuration,
+    SemanticMenuValidationResult? validationResult,
+  }) {
+    return SemanticProductConfigurationEditorData(
+      rootProduct: rootProduct ?? this.rootProduct,
+      profile: profile ?? this.profile,
+      availableProducts: availableProducts ?? this.availableProducts,
+      availableSetItemProducts:
+          availableSetItemProducts ?? this.availableSetItemProducts,
+      extraPresets: extraPresets ?? this.extraPresets,
+      configuration: configuration ?? this.configuration,
+      validationResult: validationResult ?? this.validationResult,
+    );
+  }
 }
 
 class SemanticMenuValidationResult {

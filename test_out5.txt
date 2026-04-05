@@ -1,0 +1,11 @@
+00:00 +0: loading C:/Users/nacho/Desktop/EPOS/epos_app/test/domain/services/meal_customization_phase9_test.dart
+00:00 +0 -1: loading C:/Users/nacho/Desktop/EPOS/epos_app/test/domain/services/meal_customization_phase9_test.dart [E]
+  Failed to load "C:/Users/nacho/Desktop/EPOS/epos_app/test/domain/services/meal_customization_phase9_test.dart":
+  Compilation failed for testPath=C:/Users/nacho/Desktop/EPOS/epos_app/test/domain/services/meal_customization_phase9_test.dart: test/domain/services/meal_customization_phase9_test.dart:75:1: Error: Expected a declaration, but got '}'.
+  }
+  ^
+  test/domain/services/meal_customization_phase9_test.dart:79:11: Error: Undefined name 'MealAdjustmentProfilesCompanion'.
+      drift.MealAdjustmentProfilesCompanion.insert(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  .
+00:00 +0 -1: Some tests failed.

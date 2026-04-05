@@ -6,6 +6,7 @@ enum ModifierChargeReason {
   paidSwap,
   extraAdd,
   removalDiscount,
+  comboDiscount,
 }
 
 class OrderModifier {
@@ -46,7 +47,7 @@ class OrderModifier {
     ModifierAction? action,
     String? itemName,
     int? extraPriceMinor,
-    ModifierChargeReason? chargeReason,
+    Object? chargeReason = _unsetChargeReason,
     Object? itemProductId = _unsetItemProductId,
     Object? sourceGroupId = _unsetSourceGroupId,
     int? quantity,
@@ -61,7 +62,9 @@ class OrderModifier {
       action: action ?? this.action,
       itemName: itemName ?? this.itemName,
       extraPriceMinor: extraPriceMinor ?? this.extraPriceMinor,
-      chargeReason: chargeReason ?? this.chargeReason,
+      chargeReason: identical(chargeReason, _unsetChargeReason)
+          ? this.chargeReason
+          : chargeReason as ModifierChargeReason?,
       itemProductId: identical(itemProductId, _unsetItemProductId)
           ? this.itemProductId
           : itemProductId as int?,
@@ -114,5 +117,6 @@ class OrderModifier {
   );
 }
 
+const Object _unsetChargeReason = Object();
 const Object _unsetItemProductId = Object();
 const Object _unsetSourceGroupId = Object();

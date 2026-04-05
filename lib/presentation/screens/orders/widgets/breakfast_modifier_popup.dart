@@ -53,6 +53,7 @@ class _BreakfastModifierPopupState
           transactionId: widget.transactionId,
           transactionLineId: _session.line.id,
           edit: edit,
+          expectedTransactionUpdatedAt: _session.transaction.updatedAt,
         );
     if (!mounted) {
       return;
@@ -235,6 +236,8 @@ class _BreakfastModifierPopupState
                               .map((BreakfastChoiceGroupConfig group) {
                                 final BreakfastChosenGroupRequest?
                                 currentChoice = chosenGroups[group.groupId];
+                                final bool isExplicitNone =
+                                    currentChoice?.isExplicitNone ?? false;
                                 final int groupQuantity =
                                     currentChoice?.requestedQuantity ?? 0;
                                 final int? selectedProductId =
@@ -263,50 +266,74 @@ class _BreakfastModifierPopupState
                                       Wrap(
                                         spacing: 8,
                                         runSpacing: 8,
-                                        children: group.members
-                                            .map((
-                                              BreakfastChoiceGroupMemberConfig
-                                              member,
-                                            ) {
-                                              final bool isSelected =
-                                                  selectedProductId ==
-                                                  member.itemProductId;
-                                              return ChoiceChip(
-                                                key: ValueKey<String>(
-                                                  'breakfast-choice-select-${group.groupId}-${member.itemProductId}',
-                                                ),
-                                                label: Text(member.displayName),
-                                                selected: isSelected,
-                                                onSelected: _isSubmitting
-                                                    ? null
-                                                    : (_) {
-                                                        final int nextQuantity =
-                                                            groupQuantity > 0
-                                                            ? groupQuantity
-                                                            : group
-                                                                  .includedQuantity;
-                                                        _applyEdit(
-                                                          BreakfastLineEdit.chooseGroup(
-                                                            groupId:
-                                                                group.groupId,
-                                                            selectedItemProductId:
-                                                                member
-                                                                    .itemProductId,
-                                                            quantity:
-                                                                nextQuantity,
-                                                          ),
-                                                        );
-                                                      },
-                                              );
-                                            })
-                                            .toList(growable: false),
+                                        children: <Widget>[
+                                          ChoiceChip(
+                                            key: ValueKey<String>(
+                                              'breakfast-choice-none-${group.groupId}',
+                                            ),
+                                            label: const Text(
+                                              breakfastNoneChoiceDisplayName,
+                                            ),
+                                            selected: isExplicitNone,
+                                            onSelected: _isSubmitting
+                                                ? null
+                                                : (_) {
+                                                    _applyEdit(
+                                                      BreakfastLineEdit.chooseGroup(
+                                                        groupId: group.groupId,
+                                                        selectedItemProductId:
+                                                            null,
+                                                        quantity: 1,
+                                                      ),
+                                                    );
+                                                  },
+                                          ),
+                                          ...group.members.map((
+                                            BreakfastChoiceGroupMemberConfig
+                                            member,
+                                          ) {
+                                            final bool isSelected =
+                                                selectedProductId ==
+                                                member.itemProductId;
+                                            return ChoiceChip(
+                                              key: ValueKey<String>(
+                                                'breakfast-choice-select-${group.groupId}-${member.itemProductId}',
+                                              ),
+                                              label: Text(member.displayName),
+                                              selected: isSelected,
+                                              onSelected: _isSubmitting
+                                                  ? null
+                                                  : (_) {
+                                                      final int nextQuantity =
+                                                          groupQuantity > 0 &&
+                                                              !isExplicitNone
+                                                          ? groupQuantity
+                                                          : group
+                                                                .includedQuantity;
+                                                      _applyEdit(
+                                                        BreakfastLineEdit.chooseGroup(
+                                                          groupId:
+                                                              group.groupId,
+                                                          selectedItemProductId:
+                                                              member
+                                                                  .itemProductId,
+                                                          quantity:
+                                                              nextQuantity,
+                                                        ),
+                                                      );
+                                                    },
+                                            );
+                                          }),
+                                        ],
                                       ),
                                       const SizedBox(height: 8),
                                       Row(
                                         children: <Widget>[
                                           Expanded(
                                             child: Text(
-                                              selectedProductId == null
+                                              isExplicitNone
+                                                  ? 'None selected'
+                                                  : selectedProductId == null
                                                   ? 'No selection'
                                                   : 'Qty $groupQuantity',
                                               style: const TextStyle(
@@ -337,7 +364,8 @@ class _BreakfastModifierPopupState
                                             quantity: groupQuantity,
                                             canDecrease:
                                                 !_isSubmitting &&
-                                                groupQuantity > 0,
+                                                groupQuantity > 0 &&
+                                                !isExplicitNone,
                                             canIncrease:
                                                 !_isSubmitting &&
                                                 selectedProductId != null,

@@ -3,14 +3,18 @@ import 'package:uuid/uuid.dart';
 import '../../core/logging/app_logger.dart';
 import '../../core/errors/exceptions.dart';
 import '../../data/repositories/breakfast_configuration_repository.dart';
+import '../../data/repositories/product_repository.dart';
 import '../../data/repositories/payment_repository.dart';
 import '../../data/repositories/print_job_repository.dart';
 import '../../data/repositories/sync_queue_repository.dart';
 import '../../data/repositories/transaction_repository.dart';
 import '../../data/repositories/transaction_state_repository.dart';
 import '../models/breakfast_line_edit.dart';
+import '../models/breakfast_cooking_instruction.dart';
 import '../models/breakfast_cart_selection.dart';
 import '../models/breakfast_rebuild.dart';
+import '../models/meal_adjustment_profile.dart';
+import '../models/meal_customization.dart';
 import '../models/open_order_summary.dart';
 import '../models/authorization_policy.dart';
 import '../models/checkout_item.dart';
@@ -18,12 +22,18 @@ import '../models/order_lifecycle_policy.dart';
 import '../models/order_modifier.dart';
 import '../models/payment.dart';
 import '../models/print_job.dart';
+import '../models/product.dart';
 import '../models/transaction.dart';
 import '../models/transaction_line.dart';
 import '../models/user.dart';
+import '../repositories/meal_adjustment_profile_repository.dart';
 import 'audit_log_service.dart';
+import 'breakfast_cooking_instruction_service.dart';
 import 'breakfast_rebuild_engine.dart';
 import 'breakfast_requested_state_mapper.dart';
+import 'breakfast_requested_state_transformer.dart';
+import 'meal_adjustment_profile_validation_service.dart';
+import 'meal_customization_engine.dart';
 import 'shift_session_service.dart';
 
 class OrderService {
@@ -31,23 +41,37 @@ class OrderService {
     required ShiftSessionService shiftSessionService,
     required TransactionRepository transactionRepository,
     required TransactionStateRepository transactionStateRepository,
+    ProductRepository? productRepository,
     BreakfastConfigurationRepository? breakfastConfigurationRepository,
+    MealAdjustmentProfileRepository? mealAdjustmentProfileRepository,
+    MealAdjustmentProfileValidationService?
+    mealAdjustmentProfileValidationService,
     PaymentRepository? paymentRepository,
     PrintJobRepository? printJobRepository,
     SyncQueueRepository? syncQueueRepository,
     BreakfastRebuildEngine breakfastRebuildEngine =
         const BreakfastRebuildEngine(),
+    MealCustomizationEngine mealCustomizationEngine =
+        const MealCustomizationEngine(),
+    BreakfastCookingInstructionService breakfastCookingInstructionService =
+        const BreakfastCookingInstructionService(),
     Uuid? uuidGenerator,
     AuditLogService auditLogService = const NoopAuditLogService(),
     AppLogger logger = const NoopAppLogger(),
   }) : _shiftSessionService = shiftSessionService,
        _transactionRepository = transactionRepository,
        _transactionStateRepository = transactionStateRepository,
+       _productRepository = productRepository,
        _breakfastConfigurationRepository = breakfastConfigurationRepository,
+       _mealAdjustmentProfileRepository = mealAdjustmentProfileRepository,
+       _mealAdjustmentProfileValidationService =
+           mealAdjustmentProfileValidationService,
        _paymentRepository = paymentRepository,
        _printJobRepository = printJobRepository,
        _syncQueueRepository = syncQueueRepository,
        _breakfastRebuildEngine = breakfastRebuildEngine,
+       _mealCustomizationEngine = mealCustomizationEngine,
+       _breakfastCookingInstructionService = breakfastCookingInstructionService,
        _uuidGenerator = uuidGenerator ?? const Uuid(),
        _auditLogService = auditLogService,
        _logger = logger;
@@ -55,11 +79,17 @@ class OrderService {
   final ShiftSessionService _shiftSessionService;
   final TransactionRepository _transactionRepository;
   final TransactionStateRepository _transactionStateRepository;
+  final ProductRepository? _productRepository;
   final BreakfastConfigurationRepository? _breakfastConfigurationRepository;
+  final MealAdjustmentProfileRepository? _mealAdjustmentProfileRepository;
+  final MealAdjustmentProfileValidationService?
+  _mealAdjustmentProfileValidationService;
   final PaymentRepository? _paymentRepository;
   final PrintJobRepository? _printJobRepository;
   final SyncQueueRepository? _syncQueueRepository;
   final BreakfastRebuildEngine _breakfastRebuildEngine;
+  final MealCustomizationEngine _mealCustomizationEngine;
+  final BreakfastCookingInstructionService _breakfastCookingInstructionService;
   final Uuid _uuidGenerator;
   final AuditLogService _auditLogService;
   final AppLogger _logger;
@@ -100,7 +130,22 @@ class OrderService {
     required int transactionId,
     required int productId,
     int quantity = 1,
+    MealCustomizationRequest? mealCustomizationRequest,
   }) async {
+    final _StandardProductFlowDecision flowDecision =
+        await _decideStandardProductFlow(
+          productId: productId,
+          mealCustomizationRequest: mealCustomizationRequest,
+        );
+    if (flowDecision.kind == _StandardProductFlowKind.mealCustomization) {
+      return _addMealCustomizationToOrder(
+        transactionId: transactionId,
+        context: flowDecision.mealContext!,
+        request: mealCustomizationRequest,
+        quantity: quantity,
+      );
+    }
+
     await _ensureProductAvailableForSale(productId);
     final TransactionLine line = await _transactionRepository.addLine(
       transactionId: transactionId,
@@ -124,6 +169,25 @@ class OrderService {
     }
 
     return _transactionRepository.runInTransaction(() async {
+      final BreakfastConfigurationRepository configurationRepository =
+          _requiredBreakfastConfigurationRepository;
+      final BreakfastSetConfiguration? baseConfiguration =
+          await configurationRepository.loadSetConfiguration(productId);
+      if (baseConfiguration == null) {
+        throw ValidationException('Breakfast configuration is unavailable.');
+      }
+      final BreakfastSetConfiguration configuration =
+          await _augmentConfiguration(
+            configurationRepository: configurationRepository,
+            baseConfiguration: baseConfiguration,
+            requestedState: selection.requestedState,
+          );
+      final BreakfastRequestedState normalizedRequestedState =
+          _breakfastCookingInstructionService.sanitizeRequestedState(
+            configuration: configuration,
+            requestedState: selection.requestedState,
+          );
+
       final TransactionLine line = await _transactionRepository.addLine(
         transactionId: transactionId,
         productId: productId,
@@ -132,8 +196,14 @@ class OrderService {
       await _transactionRepository.replaceBreakfastLineSnapshot(
         transactionLineId: line.id,
         rebuildResult: selection.rebuildResult,
+        cookingInstructions: _breakfastCookingInstructionService
+            .buildPersistedRecords(
+              transactionLineId: line.id,
+              configuration: configuration,
+              requestedState: normalizedRequestedState,
+              createUuid: _uuidGenerator.v4,
+            ),
       );
-      await recalculateOrderTotals(transactionId);
       final TransactionLine? persisted = await _transactionRepository
           .getLineById(line.id);
       if (persisted == null) {
@@ -165,13 +235,20 @@ class OrderService {
     required int transactionLineId,
     required BreakfastLineEdit edit,
     int? actorUserId,
+    DateTime? expectedTransactionUpdatedAt,
   }) async {
     final BreakfastConfigurationRepository configurationRepository =
         _requiredBreakfastConfigurationRepository;
 
     return _transactionRepository.runInTransaction(() async {
-      final ({TransactionLine line, TransactionStatus status})? initialContext =
-          await _transactionRepository.getLineContext(transactionLineId);
+      final ({
+        TransactionLine line,
+        TransactionStatus status,
+        DateTime transactionUpdatedAt,
+      })?
+      initialContext = await _transactionRepository.getLineContext(
+        transactionLineId,
+      );
       if (initialContext == null) {
         throw NotFoundException(
           'Transaction line not found: $transactionLineId',
@@ -192,6 +269,26 @@ class OrderService {
             'transaction_line_id': transactionLineId,
             'transaction_id': initialContext.line.transactionId,
             'reason': e.reason.name,
+          },
+        );
+        rethrow;
+      }
+      try {
+        _ensureBreakfastEditNotStale(
+          expectedTransactionUpdatedAt: expectedTransactionUpdatedAt,
+          actualTransactionUpdatedAt: initialContext.transactionUpdatedAt,
+          line: initialContext.line,
+        );
+      } on StaleBreakfastEditException catch (e) {
+        _logger.warn(
+          eventType: 'breakfast_edit_stale',
+          entityId: initialContext.line.uuid,
+          message: 'Breakfast line edit rejected: stale transaction snapshot.',
+          metadata: <String, Object?>{
+            'transaction_line_id': transactionLineId,
+            'transaction_id': initialContext.line.transactionId,
+            'expected_updated_at': e.expectedUpdatedAt.toIso8601String(),
+            'actual_updated_at': e.actualUpdatedAt.toIso8601String(),
           },
         );
         rethrow;
@@ -229,7 +326,12 @@ class OrderService {
 
       final List<OrderModifier> currentModifiers = await _transactionRepository
           .getModifiersByLine(workingLine.id);
-      if (_hasLegacyModifierSnapshot(currentModifiers)) {
+      final List<BreakfastCookingInstructionRecord> currentCookingInstructions =
+          await _transactionRepository.getBreakfastCookingInstructionsByLine(
+            workingLine.id,
+          );
+      if (_hasLegacyModifierSnapshot(currentModifiers) ||
+          _hasUnsupportedStrictRequestedStateSnapshot(currentModifiers)) {
         _logBreakfastEditRejected(
           lineUuid: workingLine.uuid,
           transactionLineId: workingLine.id,
@@ -246,13 +348,27 @@ class OrderService {
       }
 
       final BreakfastRequestedState currentRequestedState =
-          BreakfastRequestedStateMapper.reconstruct(
-            modifiers: currentModifiers,
-            configuration: baseConfiguration,
+          BreakfastRequestedStateTransformer.assertInvariant(
+            BreakfastRequestedStateMapper.fromPersistedSnapshot(
+              modifiers: currentModifiers,
+              cookingInstructions: currentCookingInstructions
+                  .map(
+                    (BreakfastCookingInstructionRecord instruction) =>
+                        BreakfastCookingInstructionRequest(
+                          itemProductId: instruction.itemProductId,
+                          instructionCode: instruction.instructionCode,
+                          instructionLabel: instruction.instructionLabel,
+                        ),
+                  )
+                  .toList(growable: false),
+            ),
+            source: 'OrderService.currentRequestedState',
           );
-      final BreakfastRequestedState nextRequestedState = edit.applyTo(
-        currentRequestedState,
-      );
+      final BreakfastRequestedState nextRequestedState =
+          BreakfastRequestedStateTransformer.assertInvariant(
+            edit.applyTo(currentRequestedState),
+            source: 'OrderService.nextRequestedState',
+          );
       final List<BreakfastEditErrorCode> invalidExtraCodes =
           _validateRequestedExtras(
             configuration: baseConfiguration,
@@ -276,6 +392,11 @@ class OrderService {
             baseConfiguration: baseConfiguration,
             requestedState: nextRequestedState,
           );
+      final BreakfastRequestedState normalizedRequestedState =
+          _breakfastCookingInstructionService.sanitizeRequestedState(
+            configuration: configuration,
+            requestedState: nextRequestedState,
+          );
 
       final BreakfastRebuildResult rebuildResult = _breakfastRebuildEngine
           .rebuild(
@@ -287,9 +408,10 @@ class OrderService {
                 rootProductName: workingLine.productName,
                 baseUnitPriceMinor: workingLine.unitPriceMinor,
                 lineQuantity: workingLine.quantity,
+                pricingMode: TransactionLinePricingMode.set,
               ),
               setConfiguration: configuration,
-              requestedState: nextRequestedState,
+              requestedState: normalizedRequestedState,
             ),
           );
       if (rebuildResult.validationErrors.isNotEmpty) {
@@ -307,8 +429,14 @@ class OrderService {
       await _transactionRepository.replaceBreakfastLineSnapshot(
         transactionLineId: workingLine.id,
         rebuildResult: rebuildResult,
+        cookingInstructions: _breakfastCookingInstructionService
+            .buildPersistedRecords(
+              transactionLineId: workingLine.id,
+              configuration: configuration,
+              requestedState: normalizedRequestedState,
+              createUuid: _uuidGenerator.v4,
+            ),
       );
-      await recalculateOrderTotals(workingLine.transactionId);
 
       final TransactionLine? refreshedLine = await _transactionRepository
           .getLineById(workingLine.id);
@@ -318,7 +446,7 @@ class OrderService {
         );
       }
 
-      // ── Audit: successful breakfast edit ──
+      // Audit successful breakfast edit.
       final Map<String, int> reasonCounts = _buildReasonCounts(
         rebuildResult.classifiedModifiers,
       );
@@ -356,11 +484,498 @@ class OrderService {
     });
   }
 
+  Future<TransactionLine> editMealCustomizationLine({
+    required int transactionLineId,
+    required MealCustomizationRequest request,
+    int? actorUserId,
+    DateTime? expectedTransactionUpdatedAt,
+  }) async {
+    return _transactionRepository.runInTransaction(() async {
+      final ({
+        TransactionLine line,
+        TransactionStatus status,
+        DateTime transactionUpdatedAt,
+      })? initialContext = await _transactionRepository.getLineContext(
+        transactionLineId,
+      );
+      if (initialContext == null) {
+        throw NotFoundException(
+          'Transaction line not found: $transactionLineId',
+        );
+      }
+
+      try {
+        _ensureMealCustomizationLineEditable(
+          status: initialContext.status,
+          line: initialContext.line,
+        );
+      } on MealCustomizationLineNotEditableException catch (error) {
+        _logger.warn(
+          eventType: 'meal_customization_edit_blocked',
+          entityId: initialContext.line.uuid,
+          message: 'Meal customization line edit rejected: not editable.',
+          metadata: <String, Object?>{
+            'transaction_line_id': transactionLineId,
+            'transaction_id': initialContext.line.transactionId,
+            'reason': error.reason.name,
+          },
+        );
+        rethrow;
+      }
+      try {
+        _ensureMealCustomizationEditNotStale(
+          expectedTransactionUpdatedAt: expectedTransactionUpdatedAt,
+          actualTransactionUpdatedAt: initialContext.transactionUpdatedAt,
+          line: initialContext.line,
+        );
+      } on StaleMealCustomizationEditException catch (error) {
+        _logger.warn(
+          eventType: 'meal_customization_edit_stale',
+          entityId: initialContext.line.uuid,
+          message:
+              'Meal customization line edit rejected: stale transaction snapshot.',
+          metadata: <String, Object?>{
+            'transaction_line_id': transactionLineId,
+            'transaction_id': initialContext.line.transactionId,
+            'expected_updated_at': error.expectedUpdatedAt.toIso8601String(),
+            'actual_updated_at': error.actualUpdatedAt.toIso8601String(),
+          },
+        );
+        rethrow;
+      }
+
+      final MealCustomizationPersistedSnapshotRecord? currentSnapshotRecord =
+          await _transactionRepository.getMealCustomizationSnapshotByLine(
+            transactionLineId,
+          );
+      if (currentSnapshotRecord == null) {
+        final MealCustomizationLineNotEditableException error =
+            MealCustomizationLineNotEditableException(
+              reason: MealCustomizationEditBlockedReason.legacySnapshotMissing,
+              transactionLineId: transactionLineId,
+              transactionId: initialContext.line.transactionId,
+            );
+        _logger.warn(
+          eventType: 'meal_customization_edit_blocked',
+          entityId: initialContext.line.uuid,
+          message:
+              'Meal customization line edit rejected: snapshot is unavailable.',
+          metadata: <String, Object?>{
+            'transaction_line_id': transactionLineId,
+            'transaction_id': initialContext.line.transactionId,
+            'is_legacy_line': await _transactionRepository
+                .isLegacyMealCustomizationLine(transactionLineId),
+            'reason': error.reason.name,
+          },
+        );
+        throw error;
+      }
+
+      final Product product = await _requiredProductRepository.getById(
+            initialContext.line.productId,
+          ) ??
+          (throw NotFoundException(
+            'Product not found: ${initialContext.line.productId}',
+          ));
+      final _MealCustomizationRuntimeContext context =
+          await _resolveMealCustomizationRuntimeContextForProfile(
+            product,
+            profileId: currentSnapshotRecord.profileId,
+            enforceCurrentProductBinding: false,
+            enforceBreakfastCompatibility: false,
+          );
+      final MealCustomizationRequest normalizedRequest = request.copyWith(
+        productId: initialContext.line.productId,
+        profileId: currentSnapshotRecord.profileId,
+      );
+      final MealCustomizationResolvedSnapshot nextSnapshot =
+          _mealCustomizationEngine.evaluate(
+            profile: context.profile,
+            request: normalizedRequest,
+          );
+
+      final int previousLineId = initialContext.line.id;
+      final int previousQuantity = initialContext.line.quantity;
+      final int oldLineTotalMinor = initialContext.line.lineTotalMinor;
+      final String previousIdentity = currentSnapshotRecord.customizationKey;
+      final String nextIdentity = nextSnapshot.stableIdentityKey;
+      final bool identityChanged = nextIdentity != previousIdentity;
+
+      TransactionLine? persistedLine;
+      bool mergedIntoExistingLine = false;
+      int? mergedTargetLineId;
+      if (!identityChanged) {
+        await _transactionRepository.replaceMealCustomizationLineSnapshot(
+          transactionLineId: previousLineId,
+          snapshot: nextSnapshot,
+        );
+        persistedLine = await _transactionRepository.getLineById(previousLineId);
+      } else {
+        final TransactionLine? existingLine = await _transactionRepository
+            .findDraftMealCustomizationLineByIdentity(
+              transactionId: initialContext.line.transactionId,
+              productId: initialContext.line.productId,
+              customizationKey: nextIdentity,
+              excludeTransactionLineId: previousLineId,
+            );
+        if (existingLine != null) {
+          await _transactionRepository.incrementLineQuantity(
+            transactionLineId: existingLine.id,
+            incrementBy: previousQuantity,
+          );
+          await _transactionRepository.deleteDraftLineCompletely(previousLineId);
+          persistedLine = await _transactionRepository.getLineById(
+            existingLine.id,
+          );
+          mergedIntoExistingLine = true;
+          mergedTargetLineId = existingLine.id;
+        } else {
+          await _transactionRepository.replaceMealCustomizationLineSnapshot(
+            transactionLineId: previousLineId,
+            snapshot: nextSnapshot,
+          );
+          persistedLine = await _transactionRepository.getLineById(
+            previousLineId,
+          );
+        }
+      }
+
+      if (persistedLine == null) {
+        throw DatabaseException(
+          'Meal customization edit did not produce a persisted transaction line.',
+        );
+      }
+
+      _logger.audit(
+        eventType: 'meal_customization_line_edited',
+        entityId: initialContext.line.uuid,
+        message: mergedIntoExistingLine
+            ? 'Meal customization line merged into an existing grouped line after edit.'
+            : 'Meal customization line snapshot replaced.',
+        metadata: <String, Object?>{
+          'transaction_id': initialContext.line.transactionId,
+          'transaction_line_id': previousLineId,
+          'result_line_id': persistedLine.id,
+          'root_product_id': initialContext.line.productId,
+          'line_quantity': previousQuantity,
+          'old_line_total_minor': oldLineTotalMinor,
+          'new_line_total_minor': persistedLine.lineTotalMinor,
+          'identity_changed': identityChanged,
+          'merged_into_existing_line': mergedIntoExistingLine,
+          'previous_identity': previousIdentity,
+          'next_identity': nextIdentity,
+          if (mergedTargetLineId != null) 'merged_target_line_id': mergedTargetLineId,
+          if (actorUserId != null) 'actor_user_id': actorUserId,
+        },
+      );
+
+      return persistedLine;
+    });
+  }
+
+  /// Splits one unit from a grouped meal customization line, applies the new
+  /// customization to it, and merges the result into an existing identical line
+  /// when possible. The original line's quantity is decremented by one.
+  ///
+  /// Commit-on-confirm: the caller is responsible for only invoking this method
+  /// after the user has confirmed the edit. No optimistic split is performed.
+  Future<TransactionLine> editOneMealCustomizationLine({
+    required int transactionLineId,
+    required MealCustomizationRequest request,
+    int? actorUserId,
+    DateTime? expectedTransactionUpdatedAt,
+  }) async {
+    return _transactionRepository.runInTransaction(() async {
+      final ({
+        TransactionLine line,
+        TransactionStatus status,
+        DateTime transactionUpdatedAt,
+      })? initialContext = await _transactionRepository.getLineContext(
+        transactionLineId,
+      );
+      if (initialContext == null) {
+        throw NotFoundException(
+          'Transaction line not found: $transactionLineId',
+        );
+      }
+
+      _ensureMealCustomizationLineEditable(
+        status: initialContext.status,
+        line: initialContext.line,
+      );
+      _ensureMealCustomizationEditNotStale(
+        expectedTransactionUpdatedAt: expectedTransactionUpdatedAt,
+        actualTransactionUpdatedAt: initialContext.transactionUpdatedAt,
+        line: initialContext.line,
+      );
+
+      if (initialContext.line.quantity < 2) {
+        throw ValidationException(
+          'editOneMealCustomizationLine requires a grouped line with quantity >= 2. '
+          'Use editMealCustomizationLine for single-quantity lines.',
+        );
+      }
+
+      final MealCustomizationPersistedSnapshotRecord? currentSnapshotRecord =
+          await _transactionRepository.getMealCustomizationSnapshotByLine(
+            transactionLineId,
+          );
+      if (currentSnapshotRecord == null) {
+        throw MealCustomizationLineNotEditableException(
+          reason: MealCustomizationEditBlockedReason.legacySnapshotMissing,
+          transactionLineId: transactionLineId,
+          transactionId: initialContext.line.transactionId,
+        );
+      }
+
+      final Product product = await _requiredProductRepository.getById(
+            initialContext.line.productId,
+          ) ??
+          (throw NotFoundException(
+            'Product not found: ${initialContext.line.productId}',
+          ));
+      final _MealCustomizationRuntimeContext context =
+          await _resolveMealCustomizationRuntimeContextForProfile(
+            product,
+            profileId: currentSnapshotRecord.profileId,
+            enforceCurrentProductBinding: false,
+            enforceBreakfastCompatibility: false,
+          );
+      final MealCustomizationRequest normalizedRequest = request.copyWith(
+        productId: initialContext.line.productId,
+        profileId: currentSnapshotRecord.profileId,
+      );
+      final MealCustomizationResolvedSnapshot nextSnapshot =
+          _mealCustomizationEngine.evaluate(
+            profile: context.profile,
+            request: normalizedRequest,
+          );
+
+      final int previousLineId = initialContext.line.id;
+      final int transactionId = initialContext.line.transactionId;
+      final String previousIdentity = currentSnapshotRecord.customizationKey;
+      final String nextIdentity = nextSnapshot.stableIdentityKey;
+
+      // Step 1: Decrement the original grouped line by 1.
+      // Precondition guarantees qty >= 2, so this leaves qty >= 1.
+      await _transactionRepository.decrementLineQuantityOrDelete(previousLineId);
+
+      // Step 2: Determine where the split unit lands.
+      TransactionLine? resultLine;
+      bool mergedIntoExistingLine = false;
+      int? mergeTargetLineId;
+
+      if (nextIdentity == previousIdentity) {
+        // The edit produced the same identity as the original line.
+        // The unit should merge back into the (now decremented) original.
+        await _transactionRepository.incrementLineQuantity(
+          transactionLineId: previousLineId,
+          incrementBy: 1,
+        );
+        // However the snapshot may have changed in-place (e.g. re-evaluation
+        // with updated pricing rules). Replace snapshot to stay current.
+        await _transactionRepository.replaceMealCustomizationLineSnapshot(
+          transactionLineId: previousLineId,
+          snapshot: nextSnapshot,
+        );
+        resultLine = await _transactionRepository.getLineById(previousLineId);
+      } else {
+        // Check for an existing line with the new identity.
+        final TransactionLine? existingLine = await _transactionRepository
+            .findDraftMealCustomizationLineByIdentity(
+              transactionId: transactionId,
+              productId: initialContext.line.productId,
+              customizationKey: nextIdentity,
+              excludeTransactionLineId: previousLineId,
+            );
+        if (existingLine != null) {
+          // Merge into the existing line with matching identity.
+          await _transactionRepository.incrementLineQuantity(
+            transactionLineId: existingLine.id,
+            incrementBy: 1,
+          );
+          resultLine = await _transactionRepository.getLineById(existingLine.id);
+          mergedIntoExistingLine = true;
+          mergeTargetLineId = existingLine.id;
+        } else {
+          // Create a new qty=1 line with the new snapshot.
+          final TransactionLine newLine = await _transactionRepository.addLine(
+            transactionId: transactionId,
+            productId: initialContext.line.productId,
+            quantity: 1,
+          );
+          await _transactionRepository.replaceMealCustomizationLineSnapshot(
+            transactionLineId: newLine.id,
+            snapshot: nextSnapshot,
+          );
+          resultLine = await _transactionRepository.getLineById(newLine.id);
+        }
+      }
+
+      if (resultLine == null) {
+        throw DatabaseException(
+          'Edit-one meal customization did not produce a persisted transaction line.',
+        );
+      }
+
+      _logger.audit(
+        eventType: 'meal_customization_line_edit_one',
+        entityId: initialContext.line.uuid,
+        message: mergedIntoExistingLine
+            ? 'Single unit split from grouped line and merged into an existing line.'
+            : nextIdentity == previousIdentity
+                ? 'Single unit edit produced same identity; re-merged into original line.'
+                : 'Single unit split from grouped line and created as new line.',
+        metadata: <String, Object?>{
+          'transaction_id': transactionId,
+          'source_line_id': previousLineId,
+          'result_line_id': resultLine.id,
+          'source_qty_before': initialContext.line.quantity,
+          'source_qty_after': initialContext.line.quantity - 1,
+          'identity_changed': nextIdentity != previousIdentity,
+          'merged_into_existing_line': mergedIntoExistingLine,
+          'previous_identity': previousIdentity,
+          'next_identity': nextIdentity,
+          if (mergeTargetLineId != null) 'merge_target_line_id': mergeTargetLineId,
+          if (actorUserId != null) 'actor_user_id': actorUserId,
+        },
+      );
+
+      return resultLine;
+    });
+  }
+
+  /// Recreates a legacy meal customization line using the new snapshot-backed
+  /// system. The legacy line is decremented (or deleted if qty=1) and a new
+  /// snapshot-backed line is created through the standard meal customization
+  /// path. The legacy line is never mutated in-place.
+  Future<TransactionLine> recreateLegacyMealLine({
+    required int transactionLineId,
+    required MealCustomizationRequest request,
+    int? actorUserId,
+  }) async {
+    return _transactionRepository.runInTransaction(() async {
+      final ({
+        TransactionLine line,
+        TransactionStatus status,
+        DateTime transactionUpdatedAt,
+      })? initialContext = await _transactionRepository.getLineContext(
+        transactionLineId,
+      );
+      if (initialContext == null) {
+        throw NotFoundException(
+          'Transaction line not found: $transactionLineId',
+        );
+      }
+
+      if (initialContext.status != TransactionStatus.draft) {
+        throw MealCustomizationLineNotEditableException(
+          reason: MealCustomizationEditBlockedReason.notDraft,
+          transactionLineId: transactionLineId,
+          transactionId: initialContext.line.transactionId,
+        );
+      }
+
+      // Verify this is actually a legacy line.
+      final bool isLegacy = await _transactionRepository
+          .isLegacyMealCustomizationLine(transactionLineId);
+      if (!isLegacy) {
+        throw ValidationException(
+          'Transaction line $transactionLineId is not a legacy meal customization line. '
+          'Use editMealCustomizationLine for snapshot-backed lines.',
+        );
+      }
+
+      final Product product = await _requiredProductRepository.getById(
+            initialContext.line.productId,
+          ) ??
+          (throw NotFoundException(
+            'Product not found: ${initialContext.line.productId}',
+          ));
+      final _MealCustomizationRuntimeContext context =
+          await _resolveMealCustomizationRuntimeContext(product);
+      final MealCustomizationRequest normalizedRequest = request.copyWith(
+        productId: product.id,
+        profileId: context.profile.id,
+      );
+      final MealCustomizationResolvedSnapshot snapshot =
+          _mealCustomizationEngine.evaluate(
+            profile: context.profile,
+            request: normalizedRequest,
+          );
+
+      final int transactionId = initialContext.line.transactionId;
+      final int legacyLineId = initialContext.line.id;
+      final int legacyQuantity = initialContext.line.quantity;
+
+      // Step 1: Decrement or delete the legacy line.
+      await _transactionRepository.decrementLineQuantityOrDelete(legacyLineId);
+
+      // Step 2: Create the new snapshot-backed line (or merge).
+      final TransactionLine? existingLine = await _transactionRepository
+          .findDraftMealCustomizationLineByIdentity(
+            transactionId: transactionId,
+            productId: product.id,
+            customizationKey: snapshot.stableIdentityKey,
+          );
+      TransactionLine? resultLine;
+      bool mergedIntoExistingLine = false;
+      if (existingLine != null) {
+        await _transactionRepository.incrementLineQuantity(
+          transactionLineId: existingLine.id,
+          incrementBy: 1,
+        );
+        resultLine = await _transactionRepository.getLineById(existingLine.id);
+        mergedIntoExistingLine = true;
+      } else {
+        final TransactionLine newLine = await _transactionRepository.addLine(
+          transactionId: transactionId,
+          productId: product.id,
+          quantity: 1,
+        );
+        await _transactionRepository.replaceMealCustomizationLineSnapshot(
+          transactionLineId: newLine.id,
+          snapshot: snapshot,
+        );
+        resultLine = await _transactionRepository.getLineById(newLine.id);
+      }
+
+      if (resultLine == null) {
+        throw DatabaseException(
+          'Legacy meal line recreation did not produce a persisted transaction line.',
+        );
+      }
+
+      _logger.audit(
+        eventType: 'meal_customization_legacy_recreated',
+        entityId: initialContext.line.uuid,
+        message: mergedIntoExistingLine
+            ? 'Legacy meal line recreated and merged into existing snapshot-backed line.'
+            : 'Legacy meal line recreated as new snapshot-backed line.',
+        metadata: <String, Object?>{
+          'transaction_id': transactionId,
+          'legacy_line_id': legacyLineId,
+          'legacy_quantity_before': legacyQuantity,
+          'result_line_id': resultLine.id,
+          'merged_into_existing': mergedIntoExistingLine,
+          'new_identity': snapshot.stableIdentityKey,
+          if (actorUserId != null) 'actor_user_id': actorUserId,
+        },
+      );
+
+      return resultLine;
+    });
+  }
+
   Map<String, int> _buildReasonCounts(
     List<BreakfastClassifiedModifier> modifiers,
   ) {
     final Map<String, int> counts = <String, int>{};
     for (final BreakfastClassifiedModifier modifier in modifiers) {
+      if (modifier.chargeReason == ModifierChargeReason.includedChoice &&
+          modifier.itemProductId == null) {
+        continue;
+      }
       final String key = modifier.chargeReason?.name ?? modifier.action.name;
       counts[key] = (counts[key] ?? 0) + modifier.quantity;
     }
@@ -463,6 +1078,16 @@ class OrderService {
     return paymentRepository;
   }
 
+  ProductRepository get _requiredProductRepository {
+    final ProductRepository? repository = _productRepository;
+    if (repository == null) {
+      throw StateError(
+        'ProductRepository is required for meal customization order operations.',
+      );
+    }
+    return repository;
+  }
+
   BreakfastConfigurationRepository
   get _requiredBreakfastConfigurationRepository {
     final BreakfastConfigurationRepository? repository =
@@ -473,6 +1098,29 @@ class OrderService {
       );
     }
     return repository;
+  }
+
+  MealAdjustmentProfileRepository get _requiredMealAdjustmentProfileRepository {
+    final MealAdjustmentProfileRepository? repository =
+        _mealAdjustmentProfileRepository;
+    if (repository == null) {
+      throw StateError(
+        'MealAdjustmentProfileRepository is required for meal customization order operations.',
+      );
+    }
+    return repository;
+  }
+
+  MealAdjustmentProfileValidationService
+  get _requiredMealAdjustmentProfileValidationService {
+    final MealAdjustmentProfileValidationService? service =
+        _mealAdjustmentProfileValidationService;
+    if (service == null) {
+      throw StateError(
+        'MealAdjustmentProfileValidationService is required for meal customization order operations.',
+      );
+    }
+    return service;
   }
 
   Future<Transaction> markOrderPaidInCheckoutIfNeeded({
@@ -497,6 +1145,27 @@ class OrderService {
             transactionId: createdTransaction.id,
             productId: item.productId,
             selection: breakfastSelection,
+          );
+          continue;
+        }
+
+        final _StandardProductFlowDecision flowDecision =
+            await _decideStandardProductFlow(
+              productId: item.productId,
+              mealCustomizationRequest: item.mealCustomizationRequest,
+            );
+
+        if (flowDecision.kind == _StandardProductFlowKind.mealCustomization) {
+          if (item.modifiers.isNotEmpty) {
+            throw ValidationException(
+              'Flat modifiers cannot be combined with meal customization.',
+            );
+          }
+          await _addMealCustomizationToOrder(
+            transactionId: createdTransaction.id,
+            context: flowDecision.mealContext!,
+            request: item.mealCustomizationRequest,
+            quantity: item.quantity,
           );
           continue;
         }
@@ -681,6 +1350,14 @@ class OrderService {
     return _transactionRepository.getModifiersByLine(transactionLineId);
   }
 
+  Future<List<BreakfastCookingInstructionRecord>> getLineCookingInstructions(
+    int transactionLineId,
+  ) {
+    return _transactionRepository.getBreakfastCookingInstructionsByLine(
+      transactionLineId,
+    );
+  }
+
   Future<List<Transaction>> getActiveOrders({int? shiftId}) {
     return _transactionRepository.getActiveOrders(shiftId: shiftId);
   }
@@ -749,12 +1426,94 @@ class OrderService {
     }
   }
 
+  void _ensureBreakfastEditNotStale({
+    required DateTime? expectedTransactionUpdatedAt,
+    required DateTime actualTransactionUpdatedAt,
+    required TransactionLine line,
+  }) {
+    if (expectedTransactionUpdatedAt == null) {
+      return;
+    }
+    if (!actualTransactionUpdatedAt.isAtSameMomentAs(
+      expectedTransactionUpdatedAt,
+    )) {
+      throw StaleBreakfastEditException(
+        transactionLineId: line.id,
+        transactionId: line.transactionId,
+        expectedUpdatedAt: expectedTransactionUpdatedAt,
+        actualUpdatedAt: actualTransactionUpdatedAt,
+      );
+    }
+  }
+
+  void _ensureMealCustomizationLineEditable({
+    required TransactionStatus status,
+    required TransactionLine line,
+  }) {
+    switch (status) {
+      case TransactionStatus.draft:
+        return;
+      case TransactionStatus.sent:
+        throw MealCustomizationLineNotEditableException(
+          reason: MealCustomizationEditBlockedReason.sent,
+          transactionLineId: line.id,
+          transactionId: line.transactionId,
+        );
+      case TransactionStatus.paid:
+        throw MealCustomizationLineNotEditableException(
+          reason: MealCustomizationEditBlockedReason.paid,
+          transactionLineId: line.id,
+          transactionId: line.transactionId,
+        );
+      case TransactionStatus.cancelled:
+        throw MealCustomizationLineNotEditableException(
+          reason: MealCustomizationEditBlockedReason.cancelled,
+          transactionLineId: line.id,
+          transactionId: line.transactionId,
+        );
+    }
+  }
+
+  void _ensureMealCustomizationEditNotStale({
+    required DateTime? expectedTransactionUpdatedAt,
+    required DateTime actualTransactionUpdatedAt,
+    required TransactionLine line,
+  }) {
+    if (expectedTransactionUpdatedAt == null) {
+      return;
+    }
+    if (!actualTransactionUpdatedAt.isAtSameMomentAs(
+      expectedTransactionUpdatedAt,
+    )) {
+      throw StaleMealCustomizationEditException(
+        transactionLineId: line.id,
+        transactionId: line.transactionId,
+        expectedUpdatedAt: expectedTransactionUpdatedAt,
+        actualUpdatedAt: actualTransactionUpdatedAt,
+      );
+    }
+  }
+
   bool _hasLegacyModifierSnapshot(List<OrderModifier> modifiers) {
     for (final OrderModifier modifier in modifiers) {
       if (modifier.chargeReason == null &&
           modifier.itemProductId == null &&
           modifier.action != ModifierAction.choice &&
           modifier.sortKey == 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _hasUnsupportedStrictRequestedStateSnapshot(
+    List<OrderModifier> modifiers,
+  ) {
+    for (final OrderModifier modifier in modifiers) {
+      if (modifier.action == ModifierAction.choice &&
+          modifier.chargeReason == ModifierChargeReason.includedChoice &&
+          modifier.itemProductId != null &&
+          modifier.sourceGroupId == null) {
         return true;
       }
     }
@@ -875,6 +1634,185 @@ class OrderService {
     }
   }
 
+  Future<_StandardProductFlowDecision> _decideStandardProductFlow({
+    required int productId,
+    MealCustomizationRequest? mealCustomizationRequest,
+  }) async {
+    final ProductRepository? productRepository = _productRepository;
+    if (productRepository == null) {
+      if (mealCustomizationRequest != null) {
+        throw StateError(
+          'ProductRepository is required for meal customization checkout requests.',
+        );
+      }
+      return const _StandardProductFlowDecision.plain();
+    }
+
+    final Product? product = await productRepository.getById(productId);
+    if (product == null) {
+      if (mealCustomizationRequest != null) {
+        throw NotFoundException('Product not found: $productId');
+      }
+      return const _StandardProductFlowDecision.plain();
+    }
+
+    final int? profileId = product.mealAdjustmentProfileId;
+    if (profileId == null) {
+      if (mealCustomizationRequest != null) {
+        throw ValidationException(
+          'Meal customization request requires an assigned meal-adjustment profile.',
+        );
+      }
+      return const _StandardProductFlowDecision.plain();
+    }
+
+    final _MealCustomizationRuntimeContext context =
+        await _resolveMealCustomizationRuntimeContext(product);
+    return _StandardProductFlowDecision.mealCustomization(context);
+  }
+
+  Future<_MealCustomizationRuntimeContext>
+  _resolveMealCustomizationRuntimeContext(Product product) async {
+    return _resolveMealCustomizationRuntimeContextForProfile(
+      product,
+      profileId: product.mealAdjustmentProfileId!,
+    );
+  }
+
+  Future<_MealCustomizationRuntimeContext>
+  _resolveMealCustomizationRuntimeContextForProfile(
+    Product product, {
+    required int profileId,
+    bool enforceCurrentProductBinding = true,
+    bool enforceBreakfastCompatibility = true,
+  }) async {
+    if (enforceCurrentProductBinding &&
+        product.mealAdjustmentProfileId != profileId) {
+      throw MealCustomizationRuntimeConfigurationException(
+        productId: product.id,
+        profileId: profileId,
+        detail: 'Assigned meal-adjustment profile does not match the product.',
+      );
+    }
+    final MealAdjustmentProfileRepository repository =
+        _requiredMealAdjustmentProfileRepository;
+    final MealAdjustmentProfileDraft? draft = await repository.loadProfileDraft(
+      profileId,
+    );
+    if (draft == null) {
+      throw MealCustomizationRuntimeConfigurationException(
+        productId: product.id,
+        profileId: profileId,
+        detail: 'Assigned meal-adjustment profile is missing.',
+      );
+    }
+    if (!draft.isActive) {
+      throw MealCustomizationRuntimeConfigurationException(
+        productId: product.id,
+        profileId: profileId,
+        detail: 'Assigned meal-adjustment profile is inactive.',
+      );
+    }
+
+    final MealAdjustmentValidationResult validationResult =
+        await _requiredMealAdjustmentProfileValidationService.validateDraft(
+          draft,
+        );
+    if (!validationResult.canSave) {
+      throw MealCustomizationRuntimeConfigurationException(
+        productId: product.id,
+        profileId: profileId,
+          detail: validationResult.message,
+      );
+    }
+
+    if (enforceBreakfastCompatibility) {
+      final Set<int> breakfastProductIds = await repository
+          .loadBreakfastSemanticProductIds(<int>[product.id]);
+      if (breakfastProductIds.contains(product.id)) {
+        throw MealCustomizationRuntimeConfigurationException(
+          productId: product.id,
+          profileId: profileId,
+          detail:
+              'Breakfast semantic products cannot carry a meal-adjustment profile.',
+        );
+      }
+    }
+
+    return _MealCustomizationRuntimeContext(
+      product: product,
+      profile: draft.toRuntimeProfile(profileId: profileId),
+    );
+  }
+
+  Future<TransactionLine> _addMealCustomizationToOrder({
+    required int transactionId,
+    required _MealCustomizationRuntimeContext context,
+    required int quantity,
+    MealCustomizationRequest? request,
+  }) async {
+    if (quantity <= 0) {
+      throw ValidationException('Quantity must be greater than zero.');
+    }
+
+    final MealCustomizationRequest normalizedRequest =
+        (request ??
+                MealCustomizationRequest(
+                  productId: context.product.id,
+                  profileId: context.profile.id,
+                ))
+            .copyWith(
+              productId: context.product.id,
+              profileId: context.profile.id,
+            );
+    if (normalizedRequest.productId != context.product.id) {
+      throw ValidationException(
+        'Meal customization request product does not match the target product.',
+      );
+    }
+
+    await _ensureProductAvailableForSale(context.product.id);
+    final MealCustomizationResolvedSnapshot snapshot =
+        _mealCustomizationEngine.evaluate(
+          profile: context.profile,
+          request: normalizedRequest,
+        );
+    final TransactionLine? persistedLine = await _transactionRepository
+        .runInTransaction(() async {
+          final TransactionLine? existingLine = await _transactionRepository
+              .findDraftMealCustomizationLineByIdentity(
+                transactionId: transactionId,
+                productId: context.product.id,
+                customizationKey: snapshot.stableIdentityKey,
+              );
+          if (existingLine != null) {
+            await _transactionRepository.incrementLineQuantity(
+              transactionLineId: existingLine.id,
+              incrementBy: quantity,
+            );
+            return _transactionRepository.getLineById(existingLine.id);
+          }
+
+          final TransactionLine line = await _transactionRepository.addLine(
+            transactionId: transactionId,
+            productId: context.product.id,
+            quantity: quantity,
+          );
+          await _transactionRepository.replaceMealCustomizationLineSnapshot(
+            transactionLineId: line.id,
+            snapshot: snapshot,
+          );
+          return _transactionRepository.getLineById(line.id);
+        });
+
+    if (persistedLine == null) {
+      throw DatabaseException(
+        'Meal customization line persistence did not produce a transaction line.',
+      );
+    }
+    return persistedLine;
+  }
+
   void _ensureTransactionCanBePaid(Transaction transaction) {
     switch (transaction.status) {
       case TransactionStatus.sent:
@@ -896,4 +1834,28 @@ class OrderService {
         );
     }
   }
+}
+
+enum _StandardProductFlowKind { plain, mealCustomization }
+
+class _StandardProductFlowDecision {
+  const _StandardProductFlowDecision.plain()
+    : kind = _StandardProductFlowKind.plain,
+      mealContext = null;
+
+  const _StandardProductFlowDecision.mealCustomization(this.mealContext)
+    : kind = _StandardProductFlowKind.mealCustomization;
+
+  final _StandardProductFlowKind kind;
+  final _MealCustomizationRuntimeContext? mealContext;
+}
+
+class _MealCustomizationRuntimeContext {
+  const _MealCustomizationRuntimeContext({
+    required this.product,
+    required this.profile,
+  });
+
+  final Product product;
+  final MealAdjustmentProfile profile;
 }

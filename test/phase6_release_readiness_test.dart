@@ -8,6 +8,7 @@ import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/core/logging/app_logger.dart';
 import 'package:epos_app/core/ops/app_crash_guard.dart';
 import 'package:epos_app/data/database/app_database.dart' hide User;
+import 'package:epos_app/data/repositories/breakfast_configuration_repository.dart';
 import 'package:epos_app/data/repositories/category_repository.dart';
 import 'package:epos_app/data/repositories/cash_movement_repository.dart';
 import 'package:epos_app/data/repositories/modifier_repository.dart';
@@ -421,6 +422,7 @@ AdminService _makeAdminService(AppDatabase db, {required AppConfig appConfig}) {
   return AdminService(
     categoryRepository: CategoryRepository(db),
     productRepository: ProductRepository(db),
+    breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
     modifierRepository: ModifierRepository(db),
     shiftRepository: ShiftRepository(db),
     transactionRepository: TransactionRepository(

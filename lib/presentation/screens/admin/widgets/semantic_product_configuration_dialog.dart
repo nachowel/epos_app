@@ -279,7 +279,8 @@ class _SemanticProductConfigurationDialogState
 
   Widget _buildIncludedTab(SemanticProductConfigurationEditorData editorData) {
     return _tabFrame(
-      heading: 'Define what comes inside the set.',
+      heading:
+          'Included Items use the set-item pool only. Reuse drinks and breads under Required Choices instead of duplicating products into Breakfast Items.',
       actionLabel: '+ Add Item',
       actionKey: const ValueKey<String>('semantic-add-item'),
       onAction: _addSetItem,
@@ -374,7 +375,8 @@ class _SemanticProductConfigurationDialogState
 
   Widget _buildChoicesTab(SemanticProductConfigurationEditorData editorData) {
     return _tabFrame(
-      heading: 'Force the cashier to choose one option for each group.',
+      heading:
+          'Required Choices can reuse existing active products from their normal POS categories, such as Hot Drinks or Bread.',
       actionLabel: '+ Add Choice Group',
       actionKey: const ValueKey<String>('semantic-add-choice-group'),
       onAction: _addChoiceGroup,
@@ -484,7 +486,8 @@ class _SemanticProductConfigurationDialogState
 
   Widget _buildExtrasTab(SemanticProductConfigurationEditorData editorData) {
     return _tabFrame(
-      heading: 'Only products listed here appear under Extras on POS.',
+      heading:
+          'Only products listed here appear under Extras on POS. Extras stay separate from Included Items and Required Choices.',
       actionLabel: '+ Add Extra Item',
       actionKey: const ValueKey<String>('semantic-add-extra-item'),
       onAction: _addExtraItem,
@@ -631,7 +634,7 @@ class _SemanticProductConfigurationDialogState
     }
     final Product? product = await _pickProduct(
       title: 'Add Included Item',
-      products: _availableSetProducts(editorData.availableProducts),
+      products: _availableSetProducts(editorData.availableSetItemProducts),
     );
     if (product == null) {
       return;
@@ -660,7 +663,7 @@ class _SemanticProductConfigurationDialogState
     final Product? product = await _pickProduct(
       title: 'Change Included Item',
       products: _availableSetProducts(
-        editorData.availableProducts,
+        editorData.availableSetItemProducts,
         currentId: current.itemProductId,
       ),
     );
@@ -846,21 +849,38 @@ class _SemanticProductConfigurationDialogState
     if (editorData == null) {
       return;
     }
-    final Product? product = await _pickProduct(
+    final List<Product> products = await _pickExtraProducts(
       title: 'Add Extra Item',
       products: _availableExtraProducts(editorData.availableProducts),
+      alreadyAddedIds: _extras
+          .map((SemanticExtraItemDraft extra) => extra.itemProductId)
+          .toSet(),
     );
-    if (product == null) {
+    if (products.isEmpty) {
+      return;
+    }
+    final Set<int> existingIds = _extras
+        .map((SemanticExtraItemDraft extra) => extra.itemProductId)
+        .toSet();
+    final List<Product> productsToAdd = products
+        .where((Product product) => !existingIds.contains(product.id))
+        .toList(growable: false);
+    if (productsToAdd.isEmpty) {
       return;
     }
     setState(() {
       _extras = <SemanticExtraItemDraft>[
         ..._extras,
-        SemanticExtraItemDraft(
-          itemProductId: product.id,
-          itemName: product.name,
-          sortOrder: _extras.length,
-        ),
+        ...List<SemanticExtraItemDraft>.generate(productsToAdd.length, (
+          int index,
+        ) {
+          final Product product = productsToAdd[index];
+          return SemanticExtraItemDraft(
+            itemProductId: product.id,
+            itemName: product.name,
+            sortOrder: _extras.length + index,
+          );
+        }),
       ];
     });
     unawaited(_refreshValidation());
@@ -906,6 +926,25 @@ class _SemanticProductConfigurationDialogState
       builder: (BuildContext context) =>
           _ProductPickerDialog(title: title, products: products),
     );
+  }
+
+  Future<List<Product>> _pickExtraProducts({
+    required String title,
+    required List<Product> products,
+    required Set<int> alreadyAddedIds,
+  }) async {
+    if (products.isEmpty) {
+      return const <Product>[];
+    }
+    final List<Product>? selectedProducts = await showDialog<List<Product>>(
+      context: context,
+      builder: (BuildContext context) => _ExtraProductPickerDialog(
+        title: title,
+        products: products,
+        alreadyAddedIds: alreadyAddedIds,
+      ),
+    );
+    return selectedProducts ?? const <Product>[];
   }
 
   List<Product> _availableSetProducts(
@@ -976,9 +1015,6 @@ class _SemanticProductConfigurationDialogState
 
   List<Product> _availableExtraProducts(List<Product> products) {
     final int? rootId = _editorData?.rootProduct.id;
-    final Set<int> selectedIds = _extras
-        .map((SemanticExtraItemDraft extra) => extra.itemProductId)
-        .toSet();
     final Set<int> setIds = _setItems
         .map((SemanticSetItemDraft item) => item.itemProductId)
         .toSet();
@@ -992,9 +1028,6 @@ class _SemanticProductConfigurationDialogState
     return products
         .where((Product product) {
           if (product.id == rootId) {
-            return false;
-          }
-          if (selectedIds.contains(product.id)) {
             return false;
           }
           if (setIds.contains(product.id) || choiceIds.contains(product.id)) {
@@ -1358,6 +1391,122 @@ class _ProductPickerDialogState extends State<_ProductPickerDialog> {
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ExtraProductPickerDialog extends StatefulWidget {
+  const _ExtraProductPickerDialog({
+    required this.title,
+    required this.products,
+    required this.alreadyAddedIds,
+  });
+
+  final String title;
+  final List<Product> products;
+  final Set<int> alreadyAddedIds;
+
+  @override
+  State<_ExtraProductPickerDialog> createState() =>
+      _ExtraProductPickerDialogState();
+}
+
+class _ExtraProductPickerDialogState extends State<_ExtraProductPickerDialog> {
+  String _query = '';
+  late final Set<int> _selectedIds;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIds = <int>{};
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Product> filtered = widget.products
+        .where((Product product) {
+          return product.name.toLowerCase().contains(_query.toLowerCase());
+        })
+        .toList(growable: false);
+    final int selectedCount = _selectedIds.length;
+    return AlertDialog(
+      title: Text(widget.title),
+      content: SizedBox(
+        width: 520,
+        height: 520,
+        child: Column(
+          children: <Widget>[
+            TextField(
+              key: const ValueKey<String>('semantic-product-picker-search'),
+              decoration: const InputDecoration(
+                hintText: 'Search products',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+              onChanged: (String value) => setState(() => _query = value),
+            ),
+            const SizedBox(height: AppSizes.spacingMd),
+            Expanded(
+              child: ListView.builder(
+                itemCount: filtered.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final Product product = filtered[index];
+                  final bool isAlreadyAdded = widget.alreadyAddedIds.contains(
+                    product.id,
+                  );
+                  final bool isSelected = _selectedIds.contains(product.id);
+                  final String priceLabel = CurrencyFormatter.fromMinor(
+                    product.priceMinor,
+                  );
+                  final String subtitle = isAlreadyAdded
+                      ? '$priceLabel · Already added'
+                      : priceLabel;
+                  return CheckboxListTile(
+                    key: ValueKey<String>(
+                      'semantic-product-picker-item-${product.id}',
+                    ),
+                    value: isSelected,
+                    enabled: !isAlreadyAdded,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(product.name),
+                    subtitle: Text(subtitle),
+                    onChanged: isAlreadyAdded
+                        ? null
+                        : (bool? value) {
+                            setState(() {
+                              if (value ?? false) {
+                                _selectedIds.add(product.id);
+                              } else {
+                                _selectedIds.remove(product.id);
+                              }
+                            });
+                          },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          key: const ValueKey<String>('semantic-extra-picker-add-selected'),
+          onPressed: selectedCount == 0
+              ? null
+              : () {
+                  final List<Product> selectedProducts = widget.products
+                      .where(
+                        (Product product) => _selectedIds.contains(product.id),
+                      )
+                      .toList(growable: false);
+                  Navigator.of(context).pop(selectedProducts);
+                },
+          child: Text('Add Selected ($selectedCount)'),
         ),
       ],
     );

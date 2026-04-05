@@ -127,6 +127,26 @@ class ErrorMapper {
           return 'Cancelled breakfast orders can no longer be edited.';
       }
     }
+    if (error is StaleMealCustomizationEditException) {
+      return 'This item was changed by another action. Please review and try again.';
+    }
+    if (error is MealAdjustmentProfileInUseException) {
+      return 'This profile is still assigned to ${error.productCount} product(s). Unassign them first.';
+    }
+    if (error is MealCustomizationLineNotEditableException) {
+      switch (error.reason) {
+        case MealCustomizationEditBlockedReason.notDraft:
+          return 'Meal items can only be edited while the order is still a draft.';
+        case MealCustomizationEditBlockedReason.sent:
+          return 'Sent meal-customized orders can no longer be edited.';
+        case MealCustomizationEditBlockedReason.paid:
+          return 'Paid meal-customized orders can no longer be edited.';
+        case MealCustomizationEditBlockedReason.cancelled:
+          return 'Cancelled meal-customized orders can no longer be edited.';
+        case MealCustomizationEditBlockedReason.legacySnapshotMissing:
+          return 'This item was created before the new system and cannot be edited.';
+      }
+    }
     if (error is AppException) {
       return error.message;
     }
@@ -191,6 +211,7 @@ class ErrorMapper {
       return 'That extra is not available for this breakfast.';
     }
     if (codes.contains(BreakfastEditErrorCode.rootNotSetProduct) ||
+        codes.contains(BreakfastEditErrorCode.invalidPricingMode) ||
         codes.contains(BreakfastEditErrorCode.unknownProduct) ||
         codes.contains(BreakfastEditErrorCode.unknownRequestedEntity)) {
       return 'Breakfast configuration is unavailable for this item.';

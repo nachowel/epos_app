@@ -160,6 +160,7 @@ class SyncPayloadRepository {
               )
               ..orderBy(<OrderingTerm>[
                 OrderingTerm.asc(_database.transactionLines.id),
+                OrderingTerm.asc(_database.orderModifiers.sortKey),
                 OrderingTerm.asc(_database.orderModifiers.id),
               ]))
             .get();

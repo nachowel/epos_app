@@ -1,6 +1,7 @@
 import 'package:epos_app/core/config/app_config.dart';
 import 'package:epos_app/core/logging/app_logger.dart';
 import 'package:epos_app/data/database/app_database.dart' show AppDatabase;
+import 'package:epos_app/data/repositories/breakfast_configuration_repository.dart';
 import 'package:epos_app/data/repositories/category_repository.dart';
 import 'package:epos_app/data/repositories/cash_movement_repository.dart';
 import 'package:epos_app/data/repositories/modifier_repository.dart';
@@ -136,7 +137,8 @@ void main() {
 
       final resetEvents = sink.entries
           .where(
-            (entry) => entry.eventType == 'admin_sync_blocked_failure_evaluated',
+            (entry) =>
+                entry.eventType == 'admin_sync_blocked_failure_evaluated',
           )
           .toList(growable: false);
       expect(resetEvents, hasLength(3));
@@ -196,15 +198,15 @@ void main() {
           .toList(growable: false);
       expect(decisionEvents, hasLength(2));
       expect(
-        decisionEvents.firstWhere(
-          (entry) => entry.entityId == 'blocked-auth',
-        ).metadata['retry_all_action'],
+        decisionEvents
+            .firstWhere((entry) => entry.entityId == 'blocked-auth')
+            .metadata['retry_all_action'],
         'skip',
       );
       expect(
-        decisionEvents.firstWhere(
-          (entry) => entry.entityId == 'retryable-remote',
-        ).metadata['retry_all_action'],
+        decisionEvents
+            .firstWhere((entry) => entry.entityId == 'retryable-remote')
+            .metadata['retry_all_action'],
         'reset',
       );
     },
@@ -221,6 +223,7 @@ AdminService _makeAdminService(AppDatabase db, {AppLogger? logger}) {
   return AdminService(
     categoryRepository: CategoryRepository(db),
     productRepository: ProductRepository(db),
+    breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
     modifierRepository: ModifierRepository(db),
     shiftRepository: shiftRepository,
     transactionRepository: transactionRepository,

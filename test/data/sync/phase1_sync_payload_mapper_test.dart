@@ -1,4 +1,7 @@
+import 'package:drift/drift.dart' show QueryRow, Value, Variable;
+import 'package:epos_app/data/database/app_database.dart' as app_db;
 import 'package:epos_app/data/database/app_database.dart' show AppDatabase;
+import 'package:epos_app/data/repositories/breakfast_configuration_repository.dart';
 import 'package:epos_app/data/repositories/payment_repository.dart';
 import 'package:epos_app/data/repositories/shift_repository.dart';
 import 'package:epos_app/data/repositories/sync_queue_repository.dart';
@@ -7,6 +10,7 @@ import 'package:epos_app/data/repositories/transaction_state_repository.dart';
 import 'package:epos_app/data/sync/phase1_sync_contract.dart';
 import 'package:epos_app/data/sync/sync_payload_repository.dart';
 import 'package:epos_app/data/sync/sync_transaction_graph.dart';
+import 'package:epos_app/domain/models/breakfast_line_edit.dart';
 import 'package:epos_app/domain/models/order_modifier.dart';
 import 'package:epos_app/domain/models/payment.dart';
 import 'package:epos_app/domain/models/transaction.dart';
@@ -76,6 +80,8 @@ void main() {
             'product_name',
             'unit_price_minor',
             'quantity',
+            'pricing_mode',
+            'removal_discount_total_minor',
             'line_total_minor',
           }),
         );
@@ -104,7 +110,13 @@ void main() {
             'transaction_line_uuid',
             'action',
             'item_name',
+            'quantity',
+            'item_product_id',
             'extra_price_minor',
+            'charge_reason',
+            'unit_price_minor',
+            'price_effect_minor',
+            'sort_key',
           }),
         );
         expect(modifierRecord.payload.containsKey('id'), isFalse);
@@ -116,6 +128,14 @@ void main() {
           modifierRecord.payload['transaction_line_uuid'],
           fixture.line.uuid,
         );
+        expect(lineRecord.payload['pricing_mode'], 'standard');
+        expect(lineRecord.payload['removal_discount_total_minor'], 0);
+        expect(modifierRecord.payload['quantity'], 1);
+        expect(modifierRecord.payload['item_product_id'], isNull);
+        expect(modifierRecord.payload['charge_reason'], isNull);
+        expect(modifierRecord.payload['unit_price_minor'], 75);
+        expect(modifierRecord.payload['price_effect_minor'], 75);
+        expect(modifierRecord.payload['sort_key'], 0);
 
         final SyncGraphRecord paymentRecord = _recordFor(graph, 'payments');
         expect(
@@ -166,6 +186,64 @@ void main() {
         );
       },
     );
+
+    test(
+      'true rebuilt breakfast snapshot payload preserves semantic fields, compatibility residue, and sync ordering',
+      () async {
+        final AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final _BreakfastPayloadFixture fixture =
+            await _createPaidBreakfastPayloadFixture(db);
+
+        final SyncGraphRecord transactionRecord = _recordFor(
+          fixture.graph,
+          'transactions',
+        );
+        final SyncGraphRecord lineRecord = _recordFor(
+          fixture.graph,
+          'transaction_lines',
+        );
+        final List<SyncGraphRecord> modifierRecords = fixture.graph.records
+            .where(
+              (SyncGraphRecord record) => record.tableName == 'order_modifiers',
+            )
+            .toList(growable: false);
+
+        expect(lineRecord.payload['pricing_mode'], 'set');
+        expect(
+          lineRecord.payload['removal_discount_total_minor'],
+          fixture.line.removalDiscountTotalMinor,
+        );
+        expect(lineRecord.payload['removal_discount_total_minor'], 0);
+
+        final SyncGraphRecord extraAddRecord = modifierRecords.singleWhere(
+          (SyncGraphRecord record) =>
+              record.payload['charge_reason'] == 'extra_add',
+        );
+        expect(
+          extraAddRecord.payload['item_product_id'],
+          fixture.toastProductId,
+        );
+        expect(extraAddRecord.payload['charge_reason'], 'extra_add');
+        expect(extraAddRecord.payload['unit_price_minor'], 100);
+        expect(extraAddRecord.payload['price_effect_minor'], 200);
+        expect(extraAddRecord.payload['sort_key'], isNonZero);
+        expect(extraAddRecord.payload.containsKey('extra_price_minor'), isTrue);
+        expect(extraAddRecord.payload['extra_price_minor'], 9999);
+
+        expect(transactionRecord.payload['modifier_total_minor'], 200);
+        expect(lineRecord.payload['line_total_minor'], 600);
+        expect(
+          extraAddRecord.payload['price_effect_minor'],
+          isNot(extraAddRecord.payload['extra_price_minor']),
+        );
+
+        final List<String> payloadModifierUuids = modifierRecords
+            .map((SyncGraphRecord record) => record.recordUuid)
+            .toList(growable: false);
+        expect(payloadModifierUuids, fixture.expectedModifierOrderUuids);
+      },
+    );
   });
 }
 
@@ -174,6 +252,22 @@ class _PayloadFixture {
 
   final Transaction transaction;
   final TransactionLine line;
+}
+
+class _BreakfastPayloadFixture {
+  const _BreakfastPayloadFixture({
+    required this.transaction,
+    required this.line,
+    required this.graph,
+    required this.toastProductId,
+    required this.expectedModifierOrderUuids,
+  });
+
+  final Transaction transaction;
+  final TransactionLine line;
+  final SyncTransactionGraph graph;
+  final int toastProductId;
+  final List<String> expectedModifierOrderUuids;
 }
 
 Future<_PayloadFixture> _createPaidFixture(
@@ -226,6 +320,286 @@ Future<_PayloadFixture> _createCancelledFixture(AppDatabase db) async {
       await fixture.transactionRepository.getById(fixture.transaction.id) ??
       (throw StateError('Expected cancelled transaction.'));
   return _PayloadFixture(transaction: cancelled, line: fixture.line);
+}
+
+Future<_BreakfastPayloadFixture> _createPaidBreakfastPayloadFixture(
+  AppDatabase db,
+) async {
+  final SyncQueueRepository syncQueueRepository = SyncQueueRepository(db);
+  final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
+  await insertShift(db, openedBy: cashierId);
+
+  final int breakfastCategoryId = await insertCategory(
+    db,
+    name: 'Set Breakfast',
+  );
+  final int hotDrinkCategoryId = await insertCategory(db, name: 'Hot Drink');
+  final int extrasCategoryId = await insertCategory(
+    db,
+    name: 'Breakfast Extras',
+  );
+
+  final int set4ProductId = await insertProduct(
+    db,
+    categoryId: breakfastCategoryId,
+    name: 'Set 4',
+    priceMinor: 400,
+  );
+  final int eggProductId = await insertProduct(
+    db,
+    categoryId: breakfastCategoryId,
+    name: 'Egg',
+    priceMinor: 120,
+  );
+  final int baconProductId = await insertProduct(
+    db,
+    categoryId: breakfastCategoryId,
+    name: 'Bacon',
+    priceMinor: 150,
+  );
+  final int sausageProductId = await insertProduct(
+    db,
+    categoryId: breakfastCategoryId,
+    name: 'Sausage',
+    priceMinor: 180,
+  );
+  final int chipsProductId = await insertProduct(
+    db,
+    categoryId: breakfastCategoryId,
+    name: 'Chips',
+    priceMinor: 110,
+  );
+  final int beansProductId = await insertProduct(
+    db,
+    categoryId: breakfastCategoryId,
+    name: 'Beans',
+    priceMinor: 80,
+  );
+  final int teaProductId = await insertProduct(
+    db,
+    categoryId: hotDrinkCategoryId,
+    name: 'Tea',
+    priceMinor: 150,
+  );
+  final int coffeeProductId = await insertProduct(
+    db,
+    categoryId: hotDrinkCategoryId,
+    name: 'Coffee',
+    priceMinor: 160,
+  );
+  final int toastProductId = await insertProduct(
+    db,
+    categoryId: extrasCategoryId,
+    name: 'Toast',
+    priceMinor: 100,
+  );
+  final int breadProductId = await insertProduct(
+    db,
+    categoryId: extrasCategoryId,
+    name: 'Bread',
+    priceMinor: 90,
+  );
+
+  Future<void> insertSetItem({
+    required int itemProductId,
+    required int sortOrder,
+  }) async {
+    await db
+        .into(db.setItems)
+        .insert(
+          app_db.SetItemsCompanion.insert(
+            productId: set4ProductId,
+            itemProductId: itemProductId,
+            sortOrder: Value<int>(sortOrder),
+          ),
+        );
+  }
+
+  await insertSetItem(itemProductId: eggProductId, sortOrder: 1);
+  await insertSetItem(itemProductId: baconProductId, sortOrder: 2);
+  await insertSetItem(itemProductId: sausageProductId, sortOrder: 3);
+  await insertSetItem(itemProductId: chipsProductId, sortOrder: 4);
+  await insertSetItem(itemProductId: beansProductId, sortOrder: 5);
+
+  final int hotDrinkGroupId = await db
+      .into(db.modifierGroups)
+      .insert(
+        app_db.ModifierGroupsCompanion.insert(
+          productId: set4ProductId,
+          name: 'Tea or Coffee',
+          minSelect: const Value<int>(0),
+          maxSelect: const Value<int>(1),
+          includedQuantity: const Value<int>(1),
+          sortOrder: const Value<int>(1),
+        ),
+      );
+  final int toastBreadGroupId = await db
+      .into(db.modifierGroups)
+      .insert(
+        app_db.ModifierGroupsCompanion.insert(
+          productId: set4ProductId,
+          name: 'Toast or Bread',
+          minSelect: const Value<int>(0),
+          maxSelect: const Value<int>(2),
+          includedQuantity: const Value<int>(2),
+          sortOrder: const Value<int>(2),
+        ),
+      );
+
+  Future<void> insertChoiceMember({
+    required int groupId,
+    required int itemProductId,
+    required String label,
+  }) async {
+    await db
+        .into(db.productModifiers)
+        .insert(
+          app_db.ProductModifiersCompanion.insert(
+            productId: set4ProductId,
+            groupId: Value<int?>(groupId),
+            itemProductId: Value<int?>(itemProductId),
+            name: label,
+            type: 'choice',
+            extraPriceMinor: const Value<int>(0),
+          ),
+        );
+  }
+
+  await insertChoiceMember(
+    groupId: hotDrinkGroupId,
+    itemProductId: teaProductId,
+    label: 'Tea',
+  );
+  await insertChoiceMember(
+    groupId: hotDrinkGroupId,
+    itemProductId: coffeeProductId,
+    label: 'Coffee',
+  );
+  await insertChoiceMember(
+    groupId: toastBreadGroupId,
+    itemProductId: toastProductId,
+    label: 'Toast',
+  );
+  await insertChoiceMember(
+    groupId: toastBreadGroupId,
+    itemProductId: breadProductId,
+    label: 'Bread',
+  );
+
+  Future<void> insertExtra({
+    required int itemProductId,
+    required String label,
+  }) async {
+    await db
+        .into(db.productModifiers)
+        .insert(
+          app_db.ProductModifiersCompanion.insert(
+            productId: set4ProductId,
+            itemProductId: Value<int?>(itemProductId),
+            name: label,
+            type: 'extra',
+            extraPriceMinor: const Value<int>(0),
+          ),
+        );
+  }
+
+  await insertExtra(itemProductId: baconProductId, label: 'Bacon');
+  await insertExtra(itemProductId: sausageProductId, label: 'Sausage');
+  await insertExtra(itemProductId: beansProductId, label: 'Beans');
+
+  final User cashierUser = User(
+    id: cashierId,
+    name: 'Cashier',
+    pin: null,
+    password: null,
+    role: UserRole.cashier,
+    isActive: true,
+    createdAt: DateTime.now(),
+  );
+  final TransactionRepository transactionRepository = TransactionRepository(
+    db,
+    syncQueueRepository: syncQueueRepository,
+  );
+  final OrderService orderService = OrderService(
+    shiftSessionService: ShiftSessionService(ShiftRepository(db)),
+    transactionRepository: transactionRepository,
+    transactionStateRepository: TransactionStateRepository(db),
+    breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
+    paymentRepository: PaymentRepository(db),
+    syncQueueRepository: syncQueueRepository,
+  );
+
+  final Transaction transaction = await orderService.createOrder(
+    currentUser: cashierUser,
+  );
+  final TransactionLine line = await orderService.addProductToOrder(
+    transactionId: transaction.id,
+    productId: set4ProductId,
+  );
+  await orderService.editBreakfastLine(
+    transactionLineId: line.id,
+    edit: BreakfastLineEdit.chooseGroup(
+      groupId: toastBreadGroupId,
+      selectedItemProductId: toastProductId,
+      quantity: 4,
+    ),
+  );
+
+  final List<QueryRow> semanticRows = await db
+      .customSelect(
+        '''
+    SELECT id, uuid, charge_reason, sort_key
+    FROM order_modifiers
+    WHERE transaction_line_id = ?
+    ORDER BY sort_key ASC, id ASC
+    ''',
+        variables: <Variable<Object>>[Variable<int>(line.id)],
+      )
+      .get();
+
+  final int extraAddId = semanticRows
+      .singleWhere(
+        (QueryRow row) => row.read<String>('charge_reason') == 'extra_add',
+      )
+      .read<int>('id');
+  await db.customStatement(
+    '''
+    UPDATE order_modifiers
+    SET extra_price_minor = 9999
+    WHERE id = ?
+    ''',
+    <Object>[extraAddId],
+  );
+
+  await orderService.sendOrder(
+    transactionId: transaction.id,
+    currentUser: cashierUser,
+  );
+  await orderService.markOrderPaid(
+    transactionId: transaction.id,
+    method: PaymentMethod.card,
+    currentUser: cashierUser,
+  );
+
+  final Transaction paid =
+      await transactionRepository.getById(transaction.id) ??
+      (throw StateError('Expected paid transaction.'));
+  final TransactionLine paidLine =
+      await transactionRepository.getLineById(line.id) ??
+      (throw StateError('Expected breakfast line.'));
+  final SyncTransactionGraph graph =
+      await SyncPayloadRepository(db).buildTransactionGraph(paid.uuid) ??
+      (throw StateError('Expected breakfast graph payload.'));
+
+  return _BreakfastPayloadFixture(
+    transaction: paid,
+    line: paidLine,
+    graph: graph,
+    toastProductId: toastProductId,
+    expectedModifierOrderUuids: semanticRows
+        .map((QueryRow row) => row.read<String>('uuid'))
+        .toList(growable: false),
+  );
 }
 
 Future<_FixtureContext> _createFixtureContext(

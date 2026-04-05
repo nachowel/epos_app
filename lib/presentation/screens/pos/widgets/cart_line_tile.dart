@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
-import '../../../../domain/services/breakfast_modifier_renderer.dart';
+import '../../../../domain/models/breakfast_cooking_instruction.dart';
+import '../../../../domain/models/meal_customization.dart';
 import '../../../../domain/models/order_modifier.dart';
+import '../../../../domain/models/breakfast_cart_selection.dart';
 import '../../../providers/cart_models.dart';
 
 class CartLineTile extends StatelessWidget {
@@ -24,7 +26,10 @@ class CartLineTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String modifierSummary = _buildModifierSummary();
+    final BreakfastCartSelection? breakfastSelection = item.breakfastSelection;
+    final MealCustomizationCartSelection? mealCustomizationSelection =
+        item.mealCustomizationSelection;
+    final List<String> cookingSummaryLines = _buildCookingSummaryLines();
 
     return Padding(
       padding: EdgeInsets.symmetric(vertical: compactLayout ? 4 : 5),
@@ -58,10 +63,27 @@ class CartLineTile extends StatelessWidget {
               ),
             ],
           ),
-          if (modifierSummary.isNotEmpty) ...<Widget>[
+          if (breakfastSelection != null)
+            ..._buildBreakfastSummary(breakfastSelection)
+          else if (mealCustomizationSelection != null &&
+              mealCustomizationSelection.compactSummary.isNotEmpty) ...<Widget>[
             const SizedBox(height: 2),
             Text(
-              modifierSummary,
+              mealCustomizationSelection.compactSummary,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+                height: 1.05,
+              ),
+            ),
+          ]
+          else if (_buildModifierSummary().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 2),
+            Text(
+              _buildModifierSummary(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -72,6 +94,23 @@ class CartLineTile extends StatelessWidget {
               ),
             ),
           ],
+          if (cookingSummaryLines.isNotEmpty)
+            ...cookingSummaryLines.map(
+              (String line) => Padding(
+                padding: const EdgeInsets.only(top: 2, left: 2),
+                child: Text(
+                  line,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
+                    height: 1.05,
+                  ),
+                ),
+              ),
+            ),
           SizedBox(height: compactLayout ? 3 : 4),
           Row(
             children: <Widget>[
@@ -122,17 +161,97 @@ class CartLineTile extends StatelessWidget {
     );
   }
 
-  String _buildModifierSummary() {
-    if (item.breakfastSelection != null) {
-      const BreakfastModifierRenderer renderer = BreakfastModifierRenderer();
-      return renderer
-          .renderClassified(
-            item.breakfastSelection!.rebuildResult.classifiedModifiers,
-          )
-          .map((BreakfastModifierRendered rendered) => rendered.label)
-          .join('  ·  ');
+  List<Widget> _buildBreakfastSummary(BreakfastCartSelection selection) {
+    final List<Widget> widgets = <Widget>[];
+    for (final BreakfastCartModifierDisplayLine line
+        in selection.modifierDisplayLines) {
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            line.cartLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: line.tone == BreakfastCartModifierTone.removed
+                  ? AppColors.warning
+                  : AppColors.primary,
+              height: 1.05,
+            ),
+          ),
+        ),
+      );
     }
+    if (selection.choiceDisplayLines.isNotEmpty) {
+      final String compactChoiceSummary = _buildChoiceSummaryLine(
+        selection.choiceDisplayLines,
+      );
+      widgets.add(const SizedBox(height: 3));
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Text(
+            compactChoiceSummary,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+              height: 1.05,
+            ),
+          ),
+        ),
+      );
+    }
+    return widgets;
+  }
+
+  String _buildChoiceSummaryLine(List<BreakfastCartChoiceDisplayLine> lines) {
+    final List<BreakfastCartChoiceDisplayLine> orderedLines =
+        List<BreakfastCartChoiceDisplayLine>.from(lines)
+          ..sort(
+            (
+              BreakfastCartChoiceDisplayLine a,
+              BreakfastCartChoiceDisplayLine b,
+            ) => _choiceSortRank(a.groupName).compareTo(
+              _choiceSortRank(b.groupName),
+            ),
+          );
+    return orderedLines
+        .map((BreakfastCartChoiceDisplayLine line) => line.selectedLabel)
+        .join(' · ');
+  }
+
+  int _choiceSortRank(String groupName) {
+    final String normalized = groupName.toLowerCase();
+    if (normalized.contains('drink') ||
+        normalized.contains('tea') ||
+        normalized.contains('coffee') ||
+        normalized.contains('latte') ||
+        normalized.contains('cappuccino')) {
+      return 0;
+    }
+    if (normalized.contains('bread') || normalized.contains('toast')) {
+      return 1;
+    }
+    return 2;
+  }
+
+  String _buildModifierSummary() {
     return item.modifiers.map(_modifierLabel).join('  ·  ');
+  }
+
+  List<String> _buildCookingSummaryLines() {
+    final selection = item.breakfastSelection;
+    if (selection == null) {
+      return const <String>[];
+    }
+    return selection.cookingDisplayLines
+        .map((BreakfastCookingInstructionDisplayLine line) => line.cartLabel)
+        .toList(growable: false);
   }
 
   String _modifierLabel(CartModifier modifier) {

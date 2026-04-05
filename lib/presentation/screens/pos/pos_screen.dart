@@ -10,6 +10,7 @@ import '../../../core/providers/app_providers.dart';
 import '../../../domain/models/payment.dart';
 import '../../../domain/models/product.dart';
 import '../../../domain/models/transaction.dart';
+import '../../../domain/models/meal_customization.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_models.dart';
 import '../../providers/cart_provider.dart';
@@ -26,8 +27,10 @@ import 'widgets/modifier_popup.dart';
 import 'widgets/payment_dialog.dart';
 import 'widgets/product_grid.dart';
 import 'widgets/semantic_bundle_editor_dialog.dart';
+import 'widgets/standard_meal_customization_dialog.dart';
 import '../../../domain/services/breakfast_pos_service.dart';
 import '../../../domain/models/breakfast_cart_selection.dart';
+import '../../../domain/services/meal_customization_pos_service.dart';
 
 class PosScreen extends ConsumerStatefulWidget {
   const PosScreen({super.key});
@@ -37,6 +40,12 @@ class PosScreen extends ConsumerStatefulWidget {
 }
 
 class _PosScreenState extends ConsumerState<PosScreen> {
+  static const Map<String, String?> _breakfastChoiceDefaults =
+      <String, String?>{
+        'drink': 'Cappuccino/Latte',
+        'bread': 'Toast',
+      };
+
   @override
   void initState() {
     super.initState();
@@ -44,7 +53,33 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       await ref.read(productsNotifierProvider.notifier).loadCatalog();
       await ref.read(shiftNotifierProvider.notifier).refreshOpenShift();
       await ref.read(ordersNotifierProvider.notifier).refreshOpenOrders();
+      _prefetchMealSuggestions();
     });
+  }
+
+  void _prefetchMealSuggestions() {
+    _prefetchMealSuggestionsForProducts(
+      ref.read(productsNotifierProvider).products,
+    );
+  }
+
+  /// Prefetches meal suggestions for the given product list.
+  /// Called on init and on category switch. Visibility-scoped:
+  /// only products present in the provided list are prefetched.
+  void _prefetchMealSuggestionsForProducts(List<Product> products) {
+    final List<int> mealProductIds = products
+        .where((Product p) => p.mealAdjustmentProfileId != null)
+        .map((Product p) => p.id)
+        .toList(growable: false);
+    if (mealProductIds.isEmpty) return;
+    final Map<int, String> productNamesById = <int, String>{
+      for (final Product p in products) p.id: p.name,
+    };
+    // Fire-and-forget — prefetch is best-effort.
+    ref.read(mealInsightsServiceProvider).prefetchSuggestions(
+      productIds: mealProductIds,
+      productNamesById: productNamesById,
+    );
   }
 
   Future<void> _onTapProduct(Product product) async {
@@ -67,6 +102,57 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
     switch (selectionPath) {
       case PosProductSelectionPath.standard:
+        if (product.mealAdjustmentProfileId != null) {
+          final MealCustomizationPosEditorData editorData;
+          try {
+            editorData = await ref
+                .read(mealCustomizationPosServiceProvider)
+                .loadEditorData(product: product);
+          } catch (error, stackTrace) {
+            if (!mounted) {
+              return;
+            }
+            _showMessage(
+              ErrorMapper.toUserMessageAndLog(
+                error,
+                logger: ref.read(appLoggerProvider),
+                eventType: 'meal_customization_editor_open_failed',
+                stackTrace: stackTrace,
+              ),
+            );
+            return;
+          }
+          List<MealQuickSuggestion> suggestions = const <MealQuickSuggestion>[];
+          try {
+            suggestions = await ref
+                .read(mealInsightsServiceProvider)
+                .loadSuggestionsForProduct(
+                  productId: product.id,
+                  productNamesById: editorData.productNamesById,
+                  limit: 5,
+                );
+          } catch (_) {
+            // Suggestions are optional — fail silently.
+          }
+          final MealCustomizationCartSelection? selection =
+              await showDialog<MealCustomizationCartSelection>(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => StandardMealCustomizationDialog(
+                  product: product,
+                  initialEditorData: editorData,
+                  suggestions: suggestions,
+                ),
+              );
+          if (!mounted || selection == null) {
+            return;
+          }
+          interactionController.addProduct(
+            product,
+            mealCustomizationSelection: selection,
+          );
+          return;
+        }
         interactionController.addProduct(product);
         return;
       case PosProductSelectionPath.legacyFlat:
@@ -112,6 +198,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               builder: (_) => SemanticBundleEditorDialog(
                 product: product,
                 initialEditorData: editorData,
+                choiceDefaults: _breakfastChoiceDefaults,
               ),
             );
         if (!mounted || selection == null) {
@@ -361,10 +448,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                 selectedCategoryId:
                                     productsState.selectedCategoryId,
                                 isLoading: productsState.isLoading,
-                                onSelectCategory: (int? categoryId) {
-                                  ref
+                                onSelectCategory: (int? categoryId) async {
+                                  await ref
                                       .read(productsNotifierProvider.notifier)
                                       .selectCategory(categoryId);
+                                  // Prefetch meal suggestions for newly visible products.
+                                  _prefetchMealSuggestionsForProducts(
+                                    ref.read(productsNotifierProvider).products,
+                                  );
                                 },
                               ),
                               Expanded(

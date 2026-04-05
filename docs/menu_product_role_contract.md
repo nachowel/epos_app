@@ -27,6 +27,12 @@ This document is authoritative for:
   - extra-capable product where allowed by the current contract set
 - which role assignments are configuration-valid versus runtime-classified later
 
+Scope note:
+
+- this document is breakfast-role specific
+- standard products outside breakfast use the profile-based contract in
+  `docs/meal_adjustment_engine_contract.md`
+
 This document defines role eligibility and valid role assignment.
 
 Choice mapping details belong to `docs/choice_group_mapping_contract.md`.

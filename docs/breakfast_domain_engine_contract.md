@@ -22,6 +22,10 @@ If `CLAUDE.md` or `schema.md` conflicts with this document on breakfast rebuild 
 
 This document is authoritative for pure breakfast rebuild semantics and classification logic.
 
+Standard products outside breakfast use a separate Phase 1 foundation contract:
+`docs/meal_adjustment_engine_contract.md`. That contract must not inherit
+breakfast-specific choice/UI semantics from this document.
+
 ## Phase Objective
 
 Define a deterministic domain rebuild engine for set breakfast lines.

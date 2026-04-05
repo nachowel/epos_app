@@ -34,6 +34,7 @@ class Phase1SyncContract {
     'categories',
     'products',
     'product_modifiers',
+    'breakfast_cooking_instructions',
     'shifts',
     'payment_adjustments',
     'shift_reconciliations',

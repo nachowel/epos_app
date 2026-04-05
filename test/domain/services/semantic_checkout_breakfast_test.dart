@@ -5,11 +5,11 @@ import 'package:epos_app/data/repositories/shift_repository.dart';
 import 'package:epos_app/data/repositories/transaction_repository.dart';
 import 'package:epos_app/data/repositories/transaction_state_repository.dart';
 import 'package:epos_app/domain/models/breakfast_rebuild.dart';
+import 'package:epos_app/domain/models/breakfast_cooking_instruction.dart';
 import 'package:epos_app/domain/models/checkout_item.dart';
 import 'package:epos_app/domain/models/checkout_modifier.dart';
 import 'package:epos_app/domain/models/breakfast_line_edit.dart';
 import 'package:epos_app/domain/models/order_modifier.dart';
-import 'package:epos_app/domain/models/payment.dart';
 import 'package:epos_app/domain/models/product.dart';
 import 'package:epos_app/domain/models/transaction_line.dart';
 import 'package:epos_app/domain/models/user.dart';
@@ -185,6 +185,143 @@ void main() {
       );
     },
   );
+
+  test(
+    'checkout persists explicit none choices without pricing impact',
+    () async {
+      final app_db.AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+      final _CheckoutSemanticFixture fixture = await _seedCheckoutFixture(db);
+
+      final BreakfastPosService posService = BreakfastPosService(
+        breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
+      );
+      final selection = await posService.buildCartSelection(
+        product: fixture.rootProduct,
+        requestedState: BreakfastLineEdit.chooseGroup(
+          groupId: fixture.drinkGroupId,
+          selectedItemProductId: null,
+          quantity: 1,
+        ).applyTo(const BreakfastRequestedState()),
+      );
+
+      final OrderService orderService = OrderService(
+        shiftSessionService: ShiftSessionService(fixture.shiftRepository),
+        transactionRepository: TransactionRepository(db),
+        transactionStateRepository: TransactionStateRepository(db),
+        breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
+      );
+      final CheckoutService checkoutService = CheckoutService(
+        shiftSessionService: ShiftSessionService(fixture.shiftRepository),
+        orderService: orderService,
+        printerService: PrinterService(TransactionRepository(db)),
+      );
+
+      final transaction = await checkoutService.checkoutCart(
+        currentUser: fixture.cashier,
+        cartItems: <CheckoutItem>[
+          CheckoutItem(
+            productId: fixture.rootProduct.id,
+            quantity: 1,
+            modifiers: const <CheckoutModifier>[],
+            breakfastSelection: selection,
+          ),
+        ],
+        idempotencyKey: 'semantic-checkout-none-test',
+        immediatePaymentMethod: null,
+      );
+
+      final List<TransactionLine> lines = await orderService.getOrderLines(
+        transaction.id,
+      );
+      final List<OrderModifier> modifiers = await orderService.getLineModifiers(
+        lines.single.id,
+      );
+
+      expect(lines.single.lineTotalMinor, fixture.rootProduct.priceMinor);
+      expect(modifiers, hasLength(1));
+      expect(modifiers.single.itemProductId, isNull);
+      expect(
+        modifiers.single.chargeReason,
+        ModifierChargeReason.includedChoice,
+      );
+      expect(modifiers.single.sourceGroupId, fixture.drinkGroupId);
+      expect(transaction.modifierTotalMinor, 0);
+    },
+  );
+
+  test(
+    'checkout persists structured cooking instructions without changing pricing',
+    () async {
+      final app_db.AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+      final _CheckoutSemanticFixture fixture = await _seedCheckoutFixture(db);
+
+      final BreakfastPosService posService = BreakfastPosService(
+        breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
+      );
+      final selection = await posService.buildCartSelection(
+        product: fixture.rootProduct,
+        requestedState:
+            BreakfastLineEdit.setCookingInstruction(
+              itemProductId: fixture.eggProductId,
+              instructionCode: 'runny',
+              instructionLabel: 'Runny',
+            ).applyTo(
+              BreakfastLineEdit.chooseGroup(
+                groupId: fixture.drinkGroupId,
+                selectedItemProductId: fixture.teaProductId,
+                quantity: 1,
+              ).applyTo(const BreakfastRequestedState()),
+            ),
+      );
+
+      final OrderService orderService = OrderService(
+        shiftSessionService: ShiftSessionService(fixture.shiftRepository),
+        transactionRepository: TransactionRepository(db),
+        transactionStateRepository: TransactionStateRepository(db),
+        breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
+      );
+      final CheckoutService checkoutService = CheckoutService(
+        shiftSessionService: ShiftSessionService(fixture.shiftRepository),
+        orderService: orderService,
+        printerService: PrinterService(TransactionRepository(db)),
+      );
+
+      final transaction = await checkoutService.checkoutCart(
+        currentUser: fixture.cashier,
+        cartItems: <CheckoutItem>[
+          CheckoutItem(
+            productId: fixture.rootProduct.id,
+            quantity: 1,
+            modifiers: const <CheckoutModifier>[],
+            breakfastSelection: selection,
+          ),
+        ],
+        idempotencyKey: 'semantic-checkout-cooking-test',
+        immediatePaymentMethod: null,
+      );
+
+      final List<TransactionLine> lines = await orderService.getOrderLines(
+        transaction.id,
+      );
+      final List<BreakfastCookingInstructionRecord> instructions =
+          await orderService.getLineCookingInstructions(lines.single.id);
+
+      expect(
+        lines.single.lineTotalMinor,
+        selection.rebuildResult.lineSnapshot.lineTotalMinor,
+      );
+      expect(
+        transaction.modifierTotalMinor,
+        selection.rebuildResult.lineSnapshot.modifierTotalMinor,
+      );
+      expect(instructions, hasLength(1));
+      expect(instructions.single.itemProductId, fixture.eggProductId);
+      expect(instructions.single.instructionCode, 'runny');
+      expect(instructions.single.kitchenLabel, 'Egg x1 - RUNNY');
+    },
+  );
 }
 
 Future<_CheckoutSemanticFixture> _seedCheckoutFixture(
@@ -193,7 +330,10 @@ Future<_CheckoutSemanticFixture> _seedCheckoutFixture(
   final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
   await insertShift(db, openedBy: cashierId);
 
-  final int breakfastCategoryId = await insertCategory(db, name: 'Breakfast');
+  final int breakfastCategoryId = await insertCategory(
+    db,
+    name: 'Set Breakfast',
+  );
   final int drinkCategoryId = await insertCategory(db, name: 'Drinks');
 
   final int rootProductId = await insertProduct(
@@ -321,6 +461,7 @@ Future<_CheckoutSemanticFixture> _seedCheckoutFixture(
       isVisibleOnPos: true,
       sortOrder: 0,
     ),
+    eggProductId: eggProductId,
     beansProductId: beansProductId,
     hashBrownProductId: hashBrownProductId,
     teaProductId: teaProductId,
@@ -333,6 +474,7 @@ class _CheckoutSemanticFixture {
     required this.shiftRepository,
     required this.cashier,
     required this.rootProduct,
+    required this.eggProductId,
     required this.beansProductId,
     required this.hashBrownProductId,
     required this.teaProductId,
@@ -342,6 +484,7 @@ class _CheckoutSemanticFixture {
   final ShiftRepository shiftRepository;
   final User cashier;
   final Product rootProduct;
+  final int eggProductId;
   final int beansProductId;
   final int hashBrownProductId;
   final int teaProductId;

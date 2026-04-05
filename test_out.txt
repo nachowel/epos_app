@@ -1,0 +1,54 @@
+00:00 +0: loading C:/Users/nacho/Desktop/EPOS/epos_app/test/domain/services/meal_customization_phase9_test.dart
+00:00 +0 -1: loading C:/Users/nacho/Desktop/EPOS/epos_app/test/domain/services/meal_customization_phase9_test.dart [E]
+  Failed to load "C:/Users/nacho/Desktop/EPOS/epos_app/test/domain/services/meal_customization_phase9_test.dart":
+  Compilation failed for testPath=C:/Users/nacho/Desktop/EPOS/epos_app/test/domain/services/meal_customization_phase9_test.dart: lib/data/repositories/transaction_repository.dart:1087:21: Error: 'getMealCustomizationActiveProductIds' is already declared in this scope.
+    Future<List<int>> getMealCustomizationActiveProductIds({
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  lib/data/repositories/transaction_repository.dart:796:21: Context: Previous declaration of 'getMealCustomizationActiveProductIds'.
+    Future<List<int>> getMealCustomizationActiveProductIds(DateTime since) async {
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  lib/data/repositories/transaction_repository.dart:1026:3: Error: 'getMealCustomizationSnapshotsByProduct' is already declared in this scope.
+    getMealCustomizationSnapshotsByProduct(int productId) async {
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  lib/data/repositories/transaction_repository.dart:812:58: Context: Previous declaration of 'getMealCustomizationSnapshotsByProduct'.
+    Future<List<MealCustomizationPersistedSnapshotRecord>> getMealCustomizationSnapshotsByProduct(
+                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  lib/data/repositories/transaction_repository.dart:1061:15: Error: 'countLegacyMealCustomizationLines' is already declared in this scope.
+    Future<int> countLegacyMealCustomizationLines(int productId) async {
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  lib/data/repositories/transaction_repository.dart:852:15: Context: Previous declaration of 'countLegacyMealCustomizationLines'.
+    Future<int> countLegacyMealCustomizationLines(int productId, DateTime since) async {
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  test/domain/services/meal_customization_phase9_test.dart:117:44: Error: Required named parameter 'uuid' must be provided.
+      transactionId = await insertTransaction(db, status: 'closed');
+                                             ^
+  test/support/test_database.dart:958:13: Context: Found this candidate, but the arguments don't match.
+  Future<int> insertTransaction(
+              ^^^^^^^^^^^^^^^^^
+  lib/domain/services/meal_optimization_service.dart:41:74: Error: Too few positional arguments: 1 required, 0 given.
+          await _transactionRepository.getMealCustomizationActiveProductIds(
+                                                                           ^
+  lib/domain/services/meal_optimization_service.dart:54:78: Error: Too few positional arguments: 2 required, 1 given.
+            await _transactionRepository.getMealCustomizationSnapshotsByProduct(
+                                                                               ^
+  lib/domain/services/meal_optimization_service.dart:65:45: Error: Too few positional arguments: 2 required, 1 given.
+            .countLegacyMealCustomizationLines(productId);
+                                              ^
+  lib/domain/services/meal_optimization_service.dart:91:45: Error: Too few positional arguments: 2 required, 1 given.
+            .countLegacyMealCustomizationLines(productId);
+                                              ^
+  lib/domain/services/meal_optimization_service.dart:537:10: Error: A value of type 'List<MapEntry<String, int>>' can't be assigned to a variable of type 'List<String>'.
+   - 'List' is from 'dart:core'.
+   - 'MapEntry' is from 'dart:core'.
+          .toList()
+           ^
+  lib/domain/services/meal_optimization_service.dart:544:24: Error: The argument type 'String Function(MapEntry<String, int>)' can't be assigned to the parameter type 'dynamic Function(String)'.
+   - 'MapEntry' is from 'dart:core'.
+          topRemoved.map((MapEntry<String, int> e) => e.key).toList();
+                         ^
+  lib/domain/services/meal_optimization_service.dart:544:60: Error: A value of type 'List<dynamic>' can't be assigned to a variable of type 'List<String>'.
+   - 'List' is from 'dart:core'.
+          topRemoved.map((MapEntry<String, int> e) => e.key).toList();
+                                                             ^
+  .
+00:00 +0 -1: Some tests failed.

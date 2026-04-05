@@ -14,6 +14,7 @@ import '../models/payment.dart';
 import '../models/authorization_policy.dart';
 import '../models/business_identity_settings.dart';
 import '../models/cashier_z_report_settings.dart';
+import '../models/meal_customization.dart';
 import '../models/report_settings_policy.dart';
 import '../models/semantic_sales_analytics.dart';
 import '../models/shift_cash_summary.dart';
@@ -402,6 +403,27 @@ class ReportService {
       metadata: <String, Object?>{'closed_by': user.id},
     );
 
+    // Best-effort orphan snapshot cleanup on shift close.
+    try {
+      final int orphansRemoved =
+          await _transactionRepository.cleanupOrphanMealCustomizationSnapshots();
+      if (orphansRemoved > 0) {
+        _logger.info(
+          eventType: 'meal_snapshot_orphan_cleanup',
+          entityId: '${finalized.openShift.id}',
+          message: 'Cleaned up $orphansRemoved orphan meal customization snapshot(s) on shift close.',
+        );
+      }
+    } catch (error, stackTrace) {
+      _logger.warn(
+        eventType: 'meal_snapshot_orphan_cleanup_failed',
+        entityId: '${finalized.openShift.id}',
+        message: 'Failed to clean up orphan meal customization snapshots on shift close.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
     return ZReportActionResult(
       shiftId: finalized.openShift.id,
       report: visibleReport,
@@ -647,7 +669,7 @@ class ReportService {
   ) async {
     final BreakfastConfigurationRepository? configurationRepository =
         _breakfastConfigurationRepository;
-    if (configurationRepository == null || paidTransactions.isEmpty) {
+    if (paidTransactions.isEmpty) {
       return const SemanticSalesAnalytics.empty();
     }
 
@@ -661,6 +683,10 @@ class ReportService {
         <_RootItemKey, _ItemBehaviorAccumulator>{};
     final Map<_ChoiceAnalyticsKey, _ChoiceSelectionAccumulator> choiceBuckets =
         <_ChoiceAnalyticsKey, _ChoiceSelectionAccumulator>{};
+    final Map<int, _MealRevenueAccumulator> mealRevenueBuckets =
+        <int, _MealRevenueAccumulator>{};
+    final Map<int, _MealRuleAccumulator> mealRuleBuckets =
+        <int, _MealRuleAccumulator>{};
     final Map<_VariantAnalyticsKey, _VariantAccumulator> variantBuckets =
         <_VariantAnalyticsKey, _VariantAccumulator>{};
     final Map<int, BreakfastSetConfiguration?> configurationCache =
@@ -676,7 +702,17 @@ class ReportService {
       );
 
       for (final TransactionLine line in lines) {
-        if (line.pricingMode != TransactionLinePricingMode.set) {
+        final MealCustomizationPersistedSnapshotRecord? mealSnapshot =
+            await _transactionRepository.getMealCustomizationSnapshotByLine(
+              line.id,
+            );
+        final bool isLegacyMealLine =
+            mealSnapshot == null &&
+            line.pricingMode == TransactionLinePricingMode.standard &&
+            await _transactionRepository.isLegacyMealCustomizationLine(line.id);
+        if (line.pricingMode != TransactionLinePricingMode.set &&
+            mealSnapshot == null &&
+            !isLegacyMealLine) {
           continue;
         }
 
@@ -686,6 +722,35 @@ class ReportService {
         );
         rootAccumulator.quantitySold += line.quantity;
         rootAccumulator.revenueMinor += line.lineTotalMinor;
+
+        if (mealSnapshot != null) {
+          _accumulateMealCustomizationAnalytics(
+            line: line,
+            snapshotRecord: mealSnapshot,
+            reasonBuckets: reasonBuckets,
+            addedBuckets: addedBuckets,
+            removedBuckets: removedBuckets,
+            mealRevenueBuckets: mealRevenueBuckets,
+            mealRuleBuckets: mealRuleBuckets,
+            variantBuckets: variantBuckets,
+            itemProductIds: itemProductIds,
+          );
+          continue;
+        }
+
+        if (isLegacyMealLine) {
+          dataQualityNotes.add(
+            'Legacy standard meal lines without persisted snapshots contribute to product revenue totals, but meal semantic breakdowns and applied-rule analytics are unavailable for those rows.',
+          );
+          continue;
+        }
+
+        if (configurationRepository == null) {
+          dataQualityNotes.add(
+            'Breakfast semantic analytics are unavailable because the breakfast configuration repository is not configured.',
+          );
+          continue;
+        }
 
         final List<OrderModifier> modifiers = await _transactionRepository
             .getModifiersByLine(line.id);
@@ -703,9 +768,12 @@ class ReportService {
           final ModifierChargeReason? reason = modifier.chargeReason;
           final int? itemProductId = modifier.itemProductId;
           if (reason != null &&
-              reason != ModifierChargeReason.removalDiscount) {
-            reasonBuckets.putIfAbsent(reason, _ChargeReasonAccumulator.new)
-              ..eventCount += 1;
+              reason != ModifierChargeReason.removalDiscount &&
+              !(reason == ModifierChargeReason.includedChoice &&
+                  itemProductId == null)) {
+            final _ChargeReasonAccumulator accumulator = reasonBuckets
+                .putIfAbsent(reason, _ChargeReasonAccumulator.new);
+            accumulator.eventCount += 1;
           }
           if (itemProductId != null) {
             itemProductIds.add(itemProductId);
@@ -781,7 +849,7 @@ class ReportService {
         );
         inferredChoiceGroups = inferredChoiceGroups || needsLegacyInference;
         final BreakfastRequestedState requestedState =
-            BreakfastRequestedStateMapper.reconstruct(
+            BreakfastRequestedStateMapper.fromPersistedSnapshotWithConfigurationFallback(
               modifiers: modifiers,
               configuration: configuration,
             );
@@ -826,7 +894,11 @@ class ReportService {
     }
 
     final Map<int, BreakfastCatalogProduct> itemNamesByProductId =
-        await configurationRepository.loadCatalogProductsByIds(itemProductIds);
+        configurationRepository == null
+        ? const <int, BreakfastCatalogProduct>{}
+        : await configurationRepository.loadCatalogProductsByIds(
+            itemProductIds,
+          );
 
     String resolveItemName(int itemProductId) {
       return itemNamesByProductId[itemProductId]?.name ??
@@ -921,7 +993,62 @@ class ReportService {
             (
               SemanticChargeReasonAnalytics a,
               SemanticChargeReasonAnalytics b,
-            ) => b.revenueMinor.compareTo(a.revenueMinor),
+          ) => b.revenueMinor.compareTo(a.revenueMinor),
+          );
+
+    final List<SemanticMealRevenueAnalytics> mealRevenueBreakdown =
+        mealRevenueBuckets.entries
+            .map(
+              (MapEntry<int, _MealRevenueAccumulator> entry) =>
+                  SemanticMealRevenueAnalytics(
+                    rootProductId: entry.key,
+                    rootProductName: entry.value.rootProductName,
+                    quantitySold: entry.value.quantitySold,
+                    baseRevenueMinor: entry.value.baseRevenueMinor,
+                    extraRevenueMinor: entry.value.extraRevenueMinor,
+                    paidSwapRevenueMinor: entry.value.paidSwapRevenueMinor,
+                    freeSwapCount: entry.value.freeSwapCount,
+                    discountTotalMinor: entry.value.discountTotalMinor,
+                    netRevenueMinor: entry.value.netRevenueMinor,
+                    removeActionCount: entry.value.removeActionCount,
+                    swapActionCount: entry.value.swapActionCount,
+                    extraActionCount: entry.value.extraActionCount,
+                    discountActionCount: entry.value.discountActionCount,
+                  ),
+            )
+            .toList(growable: true)
+          ..sort(
+            (
+              SemanticMealRevenueAnalytics a,
+              SemanticMealRevenueAnalytics b,
+            ) => b.netRevenueMinor.compareTo(a.netRevenueMinor),
+          );
+
+    final List<SemanticMealAppliedRuleAnalytics> appliedMealRules =
+        mealRuleBuckets.entries
+            .map(
+              (MapEntry<int, _MealRuleAccumulator> entry) =>
+                  SemanticMealAppliedRuleAnalytics(
+                    ruleId: entry.key,
+                    ruleType: entry.value.ruleType,
+                    applicationCount: entry.value.applicationCount,
+                    totalImpactMinor: entry.value.totalImpactMinor,
+                  ),
+            )
+            .toList(growable: true)
+          ..sort(
+            (
+              SemanticMealAppliedRuleAnalytics a,
+              SemanticMealAppliedRuleAnalytics b,
+            ) {
+              final int impactCompare = b.totalImpactMinor.abs().compareTo(
+                a.totalImpactMinor.abs(),
+              );
+              if (impactCompare != 0) {
+                return impactCompare;
+              }
+              return b.applicationCount.compareTo(a.applicationCount);
+            },
           );
 
     final List<SemanticBundleVariantAnalytics> bundleVariants =
@@ -974,6 +1101,12 @@ class ReportService {
       chargeReasonBreakdown: List<SemanticChargeReasonAnalytics>.unmodifiable(
         chargeReasonBreakdown,
       ),
+      mealRevenueBreakdown: List<SemanticMealRevenueAnalytics>.unmodifiable(
+        mealRevenueBreakdown,
+      ),
+      appliedMealRules: List<SemanticMealAppliedRuleAnalytics>.unmodifiable(
+        appliedMealRules,
+      ),
       bundleVariants: List<SemanticBundleVariantAnalytics>.unmodifiable(
         bundleVariants,
       ),
@@ -983,44 +1116,186 @@ class ReportService {
     );
   }
 
-  void _accumulateDirectItemBehaviors({
-    required int rootProductId,
-    required String rootProductName,
-    required List<OrderModifier> modifiers,
+  void _accumulateMealCustomizationAnalytics({
+    required TransactionLine line,
+    required MealCustomizationPersistedSnapshotRecord snapshotRecord,
+    required Map<ModifierChargeReason, _ChargeReasonAccumulator> reasonBuckets,
     required Map<_RootItemKey, _ItemBehaviorAccumulator> addedBuckets,
     required Map<_RootItemKey, _ItemBehaviorAccumulator> removedBuckets,
+    required Map<int, _MealRevenueAccumulator> mealRevenueBuckets,
+    required Map<int, _MealRuleAccumulator> mealRuleBuckets,
+    required Map<_VariantAnalyticsKey, _VariantAccumulator> variantBuckets,
+    required Set<int> itemProductIds,
   }) {
-    for (final OrderModifier modifier in modifiers) {
-      final int? itemProductId = modifier.itemProductId;
-      if (itemProductId == null) {
-        continue;
+    final MealCustomizationResolvedSnapshot snapshot = snapshotRecord.snapshot;
+    final int lineQuantity = line.quantity;
+    final _MealRevenueAccumulator mealRevenue = mealRevenueBuckets.putIfAbsent(
+      line.productId,
+      () => _MealRevenueAccumulator(rootProductName: line.productName),
+    );
+    mealRevenue.quantitySold += lineQuantity;
+    mealRevenue.baseRevenueMinor += line.unitPriceMinor * lineQuantity;
+    mealRevenue.netRevenueMinor += line.lineTotalMinor;
+
+    for (final MealCustomizationAppliedRule rule in snapshot.appliedRules) {
+      final _MealRuleAccumulator accumulator = mealRuleBuckets.putIfAbsent(
+        rule.ruleId,
+        () => _MealRuleAccumulator(ruleType: rule.ruleType.name),
+      );
+      accumulator.applicationCount += lineQuantity;
+      accumulator.totalImpactMinor += rule.priceDeltaMinor * lineQuantity;
+    }
+
+    for (final MealCustomizationSemanticAction action in snapshot.actions) {
+      final int? itemProductId = action.itemProductId;
+      final int? sourceItemProductId = action.sourceItemProductId;
+      final int expandedQuantity = action.quantity * lineQuantity;
+      final int expandedRevenueMinor = action.priceDeltaMinor * lineQuantity;
+      if (itemProductId != null) {
+        itemProductIds.add(itemProductId);
       }
-      if (modifier.action == ModifierAction.remove) {
-        removedBuckets.putIfAbsent(
+      if (sourceItemProductId != null) {
+        itemProductIds.add(sourceItemProductId);
+      }
+
+      final ModifierChargeReason? reason = _mapMealChargeReason(
+        action.chargeReason,
+      );
+      if (reason != null) {
+        final _ChargeReasonAccumulator accumulator = reasonBuckets.putIfAbsent(
+          reason,
+          _ChargeReasonAccumulator.new,
+        );
+        accumulator.eventCount += lineQuantity;
+        accumulator.totalQuantity += expandedQuantity;
+        accumulator.revenueMinor += expandedRevenueMinor;
+      }
+
+      switch (action.action) {
+        case MealCustomizationAction.remove:
+          mealRevenue.removeActionCount += expandedQuantity;
+          if (itemProductId == null) {
+            continue;
+          }
+          final _ItemBehaviorAccumulator accumulator = removedBuckets
+              .putIfAbsent(
+                _RootItemKey(
+                  rootProductId: line.productId,
+                  itemProductId: itemProductId,
+                ),
+                () => _ItemBehaviorAccumulator(rootProductName: line.productName),
+              );
+          accumulator.occurrenceCount += lineQuantity;
+          accumulator.totalQuantity += expandedQuantity;
+          break;
+        case MealCustomizationAction.swap:
+          mealRevenue.swapActionCount += expandedQuantity;
+          if (action.chargeReason == MealCustomizationChargeReason.freeSwap) {
+            mealRevenue.freeSwapCount += expandedQuantity;
+          } else if (action.chargeReason ==
+              MealCustomizationChargeReason.paidSwap) {
+            mealRevenue.paidSwapRevenueMinor += expandedRevenueMinor;
+          }
+          if (sourceItemProductId != null) {
+            final _ItemBehaviorAccumulator removedAccumulator = removedBuckets
+                .putIfAbsent(
+                  _RootItemKey(
+                    rootProductId: line.productId,
+                    itemProductId: sourceItemProductId,
+                  ),
+                  () =>
+                      _ItemBehaviorAccumulator(rootProductName: line.productName),
+                );
+            removedAccumulator.occurrenceCount += lineQuantity;
+            removedAccumulator.totalQuantity += expandedQuantity;
+          }
+          if (itemProductId == null) {
+            continue;
+          }
+          final _ItemBehaviorAccumulator addedAccumulator = addedBuckets
+              .putIfAbsent(
+                _RootItemKey(
+                  rootProductId: line.productId,
+                  itemProductId: itemProductId,
+                ),
+                () => _ItemBehaviorAccumulator(rootProductName: line.productName),
+              );
+          addedAccumulator.occurrenceCount += lineQuantity;
+          addedAccumulator.totalQuantity += expandedQuantity;
+          addedAccumulator.revenueMinor += expandedRevenueMinor;
+          break;
+        case MealCustomizationAction.extra:
+          mealRevenue.extraActionCount += expandedQuantity;
+          mealRevenue.extraRevenueMinor += expandedRevenueMinor;
+          if (itemProductId == null) {
+            continue;
+          }
+          final _ItemBehaviorAccumulator accumulator = addedBuckets.putIfAbsent(
             _RootItemKey(
-              rootProductId: rootProductId,
+              rootProductId: line.productId,
               itemProductId: itemProductId,
             ),
-            () => _ItemBehaviorAccumulator(rootProductName: rootProductName),
-          )
-          ..occurrenceCount += 1
-          ..totalQuantity += modifier.quantity;
-        continue;
-      }
-      if (modifier.action == ModifierAction.add &&
-          modifier.chargeReason != ModifierChargeReason.removalDiscount) {
-        addedBuckets.putIfAbsent(
-            _RootItemKey(
-              rootProductId: rootProductId,
-              itemProductId: itemProductId,
-            ),
-            () => _ItemBehaviorAccumulator(rootProductName: rootProductName),
-          )
-          ..occurrenceCount += 1
-          ..totalQuantity += modifier.quantity
-          ..revenueMinor += modifier.priceEffectMinor;
+            () => _ItemBehaviorAccumulator(rootProductName: line.productName),
+          );
+          accumulator.occurrenceCount += lineQuantity;
+          accumulator.totalQuantity += expandedQuantity;
+          accumulator.revenueMinor += expandedRevenueMinor;
+          break;
+        case MealCustomizationAction.discount:
+          mealRevenue.discountActionCount += expandedQuantity;
+          mealRevenue.discountTotalMinor += expandedRevenueMinor;
+          break;
       }
     }
+
+    final List<int> chosenItemProductIds = snapshot.resolvedComponentActions
+        .where((MealCustomizationSemanticAction action) {
+          return action.action == MealCustomizationAction.swap &&
+              action.itemProductId != null;
+        })
+        .map((MealCustomizationSemanticAction action) => action.itemProductId!)
+        .toList(growable: false)
+      ..sort();
+    final List<int> removedItemProductIds = <int>[
+      ...snapshot.resolvedComponentActions
+          .where((MealCustomizationSemanticAction action) {
+            return action.action == MealCustomizationAction.remove &&
+                action.itemProductId != null;
+          })
+          .map((MealCustomizationSemanticAction action) => action.itemProductId!),
+      ...snapshot.resolvedComponentActions
+          .where((MealCustomizationSemanticAction action) {
+            return action.action == MealCustomizationAction.swap &&
+                action.sourceItemProductId != null;
+          })
+          .map(
+            (MealCustomizationSemanticAction action) =>
+                action.sourceItemProductId!,
+          ),
+    ]..sort();
+    final List<int> addedItemProductIds = <int>[
+      ...chosenItemProductIds,
+      ...snapshot.resolvedExtraActions
+          .where((MealCustomizationSemanticAction action) {
+            return action.itemProductId != null;
+          })
+          .map((MealCustomizationSemanticAction action) => action.itemProductId!),
+    ]..sort();
+
+    final _VariantAccumulator accumulator = variantBuckets.putIfAbsent(
+      _VariantAnalyticsKey(
+        rootProductId: line.productId,
+        variantKey: snapshot.stableIdentityKey,
+      ),
+      () => _VariantAccumulator(
+        rootProductName: line.productName,
+        chosenItemProductIds: chosenItemProductIds,
+        removedItemProductIds: removedItemProductIds,
+        addedItemProductIds: addedItemProductIds,
+      ),
+    );
+    accumulator.orderCount += lineQuantity;
+    accumulator.revenueMinor += line.lineTotalMinor;
   }
 
   void _accumulateRequestedStateBehaviors({
@@ -1410,6 +1685,25 @@ class ReportService {
   }
 }
 
+ModifierChargeReason? _mapMealChargeReason(
+  MealCustomizationChargeReason? chargeReason,
+) {
+  switch (chargeReason) {
+    case null:
+      return null;
+    case MealCustomizationChargeReason.freeSwap:
+      return ModifierChargeReason.freeSwap;
+    case MealCustomizationChargeReason.paidSwap:
+      return ModifierChargeReason.paidSwap;
+    case MealCustomizationChargeReason.extraAdd:
+      return ModifierChargeReason.extraAdd;
+    case MealCustomizationChargeReason.removalDiscount:
+      return ModifierChargeReason.removalDiscount;
+    case MealCustomizationChargeReason.comboDiscount:
+      return ModifierChargeReason.comboDiscount;
+  }
+}
+
 class _RootProductAccumulator {
   _RootProductAccumulator({required this.rootProductName});
 
@@ -1422,6 +1716,31 @@ class _ChargeReasonAccumulator {
   int eventCount = 0;
   int totalQuantity = 0;
   int revenueMinor = 0;
+}
+
+class _MealRevenueAccumulator {
+  _MealRevenueAccumulator({required this.rootProductName});
+
+  final String rootProductName;
+  int quantitySold = 0;
+  int baseRevenueMinor = 0;
+  int extraRevenueMinor = 0;
+  int paidSwapRevenueMinor = 0;
+  int freeSwapCount = 0;
+  int discountTotalMinor = 0;
+  int netRevenueMinor = 0;
+  int removeActionCount = 0;
+  int swapActionCount = 0;
+  int extraActionCount = 0;
+  int discountActionCount = 0;
+}
+
+class _MealRuleAccumulator {
+  _MealRuleAccumulator({required this.ruleType});
+
+  final String ruleType;
+  int applicationCount = 0;
+  int totalImpactMinor = 0;
 }
 
 class _RootItemKey {

@@ -83,6 +83,7 @@ class BreakfastAnalyticsExtractor {
 
       switch (reason) {
         case ModifierChargeReason.removalDiscount:
+        case ModifierChargeReason.comboDiscount:
           break;
         case ModifierChargeReason.includedChoice:
           includedChoiceCount += modifier.quantity;

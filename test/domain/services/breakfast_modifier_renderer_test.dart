@@ -5,7 +5,7 @@ import 'package:epos_app/domain/services/breakfast_modifier_renderer.dart';
 void main() {
   const BreakfastModifierRenderer renderer = BreakfastModifierRenderer();
 
-  OrderModifier _modifier({
+  OrderModifier modifierFixture({
     ModifierAction action = ModifierAction.add,
     ModifierChargeReason? chargeReason,
     String itemName = 'Hash Brown',
@@ -34,7 +34,7 @@ void main() {
     group('renderAll', () {
       test('remove_only renders correctly', () {
         final List<BreakfastModifierRendered> result = renderer.renderAll([
-          _modifier(
+          modifierFixture(
             action: ModifierAction.remove,
             chargeReason: null,
             itemName: 'Beans',
@@ -50,7 +50,7 @@ void main() {
 
       test('included_choice renders without price', () {
         final List<BreakfastModifierRendered> result = renderer.renderAll([
-          _modifier(
+          modifierFixture(
             action: ModifierAction.choice,
             chargeReason: ModifierChargeReason.includedChoice,
             itemName: 'Tea',
@@ -67,7 +67,7 @@ void main() {
 
       test('free_swap renders with swap label', () {
         final List<BreakfastModifierRendered> result = renderer.renderAll([
-          _modifier(
+          modifierFixture(
             chargeReason: ModifierChargeReason.freeSwap,
             itemName: 'Black Pudding',
           ),
@@ -79,7 +79,7 @@ void main() {
 
       test('paid_swap renders with price', () {
         final List<BreakfastModifierRendered> result = renderer.renderAll([
-          _modifier(
+          modifierFixture(
             chargeReason: ModifierChargeReason.paidSwap,
             itemName: 'Halloumi',
             priceEffectMinor: 150,
@@ -93,7 +93,7 @@ void main() {
 
       test('extra_add renders with price', () {
         final List<BreakfastModifierRendered> result = renderer.renderAll([
-          _modifier(
+          modifierFixture(
             chargeReason: ModifierChargeReason.extraAdd,
             itemName: 'Sausage',
             priceEffectMinor: 200,
@@ -106,12 +106,12 @@ void main() {
 
       test('free_swap and paid_swap are distinguishable', () {
         final List<BreakfastModifierRendered> result = renderer.renderAll([
-          _modifier(
+          modifierFixture(
             chargeReason: ModifierChargeReason.freeSwap,
             itemName: 'Item A',
             sortKey: 1,
           ),
-          _modifier(
+          modifierFixture(
             chargeReason: ModifierChargeReason.paidSwap,
             itemName: 'Item A',
             priceEffectMinor: 100,
@@ -127,7 +127,7 @@ void main() {
 
       test('quantity suffix appears when quantity > 1', () {
         final List<BreakfastModifierRendered> result = renderer.renderAll([
-          _modifier(
+          modifierFixture(
             chargeReason: ModifierChargeReason.includedChoice,
             itemName: 'Toast',
             quantity: 2,
@@ -139,7 +139,7 @@ void main() {
 
       test('removalDiscount is hidden from kitchen and receipt', () {
         final List<BreakfastModifierRendered> result = renderer.renderAll([
-          _modifier(
+          modifierFixture(
             action: ModifierAction.remove,
             chargeReason: ModifierChargeReason.removalDiscount,
             itemName: 'Discount',
@@ -152,18 +152,18 @@ void main() {
 
       test('output order is deterministic by sortKey then group priority', () {
         final List<BreakfastModifierRendered> result = renderer.renderAll([
-          _modifier(
+          modifierFixture(
             chargeReason: ModifierChargeReason.extraAdd,
             itemName: 'Extra',
             sortKey: 0,
           ),
-          _modifier(
+          modifierFixture(
             action: ModifierAction.remove,
             chargeReason: null,
             itemName: 'Removed',
             sortKey: 0,
           ),
-          _modifier(
+          modifierFixture(
             chargeReason: ModifierChargeReason.includedChoice,
             action: ModifierAction.choice,
             itemName: 'Choice',
@@ -180,14 +180,14 @@ void main() {
     group('kitchenLabel', () {
       test('remove uses "no" prefix', () {
         final String label = renderer.kitchenLabel(
-          _modifier(action: ModifierAction.remove, itemName: 'Beans'),
+          modifierFixture(action: ModifierAction.remove, itemName: 'Beans'),
         );
         expect(label, 'no Beans');
       });
 
       test('included_choice shows item name only', () {
         final String label = renderer.kitchenLabel(
-          _modifier(
+          modifierFixture(
             action: ModifierAction.choice,
             chargeReason: ModifierChargeReason.includedChoice,
             itemName: 'Tea',
@@ -198,7 +198,7 @@ void main() {
 
       test('free_swap shows swap prefix', () {
         final String label = renderer.kitchenLabel(
-          _modifier(
+          modifierFixture(
             chargeReason: ModifierChargeReason.freeSwap,
             itemName: 'Black Pudding',
           ),
@@ -208,7 +208,7 @@ void main() {
 
       test('paid_swap shows swap prefix', () {
         final String label = renderer.kitchenLabel(
-          _modifier(
+          modifierFixture(
             chargeReason: ModifierChargeReason.paidSwap,
             itemName: 'Halloumi',
             priceEffectMinor: 150,
@@ -219,7 +219,7 @@ void main() {
 
       test('extra_add shows extra prefix', () {
         final String label = renderer.kitchenLabel(
-          _modifier(
+          modifierFixture(
             chargeReason: ModifierChargeReason.extraAdd,
             itemName: 'Sausage',
           ),
@@ -229,7 +229,7 @@ void main() {
 
       test('quantity suffix on kitchen label', () {
         final String label = renderer.kitchenLabel(
-          _modifier(
+          modifierFixture(
             chargeReason: ModifierChargeReason.includedChoice,
             action: ModifierAction.choice,
             itemName: 'Toast',
@@ -242,14 +242,15 @@ void main() {
 
     group('receiptLabel', () {
       test('matches renderAll label', () {
-        final OrderModifier modifier = _modifier(
+        final OrderModifier modifier = modifierFixture(
           chargeReason: ModifierChargeReason.paidSwap,
           itemName: 'Halloumi',
           priceEffectMinor: 150,
         );
         final String label = renderer.receiptLabel(modifier);
-        final List<BreakfastModifierRendered> rendered =
-            renderer.renderAll([modifier]);
+        final List<BreakfastModifierRendered> rendered = renderer.renderAll([
+          modifier,
+        ]);
         expect(label, rendered.first.label);
       });
     });
@@ -257,7 +258,7 @@ void main() {
     group('legacy modifier rendering', () {
       test('legacy remove renders with dash prefix', () {
         final List<BreakfastModifierRendered> result = renderer.renderAll([
-          _modifier(
+          modifierFixture(
             action: ModifierAction.remove,
             chargeReason: null,
             itemName: 'Chips',
@@ -269,7 +270,7 @@ void main() {
 
       test('legacy add with price renders price suffix', () {
         final List<BreakfastModifierRendered> result = renderer.renderAll([
-          _modifier(
+          modifierFixture(
             action: ModifierAction.add,
             chargeReason: null,
             itemName: 'Bacon',
@@ -282,7 +283,7 @@ void main() {
 
       test('legacy choice renders with included', () {
         final List<BreakfastModifierRendered> result = renderer.renderAll([
-          _modifier(
+          modifierFixture(
             action: ModifierAction.choice,
             chargeReason: null,
             itemName: 'Coffee',
@@ -310,8 +311,9 @@ void main() {
         quantity: 1,
         sortKey: 1,
       );
-      final List<BreakfastModifierRendered> rendered =
-          renderer.renderAll([modifier]);
+      final List<BreakfastModifierRendered> rendered = renderer.renderAll([
+        modifier,
+      ]);
       expect(rendered.first.label, contains('Hash Brown'));
       expect(rendered.first.label, contains('£1.50'));
     });

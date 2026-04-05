@@ -1,5 +1,9 @@
 import '../../core/errors/exceptions.dart';
+import 'breakfast_cooking_instruction.dart';
 import 'order_modifier.dart';
+import 'transaction_line.dart';
+
+const String breakfastNoneChoiceDisplayName = 'None';
 
 class BreakfastRebuildInput {
   const BreakfastRebuildInput({
@@ -21,6 +25,7 @@ class BreakfastTransactionLineInput {
     required this.rootProductName,
     required this.baseUnitPriceMinor,
     required this.lineQuantity,
+    this.pricingMode = TransactionLinePricingMode.set,
   });
 
   final int lineId;
@@ -29,6 +34,7 @@ class BreakfastTransactionLineInput {
   final String rootProductName;
   final int baseUnitPriceMinor;
   final int lineQuantity;
+  final TransactionLinePricingMode pricingMode;
 }
 
 class BreakfastSetConfiguration {
@@ -214,23 +220,47 @@ class BreakfastRequestedState {
     this.removedSetItems = const <BreakfastRemovedSetItemRequest>[],
     this.addedProducts = const <BreakfastAddedProductRequest>[],
     this.chosenGroups = const <BreakfastChosenGroupRequest>[],
+    this.cookingInstructions = const <BreakfastCookingInstructionRequest>[],
   });
 
   final List<BreakfastRemovedSetItemRequest> removedSetItems;
   final List<BreakfastAddedProductRequest> addedProducts;
   final List<BreakfastChosenGroupRequest> chosenGroups;
+  final List<BreakfastCookingInstructionRequest> cookingInstructions;
 
   BreakfastRequestedState copyWith({
     List<BreakfastRemovedSetItemRequest>? removedSetItems,
     List<BreakfastAddedProductRequest>? addedProducts,
     List<BreakfastChosenGroupRequest>? chosenGroups,
+    List<BreakfastCookingInstructionRequest>? cookingInstructions,
   }) {
     return BreakfastRequestedState(
       removedSetItems: removedSetItems ?? this.removedSetItems,
       addedProducts: addedProducts ?? this.addedProducts,
       chosenGroups: chosenGroups ?? this.chosenGroups,
+      cookingInstructions: cookingInstructions ?? this.cookingInstructions,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is BreakfastRequestedState &&
+        _listEquals(other.removedSetItems, removedSetItems) &&
+        _listEquals(other.addedProducts, addedProducts) &&
+        _listEquals(other.chosenGroups, chosenGroups) &&
+        _listEquals(other.cookingInstructions, cookingInstructions);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    Object.hashAll(removedSetItems),
+    Object.hashAll(addedProducts),
+    Object.hashAll(chosenGroups),
+    Object.hashAll(cookingInstructions),
+  );
 }
 
 class BreakfastRemovedSetItemRequest {
@@ -241,6 +271,19 @@ class BreakfastRemovedSetItemRequest {
 
   final int itemProductId;
   final int quantity;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is BreakfastRemovedSetItemRequest &&
+        other.itemProductId == itemProductId &&
+        other.quantity == quantity;
+  }
+
+  @override
+  int get hashCode => Object.hash(itemProductId, quantity);
 }
 
 class BreakfastAddedProductRequest {
@@ -253,6 +296,20 @@ class BreakfastAddedProductRequest {
   final int itemProductId;
   final int quantity;
   final int orderHint;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is BreakfastAddedProductRequest &&
+        other.itemProductId == itemProductId &&
+        other.quantity == quantity &&
+        other.orderHint == orderHint;
+  }
+
+  @override
+  int get hashCode => Object.hash(itemProductId, quantity, orderHint);
 }
 
 class BreakfastChosenGroupRequest {
@@ -265,6 +322,26 @@ class BreakfastChosenGroupRequest {
   final int groupId;
   final int? selectedItemProductId;
   final int requestedQuantity;
+
+  bool get isExplicitNone =>
+      selectedItemProductId == null && requestedQuantity > 0;
+
+  bool get hasSelection => requestedQuantity > 0;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is BreakfastChosenGroupRequest &&
+        other.groupId == groupId &&
+        other.selectedItemProductId == selectedItemProductId &&
+        other.requestedQuantity == requestedQuantity;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(groupId, selectedItemProductId, requestedQuantity);
 }
 
 enum BreakfastModifierKind {
@@ -337,20 +414,78 @@ class BreakfastClassifiedModifier {
           : sourceSetItemId as int?,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is BreakfastClassifiedModifier &&
+        other.kind == kind &&
+        other.action == action &&
+        other.chargeReason == chargeReason &&
+        other.itemProductId == itemProductId &&
+        other.displayName == displayName &&
+        other.quantity == quantity &&
+        other.unitPriceMinor == unitPriceMinor &&
+        other.priceEffectMinor == priceEffectMinor &&
+        other.sortKey == sortKey &&
+        other.sourceGroupId == sourceGroupId &&
+        other.sourceSetItemId == sourceSetItemId;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    kind,
+    action,
+    chargeReason,
+    itemProductId,
+    displayName,
+    quantity,
+    unitPriceMinor,
+    priceEffectMinor,
+    sortKey,
+    sourceGroupId,
+    sourceSetItemId,
+  );
 }
 
 class BreakfastLineSnapshot {
   const BreakfastLineSnapshot({
+    this.pricingMode = TransactionLinePricingMode.set,
     required this.baseUnitPriceMinor,
     required this.removalDiscountTotalMinor,
     required this.modifierTotalMinor,
     required this.lineTotalMinor,
   });
 
+  final TransactionLinePricingMode pricingMode;
   final int baseUnitPriceMinor;
   final int removalDiscountTotalMinor;
   final int modifierTotalMinor;
   final int lineTotalMinor;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is BreakfastLineSnapshot &&
+        other.pricingMode == pricingMode &&
+        other.baseUnitPriceMinor == baseUnitPriceMinor &&
+        other.removalDiscountTotalMinor == removalDiscountTotalMinor &&
+        other.modifierTotalMinor == modifierTotalMinor &&
+        other.lineTotalMinor == lineTotalMinor;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    pricingMode,
+    baseUnitPriceMinor,
+    removalDiscountTotalMinor,
+    modifierTotalMinor,
+    lineTotalMinor,
+  );
 }
 
 class BreakfastPricingBreakdown {
@@ -373,6 +508,34 @@ class BreakfastPricingBreakdown {
   final int removeTotalMinor;
   final int removalDiscountTotalMinor;
   final int finalLineTotalMinor;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is BreakfastPricingBreakdown &&
+        other.basePriceMinor == basePriceMinor &&
+        other.extraAddTotalMinor == extraAddTotalMinor &&
+        other.paidSwapTotalMinor == paidSwapTotalMinor &&
+        other.freeSwapTotalMinor == freeSwapTotalMinor &&
+        other.includedChoiceTotalMinor == includedChoiceTotalMinor &&
+        other.removeTotalMinor == removeTotalMinor &&
+        other.removalDiscountTotalMinor == removalDiscountTotalMinor &&
+        other.finalLineTotalMinor == finalLineTotalMinor;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    basePriceMinor,
+    extraAddTotalMinor,
+    paidSwapTotalMinor,
+    freeSwapTotalMinor,
+    includedChoiceTotalMinor,
+    removeTotalMinor,
+    removalDiscountTotalMinor,
+    finalLineTotalMinor,
+  );
 }
 
 class BreakfastRebuildMetadata {
@@ -383,6 +546,19 @@ class BreakfastRebuildMetadata {
 
   final int replacementCount;
   final int unmatchedRemovalCount;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is BreakfastRebuildMetadata &&
+        other.replacementCount == replacementCount &&
+        other.unmatchedRemovalCount == unmatchedRemovalCount;
+  }
+
+  @override
+  int get hashCode => Object.hash(replacementCount, unmatchedRemovalCount);
 }
 
 class BreakfastRebuildResult {
@@ -399,7 +575,44 @@ class BreakfastRebuildResult {
   final BreakfastPricingBreakdown pricingBreakdown;
   final List<BreakfastEditErrorCode> validationErrors;
   final BreakfastRebuildMetadata rebuildMetadata;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is BreakfastRebuildResult &&
+        other.lineSnapshot == lineSnapshot &&
+        _listEquals(other.classifiedModifiers, classifiedModifiers) &&
+        other.pricingBreakdown == pricingBreakdown &&
+        _listEquals(other.validationErrors, validationErrors) &&
+        other.rebuildMetadata == rebuildMetadata;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    lineSnapshot,
+    Object.hashAll(classifiedModifiers),
+    pricingBreakdown,
+    Object.hashAll(validationErrors),
+    rebuildMetadata,
+  );
 }
 
 const Object _unsetNullableInt = Object();
 const Object _unsetChargeReason = Object();
+
+bool _listEquals<T>(List<T> a, List<T> b) {
+  if (identical(a, b)) {
+    return true;
+  }
+  if (a.length != b.length) {
+    return false;
+  }
+  for (int index = 0; index < a.length; index += 1) {
+    if (a[index] != b[index]) {
+      return false;
+    }
+  }
+  return true;
+}

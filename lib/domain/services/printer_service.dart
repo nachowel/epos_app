@@ -14,6 +14,7 @@ import '../../data/repositories/payment_repository.dart';
 import '../../data/repositories/print_job_repository.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/repositories/transaction_repository.dart';
+import '../models/breakfast_cooking_instruction.dart';
 import '../models/cashier_projected_report.dart';
 import '../models/order_lifecycle_policy.dart';
 import '../models/order_modifier.dart';
@@ -269,16 +270,20 @@ class PrinterService {
     final List<_PrintableLine> printableLines = <_PrintableLine>[];
 
     for (final TransactionLine line in lines) {
-      final List<OrderModifier> modifiers =
-          await _transactionRepository.getModifiersByLine(line.id);
+      final List<OrderModifier> modifiers = await _transactionRepository
+          .getModifiersByLine(line.id);
+      final List<BreakfastCookingInstructionRecord> cookingInstructions =
+          await _transactionRepository.getBreakfastCookingInstructionsByLine(
+            line.id,
+          );
       final bool isBreakfastLine =
           line.pricingMode == TransactionLinePricingMode.set;
 
       if (isBreakfastLine) {
-        const BreakfastModifierRenderer renderer =
-            BreakfastModifierRenderer();
-        final List<BreakfastModifierRendered> rendered =
-            renderer.renderAll(modifiers);
+        const BreakfastModifierRenderer renderer = BreakfastModifierRenderer();
+        final List<BreakfastModifierRendered> rendered = renderer.renderAll(
+          modifiers,
+        );
         printableLines.add(
           _PrintableLine(
             line: line,
@@ -290,15 +295,26 @@ class PrinterService {
                     isAdd: r.action != ModifierAction.remove,
                     showOnKitchen: r.showOnKitchen,
                     showOnReceipt: r.showOnReceipt,
-                    kitchenLabel: renderer.kitchenLabel(modifiers.firstWhere(
-                      (OrderModifier m) =>
-                          m.itemProductId == r.itemProductId &&
-                          m.chargeReason == r.chargeReason &&
-                          m.action == r.action,
-                      orElse: () => modifiers.first,
-                    )),
+                    kitchenLabel: renderer.kitchenLabel(
+                      modifiers.firstWhere(
+                        (OrderModifier m) =>
+                            m.itemProductId == r.itemProductId &&
+                            m.chargeReason == r.chargeReason &&
+                            m.action == r.action,
+                        orElse: () => modifiers.first,
+                      ),
+                    ),
                     chargeReason: r.chargeReason,
                   ),
+                )
+                .toList(growable: false),
+            cookingInstructions: cookingInstructions
+                .map(
+                  (BreakfastCookingInstructionRecord instruction) =>
+                      _PrintableCookingInstruction(
+                        kitchenLabel: instruction.kitchenLabel,
+                        sortKey: instruction.sortKey,
+                      ),
                 )
                 .toList(growable: false),
           ),
@@ -317,6 +333,7 @@ class PrinterService {
                   ),
                 )
                 .toList(growable: false),
+            cookingInstructions: const <_PrintableCookingInstruction>[],
           ),
         );
       }
@@ -392,9 +409,15 @@ class PrinterService {
         if (!modifier.showOnKitchen) continue;
         final String displayLabel = modifier.kitchenLabel ?? modifier.label;
         bytes.addAll(
+          generator.text('  $displayLabel', styles: const PosStyles()),
+        );
+      }
+      for (final _PrintableCookingInstruction instruction
+          in line.cookingInstructions) {
+        bytes.addAll(
           generator.text(
-            '  $displayLabel',
-            styles: const PosStyles(),
+            '  ${instruction.kitchenLabel}',
+            styles: const PosStyles(bold: true),
           ),
         );
       }
@@ -474,6 +497,15 @@ class PrinterService {
             ? ' ${CurrencyFormatter.fromMinor(modifier.extraPriceMinor)}'
             : '';
         bytes.addAll(generator.text('  ${modifier.label}$suffix'));
+      }
+      for (final _PrintableCookingInstruction instruction
+          in line.cookingInstructions) {
+        bytes.addAll(
+          generator.text(
+            '  ${instruction.kitchenLabel}',
+            styles: const PosStyles(bold: true),
+          ),
+        );
       }
     }
 
@@ -1045,10 +1077,15 @@ class _PrintableOrder {
 }
 
 class _PrintableLine {
-  const _PrintableLine({required this.line, required this.modifiers});
+  const _PrintableLine({
+    required this.line,
+    required this.modifiers,
+    required this.cookingInstructions,
+  });
 
   final TransactionLine line;
   final List<_PrintableModifier> modifiers;
+  final List<_PrintableCookingInstruction> cookingInstructions;
 }
 
 class _PrintableModifier {
@@ -1069,4 +1106,14 @@ class _PrintableModifier {
   final bool showOnReceipt;
   final String? kitchenLabel;
   final ModifierChargeReason? chargeReason;
+}
+
+class _PrintableCookingInstruction {
+  const _PrintableCookingInstruction({
+    required this.kitchenLabel,
+    required this.sortKey,
+  });
+
+  final String kitchenLabel;
+  final int sortKey;
 }

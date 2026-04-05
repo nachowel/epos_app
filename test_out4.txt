@@ -1,0 +1,1155 @@
+00:00 +0: loading C:/Users/nacho/Desktop/EPOS/epos_app/test/domain/services/meal_customization_phase9_test.dart
+00:00 +0: G. Confidence thresholds high confidence when >= 30 orders
+00:00 +1: G. Confidence thresholds medium confidence when 10–29 orders
+00:00 +2: G. Confidence thresholds low confidence when < 10 orders
+00:00 +3: G. Confidence thresholds empty database produces empty report without errors
+00:00 +4: G. Confidence thresholds low data case produces Low confidence insight
+00:00 +4 -1: G. Confidence thresholds low data case produces Low confidence insight [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, c6e7a29dbf8d931bc29cf1bf89970ef80b8412c626a347791fc179461ba78c22, {"product_id":1,"profile_id":1,"resolved_component_actions":[],"resolved_extra_actions":[],"triggered_discounts":[],"applied_rules":[],"total_adjustment_minor":0,"free_swap_count_used":0,"paid_swap_count_used":0}, 0, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 194:15        main.<fn>.<fn>
+  
+00:00 +4 -1: A. Discount Leakage discount frequency is calculated correctly
+00:00 +4 -2: A. Discount Leakage discount frequency is calculated correctly [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, a9a6eda0239157ed53e9d656d5f53e6b9755afeea39cb05973fd344d8c676a6e, {"product_id":1,"profile_id":1,"resolved_component_actions":[{"action":"remove","charge_reason":null,"component_key":"beans","item_product_id":1,"source_item_product_id":null,"quantity":1,"price_delta_minor":0,"applied_rule_ids":[]}],"resolved_extra_actions":[],"triggered_discounts":[{"action":"discount","charge_reason":"removalDiscount","component_key":null,"item_product_id":null,"source_item_product_id":null,"quantity":1,"price_delta_minor":-50,"applied_rule_ids":[]}],"applied_rules":[],"total_adjustment_minor":-50,"free_swap_count_used":0,"paid_swap_count_used":0}, -50, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 223:15        main.<fn>.<fn>
+  
+00:00 +4 -2: A. Discount Leakage high removal detected adds highFrequency flag
+00:00 +4 -3: A. Discount Leakage high removal detected adds highFrequency flag [E]
+  Meal customization action remove is missing item_product_id.
+  package:epos_app/domain/services/meal_customization_persistence_mapper.dart 209:5  MealCustomizationPersistenceMapper._requireProductId
+  package:epos_app/domain/services/meal_customization_persistence_mapper.dart 37:37  MealCustomizationPersistenceMapper.mapSnapshot
+  package:epos_app/data/repositories/transaction_repository.dart 682:45              TransactionRepository.replaceMealCustomizationLineSnapshot
+  
+00:00 +4 -3: A. Discount Leakage combo discount order count is tracked
+00:00 +4 -4: A. Discount Leakage combo discount order count is tracked [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, 100bc122bb4d69f9f7b6100e99c11374a61c017284d77a3e74eef345299c3a26, {"product_id":1,"profile_id":1,"resolved_component_actions":[],"resolved_extra_actions":[],"triggered_discounts":[{"action":"discount","charge_reason":"comboDiscount","component_key":null,"item_product_id":null,"source_item_product_id":null,"quantity":1,"price_delta_minor":-200,"applied_rule_ids":[]}],"applied_rules":[],"total_adjustment_minor":0,"free_swap_count_used":0,"paid_swap_count_used":0}, 0, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 318:15        main.<fn>.<fn>
+  
+00:00 +4 -4: B. Upsell Opportunity extra attach rate is calculated correctly
+00:00 +4 -5: B. Upsell Opportunity extra attach rate is calculated correctly [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, 5a627869c6f61700e65db18eeb7357aff860c672cb24b8931b0b0976e3b4c749, {"product_id":1,"profile_id":1,"resolved_component_actions":[],"resolved_extra_actions":[{"action":"extra","charge_reason":"extraAdd","component_key":null,"item_product_id":4,"source_item_product_id":null,"quantity":1,"price_delta_minor":100,"applied_rule_ids":[]}],"triggered_discounts":[],"applied_rules":[],"total_adjustment_minor":0,"free_swap_count_used":0,"paid_swap_count_used":0}, 0, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 361:15        main.<fn>.<fn>
+  
+00:00 +4 -5: B. Upsell Opportunity top extra detection — highest count wins
+00:00 +4 -6: B. Upsell Opportunity top extra detection — highest count wins [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, 5a627869c6f61700e65db18eeb7357aff860c672cb24b8931b0b0976e3b4c749, {"product_id":1,"profile_id":1,"resolved_component_actions":[],"resolved_extra_actions":[{"action":"extra","charge_reason":"extraAdd","component_key":null,"item_product_id":4,"source_item_product_id":null,"quantity":1,"price_delta_minor":100,"applied_rule_ids":[]}],"triggered_discounts":[],"applied_rules":[],"total_adjustment_minor":0,"free_swap_count_used":0,"paid_swap_count_used":0}, 0, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 403:15        main.<fn>.<fn>
+  
+00:00 +4 -6: C. Swap Behavior top swap pair is correctly identified
+00:00 +4 -7: C. Swap Behavior top swap pair is correctly identified [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, 161c61fa040bf60b246a703fb36a35dcf57f594909c3d509738157b3aab2ba72, {"product_id":1,"profile_id":1,"resolved_component_actions":[{"action":"swap","charge_reason":"freeSwap","component_key":"beans","item_product_id":3,"source_item_product_id":2,"quantity":1,"price_delta_minor":0,"applied_rule_ids":[]}],"resolved_extra_actions":[],"triggered_discounts":[],"applied_rules":[],"total_adjustment_minor":0,"free_swap_count_used":0,"paid_swap_count_used":0}, 0, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 470:15        main.<fn>.<fn>
+  
+00:00 +4 -7: C. Swap Behavior swap frequency percent is correct
+00:00 +4 -8: C. Swap Behavior swap frequency percent is correct [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, 161c61fa040bf60b246a703fb36a35dcf57f594909c3d509738157b3aab2ba72, {"product_id":1,"profile_id":1,"resolved_component_actions":[{"action":"swap","charge_reason":"freeSwap","component_key":"beans","item_product_id":3,"source_item_product_id":2,"quantity":1,"price_delta_minor":0,"applied_rule_ids":[]}],"resolved_extra_actions":[],"triggered_discounts":[],"applied_rules":[],"total_adjustment_minor":0,"free_swap_count_used":0,"paid_swap_count_used":0}, 0, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 533:15        main.<fn>.<fn>
+  
+00:00 +4 -8: C. Swap Behavior free vs paid swap counts are tracked separately
+00:00 +4 -9: C. Swap Behavior free vs paid swap counts are tracked separately [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, 161c61fa040bf60b246a703fb36a35dcf57f594909c3d509738157b3aab2ba72, {"product_id":1,"profile_id":1,"resolved_component_actions":[{"action":"swap","charge_reason":"freeSwap","component_key":"beans","item_product_id":3,"source_item_product_id":2,"quantity":1,"price_delta_minor":0,"applied_rule_ids":[]}],"resolved_extra_actions":[],"triggered_discounts":[],"applied_rules":[],"total_adjustment_minor":0,"free_swap_count_used":0,"paid_swap_count_used":0}, 0, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 572:15        main.<fn>.<fn>
+  
+00:00 +4 -9: D. Profile Performance discount-heavy profile classified correctly
+00:01 +4 -10: D. Profile Performance discount-heavy profile classified correctly [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 42, 47fc96f8248123705cec489c37d825f95bf176b3fa443ff638ea38a8f22b0e67, {"product_id":1,"profile_id":42,"resolved_component_actions":[],"resolved_extra_actions":[],"triggered_discounts":[{"action":"discount","charge_reason":"removalDiscount","component_key":null,"item_product_id":null,"source_item_product_id":null,"quantity":1,"price_delta_minor":-200,"applied_rule_ids":[]}],"applied_rules":[],"total_adjustment_minor":-200,"free_swap_count_used":0,"paid_swap_count_used":0}, -200, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 640:15        main.<fn>.<fn>
+  
+00:01 +4 -10: D. Profile Performance balanced profile classification when discount ≈ extra
+00:01 +4 -11: D. Profile Performance balanced profile classification when discount ≈ extra [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 43, 7e3254ae04c9fc0a55c10487989688639c55306b50765bc472cd04f5da47d2e7, {"product_id":1,"profile_id":43,"resolved_component_actions":[],"resolved_extra_actions":[{"action":"extra","charge_reason":"extraAdd","component_key":null,"item_product_id":4,"source_item_product_id":null,"quantity":1,"price_delta_minor":100,"applied_rule_ids":[]}],"triggered_discounts":[{"action":"discount","charge_reason":"removalDiscount","component_key":null,"item_product_id":null,"source_item_product_id":null,"quantity":1,"price_delta_minor":-50,"applied_rule_ids":[]}],"applied_rules":[],"total_adjustment_minor":50,"free_swap_count_used":0,"paid_swap_count_used":0}, 50, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 675:15        main.<fn>.<fn>
+  
+00:01 +4 -11: E. Recommendations high discount frequency triggers reduceDiscount recommendation
+00:01 +4 -12: E. Recommendations high discount frequency triggers reduceDiscount recommendation [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, 100bc122bb4d69f9f7b6100e99c11374a61c017284d77a3e74eef345299c3a26, {"product_id":1,"profile_id":1,"resolved_component_actions":[],"resolved_extra_actions":[],"triggered_discounts":[{"action":"discount","charge_reason":"comboDiscount","component_key":null,"item_product_id":null,"source_item_product_id":null,"quantity":1,"price_delta_minor":-200,"applied_rule_ids":[]}],"applied_rules":[],"total_adjustment_minor":0,"free_swap_count_used":0,"paid_swap_count_used":0}, 0, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 725:15        main.<fn>.<fn>
+  
+00:01 +4 -12: E. Recommendations low extra attach rate triggers promoteExtra recommendation for medium+ confidence
+00:01 +4 -13: E. Recommendations low extra attach rate triggers promoteExtra recommendation for medium+ confidence [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, 5a627869c6f61700e65db18eeb7357aff860c672cb24b8931b0b0976e3b4c749, {"product_id":1,"profile_id":1,"resolved_component_actions":[],"resolved_extra_actions":[{"action":"extra","charge_reason":"extraAdd","component_key":null,"item_product_id":4,"source_item_product_id":null,"quantity":1,"price_delta_minor":100,"applied_rule_ids":[]}],"triggered_discounts":[],"applied_rules":[],"total_adjustment_minor":0,"free_swap_count_used":0,"paid_swap_count_used":0}, 0, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 766:15        main.<fn>.<fn>
+  
+00:01 +4 -13: E. Recommendations high frequent swap triggers adjustDefaultComponent
+00:01 +4 -14: E. Recommendations high frequent swap triggers adjustDefaultComponent [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, 161c61fa040bf60b246a703fb36a35dcf57f594909c3d509738157b3aab2ba72, {"product_id":1,"profile_id":1,"resolved_component_actions":[{"action":"swap","charge_reason":"freeSwap","component_key":"beans","item_product_id":3,"source_item_product_id":2,"quantity":1,"price_delta_minor":0,"applied_rule_ids":[]}],"resolved_extra_actions":[],"triggered_discounts":[],"applied_rules":[],"total_adjustment_minor":0,"free_swap_count_used":0,"paid_swap_count_used":0}, 0, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 806:15        main.<fn>.<fn>
+  
+00:01 +4 -14: E. Recommendations recommendations are deterministic across multiple calls
+00:01 +4 -15: E. Recommendations recommendations are deterministic across multiple calls [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, 98c3f78dda4d452e8f4854adbf4d5d0f1d4647682e9fb67f848c19a7c903e6f0, {"product_id":1,"profile_id":1,"resolved_component_actions":[],"resolved_extra_actions":[],"triggered_discounts":[{"action":"discount","charge_reason":"comboDiscount","component_key":null,"item_product_id":null,"source_item_product_id":null,"quantity":1,"price_delta_minor":-100,"applied_rule_ids":[]}],"applied_rules":[],"total_adjustment_minor":0,"free_swap_count_used":0,"paid_swap_count_used":0}, 0, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 845:15        main.<fn>.<fn>
+  
+00:01 +4 -15: E. Recommendations no recommendations for products with very low data (low confidence)
+00:01 +4 -16: E. Recommendations no recommendations for products with very low data (low confidence) [E]
+  SqliteException(1811): while executing statement, fk_meal_customization_line_snapshots.profile_id->meal_adjustment_profiles.id, constraint failed (code 1811)
+    Causing statement:         INSERT INTO meal_customization_line_snapshots (
+            transaction_line_id,
+            product_id,
+            profile_id,
+            customization_key,
+            snapshot_json,
+            total_adjustment_minor,
+            free_swap_count_used,
+            paid_swap_count_used
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(transaction_line_id) DO UPDATE SET
+            product_id = excluded.product_id,
+            profile_id = excluded.profile_id,
+            customization_key = excluded.customization_key,
+            snapshot_json = excluded.snapshot_json,
+            total_adjustment_minor = excluded.total_adjustment_minor,
+            free_swap_count_used = excluded.free_swap_count_used,
+            paid_swap_count_used = excluded.paid_swap_count_used
+          , parameters: 1, 1, 1, 100bc122bb4d69f9f7b6100e99c11374a61c017284d77a3e74eef345299c3a26, {"product_id":1,"profile_id":1,"resolved_component_actions":[],"resolved_extra_actions":[],"triggered_discounts":[{"action":"discount","charge_reason":"comboDiscount","component_key":null,"item_product_id":null,"source_item_product_id":null,"quantity":1,"price_delta_minor":-200,"applied_rule_ids":[]}],"applied_rules":[],"total_adjustment_minor":0,"free_swap_count_used":0,"paid_swap_count_used":0}, 0, 0, 0
+  package:sqlite3/src/implementation/exception.dart 95:3                 throwException
+  package:sqlite3/src/implementation/statement.dart 109:7                StatementImplementation._execute
+  package:sqlite3/src/implementation/statement.dart 309:5                StatementImplementation.executeWith
+  package:sqlite3/src/statement.dart 81:12                               CommonPreparedStatement.execute
+  package:drift/src/sqlite3/database.dart 149:14                         Sqlite3Delegate.runWithArgsSync
+  package:drift/native.dart 439:7                                        _NativeDelegate.runUpdate.<fn>
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             new Future.sync
+  package:drift/native.dart 438:19                                       _NativeDelegate.runUpdate
+  package:drift/src/runtime/executor/helpers/engines.dart 88:19          _BaseExecutor.runUpdate.<fn>
+  package:drift/src/runtime/executor/helpers/engines.dart 62:20          _BaseExecutor._synchronized
+  package:drift/src/runtime/executor/helpers/engines.dart 85:12          _BaseExecutor.runUpdate
+  package:drift/src/runtime/api/connection_user.dart 304:25              DatabaseConnectionUser.customUpdate.<fn>
+  package:drift/src/runtime/api/connection_user.dart 365:48              DatabaseConnectionUser._customWrite.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 365:22              DatabaseConnectionUser._customWrite
+  package:drift/src/runtime/api/connection_user.dart 298:12              DatabaseConnectionUser.customUpdate
+  package:epos_app/data/repositories/transaction_repository.dart 707:23  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 690:42  TransactionRepository.replaceMealCustomizationLineSnapshot.<fn>
+  package:drift/src/runtime/api/connection_user.dart 505:38              DatabaseConnectionUser.transaction.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:drift/src/runtime/api/connection_user.dart 503:9               DatabaseConnectionUser.transaction.<fn>.<fn>
+  dart:async                                                             runZoned
+  package:drift/src/runtime/api/connection_user.dart 639:12              DatabaseConnectionUser._runConnectionZoned
+  package:drift/src/runtime/api/connection_user.dart 500:14              DatabaseConnectionUser.transaction.<fn>
+  package:drift/src/runtime/api/connection_user.dart 171:16              DatabaseConnectionUser.doWhenOpened.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                             Future.then
+  package:drift/src/runtime/api/connection_user.dart 169:50              DatabaseConnectionUser.doWhenOpened
+  package:drift/src/runtime/api/connection_user.dart 496:27              DatabaseConnectionUser.transaction
+  package:epos_app/data/repositories/transaction_repository.dart 689:21  TransactionRepository.replaceMealCustomizationLineSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  package:epos_app/data/repositories/transaction_repository.dart 677:47  TransactionRepository.replaceMealCustomizationLineSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 57:14         _persistSnapshot
+  ===== asynchronous gap ===========================
+  dart:async                                                             _CustomZone.registerUnaryCallback
+  test\domain\services\meal_customization_phase9_test.dart 52:16         _persistSnapshot
+  test\domain\services\meal_customization_phase9_test.dart 882:15        main.<fn>.<fn>
+  
+00:01 +4 -16: Regression existing meal engine is unaffected
+00:01 +5 -16: Regression report generation does not throw on new empty database
+00:01 +6 -16: Some tests failed.

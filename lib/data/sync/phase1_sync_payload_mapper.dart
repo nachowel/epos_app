@@ -39,6 +39,8 @@ class Phase1SyncPayloadMapper {
       'product_name': row.productName,
       'unit_price_minor': row.unitPriceMinor,
       'quantity': row.quantity,
+      'pricing_mode': row.pricingMode,
+      'removal_discount_total_minor': row.removalDiscountTotalMinor,
       'line_total_minor': row.lineTotalMinor,
     };
   }
@@ -52,7 +54,13 @@ class Phase1SyncPayloadMapper {
       'transaction_line_uuid': transactionLineUuid,
       'action': row.action,
       'item_name': row.itemName,
+      'quantity': row.quantity,
+      'item_product_id': row.itemProductId,
       'extra_price_minor': row.extraPriceMinor,
+      'charge_reason': row.chargeReason,
+      'unit_price_minor': row.unitPriceMinor,
+      'price_effect_minor': row.priceEffectMinor,
+      'sort_key': row.sortKey,
     };
   }
 

@@ -2,6 +2,12 @@
 
 Phase 2D defines product eligibility classes and the enforcement boundary for menu configuration. This is a contract doc only. It does not implement pricing, POS UI, or admin UI.
 
+Scope note:
+
+- this document covers breakfast/menu-engine eligibility only
+- the standard non-breakfast foundation is documented in
+  `docs/meal_adjustment_engine_contract.md`
+
 ## Purpose
 
 This document answers four questions:

@@ -4,13 +4,31 @@ import '../../core/constants/app_strings.dart';
 import '../../core/errors/error_mapper.dart';
 import '../../core/providers/app_providers.dart';
 import '../../domain/models/category.dart';
+import '../../domain/models/meal_adjustment_profile.dart';
 import '../../domain/models/product.dart';
 import '../../domain/models/semantic_product_configuration.dart';
 import '../../domain/services/admin_service.dart';
+import '../../domain/services/meal_adjustment_profile_validation_service.dart';
 import '../../domain/models/user.dart';
 import 'auth_provider.dart';
 
 enum AdminProductStatusFilter { active, archived, all }
+
+class AdminMealProfileVisibility {
+  const AdminMealProfileVisibility({
+    required this.profileId,
+    required this.profileName,
+    required this.healthStatus,
+    required this.headline,
+    required this.previewSummary,
+  });
+
+  final int profileId;
+  final String profileName;
+  final MealAdjustmentHealthStatus healthStatus;
+  final String headline;
+  final String previewSummary;
+}
 
 class AdminProductsState {
   const AdminProductsState({
@@ -20,6 +38,8 @@ class AdminProductsState {
     required this.setProducts,
     required this.normalProducts,
     required this.profiles,
+    required this.mealProfileVisibilityByProductId,
+    required this.legacyMealLineCountsByProduct,
     required this.selectedCategoryId,
     required this.selectedStatusFilter,
     required this.isLoading,
@@ -34,6 +54,9 @@ class AdminProductsState {
       setProducts = const <Product>[],
       normalProducts = const <Product>[],
       profiles = const <int, ProductMenuConfigurationProfile>{},
+      mealProfileVisibilityByProductId =
+          const <int, AdminMealProfileVisibility>{},
+      legacyMealLineCountsByProduct = const <int, int>{},
       selectedCategoryId = null,
       selectedStatusFilter = AdminProductStatusFilter.active,
       isLoading = false,
@@ -46,6 +69,8 @@ class AdminProductsState {
   final List<Product> setProducts;
   final List<Product> normalProducts;
   final Map<int, ProductMenuConfigurationProfile> profiles;
+  final Map<int, AdminMealProfileVisibility> mealProfileVisibilityByProductId;
+  final Map<int, int> legacyMealLineCountsByProduct;
   final int? selectedCategoryId;
   final AdminProductStatusFilter selectedStatusFilter;
   final bool isLoading;
@@ -59,6 +84,8 @@ class AdminProductsState {
     List<Product>? setProducts,
     List<Product>? normalProducts,
     Map<int, ProductMenuConfigurationProfile>? profiles,
+    Map<int, AdminMealProfileVisibility>? mealProfileVisibilityByProductId,
+    Map<int, int>? legacyMealLineCountsByProduct,
     Object? selectedCategoryId = _unset,
     AdminProductStatusFilter? selectedStatusFilter,
     bool? isLoading,
@@ -72,6 +99,12 @@ class AdminProductsState {
       setProducts: setProducts ?? this.setProducts,
       normalProducts: normalProducts ?? this.normalProducts,
       profiles: profiles ?? this.profiles,
+      mealProfileVisibilityByProductId:
+          mealProfileVisibilityByProductId ??
+          this.mealProfileVisibilityByProductId,
+      legacyMealLineCountsByProduct:
+          legacyMealLineCountsByProduct ??
+          this.legacyMealLineCountsByProduct,
       selectedCategoryId: selectedCategoryId == _unset
           ? this.selectedCategoryId
           : selectedCategoryId as int?,
@@ -110,6 +143,16 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
       final Map<int, ProductMenuConfigurationProfile> profiles = await _ref
           .read(semanticMenuAdminServiceProvider)
           .getProductProfiles(allProducts.map((Product product) => product.id));
+      final Map<int, AdminMealProfileVisibility> mealProfileVisibilityByProductId =
+          await _loadMealProfileVisibility(allProducts);
+      Map<int, int> legacyLineCounts = const <int, int>{};
+      try {
+        legacyLineCounts = await _ref
+            .read(mealInsightsServiceProvider)
+            .getLegacyLineCountsByProduct();
+      } catch (_) {
+        // Legacy counts are best-effort — do not block admin load.
+      }
       final _ProductSections sections = _splitProducts(products, profiles);
 
       state = state.copyWith(
@@ -119,6 +162,8 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
         setProducts: sections.setProducts,
         normalProducts: sections.normalProducts,
         profiles: profiles,
+        mealProfileVisibilityByProductId: mealProfileVisibilityByProductId,
+        legacyMealLineCountsByProduct: legacyLineCounts,
         selectedCategoryId: selectedCategoryId,
         isLoading: false,
         errorMessage: null,
@@ -157,6 +202,8 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
       final Map<int, ProductMenuConfigurationProfile> profiles = await _ref
           .read(semanticMenuAdminServiceProvider)
           .getProductProfiles(allProducts.map((Product product) => product.id));
+      final Map<int, AdminMealProfileVisibility> mealProfileVisibilityByProductId =
+          await _loadMealProfileVisibility(allProducts);
       final _ProductSections sections = _splitProducts(products, profiles);
       state = state.copyWith(
         allProducts: allProducts,
@@ -164,6 +211,7 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
         setProducts: sections.setProducts,
         normalProducts: sections.normalProducts,
         profiles: profiles,
+        mealProfileVisibilityByProductId: mealProfileVisibilityByProductId,
         isLoading: false,
         errorMessage: null,
       );
@@ -492,6 +540,115 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
       return current;
     }
     return availableItems.first;
+  }
+
+  Future<Map<int, AdminMealProfileVisibility>> _loadMealProfileVisibility(
+    List<Product> products,
+  ) async {
+    final Set<int> profileIds = products
+        .map((Product product) => product.mealAdjustmentProfileId)
+        .whereType<int>()
+        .toSet();
+    if (profileIds.isEmpty) {
+      return const <int, AdminMealProfileVisibility>{};
+    }
+
+    final Map<int, MealAdjustmentProfile> profilesById =
+        <int, MealAdjustmentProfile>{
+          for (final MealAdjustmentProfile profile
+              in await _ref
+                  .read(mealAdjustmentProfileRepositoryProvider)
+                  .listProfilesForAdmin())
+            profile.id: profile,
+        };
+    final Map<int, AdminMealProfileVisibility> visibilityByProfileId =
+        <int, AdminMealProfileVisibility>{};
+    for (final int profileId in profileIds) {
+      final MealAdjustmentProfile? profile = profilesById[profileId];
+      final MealAdjustmentProfileDraft? draft = await _ref
+          .read(mealAdjustmentProfileRepositoryProvider)
+          .loadProfileDraft(profileId);
+      final AdminMealProfileVisibility visibility;
+      if (draft == null) {
+        visibility = AdminMealProfileVisibility(
+          profileId: profileId,
+          profileName: profile?.name ?? 'Missing profile #$profileId',
+          healthStatus: MealAdjustmentHealthStatus.invalid,
+          headline: 'Assigned meal profile is missing.',
+          previewSummary: 'Preview unavailable.',
+        );
+      } else {
+        final MealAdjustmentProfileHealthSummary healthSummary = await _ref
+            .read(mealAdjustmentProfileValidationServiceProvider)
+            .computeHealthSummary(draft);
+        visibility = AdminMealProfileVisibility(
+          profileId: profileId,
+          profileName: profile?.name ?? draft.name,
+          healthStatus: healthSummary.healthStatus,
+          headline: healthSummary.headline,
+          previewSummary: await _buildMealProfilePreview(draft),
+        );
+      }
+      visibilityByProfileId[profileId] = visibility;
+    }
+
+    final Map<int, AdminMealProfileVisibility> visibilityByProductId =
+        <int, AdminMealProfileVisibility>{};
+    for (final Product product in products) {
+      final int? profileId = product.mealAdjustmentProfileId;
+      if (profileId == null) {
+        continue;
+      }
+      final AdminMealProfileVisibility? visibility =
+          visibilityByProfileId[profileId];
+      if (visibility != null) {
+        visibilityByProductId[product.id] = visibility;
+      }
+    }
+    return visibilityByProductId;
+  }
+
+  Future<String> _buildMealProfilePreview(
+    MealAdjustmentProfileDraft draft,
+  ) async {
+    final Set<int> productIds = <int>{
+      for (final MealAdjustmentComponentDraft component in draft.components)
+        component.defaultItemProductId,
+      for (final MealAdjustmentComponentDraft component in draft.components)
+        ...component.swapOptions.map(
+          (MealAdjustmentComponentOptionDraft option) => option.optionItemProductId,
+        ),
+      for (final MealAdjustmentExtraOptionDraft extra in draft.extraOptions)
+        extra.itemProductId,
+    };
+    final Map<int, String> namesById = <int, String>{};
+    for (final int productId in productIds) {
+      final Product? product = await _ref
+          .read(productRepositoryProvider)
+          .getById(productId);
+      if (product != null) {
+        namesById[productId] = product.name;
+      }
+    }
+
+    final List<String> fragments = <String>[
+      for (final MealAdjustmentComponentDraft component in draft.components.take(2))
+        '${component.displayName}: ${namesById[component.defaultItemProductId] ?? '#${component.defaultItemProductId}'}',
+    ];
+    if (draft.extraOptions.isNotEmpty) {
+      final List<String> extras = draft.extraOptions
+          .take(2)
+          .map(
+            (MealAdjustmentExtraOptionDraft extra) =>
+                namesById[extra.itemProductId] ?? '#${extra.itemProductId}',
+          )
+          .toList(growable: false);
+      fragments.add('Extras: ${extras.join(', ')}');
+    }
+    if (fragments.isEmpty) {
+      return 'No active components configured.';
+    }
+    return fragments.join(' · ');
   }
 }
 

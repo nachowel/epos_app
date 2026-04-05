@@ -3,7 +3,9 @@ import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/core/providers/app_providers.dart';
 import 'package:epos_app/data/database/app_database.dart' as app_db;
 import 'package:epos_app/data/repositories/category_repository.dart';
+import 'package:epos_app/data/repositories/drift_meal_adjustment_profile_repository.dart';
 import 'package:epos_app/data/repositories/product_repository.dart';
+import 'package:epos_app/domain/models/meal_adjustment_profile.dart';
 import 'package:epos_app/domain/models/user.dart';
 import 'package:epos_app/domain/services/admin_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +15,95 @@ import '../../support/test_database.dart';
 
 void main() {
   group('Admin product lifecycle hardening', () {
+    test(
+      'meal-adjustment referenced product cannot be archived or deleted',
+      () async {
+        final db = createTestDatabase();
+        addTearDown(db.close);
+
+        final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+        final int categoryId = await insertCategory(db, name: 'Meals');
+        final int mealRootId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Burger Meal',
+          priceMinor: 1000,
+        );
+        final int referencedItemId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Fries',
+          priceMinor: 0,
+        );
+
+        final DriftMealAdjustmentProfileRepository repository =
+            DriftMealAdjustmentProfileRepository(db);
+        final int profileId = await repository.saveProfileDraft(
+          MealAdjustmentProfileDraft(
+            name: 'Meal profile',
+            freeSwapLimit: 0,
+            isActive: true,
+            components: <MealAdjustmentComponentDraft>[
+              MealAdjustmentComponentDraft(
+                componentKey: 'side',
+                displayName: 'Side',
+                defaultItemProductId: referencedItemId,
+                quantity: 1,
+                canRemove: true,
+                sortOrder: 0,
+                isActive: true,
+              ),
+            ],
+          ),
+        );
+        await repository.assignProfileToProduct(
+          productId: mealRootId,
+          profileId: profileId,
+        );
+
+        final ProviderContainer container = ProviderContainer(
+          overrides: <Override>[appDatabaseProvider.overrideWithValue(db)],
+        );
+        addTearDown(container.dispose);
+
+        final AdminService service = container.read(adminServiceProvider);
+
+        await expectLater(
+          service.toggleProductActive(
+            user: _adminUser(adminId),
+            id: referencedItemId,
+            isActive: false,
+          ),
+          throwsA(
+            isA<ValidationException>().having(
+              (ValidationException error) => error.message,
+              'message',
+              contains('Archiving is blocked'),
+            ),
+          ),
+        );
+
+        await expectLater(
+          service.deleteProduct(user: _adminUser(adminId), id: referencedItemId),
+          throwsA(
+            isA<ValidationException>().having(
+              (ValidationException error) => error.message,
+              'message',
+              contains('Archive or delete is blocked'),
+            ),
+          ),
+        );
+
+        final ProductDeletionAnalysis analysis = await service.analyzeProductDeletion(
+          user: _adminUser(adminId),
+          id: referencedItemId,
+        );
+        expect(analysis.mealComponentDefaultReferenceCount, 1);
+        expect(analysis.mealAffectedProfileCount, 1);
+        expect(analysis.hasMealAdjustmentReferences, isTrue);
+      },
+    );
+
     test(
       'standard product with semantic references requires explicit confirmation',
       () async {

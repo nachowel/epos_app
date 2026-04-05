@@ -57,6 +57,7 @@ class _TestAppDatabase extends AppDatabase {
       CREATE TABLE products (
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         category_id INTEGER NOT NULL,
+        meal_adjustment_profile_id INTEGER NULL,
         name TEXT NOT NULL,
         price_minor INTEGER NOT NULL CHECK (price_minor >= 0),
         image_url TEXT NULL,
@@ -64,6 +65,112 @@ class _TestAppDatabase extends AppDatabase {
         is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
         is_visible_on_pos INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_on_pos IN (0, 1)),
         sort_order INTEGER NOT NULL DEFAULT 0
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE meal_adjustment_profiles (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT NULL,
+        free_swap_limit INTEGER NOT NULL DEFAULT 0 CHECK (free_swap_limit >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CHECK (length(trim(name)) > 0)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE meal_adjustment_profile_components (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
+        component_key TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        default_item_product_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+        can_remove INTEGER NOT NULL DEFAULT 1 CHECK (can_remove IN (0, 1)),
+        sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        CHECK (length(trim(component_key)) > 0),
+        CHECK (length(trim(display_name)) > 0),
+        UNIQUE(profile_id, component_key)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE meal_adjustment_component_options (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_component_id INTEGER NOT NULL,
+        option_item_product_id INTEGER NOT NULL,
+        option_type TEXT NOT NULL CHECK (option_type IN ('swap')),
+        fixed_price_delta_minor INTEGER NULL CHECK (fixed_price_delta_minor IS NULL OR fixed_price_delta_minor >= 0),
+        sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        UNIQUE(profile_component_id, option_item_product_id, option_type)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE meal_adjustment_profile_extras (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
+        item_product_id INTEGER NOT NULL,
+        fixed_price_delta_minor INTEGER NOT NULL CHECK (fixed_price_delta_minor >= 0),
+        sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        UNIQUE(profile_id, item_product_id)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE meal_adjustment_pricing_rules (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        rule_type TEXT NOT NULL CHECK (rule_type IN ('remove_only','combo','swap','extra')),
+        price_delta_minor INTEGER NOT NULL,
+        priority INTEGER NOT NULL DEFAULT 0 CHECK (priority >= 0),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        CHECK (length(trim(name)) > 0)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE meal_adjustment_pricing_rule_conditions (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        rule_id INTEGER NOT NULL,
+        condition_type TEXT NOT NULL CHECK (condition_type IN ('removed_component','swap_to_item','extra_item')),
+        component_key TEXT NULL,
+        item_product_id INTEGER NULL,
+        quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+        CHECK (
+          (condition_type = 'removed_component'
+            AND component_key IS NOT NULL
+            AND length(trim(component_key)) > 0
+            AND item_product_id IS NULL)
+          OR
+          (condition_type = 'swap_to_item'
+            AND component_key IS NOT NULL
+            AND length(trim(component_key)) > 0
+            AND item_product_id IS NOT NULL)
+          OR
+          (condition_type = 'extra_item'
+            AND component_key IS NULL
+            AND item_product_id IS NOT NULL)
+        )
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE breakfast_extra_presets (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        CHECK (length(trim(name)) > 0)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE breakfast_extra_preset_items (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        preset_id INTEGER NOT NULL,
+        item_product_id INTEGER NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
+        UNIQUE(preset_id, item_product_id)
       );
     ''');
     await customStatement('''
@@ -143,7 +250,7 @@ class _TestAppDatabase extends AppDatabase {
         table_number INTEGER NULL,
         status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid','cancelled')),
         subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
-        modifier_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (modifier_total_minor >= 0),
+        modifier_total_minor INTEGER NOT NULL DEFAULT 0,
         total_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_amount_minor >= 0),
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         paid_at INTEGER NULL,
@@ -170,6 +277,18 @@ class _TestAppDatabase extends AppDatabase {
       );
     ''');
     await customStatement('''
+      CREATE TABLE meal_customization_line_snapshots (
+        transaction_line_id INTEGER NOT NULL PRIMARY KEY,
+        product_id INTEGER NOT NULL,
+        profile_id INTEGER NOT NULL,
+        customization_key TEXT NOT NULL,
+        snapshot_json TEXT NOT NULL,
+        total_adjustment_minor INTEGER NOT NULL,
+        free_swap_count_used INTEGER NOT NULL DEFAULT 0 CHECK (free_swap_count_used >= 0),
+        paid_swap_count_used INTEGER NOT NULL DEFAULT 0 CHECK (paid_swap_count_used >= 0)
+      );
+    ''');
+    await customStatement('''
       CREATE TABLE order_modifiers (
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         uuid TEXT NOT NULL UNIQUE,
@@ -180,11 +299,25 @@ class _TestAppDatabase extends AppDatabase {
         item_product_id INTEGER NULL,
         source_group_id INTEGER NULL,
         extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
-        charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount')),
+        charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount','combo_discount')),
         unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
-        price_effect_minor INTEGER NOT NULL DEFAULT 0 CHECK (price_effect_minor >= 0),
+        price_effect_minor INTEGER NOT NULL DEFAULT 0,
         sort_key INTEGER NOT NULL DEFAULT 0,
         CHECK (action != 'choice' OR charge_reason = 'included_choice')
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE breakfast_cooking_instructions (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT NOT NULL UNIQUE,
+        transaction_line_id INTEGER NOT NULL,
+        item_product_id INTEGER NOT NULL,
+        item_name TEXT NOT NULL,
+        instruction_code TEXT NOT NULL CHECK (length(trim(instruction_code)) > 0),
+        instruction_label TEXT NOT NULL CHECK (length(trim(instruction_label)) > 0),
+        applied_quantity INTEGER NOT NULL DEFAULT 1 CHECK (applied_quantity > 0),
+        sort_key INTEGER NOT NULL DEFAULT 0,
+        UNIQUE(transaction_line_id, item_product_id)
       );
     ''');
     await customStatement('''
@@ -316,6 +449,12 @@ class _TestAppDatabase extends AppDatabase {
       "CREATE UNIQUE INDEX ux_shifts_single_open ON shifts(status) WHERE status = 'open';",
     );
     await customStatement(
+      'CREATE INDEX idx_breakfast_extra_presets_name ON breakfast_extra_presets(name, updated_at, id);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_breakfast_extra_preset_items_preset ON breakfast_extra_preset_items(preset_id, sort_order, id);',
+    );
+    await customStatement(
       'CREATE INDEX idx_menu_settings_updated_at ON menu_settings(updated_at, id);',
     );
     await customStatement(
@@ -326,6 +465,24 @@ class _TestAppDatabase extends AppDatabase {
     );
     await customStatement(
       'CREATE INDEX idx_products_category ON products(category_id, is_active, is_visible_on_pos, sort_order);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_products_meal_adjustment_profile ON products(meal_adjustment_profile_id);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_meal_adjustment_profile_components_profile ON meal_adjustment_profile_components(profile_id, is_active, sort_order);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_meal_adjustment_component_options_component ON meal_adjustment_component_options(profile_component_id, is_active, sort_order);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_meal_adjustment_profile_extras_profile ON meal_adjustment_profile_extras(profile_id, is_active, sort_order);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_meal_adjustment_pricing_rules_profile ON meal_adjustment_pricing_rules(profile_id, is_active, priority);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_meal_adjustment_pricing_rule_conditions_rule ON meal_adjustment_pricing_rule_conditions(rule_id);',
     );
     await customStatement(
       'CREATE INDEX idx_product_modifiers_prod ON product_modifiers(product_id, is_active);',
@@ -346,6 +503,12 @@ class _TestAppDatabase extends AppDatabase {
       'CREATE INDEX idx_transaction_lines_tx ON transaction_lines(transaction_id);',
     );
     await customStatement(
+      'CREATE UNIQUE INDEX ux_meal_customization_line_snapshots_line ON meal_customization_line_snapshots(transaction_line_id);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_meal_customization_line_snapshots_lookup ON meal_customization_line_snapshots(product_id, profile_id, customization_key, transaction_line_id);',
+    );
+    await customStatement(
       'CREATE INDEX idx_order_modifiers_line ON order_modifiers(transaction_line_id);',
     );
     await customStatement(
@@ -356,6 +519,12 @@ class _TestAppDatabase extends AppDatabase {
     );
     await customStatement(
       'CREATE INDEX idx_order_modifiers_source_group ON order_modifiers(source_group_id, item_product_id, charge_reason);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_breakfast_cooking_instructions_line ON breakfast_cooking_instructions(transaction_line_id, sort_key, id);',
+    );
+    await customStatement(
+      'CREATE INDEX idx_breakfast_cooking_instructions_item ON breakfast_cooking_instructions(item_product_id, instruction_code);',
     );
     await customStatement(
       'CREATE INDEX idx_payments_tx ON payments(transaction_id);',
@@ -400,9 +569,71 @@ class _TestAppDatabase extends AppDatabase {
 
   Future<void> _createForeignKeyEmulation() async {
     await _createFkTrigger(
+      table: 'breakfast_extra_preset_items',
+      column: 'preset_id',
+      referencedTable: 'breakfast_extra_presets',
+    );
+    await _createFkTrigger(
+      table: 'breakfast_extra_preset_items',
+      column: 'item_product_id',
+      referencedTable: 'products',
+    );
+    await _createFkTrigger(
       table: 'products',
       column: 'category_id',
       referencedTable: 'categories',
+    );
+    await _createFkTrigger(
+      table: 'products',
+      column: 'meal_adjustment_profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+      nullable: true,
+    );
+    await _createFkTrigger(
+      table: 'meal_adjustment_profile_components',
+      column: 'profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+    );
+    await _createFkTrigger(
+      table: 'meal_adjustment_profile_components',
+      column: 'default_item_product_id',
+      referencedTable: 'products',
+    );
+    await _createFkTrigger(
+      table: 'meal_adjustment_component_options',
+      column: 'profile_component_id',
+      referencedTable: 'meal_adjustment_profile_components',
+    );
+    await _createFkTrigger(
+      table: 'meal_adjustment_component_options',
+      column: 'option_item_product_id',
+      referencedTable: 'products',
+    );
+    await _createFkTrigger(
+      table: 'meal_adjustment_profile_extras',
+      column: 'profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+    );
+    await _createFkTrigger(
+      table: 'meal_adjustment_profile_extras',
+      column: 'item_product_id',
+      referencedTable: 'products',
+    );
+    await _createFkTrigger(
+      table: 'meal_adjustment_pricing_rules',
+      column: 'profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+    );
+    await _createFkTrigger(
+      table: 'meal_adjustment_pricing_rule_conditions',
+      column: 'rule_id',
+      referencedTable: 'meal_adjustment_pricing_rules',
+    );
+    await _createFkTrigger(
+      table: 'meal_adjustment_pricing_rule_conditions',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
     );
     await _createFkTrigger(
       table: 'menu_settings',
@@ -486,6 +717,21 @@ class _TestAppDatabase extends AppDatabase {
       referencedTable: 'products',
     );
     await _createFkTrigger(
+      table: 'meal_customization_line_snapshots',
+      column: 'transaction_line_id',
+      referencedTable: 'transaction_lines',
+    );
+    await _createFkTrigger(
+      table: 'meal_customization_line_snapshots',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createFkTrigger(
+      table: 'meal_customization_line_snapshots',
+      column: 'profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+    );
+    await _createFkTrigger(
       table: 'order_modifiers',
       column: 'transaction_line_id',
       referencedTable: 'transaction_lines',
@@ -501,6 +747,16 @@ class _TestAppDatabase extends AppDatabase {
       column: 'source_group_id',
       referencedTable: 'modifier_groups',
       nullable: true,
+    );
+    await _createFkTrigger(
+      table: 'breakfast_cooking_instructions',
+      column: 'transaction_line_id',
+      referencedTable: 'transaction_lines',
+    );
+    await _createFkTrigger(
+      table: 'breakfast_cooking_instructions',
+      column: 'item_product_id',
+      referencedTable: 'products',
     );
     await _createFkTrigger(
       table: 'payments',
@@ -658,6 +914,7 @@ Future<int> insertProduct(
   required int categoryId,
   required String name,
   required int priceMinor,
+  int? mealAdjustmentProfileId,
   bool hasModifiers = false,
   int sortOrder = 0,
   bool isActive = true,
@@ -670,6 +927,7 @@ Future<int> insertProduct(
           categoryId: categoryId,
           name: name,
           priceMinor: priceMinor,
+          mealAdjustmentProfileId: Value<int?>(mealAdjustmentProfileId),
           hasModifiers: Value<bool>(hasModifiers),
           sortOrder: Value<int>(sortOrder),
           isActive: Value<bool>(isActive),

@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 
+import '../../core/errors/exceptions.dart';
 import '../../domain/models/breakfast_rebuild.dart';
+import '../../domain/models/breakfast_extra_preset.dart';
 import '../../domain/models/semantic_product_configuration.dart';
 import '../database/app_database.dart' as db;
 
@@ -8,6 +10,103 @@ class BreakfastConfigurationRepository {
   const BreakfastConfigurationRepository(this._database);
 
   final db.AppDatabase _database;
+
+  Future<void> bootstrapBreakfastSetRoot(int rootProductId) {
+    return _database.transaction(() async {
+      final List<db.ModifierGroup> existingGroups =
+          await (_database.select(_database.modifierGroups)..where(
+                (db.$ModifierGroupsTable t) =>
+                    t.productId.equals(rootProductId),
+              ))
+              .get();
+      if (existingGroups.isNotEmpty) {
+        return;
+      }
+
+      final List<_BreakfastBootstrapCatalogProduct> availableProducts =
+          await _loadBootstrapCatalogProducts();
+
+      for (final _BreakfastBootstrapChoiceGroupTemplate groupTemplate
+          in _defaultBreakfastChoiceGroupTemplates) {
+        final int groupId = await _database
+            .into(_database.modifierGroups)
+            .insert(
+              db.ModifierGroupsCompanion.insert(
+                productId: rootProductId,
+                name: groupTemplate.name,
+                minSelect: Value<int>(groupTemplate.minSelect),
+                maxSelect: Value<int>(groupTemplate.maxSelect),
+                includedQuantity: Value<int>(groupTemplate.includedQuantity),
+                sortOrder: Value<int>(groupTemplate.sortOrder),
+              ),
+            );
+        for (final _BreakfastBootstrapChoiceMemberTemplate memberTemplate
+            in groupTemplate.members) {
+          final _BreakfastBootstrapCatalogProduct? product =
+              _findBootstrapProduct(
+                availableProducts: availableProducts,
+                normalizedNames: memberTemplate.normalizedNames,
+              );
+          if (product == null) {
+            continue;
+          }
+          await _database
+              .into(_database.productModifiers)
+              .insert(
+                db.ProductModifiersCompanion.insert(
+                  productId: rootProductId,
+                  groupId: Value<int?>(groupId),
+                  itemProductId: Value<int?>(product.id),
+                  name: product.name,
+                  type: 'choice',
+                  extraPriceMinor: const Value<int>(0),
+                  isActive: const Value<bool>(true),
+                ),
+              );
+        }
+      }
+    });
+  }
+
+  Future<List<_BreakfastBootstrapCatalogProduct>>
+  _loadBootstrapCatalogProducts() async {
+    final List<QueryRow> rows = await _database
+        .customSelect(
+          '''
+      SELECT p.id, p.name
+      FROM products p
+      INNER JOIN categories c ON c.id = p.category_id
+      WHERE p.is_active = 1
+        AND LOWER(TRIM(c.name)) != 'set breakfast'
+      ORDER BY p.sort_order ASC, p.id ASC
+      ''',
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _database.products,
+            _database.categories,
+          },
+        )
+        .get();
+    return rows
+        .map(
+          (QueryRow row) => _BreakfastBootstrapCatalogProduct(
+            id: row.read<int>('id'),
+            name: row.read<String>('name'),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  _BreakfastBootstrapCatalogProduct? _findBootstrapProduct({
+    required List<_BreakfastBootstrapCatalogProduct> availableProducts,
+    required Set<String> normalizedNames,
+  }) {
+    for (final _BreakfastBootstrapCatalogProduct product in availableProducts) {
+      if (normalizedNames.contains(product.normalizedName)) {
+        return product;
+      }
+    }
+    return null;
+  }
 
   Future<bool> hasSetConfiguration(int rootProductId) async {
     final db.SetItem? row =
@@ -60,6 +159,12 @@ class BreakfastConfigurationRepository {
                 (db.$ProductModifiersTable t) => OrderingTerm.asc(t.id),
               ]))
             .get();
+    final bool hasSemanticFootprint =
+        setItems.isNotEmpty || groups.isNotEmpty || productModifiers.isNotEmpty;
+    if (!hasSemanticFootprint) {
+      return null;
+    }
+
     final List<db.ProductModifier> extraRows =
         await (_database.select(_database.productModifiers)
               ..where((db.$ProductModifiersTable t) {
@@ -72,6 +177,23 @@ class BreakfastConfigurationRepository {
                 (db.$ProductModifiersTable t) => OrderingTerm.asc(t.id),
               ]))
             .get();
+    final _BreakfastConfigProductContext? rootProduct =
+        await _loadProductContext(rootProductId);
+    final Set<int> setRootProductIds = await loadSetRootProductIds();
+    final List<BreakfastConfigurationIssue> issues = _validateRuntimeSnapshot(
+      rootProductId: rootProductId,
+      rootProduct: rootProduct,
+      setItems: setItems,
+      groups: groups,
+      productModifiers: productModifiers,
+      setRootProductIds: setRootProductIds,
+    );
+    if (issues.isNotEmpty) {
+      throw BreakfastConfigurationInvalidException(
+        rootProductId: rootProductId,
+        issues: issues,
+      );
+    }
 
     final db.MenuSetting? menuSettingsRow =
         await (_database.select(_database.menuSettings)
@@ -177,6 +299,124 @@ class BreakfastConfigurationRepository {
     );
   }
 
+  List<BreakfastConfigurationIssue> _validateRuntimeSnapshot({
+    required int rootProductId,
+    required _BreakfastConfigProductContext? rootProduct,
+    required List<db.SetItem> setItems,
+    required List<db.ModifierGroup> groups,
+    required List<db.ProductModifier> productModifiers,
+    required Set<int> setRootProductIds,
+  }) {
+    final List<BreakfastConfigurationIssue> issues =
+        <BreakfastConfigurationIssue>[];
+    if (rootProduct == null || !_isSetBreakfastCategory(rootProduct.category)) {
+      issues.add(
+        const BreakfastConfigurationIssue(
+          code: BreakfastConfigurationErrorCode.invalidSetRoot,
+        ),
+      );
+    }
+
+    final Map<int, db.ModifierGroup> groupsById = <int, db.ModifierGroup>{
+      for (final db.ModifierGroup group in groups) group.id: group,
+    };
+    final Set<int> localChoiceMemberProductIds = <int>{};
+    for (final db.ModifierGroup group in groups) {
+      if (group.minSelect < 0 ||
+          group.maxSelect <= 0 ||
+          group.maxSelect < group.minSelect) {
+        issues.add(
+          BreakfastConfigurationIssue(
+            code: BreakfastConfigurationErrorCode.invalidChoiceBounds,
+            groupId: group.id,
+          ),
+        );
+      }
+      if (group.includedQuantity <= 0 ||
+          group.includedQuantity > group.maxSelect) {
+        issues.add(
+          BreakfastConfigurationIssue(
+            code: BreakfastConfigurationErrorCode.invalidIncludedQuantity,
+            groupId: group.id,
+          ),
+        );
+      }
+    }
+
+    final Set<int> groupsWithMembers = <int>{};
+    for (final db.ProductModifier modifier in productModifiers) {
+      final int? groupId = modifier.groupId;
+      final int? itemProductId = modifier.itemProductId;
+      if (groupId == null || !groupsById.containsKey(groupId)) {
+        issues.add(
+          BreakfastConfigurationIssue(
+            code: BreakfastConfigurationErrorCode.invalidChoiceGroup,
+            groupId: groupId,
+            productModifierId: modifier.id,
+          ),
+        );
+      } else {
+        groupsWithMembers.add(groupId);
+      }
+      if (itemProductId == null) {
+        issues.add(
+          BreakfastConfigurationIssue(
+            code: BreakfastConfigurationErrorCode.missingItemProductId,
+            groupId: groupId,
+            productModifierId: modifier.id,
+          ),
+        );
+        continue;
+      }
+      localChoiceMemberProductIds.add(itemProductId);
+      if (itemProductId == rootProductId ||
+          setRootProductIds.contains(itemProductId)) {
+        issues.add(
+          BreakfastConfigurationIssue(
+            code: BreakfastConfigurationErrorCode.wrongProductRoleAssignment,
+            groupId: groupId,
+            itemProductId: itemProductId,
+            productModifierId: modifier.id,
+          ),
+        );
+      }
+    }
+
+    for (final db.ModifierGroup group in groups) {
+      if (!groupsWithMembers.contains(group.id)) {
+        issues.add(
+          BreakfastConfigurationIssue(
+            code: BreakfastConfigurationErrorCode.invalidChoiceGroup,
+            groupId: group.id,
+          ),
+        );
+      }
+    }
+
+    for (final db.SetItem item in setItems) {
+      if (item.itemProductId == rootProductId ||
+          setRootProductIds.contains(item.itemProductId)) {
+        issues.add(
+          BreakfastConfigurationIssue(
+            code: BreakfastConfigurationErrorCode.wrongProductRoleAssignment,
+            itemProductId: item.itemProductId,
+          ),
+        );
+      }
+      if (localChoiceMemberProductIds.contains(item.itemProductId)) {
+        issues.add(
+          BreakfastConfigurationIssue(
+            code:
+                BreakfastConfigurationErrorCode.choiceCapableProductInSetItems,
+            itemProductId: item.itemProductId,
+          ),
+        );
+      }
+    }
+
+    return issues;
+  }
+
   Future<Map<int, BreakfastCatalogProduct>> loadCatalogProductsByIds(
     Iterable<int> productIds,
   ) async {
@@ -245,6 +485,131 @@ class BreakfastConfigurationRepository {
       );
     }
     return profiles;
+  }
+
+  Future<List<BreakfastExtraPreset>> loadExtraPresets() async {
+    final List<db.BreakfastExtraPreset> presetRows =
+        await (_database.select(_database.breakfastExtraPresets)
+              ..orderBy(<OrderingTerm Function(db.$BreakfastExtraPresetsTable)>[
+                (db.$BreakfastExtraPresetsTable t) => OrderingTerm.asc(t.name),
+                (db.$BreakfastExtraPresetsTable t) =>
+                    OrderingTerm.desc(t.updatedAt),
+                (db.$BreakfastExtraPresetsTable t) => OrderingTerm.asc(t.id),
+              ]))
+            .get();
+    if (presetRows.isEmpty) {
+      return const <BreakfastExtraPreset>[];
+    }
+
+    final List<int> presetIds = presetRows
+        .map((db.BreakfastExtraPreset preset) => preset.id)
+        .toList(growable: false);
+    final List<db.BreakfastExtraPresetItem> itemRows =
+        await (_database.select(_database.breakfastExtraPresetItems)
+              ..where(
+                (db.$BreakfastExtraPresetItemsTable t) =>
+                    t.presetId.isIn(presetIds),
+              )
+              ..orderBy(
+                <OrderingTerm Function(db.$BreakfastExtraPresetItemsTable)>[
+                  (db.$BreakfastExtraPresetItemsTable t) =>
+                      OrderingTerm.asc(t.presetId),
+                  (db.$BreakfastExtraPresetItemsTable t) =>
+                      OrderingTerm.asc(t.sortOrder),
+                  (db.$BreakfastExtraPresetItemsTable t) =>
+                      OrderingTerm.asc(t.id),
+                ],
+              ))
+            .get();
+
+    final Map<int, BreakfastCatalogProduct> productsById =
+        await loadCatalogProductsByIds(
+          itemRows.map((db.BreakfastExtraPresetItem row) => row.itemProductId),
+        );
+    final Map<int, List<BreakfastExtraPresetItem>> itemsByPresetId =
+        <int, List<BreakfastExtraPresetItem>>{};
+    for (final db.BreakfastExtraPresetItem row in itemRows) {
+      final BreakfastCatalogProduct? product = productsById[row.itemProductId];
+      itemsByPresetId
+          .putIfAbsent(row.presetId, () => <BreakfastExtraPresetItem>[])
+          .add(
+            BreakfastExtraPresetItem(
+              itemProductId: row.itemProductId,
+              itemName: product?.name ?? 'Product ${row.itemProductId}',
+              sortOrder: row.sortOrder,
+            ),
+          );
+    }
+
+    return presetRows
+        .map((db.BreakfastExtraPreset row) {
+          return BreakfastExtraPreset(
+            id: row.id,
+            name: row.name,
+            items: List<BreakfastExtraPresetItem>.unmodifiable(
+              itemsByPresetId[row.id] ?? const <BreakfastExtraPresetItem>[],
+            ),
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  Future<int> saveExtraPreset({
+    int? presetId,
+    required String name,
+    required List<int> itemProductIds,
+  }) {
+    return _database.transaction(() async {
+      final DateTime now = DateTime.now();
+      late final int effectivePresetId;
+      if (presetId == null) {
+        effectivePresetId = await _database
+            .into(_database.breakfastExtraPresets)
+            .insert(
+              db.BreakfastExtraPresetsCompanion.insert(
+                name: name,
+                createdAt: Value<DateTime>(now),
+                updatedAt: Value<DateTime>(now),
+              ),
+            );
+      } else {
+        final int updatedCount =
+            await (_database.update(_database.breakfastExtraPresets)
+                  ..where((db.$BreakfastExtraPresetsTable t) {
+                    return t.id.equals(presetId);
+                  }))
+                .write(
+                  db.BreakfastExtraPresetsCompanion(
+                    name: Value<String>(name),
+                    updatedAt: Value<DateTime>(now),
+                  ),
+                );
+        if (updatedCount == 0) {
+          throw NotFoundException('Breakfast extras preset not found.');
+        }
+        effectivePresetId = presetId;
+        await (_database.delete(_database.breakfastExtraPresetItems)..where(
+              (db.$BreakfastExtraPresetItemsTable t) =>
+                  t.presetId.equals(effectivePresetId),
+            ))
+            .go();
+      }
+
+      for (int index = 0; index < itemProductIds.length; index += 1) {
+        await _database
+            .into(_database.breakfastExtraPresetItems)
+            .insert(
+              db.BreakfastExtraPresetItemsCompanion.insert(
+                presetId: effectivePresetId,
+                itemProductId: itemProductIds[index],
+                sortOrder: Value<int>(index),
+              ),
+            );
+      }
+      return effectivePresetId;
+    });
   }
 
   Future<SemanticProductConfigurationDraft> loadAdminConfigurationDraft(
@@ -533,4 +898,113 @@ class BreakfastConfigurationRepository {
         .get();
     return rows.map((QueryRow row) => row.read<int>('product_id')).toSet();
   }
+
+  Future<_BreakfastConfigProductContext?> _loadProductContext(
+    int productId,
+  ) async {
+    final List<QueryRow> rows = await _database
+        .customSelect(
+          '''
+        SELECT p.id, p.name, c.name AS category_name
+        FROM products p
+        INNER JOIN categories c ON c.id = p.category_id
+        WHERE p.id = ?
+        LIMIT 1
+      ''',
+          variables: <Variable<Object>>[Variable<int>(productId)],
+        )
+        .get();
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    final QueryRow row = rows.single;
+    return _BreakfastConfigProductContext(
+      id: row.read<int>('id'),
+      name: row.read<String>('name'),
+      category: row.read<String>('category_name'),
+    );
+  }
+
+  bool _isSetBreakfastCategory(String categoryName) =>
+      categoryName.trim().toLowerCase() == 'set breakfast';
 }
+
+class _BreakfastConfigProductContext {
+  const _BreakfastConfigProductContext({
+    required this.id,
+    required this.name,
+    required this.category,
+  });
+
+  final int id;
+  final String name;
+  final String category;
+}
+
+class _BreakfastBootstrapChoiceGroupTemplate {
+  const _BreakfastBootstrapChoiceGroupTemplate({
+    required this.name,
+    required this.minSelect,
+    required this.maxSelect,
+    required this.includedQuantity,
+    required this.sortOrder,
+    required this.members,
+  });
+
+  final String name;
+  final int minSelect;
+  final int maxSelect;
+  final int includedQuantity;
+  final int sortOrder;
+  final List<_BreakfastBootstrapChoiceMemberTemplate> members;
+}
+
+class _BreakfastBootstrapChoiceMemberTemplate {
+  const _BreakfastBootstrapChoiceMemberTemplate(this.normalizedNames);
+
+  final Set<String> normalizedNames;
+}
+
+class _BreakfastBootstrapCatalogProduct {
+  const _BreakfastBootstrapCatalogProduct({
+    required this.id,
+    required this.name,
+  });
+
+  final int id;
+  final String name;
+
+  String get normalizedName => name.trim().toLowerCase();
+}
+
+const List<_BreakfastBootstrapChoiceGroupTemplate>
+_defaultBreakfastChoiceGroupTemplates =
+    <_BreakfastBootstrapChoiceGroupTemplate>[
+      _BreakfastBootstrapChoiceGroupTemplate(
+        name: 'Tea or Coffee',
+        minSelect: 1,
+        maxSelect: 1,
+        includedQuantity: 1,
+        sortOrder: 1,
+        members: <_BreakfastBootstrapChoiceMemberTemplate>[
+          _BreakfastBootstrapChoiceMemberTemplate(<String>{'tea'}),
+          _BreakfastBootstrapChoiceMemberTemplate(<String>{
+            'cappucino',
+            'cappuccino',
+            'latte',
+          }),
+        ],
+      ),
+      _BreakfastBootstrapChoiceGroupTemplate(
+        name: 'Toast or Bread',
+        minSelect: 1,
+        maxSelect: 1,
+        includedQuantity: 1,
+        sortOrder: 2,
+        members: <_BreakfastBootstrapChoiceMemberTemplate>[
+          _BreakfastBootstrapChoiceMemberTemplate(<String>{'toasts', 'toast'}),
+          _BreakfastBootstrapChoiceMemberTemplate(<String>{'breads', 'bread'}),
+        ],
+      ),
+    ];
