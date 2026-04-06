@@ -112,6 +112,12 @@ Each component declares:
 - remove eligibility
 - sort order
 
+Current cashier runtime interpretation:
+
+- component `quantity` is authoritative semantic quantity for that slot
+- remove and swap actions apply to the full configured component quantity
+- the standard POS dialog does not expose partial per-component quantity edits
+
 ## Semantic Split
 
 The standard engine keeps these concepts separate:
@@ -209,8 +215,8 @@ schema.
 The engine resolves in this exact order:
 
 1. request validation
-2. swap eligibility classification
-3. free swap allowance application
+2. component action classification (`keep`, `remove`, `swap`)
+3. swap eligibility classification and free/paid swap classification
 4. exact combo rule evaluation
 5. exact swap rule evaluation
 6. exact extra rule evaluation
@@ -281,6 +287,14 @@ Request carries user intent only:
 - removed component keys
 - swap selections (`component_key -> target_item_product_id`)
 - extra selections (`item_product_id + quantity`)
+
+Editor state must carry one explicit mode per component:
+
+- `keep`
+- `remove`
+- `swap(target_item_product_id)`
+
+`remove` and `swap` are mutually exclusive for the same component key.
 
 Resolved snapshot is deterministic engine output and includes:
 
@@ -485,13 +499,17 @@ Phase 4 groundwork and Phase 5 edit flow require:
 - persisted snapshot -> editor-state rehydration without re-evaluating raw
   request text
 - grouped quantity to remain separate from editor semantic state
-- grouped meal edit operates on the full line quantity, not a single split unit
+- grouped meal edit supports an explicit scope choice:
+  - edit all items on the grouped line in place
+  - edit one item by splitting one unit into a new snapshot-backed line
 - edit save flow must:
   - rebuild a new request from editor state
   - re-evaluate through the deterministic engine
   - persist a new resolved snapshot
   - recompute semantic identity from the new snapshot
   - merge into an existing grouped line when the new identity already exists
+- component quantity remains part of the semantic snapshot during edit and
+  rehydration; it is not derived from grouped line quantity
 - decrement contract for grouped lines:
   - remove once from a grouped line -> decrement quantity
   - remove the final unit -> delete the line and its snapshot

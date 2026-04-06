@@ -39,42 +39,63 @@ class _StandardMealCustomizationDialogState
     extends ConsumerState<StandardMealCustomizationDialog> {
   late MealCustomizationEditorState _editorState;
   late MealCustomizationPosPreview _preview;
+  late bool _isAddInsExpanded;
 
   MealAdjustmentProfile get _profile => widget.initialEditorData.profile;
-  Map<int, String> get _productNamesById => widget.initialEditorData.productNamesById;
+  Map<int, String> get _productNamesById =>
+      widget.initialEditorData.productNamesById;
+  bool get _isSandwichProfile =>
+      _profile.kind == MealAdjustmentProfileKind.sandwich;
+  SandwichBreadType? get _selectedBreadType =>
+      _editorState.sandwichSelection.breadType;
+  SandwichToastOption? get _selectedToastOption =>
+      _editorState.sandwichSelection.toastOption;
 
   @override
   void initState() {
     super.initState();
     _editorState = widget.initialEditorData.preview.editorState;
     _preview = widget.initialEditorData.preview;
+    _isAddInsExpanded = _hasSelectedAddIns;
   }
+
+  bool get _hasSelectedAddIns => _editorState.extraSelections.any(
+    (MealCustomizationExtraSelection selection) => selection.quantity > 0,
+  );
 
   @override
   Widget build(BuildContext context) {
-    final List<MealAdjustmentComponent> activeComponents = _profile.components
-        .where((MealAdjustmentComponent component) => component.isActive)
-        .toList(growable: false)
-      ..sort(
-        (MealAdjustmentComponent left, MealAdjustmentComponent right) =>
-            left.sortOrder.compareTo(right.sortOrder),
-      );
-    final List<MealAdjustmentExtraOption> activeExtras = _profile.extraOptions
-        .where((MealAdjustmentExtraOption option) => option.isActive)
-        .toList(growable: false)
-      ..sort(
-        (MealAdjustmentExtraOption left, MealAdjustmentExtraOption right) =>
-            left.sortOrder.compareTo(right.sortOrder),
-      );
+    final List<MealAdjustmentComponent> activeComponents =
+        _profile.components
+            .where((MealAdjustmentComponent component) => component.isActive)
+            .toList(growable: false)
+          ..sort(
+            (MealAdjustmentComponent left, MealAdjustmentComponent right) =>
+                left.sortOrder.compareTo(right.sortOrder),
+          );
+    final List<MealAdjustmentExtraOption> activeExtras =
+        _profile.extraOptions
+            .where((MealAdjustmentExtraOption option) => option.isActive)
+            .where(
+              (MealAdjustmentExtraOption option) =>
+                  _productNamesById.containsKey(option.itemProductId),
+            )
+            .toList(growable: false)
+          ..sort(
+            (MealAdjustmentExtraOption left, MealAdjustmentExtraOption right) =>
+                left.sortOrder.compareTo(right.sortOrder),
+          );
 
     return AlertDialog(
       key: const ValueKey<String>('meal-customization-dialog'),
       title: Text(
-        widget.isLegacyRecreateMode
+        _isSandwichProfile
+            ? 'Sandwich customization: ${widget.product.name}'
+            : widget.isLegacyRecreateMode
             ? 'Recreate meal: ${widget.product.name}'
             : widget.isEditMode
-                ? 'Edit meal: ${widget.product.name}'
-                : 'Meal customization: ${widget.product.name}',
+            ? 'Edit meal: ${widget.product.name}'
+            : 'Meal customization: ${widget.product.name}',
       ),
       content: SizedBox(
         width: 860,
@@ -84,7 +105,9 @@ class _StandardMealCustomizationDialogState
             children: <Widget>[
               if (widget.isLegacyRecreateMode) ...<Widget>[
                 Container(
-                  key: const ValueKey<String>('meal-customization-legacy-notice'),
+                  key: const ValueKey<String>(
+                    'meal-customization-legacy-notice',
+                  ),
                   width: double.infinity,
                   padding: const EdgeInsets.all(AppSizes.spacingSm),
                   decoration: BoxDecoration(
@@ -103,7 +126,9 @@ class _StandardMealCustomizationDialogState
                 const SizedBox(height: AppSizes.spacingMd),
               ] else if (widget.isEditMode && widget.editOneMode) ...<Widget>[
                 Container(
-                  key: const ValueKey<String>('meal-customization-edit-one-notice'),
+                  key: const ValueKey<String>(
+                    'meal-customization-edit-one-notice',
+                  ),
                   width: double.infinity,
                   padding: const EdgeInsets.all(AppSizes.spacingSm),
                   decoration: BoxDecoration(
@@ -123,7 +148,9 @@ class _StandardMealCustomizationDialogState
               ] else if (widget.isEditMode &&
                   (widget.lineQuantity ?? 0) > 1) ...<Widget>[
                 Container(
-                  key: const ValueKey<String>('meal-customization-edit-all-notice'),
+                  key: const ValueKey<String>(
+                    'meal-customization-edit-all-notice',
+                  ),
                   width: double.infinity,
                   padding: const EdgeInsets.all(AppSizes.spacingSm),
                   decoration: BoxDecoration(
@@ -152,35 +179,43 @@ class _StandardMealCustomizationDialogState
                 ),
                 const SizedBox(height: AppSizes.spacingMd),
               ],
-              _SectionTitle('Included sides / components'),
-              const SizedBox(height: AppSizes.spacingSm),
-              for (final MealAdjustmentComponent component in activeComponents)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSizes.spacingSm),
-                  child: _buildComponentCard(component),
-                ),
-              const SizedBox(height: AppSizes.spacingMd),
-              _SectionTitle('Extras'),
-              const SizedBox(height: AppSizes.spacingSm),
-              if (activeExtras.isEmpty)
-                const Text(
-                  'No extras configured.',
-                  style: TextStyle(color: AppColors.textSecondary),
-                )
-              else
-                Wrap(
-                  spacing: AppSizes.spacingSm,
-                  runSpacing: AppSizes.spacingSm,
-                  children: activeExtras
-                      .map(_buildExtraCard)
-                      .toList(growable: false),
-                ),
-              const SizedBox(height: AppSizes.spacingLg),
+              if (_isSandwichProfile) ...<Widget>[
+                _SectionTitle('Bread type'),
+                const SizedBox(height: AppSizes.spacingSm),
+                _buildSandwichBreadSection(),
+                const SizedBox(height: AppSizes.spacingMd),
+                _SectionTitle('Sauce'),
+                const SizedBox(height: AppSizes.spacingSm),
+                _buildSandwichSauceSection(),
+                if (_selectedBreadType ==
+                    SandwichBreadType.sandwich) ...<Widget>[
+                  const SizedBox(height: AppSizes.spacingMd),
+                  _SectionTitle('Toast'),
+                  const SizedBox(height: AppSizes.spacingSm),
+                  _buildSandwichToastSection(),
+                ],
+              ] else ...<Widget>[
+                _SectionTitle('Included sides / components'),
+                const SizedBox(height: AppSizes.spacingSm),
+                for (final MealAdjustmentComponent component
+                    in activeComponents)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSizes.spacingSm),
+                    child: _buildComponentCard(component),
+                  ),
+              ],
+              if (activeExtras.isNotEmpty) ...<Widget>[
+                const SizedBox(height: AppSizes.spacingMd),
+                _buildAddInsSection(activeExtras),
+                const SizedBox(height: AppSizes.spacingLg),
+              ],
               _SectionTitle('Summary'),
               const SizedBox(height: AppSizes.spacingSm),
               if (_preview.validationMessages.isNotEmpty)
                 Container(
-                  key: const ValueKey<String>('meal-customization-invalid-message'),
+                  key: const ValueKey<String>(
+                    'meal-customization-invalid-message',
+                  ),
                   width: double.infinity,
                   padding: const EdgeInsets.all(AppSizes.spacingSm),
                   decoration: BoxDecoration(
@@ -276,8 +311,8 @@ class _StandardMealCustomizationDialogState
             widget.isLegacyRecreateMode
                 ? 'Recreate meal'
                 : widget.isEditMode
-                    ? 'Save changes'
-                    : 'Add to cart',
+                ? 'Save changes'
+                : 'Add to cart',
           ),
         ),
       ],
@@ -285,26 +320,26 @@ class _StandardMealCustomizationDialogState
   }
 
   Widget _buildComponentCard(MealAdjustmentComponent component) {
-    final MealCustomizationComponentSelection? swapSelection =
-        _editorState.swapSelections.cast<MealCustomizationComponentSelection?>().firstWhere(
-              (MealCustomizationComponentSelection? selection) =>
-                  selection?.componentKey == component.componentKey,
-              orElse: () => null,
-            );
-    final bool isRemoved = _editorState.removedComponentKeys.contains(
-      component.componentKey,
-    );
+    final MealCustomizationComponentState selection = _editorState
+        .selectionForComponent(component.componentKey);
     final String defaultName =
         _productNamesById[component.defaultItemProductId] ??
         'Product ${component.defaultItemProductId}';
+    final String defaultLabel = _formatComponentItemLabel(
+      defaultName,
+      component.quantity,
+    );
     final String stateLabel;
-    if (swapSelection != null) {
+    if (selection.isSwap) {
+      final String targetName =
+          _productNamesById[selection.swapTargetItemProductId] ??
+          selection.swapTargetItemProductId.toString();
       stateLabel =
-          '$defaultName → ${_productNamesById[swapSelection.targetItemProductId] ?? swapSelection.targetItemProductId}';
-    } else if (isRemoved) {
-      stateLabel = 'No $defaultName';
+          '$defaultLabel → ${_formatComponentItemLabel(targetName, selection.quantity)}';
+    } else if (selection.isRemove) {
+      stateLabel = 'No $defaultLabel';
     } else {
-      stateLabel = defaultName;
+      stateLabel = defaultLabel;
     }
 
     return Container(
@@ -342,11 +377,14 @@ class _StandardMealCustomizationDialogState
             runSpacing: AppSizes.spacingSm,
             children: <Widget>[
               _ModeButton(
-                key: ValueKey<String>('meal-component-keep-${component.componentKey}'),
+                key: ValueKey<String>(
+                  'meal-component-keep-${component.componentKey}',
+                ),
                 label: 'Keep',
-                selected: !isRemoved && swapSelection == null,
+                selected: selection.isKeep,
                 onPressed: () => _updateComponent(
                   componentKey: component.componentKey,
+                  mode: MealComponentSelectionMode.keep,
                 ),
               ),
               if (component.canRemove)
@@ -355,22 +393,26 @@ class _StandardMealCustomizationDialogState
                     'meal-component-remove-${component.componentKey}',
                   ),
                   label: 'Remove',
-                  selected: isRemoved,
+                  selected: selection.isRemove,
                   onPressed: () => _updateComponent(
                     componentKey: component.componentKey,
-                    remove: true,
+                    mode: MealComponentSelectionMode.remove,
                   ),
                 )
               else
                 const _RequiredPill(label: 'Required'),
-              for (final MealAdjustmentComponentOption option in component.swapOptions
-                  .where((MealAdjustmentComponentOption option) => option.isActive))
+              for (final MealAdjustmentComponentOption option
+                  in component.swapOptions.where(
+                    (MealAdjustmentComponentOption option) => option.isActive,
+                  ))
                 (() {
                   final int swapPriceDeltaMinor =
                       option.fixedPriceDeltaMinor ?? 0;
-                  final String optionLabel =
-                      _productNamesById[option.optionItemProductId] ??
-                      option.optionItemProductId.toString();
+                  final String optionLabel = _formatComponentItemLabel(
+                    _productNamesById[option.optionItemProductId] ??
+                        option.optionItemProductId.toString(),
+                    component.quantity,
+                  );
                   final String priceSuffix = swapPriceDeltaMinor > 0
                       ? ' +${CurrencyFormatter.fromMinor(swapPriceDeltaMinor)}'
                       : '';
@@ -380,10 +422,11 @@ class _StandardMealCustomizationDialogState
                     ),
                     label: 'Swap to $optionLabel$priceSuffix',
                     selected:
-                        swapSelection?.targetItemProductId ==
+                        selection.swapTargetItemProductId ==
                         option.optionItemProductId,
                     onPressed: () => _updateComponent(
                       componentKey: component.componentKey,
+                      mode: MealComponentSelectionMode.swap,
                       swapTargetItemProductId: option.optionItemProductId,
                     ),
                   );
@@ -392,6 +435,77 @@ class _StandardMealCustomizationDialogState
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSandwichBreadSection() {
+    return Wrap(
+      spacing: AppSizes.spacingSm,
+      runSpacing: AppSizes.spacingSm,
+      children: SandwichBreadType.values
+          .map((SandwichBreadType breadType) {
+            final int surchargeMinor = _profile.sandwichSettings
+                .surchargeForBread(breadType);
+            final String surchargeLabel = surchargeMinor == 0
+                ? ''
+                : ' +${CurrencyFormatter.fromMinor(surchargeMinor)}';
+            return _ModeButton(
+              key: ValueKey<String>('meal-sandwich-bread-${breadType.name}'),
+              label: '${sandwichBreadLabel(breadType)}$surchargeLabel',
+              selected: _selectedBreadType == breadType,
+              onPressed: () => _updateSandwichBreadType(breadType),
+            );
+          })
+          .toList(growable: false),
+    );
+  }
+
+  Widget _buildSandwichSauceSection() {
+    final List<SandwichSauceType> sauceOptions =
+        _profile.sandwichSettings.sauceOptions;
+    if (sauceOptions.isEmpty) {
+      return const Text(
+        'No sauces are enabled for this sandwich profile.',
+        style: TextStyle(
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    }
+    return Wrap(
+      spacing: AppSizes.spacingSm,
+      runSpacing: AppSizes.spacingSm,
+      children: sauceOptions
+          .map((SandwichSauceType sauceType) {
+            return _ModeButton(
+              key: ValueKey<String>('meal-sandwich-sauce-${sauceType.name}'),
+              label: sandwichSauceLabel(sauceType),
+              selected: _editorState.sandwichSelection.sauceTypes.contains(
+                sauceType,
+              ),
+              onPressed: () => _toggleSandwichSauce(sauceType),
+            );
+          })
+          .toList(growable: false),
+    );
+  }
+
+  Widget _buildSandwichToastSection() {
+    return Wrap(
+      spacing: AppSizes.spacingSm,
+      runSpacing: AppSizes.spacingSm,
+      children: SandwichToastOption.values
+          .map((SandwichToastOption option) {
+            return _ModeButton(
+              key: ValueKey<String>('meal-sandwich-toast-${option.name}'),
+              label: sandwichToastLabel(option),
+              selected: _selectedToastOption == option,
+              onPressed: () => _updateSandwichSelection(
+                _editorState.sandwichSelection.copyWith(toastOption: option),
+              ),
+            );
+          })
+          .toList(growable: false),
     );
   }
 
@@ -408,12 +522,106 @@ class _StandardMealCustomizationDialogState
           orElse: () => null,
         );
     final int quantity = existingSelection?.quantity ?? 0;
+    final bool isSelected = quantity > 0;
     final String itemName =
-        _productNamesById[option.itemProductId] ?? 'Product ${option.itemProductId}';
+        _productNamesById[option.itemProductId] ??
+        'Product ${option.itemProductId}';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey<String>('meal-extra-toggle-${option.itemProductId}'),
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        onTap: () =>
+            _updateExtraQuantity(option.itemProductId, isSelected ? 0 : 1),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          width: 220,
+          padding: const EdgeInsets.all(AppSizes.spacingSm),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? AppColors.primary.withValues(alpha: 0.10)
+                : AppColors.surface,
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.border,
+              width: isSelected ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      itemName,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  if (isSelected)
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '+${CurrencyFormatter.fromMinor(option.fixedPriceDeltaMinor)}',
+                style: TextStyle(
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (isSelected) ...<Widget>[
+                const SizedBox(height: AppSizes.spacingSm),
+                Container(
+                  key: ValueKey<String>(
+                    'meal-extra-selected-${option.itemProductId}',
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    'Added',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddInsSection(List<MealAdjustmentExtraOption> activeExtras) {
+    final List<String> selectedNames = _selectedAddInNames(activeExtras);
+    final int selectedCount = selectedNames.length;
+    final String headerLabel = selectedCount > 0
+        ? 'Add-ins ($selectedCount selected)'
+        : 'Add-ins (${activeExtras.length})';
+    final String? collapsedSummary =
+        !_isAddInsExpanded && selectedNames.isNotEmpty
+        ? selectedNames.map((String name) => '+$name').join(', ')
+        : null;
 
     return Container(
-      width: 220,
-      padding: const EdgeInsets.all(AppSizes.spacingSm),
+      key: const ValueKey<String>('meal-addins-section'),
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
@@ -421,91 +629,158 @@ class _StandardMealCustomizationDialogState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            itemName,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            CurrencyFormatter.fromMinor(option.fixedPriceDeltaMinor),
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
+          InkWell(
+            key: const ValueKey<String>('meal-addins-toggle'),
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            onTap: () {
+              setState(() {
+                _isAddInsExpanded = !_isAddInsExpanded;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(AppSizes.spacingSm),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          headerLabel,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        if (collapsedSummary != null) ...<Widget>[
+                          const SizedBox(height: 4),
+                          Text(
+                            collapsedSummary,
+                            key: const ValueKey<String>('meal-addins-summary'),
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _isAddInsExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: AppSizes.spacingSm),
-          Row(
-            children: <Widget>[
-              IconButton(
-                key: ValueKey<String>('meal-extra-dec-${option.itemProductId}'),
-                onPressed: quantity == 0
-                    ? null
-                    : () => _updateExtraQuantity(
-                        option.itemProductId,
-                        quantity - 1,
-                      ),
-                icon: const Icon(Icons.remove_rounded),
+          if (_isAddInsExpanded)
+            Padding(
+              key: const ValueKey<String>('meal-addins-body'),
+              padding: const EdgeInsets.fromLTRB(
+                AppSizes.spacingSm,
+                0,
+                AppSizes.spacingSm,
+                AppSizes.spacingSm,
               ),
-              Expanded(
-                child: Text(
-                  '$quantity',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Text(
+                    'Added into the meal itself.',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: AppSizes.spacingSm),
+                  Wrap(
+                    spacing: AppSizes.spacingSm,
+                    runSpacing: AppSizes.spacingSm,
+                    children: activeExtras
+                        .map(_buildExtraCard)
+                        .toList(growable: false),
+                  ),
+                ],
               ),
-              IconButton(
-                key: ValueKey<String>('meal-extra-inc-${option.itemProductId}'),
-                onPressed: () => _updateExtraQuantity(
-                  option.itemProductId,
-                  quantity + 1,
-                ),
-                icon: const Icon(Icons.add_rounded),
-              ),
-            ],
-          ),
+            ),
         ],
       ),
     );
   }
 
+  List<String> _selectedAddInNames(
+    List<MealAdjustmentExtraOption> activeExtras,
+  ) {
+    final Set<int> activeIds = activeExtras
+        .map((MealAdjustmentExtraOption option) => option.itemProductId)
+        .toSet();
+    return _editorState.extraSelections
+        .where(
+          (MealCustomizationExtraSelection selection) =>
+              selection.quantity > 0 &&
+              activeIds.contains(selection.itemProductId),
+        )
+        .map(
+          (MealCustomizationExtraSelection selection) =>
+              _productNamesById[selection.itemProductId] ??
+              'Product ${selection.itemProductId}',
+        )
+        .toList(growable: false);
+  }
+
   void _updateComponent({
     required String componentKey,
-    bool remove = false,
+    required MealComponentSelectionMode mode,
     int? swapTargetItemProductId,
   }) {
-    final Set<String> removedKeys = _editorState.removedComponentKeys.toSet();
-    final List<MealCustomizationComponentSelection> swaps = _editorState
-        .swapSelections
-        .where(
-          (MealCustomizationComponentSelection selection) =>
-              selection.componentKey != componentKey,
-        )
-        .toList(growable: true);
-    if (remove) {
-      removedKeys.add(componentKey);
-    } else {
-      removedKeys.remove(componentKey);
-      if (swapTargetItemProductId != null) {
-        swaps.add(
-          MealCustomizationComponentSelection(
+    final int componentQuantity = _componentQuantityForKey(componentKey);
+    final List<MealCustomizationComponentState> componentSelections =
+        _editorState.componentSelections
+            .where(
+              (MealCustomizationComponentState selection) =>
+                  selection.componentKey != componentKey,
+            )
+            .toList(growable: true);
+    switch (mode) {
+      case MealComponentSelectionMode.keep:
+        break;
+      case MealComponentSelectionMode.remove:
+        componentSelections.add(
+          MealCustomizationComponentState(
             componentKey: componentKey,
-            targetItemProductId: swapTargetItemProductId,
+            mode: MealComponentSelectionMode.remove,
+            quantity: componentQuantity,
           ),
         );
-      }
+        break;
+      case MealComponentSelectionMode.swap:
+        componentSelections.add(
+          MealCustomizationComponentState(
+            componentKey: componentKey,
+            mode: MealComponentSelectionMode.swap,
+            swapTargetItemProductId: swapTargetItemProductId,
+            quantity: componentQuantity,
+          ),
+        );
+        break;
     }
+    componentSelections.sort(
+      (
+        MealCustomizationComponentState left,
+        MealCustomizationComponentState right,
+      ) => left.componentKey.compareTo(right.componentKey),
+    );
     _setEditorState(
-      _editorState.copyWith(
-        removedComponentKeys: removedKeys.toList(growable: false)..sort(),
-        swapSelections: swaps,
-      ),
+      _editorState.copyWith(componentSelections: componentSelections),
     );
   }
 
   void _updateExtraQuantity(int itemProductId, int quantity) {
+    final int normalizedQuantity = quantity <= 0 ? 0 : 1;
     final List<MealCustomizationExtraSelection> extras = _editorState
         .extraSelections
         .where(
@@ -513,11 +788,11 @@ class _StandardMealCustomizationDialogState
               selection.itemProductId != itemProductId,
         )
         .toList(growable: true);
-    if (quantity > 0) {
+    if (normalizedQuantity > 0) {
       extras.add(
         MealCustomizationExtraSelection(
           itemProductId: itemProductId,
-          quantity: quantity,
+          quantity: normalizedQuantity,
         ),
       );
     }
@@ -530,10 +805,44 @@ class _StandardMealCustomizationDialogState
     _setEditorState(_editorState.copyWith(extraSelections: extras));
   }
 
+  void _updateSandwichBreadType(SandwichBreadType breadType) {
+    final SandwichCustomizationSelection current =
+        _editorState.sandwichSelection;
+    final SandwichToastOption? nextToast =
+        breadType == SandwichBreadType.sandwich
+        ? (current.toastOption ?? SandwichToastOption.normal)
+        : null;
+    _updateSandwichSelection(
+      current.copyWith(breadType: breadType, toastOption: nextToast),
+    );
+  }
+
+  void _updateSandwichSelection(SandwichCustomizationSelection selection) {
+    _setEditorState(_editorState.copyWith(sandwichSelection: selection));
+  }
+
+  void _toggleSandwichSauce(SandwichSauceType sauceType) {
+    final List<SandwichSauceType> current = List<SandwichSauceType>.from(
+      _editorState.sandwichSelection.sauceTypes,
+    );
+    if (current.contains(sauceType)) {
+      current.remove(sauceType);
+    } else {
+      current.add(sauceType);
+    }
+    _updateSandwichSelection(
+      _editorState.sandwichSelection.copyWith(
+        sauceTypes: normalizeSandwichSauceTypes(current),
+      ),
+    );
+  }
+
   void _setEditorState(MealCustomizationEditorState nextState) {
     setState(() {
       _editorState = nextState;
-      _preview = ref.read(mealCustomizationPosServiceProvider).previewSelection(
+      _preview = ref
+          .read(mealCustomizationPosServiceProvider)
+          .previewSelection(
             product: widget.product,
             profile: _profile,
             editorState: _editorState,
@@ -561,7 +870,7 @@ class _StandardMealCustomizationDialogState
         if (suggestion.componentKey != null) {
           _updateComponent(
             componentKey: suggestion.componentKey!,
-            remove: true,
+            mode: MealComponentSelectionMode.remove,
           );
         }
         break;
@@ -570,6 +879,7 @@ class _StandardMealCustomizationDialogState
             suggestion.targetItemProductId != null) {
           _updateComponent(
             componentKey: suggestion.componentKey!,
+            mode: MealComponentSelectionMode.swap,
             swapTargetItemProductId: suggestion.targetItemProductId,
           );
         }
@@ -581,8 +891,11 @@ class _StandardMealCustomizationDialogState
                 (MealCustomizationExtraSelection selection) =>
                     selection.itemProductId == suggestion.itemProductId,
               )
-              .fold<int>(0, (int total, MealCustomizationExtraSelection s) =>
-                  total + s.quantity);
+              .fold<int>(
+                0,
+                (int total, MealCustomizationExtraSelection s) =>
+                    total + s.quantity,
+              );
           _updateExtraQuantity(
             suggestion.itemProductId!,
             current + suggestion.quantity,
@@ -600,6 +913,19 @@ class _StandardMealCustomizationDialogState
       return '-${CurrencyFormatter.fromMinor(amountMinor.abs())}';
     }
     return CurrencyFormatter.fromMinor(amountMinor);
+  }
+
+  int _componentQuantityForKey(String componentKey) {
+    for (final MealAdjustmentComponent component in _profile.components) {
+      if (component.componentKey == componentKey) {
+        return component.quantity;
+      }
+    }
+    return 1;
+  }
+
+  String _formatComponentItemLabel(String label, int quantity) {
+    return quantity > 1 ? '$label x$quantity' : label;
   }
 }
 
