@@ -110,7 +110,10 @@ void main() {
       () async {
         final db = createTestDatabase();
         addTearDown(db.close);
-        final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
+        final _BreakfastFixture fixture = await _seedBreakfastFixture(
+          db,
+          hotDrinkExplicitNoneLabel: 'No drink',
+        );
 
         final order = await fixture.service.createOrder(
           currentUser: fixture.cashier,
@@ -421,7 +424,10 @@ void main() {
   });
 }
 
-Future<_BreakfastFixture> _seedBreakfastFixture(app_db.AppDatabase db) async {
+Future<_BreakfastFixture> _seedBreakfastFixture(
+  app_db.AppDatabase db, {
+  String? hotDrinkExplicitNoneLabel,
+}) async {
   final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
   await insertShift(db, openedBy: cashierId);
 
@@ -596,6 +602,20 @@ Future<_BreakfastFixture> _seedBreakfastFixture(app_db.AppDatabase db) async {
     itemProductId: coffeeProductId,
     label: 'Coffee',
   );
+  if (hotDrinkExplicitNoneLabel != null) {
+    await db
+        .into(db.productModifiers)
+        .insert(
+          app_db.ProductModifiersCompanion.insert(
+            productId: set4ProductId,
+            groupId: Value<int?>(hotDrinkGroupId),
+            itemProductId: const Value<int?>(null),
+            name: hotDrinkExplicitNoneLabel,
+            type: 'choice',
+            extraPriceMinor: const Value<int>(0),
+          ),
+        );
+  }
   await insertChoiceMember(
     groupId: toastBreadGroupId,
     itemProductId: toastProductId,

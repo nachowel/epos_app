@@ -239,7 +239,7 @@ class _BreakfastModifierPopupState
                                 final bool isExplicitNone =
                                     currentChoice?.isExplicitNone ?? false;
                                 final bool supportsExplicitNone =
-                                    group.minSelect == 0;
+                                    group.allowsExplicitNoneSelection;
                                 final int groupQuantity =
                                     currentChoice?.requestedQuantity ?? 0;
                                 final int? selectedProductId =
@@ -270,8 +270,8 @@ class _BreakfastModifierPopupState
                                               key: ValueKey<String>(
                                                 'breakfast-choice-none-${group.groupId}',
                                               ),
-                                              label: const Text(
-                                                breakfastNoneChoiceDisplayName,
+                                              label: Text(
+                                                group.explicitNoneDisplayLabel,
                                               ),
                                               selected: isExplicitNone,
                                               onSelected: _isSubmitting
@@ -332,7 +332,7 @@ class _BreakfastModifierPopupState
                                           Expanded(
                                             child: Text(
                                               isExplicitNone
-                                                  ? 'None selected'
+                                                  ? '${group.explicitNoneDisplayLabel} selected'
                                                   : selectedProductId == null
                                                   ? 'No selection'
                                                   : 'Qty $groupQuantity',

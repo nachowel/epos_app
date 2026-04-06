@@ -270,8 +270,11 @@ class _SemanticBundleEditorDialogState
         changed = true;
         continue;
       }
-      if (group.minSelect == 0 &&
-          normalizedDefault == breakfastNoneChoiceDisplayName.toLowerCase()) {
+      if (group.allowsExplicitNoneSelection &&
+          _matchesExplicitNoneDefault(
+            group: group,
+            normalizedDefault: normalizedDefault,
+          )) {
         nextState = BreakfastLineEdit.chooseGroup(
           groupId: group.groupId,
           selectedItemProductId: null,
@@ -382,6 +385,21 @@ class _SemanticBundleEditorDialogState
     }
   }
 
+  bool _matchesExplicitNoneDefault({
+    required BreakfastChoiceGroupConfig group,
+    required String normalizedDefault,
+  }) {
+    final Set<String> aliases = <String>{
+      'none',
+      'nodrink',
+      'notoastbread',
+      'notoastorbread',
+      'nobread',
+      _normalizeChoiceToken(group.explicitNoneDisplayLabel),
+    };
+    return aliases.contains(normalizedDefault);
+  }
+
   @override
   Widget build(BuildContext context) {
     final BreakfastPosEditorData? editorData = _editorData;
@@ -449,7 +467,9 @@ class _SemanticBundleEditorDialogState
           if (choice == null) {
             return true;
           }
-          return group.minSelect > 0 && choice.isExplicitNone;
+          return group.minSelect > 0 &&
+              choice.isExplicitNone &&
+              !group.allowsExplicitNoneSelection;
         })
         .length;
     final String? blockingMessage =
@@ -670,7 +690,7 @@ class _SemanticBundleEditorDialogState
                           final bool isExplicitNone =
                               currentChoice?.isExplicitNone ?? false;
                           final bool supportsExplicitNone =
-                              group.minSelect == 0;
+                              group.allowsExplicitNoneSelection;
                           final bool hasSatisfiedSelection =
                               currentChoice != null &&
                               (supportsExplicitNone || !isExplicitNone);
@@ -736,7 +756,7 @@ class _SemanticBundleEditorDialogState
                                                   'semantic-choice-none-${group.groupId}',
                                                 ),
                                                 label:
-                                                    breakfastNoneChoiceDisplayName,
+                                                    group.explicitNoneDisplayLabel,
                                                 selected: isExplicitNone,
                                                 onTap: () {
                                                   _apply(
@@ -1182,7 +1202,7 @@ class _StickyShortcutGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final int? selectedId = currentChoice?.selectedItemProductId;
     final bool isExplicitNone = currentChoice?.isExplicitNone ?? false;
-    final bool supportsExplicitNone = group.minSelect == 0;
+    final bool supportsExplicitNone = group.allowsExplicitNoneSelection;
     final List<Widget> buttons = <Widget>[
       ...group.members.map(
         (BreakfastChoiceGroupMemberConfig member) => Expanded(
@@ -1210,8 +1230,8 @@ class _StickyShortcutGroup extends StatelessWidget {
             buttonKey: ValueKey<String>(
               'semantic-sticky-choice-none-${group.groupId}',
             ),
-            semanticLabel: '$semanticLabel $breakfastNoneChoiceDisplayName',
-            label: breakfastNoneChoiceDisplayName,
+            semanticLabel: '$semanticLabel ${group.explicitNoneDisplayLabel}',
+            label: group.explicitNoneDisplayLabel,
             selected: isExplicitNone,
             weakened: true,
             onTap: () {

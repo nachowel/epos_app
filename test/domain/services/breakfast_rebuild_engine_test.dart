@@ -261,7 +261,7 @@ void main() {
             .having(
               (BreakfastClassifiedModifier row) => row.displayName,
               'displayName',
-              breakfastNoneChoiceDisplayName,
+              'No drink',
             )
             .having(
               (BreakfastClassifiedModifier row) => row.unitPriceMinor,
@@ -342,7 +342,7 @@ void main() {
       expect(result.lineSnapshot.modifierTotalMinor, 150);
     });
 
-    test('explicit none is rejected for required toast or bread', () {
+    test('explicit none is allowed for required toast or bread answers', () {
       final BreakfastRebuildResult result = engine.rebuild(
         _input(
           requestedState: const BreakfastRequestedState(
@@ -359,9 +359,11 @@ void main() {
 
       expect(
         result.validationErrors,
-        contains(BreakfastEditErrorCode.invalidChoiceQuantity),
+        isEmpty,
       );
-      expect(result.classifiedModifiers, isEmpty);
+      expect(result.classifiedModifiers, hasLength(1));
+      expect(result.classifiedModifiers.single.itemProductId, isNull);
+      expect(result.classifiedModifiers.single.displayName, 'No toast/bread');
     });
 
     test('mixed toast/bread invalid', () {
@@ -598,10 +600,11 @@ BreakfastSetConfiguration _configuration() {
         BreakfastChoiceGroupConfig(
           groupId: _hotDrinkGroupId,
           groupName: 'Tea or Coffee',
-          minSelect: 0,
+          minSelect: 1,
           maxSelect: 1,
           includedQuantity: 1,
           sortOrder: 1,
+          explicitNoneLabel: 'No drink',
           members: <BreakfastChoiceGroupMemberConfig>[
             BreakfastChoiceGroupMemberConfig(
               productModifierId: 11,
@@ -622,6 +625,7 @@ BreakfastSetConfiguration _configuration() {
           maxSelect: 1,
           includedQuantity: 1,
           sortOrder: 2,
+          explicitNoneLabel: 'No toast/bread',
           members: <BreakfastChoiceGroupMemberConfig>[
             BreakfastChoiceGroupMemberConfig(
               productModifierId: 13,

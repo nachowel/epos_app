@@ -72,7 +72,11 @@ class _TestAppDatabase extends AppDatabase {
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         description TEXT NULL,
+        profile_kind TEXT NOT NULL DEFAULT 'standard' CHECK (profile_kind IN ('standard','sandwich')),
         free_swap_limit INTEGER NOT NULL DEFAULT 0 CHECK (free_swap_limit >= 0),
+        sandwich_surcharge_minor INTEGER NOT NULL DEFAULT 100 CHECK (sandwich_surcharge_minor >= 0),
+        baguette_surcharge_minor INTEGER NOT NULL DEFAULT 180 CHECK (baguette_surcharge_minor >= 0),
+        sandwich_sauce_options_json TEXT NOT NULL DEFAULT '["ketchup","mayo","brownSauce","chilliSauce"]',
         is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
@@ -226,7 +230,7 @@ class _TestAppDatabase extends AppDatabase {
         type TEXT NOT NULL CHECK (type IN ('included','extra','choice')),
         extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
         is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
-        CHECK ((type = 'choice' AND group_id IS NOT NULL AND item_product_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))
+        CHECK ((type = 'choice' AND group_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))
       );
     ''');
     await customStatement('''

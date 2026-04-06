@@ -315,7 +315,7 @@ class ProductModifiers extends Table {
   List<String> get customConstraints => <String>[
     "CHECK (type IN ('included','extra','choice'))",
     'CHECK (extra_price_minor >= 0)',
-    "CHECK ((type = 'choice' AND group_id IS NOT NULL AND item_product_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))",
+    "CHECK ((type = 'choice' AND group_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))",
   ];
 }
 
@@ -899,7 +899,7 @@ class AppDatabase extends _$AppDatabase {
     return AppDatabase(NativeDatabase(file));
   }
 
-  static const int currentSchemaVersion = 28;
+  static const int currentSchemaVersion = 29;
   final List<MigrationLogEntry> _migrationHistory = <MigrationLogEntry>[];
   MigrationLogEntry? _lastMigrationFailure;
 
@@ -1154,6 +1154,14 @@ class AppDatabase extends _$AppDatabase {
           action: _migrateToV28,
         );
       }
+      if (from < 29) {
+        await _runMigrationStep(
+          step: 'migrate_v29',
+          fromVersion: from < 28 ? 28 : from,
+          toVersion: 29,
+          action: _migrateToV29,
+        );
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
@@ -1364,7 +1372,7 @@ class AppDatabase extends _$AppDatabase {
         type TEXT NOT NULL CHECK (type IN ('included','extra','choice')),
         extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
         is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
-        CHECK ((type = 'choice' AND group_id IS NOT NULL AND item_product_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))
+        CHECK ((type = 'choice' AND group_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))
       );
     ''');
     await customStatement('''
@@ -3498,6 +3506,95 @@ class AppDatabase extends _$AppDatabase {
       );
       await customStatement('PRAGMA foreign_keys = ON;');
     }
+  }
+
+  Future<void> _migrateToV29() async {
+    final bool hasProductModifiersTable = await _tableExists(
+      'product_modifiers',
+    );
+    await customStatement('PRAGMA foreign_keys = OFF;');
+    try {
+      if (hasProductModifiersTable) {
+        await customStatement(
+          'DROP INDEX IF EXISTS idx_product_modifiers_prod;',
+        );
+        await customStatement(
+          'DROP INDEX IF EXISTS idx_product_modifiers_group;',
+        );
+        await customStatement(
+          'DROP INDEX IF EXISTS idx_product_modifiers_item_product;',
+        );
+        await customStatement(
+          'ALTER TABLE product_modifiers RENAME TO product_modifiers_legacy_v29;',
+        );
+      }
+      await customStatement('''
+        CREATE TABLE product_modifiers (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          group_id INTEGER NULL,
+          item_product_id INTEGER NULL,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('included','extra','choice')),
+          extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
+          is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+          CHECK ((type = 'choice' AND group_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))
+        );
+      ''');
+      if (hasProductModifiersTable) {
+        await customStatement('''
+          INSERT INTO product_modifiers (
+            id,
+            product_id,
+            group_id,
+            item_product_id,
+            name,
+            type,
+            extra_price_minor,
+            is_active
+          )
+          SELECT
+            id,
+            product_id,
+            group_id,
+            item_product_id,
+            name,
+            type,
+            extra_price_minor,
+            is_active
+          FROM product_modifiers_legacy_v29;
+        ''');
+        await customStatement('DROP TABLE product_modifiers_legacy_v29;');
+      }
+    } finally {
+      await customStatement('PRAGMA foreign_keys = ON;');
+    }
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_product_modifiers_prod ON product_modifiers(product_id, is_active);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_product_modifiers_group ON product_modifiers(group_id, is_active);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_product_modifiers_item_product ON product_modifiers(item_product_id, type);',
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'group_id',
+      referencedTable: 'modifier_groups',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
+    );
   }
 
   Future<void> _createSyncRootSnapshotTable() async {

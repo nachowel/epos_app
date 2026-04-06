@@ -487,7 +487,7 @@ void main() {
             'semantic-sticky-choice-none-${fixture.drinkGroupId}',
           ),
         ),
-        findsNothing,
+        findsOneWidget,
       );
       final Finder includedSection = find.byKey(
         const ValueKey<String>('semantic-section-included-items'),
@@ -1215,7 +1215,7 @@ void main() {
     );
   });
 
-  testWidgets('semantic editor hides None for required choices', (
+  testWidgets('semantic editor shows explicit no-answer options for required choices', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -1250,8 +1250,9 @@ void main() {
       find.byKey(
         ValueKey<String>('semantic-choice-none-${fixture.drinkGroupId}'),
       ),
-      findsNothing,
+      findsOneWidget,
     );
+    expect(find.text('No drink'), findsWidgets);
 
     final ElevatedButton disabledConfirm = tester.widget<ElevatedButton>(
       find.byKey(const ValueKey<String>('semantic-bundle-confirm')),
@@ -1291,7 +1292,7 @@ void main() {
     expect(chosenGroup.requestedQuantity, 1);
   });
 
-  testWidgets('semantic editor requires concrete selections for every required group', (
+  testWidgets('semantic editor requires answers for every required group', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -1343,7 +1344,7 @@ void main() {
       find.byKey(
         ValueKey<String>('semantic-sticky-choice-none-${fixture.drinkGroupId}'),
       ),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(
@@ -1351,19 +1352,19 @@ void main() {
           'semantic-sticky-choice-none-${fixture.breadGroupId!}',
         ),
       ),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(
         ValueKey<String>('semantic-choice-none-${fixture.drinkGroupId}'),
       ),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(
         ValueKey<String>('semantic-choice-none-${fixture.breadGroupId!}'),
       ),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(
@@ -1532,6 +1533,8 @@ Future<_PosSemanticFixture> _seedPosSemanticFixture(
   String latteChoiceLabel = 'Cappuccino/Latte',
   String toastChoiceLabel = 'Toast',
   String breadChoiceLabel = 'Bread',
+  String drinkNoneLabel = 'No drink',
+  String breadNoneLabel = 'No toast/bread',
 }) async {
   final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
   await insertShift(db, openedBy: cashierId);
@@ -1671,6 +1674,18 @@ Future<_PosSemanticFixture> _seedPosSemanticFixture(
       label: latteChoiceLabel,
     );
   }
+  await db
+      .into(db.productModifiers)
+      .insert(
+        ProductModifiersCompanion.insert(
+          productId: rootProductId,
+          groupId: Value<int?>(drinkGroupId),
+          itemProductId: const Value<int?>(null),
+          name: drinkNoneLabel,
+          type: 'choice',
+          extraPriceMinor: const Value<int>(0),
+        ),
+      );
 
   int? breadGroupId;
   if (includeBreadGroup) {
@@ -1713,6 +1728,18 @@ Future<_PosSemanticFixture> _seedPosSemanticFixture(
       itemProductId: breadProductId,
       label: breadChoiceLabel,
     );
+    await db
+        .into(db.productModifiers)
+        .insert(
+          ProductModifiersCompanion.insert(
+            productId: rootProductId,
+            groupId: Value<int?>(breadGroupId),
+            itemProductId: const Value<int?>(null),
+            name: breadNoneLabel,
+            type: 'choice',
+            extraPriceMinor: const Value<int>(0),
+          ),
+        );
   }
   await db
       .into(db.productModifiers)

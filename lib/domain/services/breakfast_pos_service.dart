@@ -127,7 +127,7 @@ class BreakfastPosSelectionPreview {
       if (selectedChoice == null) {
         continue;
       }
-      String selectedLabel = breakfastNoneChoiceDisplayName;
+      String selectedLabel = group.explicitNoneDisplayLabel;
       if (!selectedChoice.isExplicitNone) {
         for (final BreakfastChoiceGroupMemberConfig member in group.members) {
           if (member.itemProductId == selectedChoice.selectedItemProductId) {
@@ -363,7 +363,7 @@ class BreakfastPosService {
       final bool hasSelection =
           choice != null &&
           choice.requestedQuantity > 0 &&
-          (!choice.isExplicitNone || group.minSelect == 0);
+          (!choice.isExplicitNone || group.allowsExplicitNoneSelection);
 
       if (group.maxSelect > 1) {
         messages.add(

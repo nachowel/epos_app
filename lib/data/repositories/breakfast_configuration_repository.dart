@@ -64,25 +64,45 @@ class BreakfastConfigurationRepository {
                 ),
               );
         }
+        if (groupTemplate.explicitNoneLabel != null) {
+          await _database
+              .into(_database.productModifiers)
+              .insert(
+                db.ProductModifiersCompanion.insert(
+                  productId: rootProductId,
+                  groupId: Value<int?>(groupId),
+                  itemProductId: const Value<int?>(null),
+                  name: groupTemplate.explicitNoneLabel!,
+                  type: 'choice',
+                  extraPriceMinor: const Value<int>(0),
+                  isActive: const Value<bool>(true),
+                ),
+              );
+        }
       }
     });
   }
 
   Future<List<_BreakfastBootstrapCatalogProduct>>
   _loadBootstrapCatalogProducts() async {
+    final Set<int> setRootProductIds = await loadSetRootProductIds();
+    final String exclusionClause = setRootProductIds.isEmpty
+        ? ''
+        : 'WHERE p.id NOT IN (${setRootProductIds.join(',')})';
     final List<QueryRow> rows = await _database
         .customSelect(
           '''
       SELECT p.id, p.name
       FROM products p
-      INNER JOIN categories c ON c.id = p.category_id
-      WHERE p.is_active = 1
-        AND LOWER(TRIM(c.name)) != 'set breakfast'
+      $exclusionClause
+      ${exclusionClause.isEmpty ? 'WHERE' : 'AND'} p.is_active = 1
       ORDER BY p.sort_order ASC, p.id ASC
       ''',
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _database.products,
-            _database.categories,
+            _database.setItems,
+            _database.modifierGroups,
+            _database.productModifiers,
           },
         )
         .get();
@@ -239,10 +259,18 @@ class BreakfastConfigurationRepository {
 
     final Map<int, List<BreakfastChoiceGroupMemberConfig>> membersByGroupId =
         <int, List<BreakfastChoiceGroupMemberConfig>>{};
+    final Map<int, String> explicitNoneLabelsByGroupId = <int, String>{};
     for (final db.ProductModifier modifier in productModifiers) {
       final int? groupId = modifier.groupId;
       final int? itemProductId = modifier.itemProductId;
-      if (groupId == null || itemProductId == null) {
+      if (groupId == null) {
+        continue;
+      }
+      if (itemProductId == null) {
+        final String label = modifier.name.trim();
+        if (label.isNotEmpty) {
+          explicitNoneLabelsByGroupId[groupId] = label;
+        }
         continue;
       }
       membersByGroupId
@@ -269,6 +297,7 @@ class BreakfastConfigurationRepository {
               membersByGroupId[group.id] ??
                   const <BreakfastChoiceGroupMemberConfig>[],
             ),
+            explicitNoneLabel: explicitNoneLabelsByGroupId[group.id],
           );
         })
         .toList(growable: false);
@@ -309,7 +338,7 @@ class BreakfastConfigurationRepository {
   }) {
     final List<BreakfastConfigurationIssue> issues =
         <BreakfastConfigurationIssue>[];
-    if (rootProduct == null || !_isSetBreakfastCategory(rootProduct.category)) {
+    if (rootProduct == null) {
       issues.add(
         const BreakfastConfigurationIssue(
           code: BreakfastConfigurationErrorCode.invalidSetRoot,
@@ -344,6 +373,7 @@ class BreakfastConfigurationRepository {
     }
 
     final Set<int> groupsWithMembers = <int>{};
+    final Set<int> groupsWithExplicitNone = <int>{};
     for (final db.ProductModifier modifier in productModifiers) {
       final int? groupId = modifier.groupId;
       final int? itemProductId = modifier.itemProductId;
@@ -355,19 +385,20 @@ class BreakfastConfigurationRepository {
             productModifierId: modifier.id,
           ),
         );
-      } else {
-        groupsWithMembers.add(groupId);
       }
       if (itemProductId == null) {
-        issues.add(
-          BreakfastConfigurationIssue(
-            code: BreakfastConfigurationErrorCode.missingItemProductId,
-            groupId: groupId,
-            productModifierId: modifier.id,
-          ),
-        );
+        if (!groupsWithExplicitNone.add(groupId!)) {
+          issues.add(
+            BreakfastConfigurationIssue(
+              code: BreakfastConfigurationErrorCode.invalidChoiceGroup,
+              groupId: groupId,
+              productModifierId: modifier.id,
+            ),
+          );
+        }
         continue;
       }
+      groupsWithMembers.add(groupId!);
       localChoiceMemberProductIds.add(itemProductId);
       if (itemProductId == rootProductId ||
           setRootProductIds.contains(itemProductId)) {
@@ -464,7 +495,7 @@ class BreakfastConfigurationRepository {
     final Map<int, int> choiceMemberCounts = await _loadGroupedCounts(
       tableName: 'product_modifiers',
       productIds: ids,
-      whereClause: "type = 'choice'",
+      whereClause: "type = 'choice' AND item_product_id IS NOT NULL",
     );
     final Map<int, int> extraPoolCounts = await _loadGroupedCounts(
       tableName: 'product_modifiers',
@@ -696,11 +727,19 @@ class BreakfastConfigurationRepository {
 
     final Map<int, List<SemanticChoiceMemberDraft>> membersByGroupId =
         <int, List<SemanticChoiceMemberDraft>>{};
+    final Map<int, String> explicitNoneLabelsByGroupId = <int, String>{};
     for (int index = 0; index < choiceRows.length; index += 1) {
       final db.ProductModifier modifier = choiceRows[index];
       final int? groupId = modifier.groupId;
       final int? itemProductId = modifier.itemProductId;
-      if (groupId == null || itemProductId == null) {
+      if (groupId == null) {
+        continue;
+      }
+      if (itemProductId == null) {
+        final String label = modifier.name.trim();
+        if (label.isNotEmpty) {
+          explicitNoneLabelsByGroupId[groupId] = label;
+        }
         continue;
       }
       final BreakfastCatalogProduct? product = productsById[itemProductId];
@@ -728,6 +767,7 @@ class BreakfastConfigurationRepository {
             members: List<SemanticChoiceMemberDraft>.unmodifiable(
               membersByGroupId[group.id] ?? const <SemanticChoiceMemberDraft>[],
             ),
+            explicitNoneLabel: explicitNoneLabelsByGroupId[group.id],
           );
         })
         .toList(growable: false);
@@ -811,6 +851,22 @@ class BreakfastConfigurationRepository {
                   groupId: Value<int?>(groupId),
                   itemProductId: Value<int?>(member.itemProductId),
                   name: member.itemName,
+                  type: 'choice',
+                  extraPriceMinor: const Value<int>(0),
+                  isActive: const Value<bool>(true),
+                ),
+              );
+        }
+        final String? explicitNoneLabel = group.explicitNoneLabel?.trim();
+        if (explicitNoneLabel != null && explicitNoneLabel.isNotEmpty) {
+          await _database
+              .into(_database.productModifiers)
+              .insert(
+                db.ProductModifiersCompanion.insert(
+                  productId: configuration.productId,
+                  groupId: Value<int?>(groupId),
+                  itemProductId: const Value<int?>(null),
+                  name: explicitNoneLabel,
                   type: 'choice',
                   extraPriceMinor: const Value<int>(0),
                   isActive: const Value<bool>(true),
@@ -922,24 +978,15 @@ class BreakfastConfigurationRepository {
     return _BreakfastConfigProductContext(
       id: row.read<int>('id'),
       name: row.read<String>('name'),
-      category: row.read<String>('category_name'),
     );
   }
-
-  bool _isSetBreakfastCategory(String categoryName) =>
-      categoryName.trim().toLowerCase() == 'set breakfast';
 }
 
 class _BreakfastConfigProductContext {
-  const _BreakfastConfigProductContext({
-    required this.id,
-    required this.name,
-    required this.category,
-  });
+  const _BreakfastConfigProductContext({required this.id, required this.name});
 
   final int id;
   final String name;
-  final String category;
 }
 
 class _BreakfastBootstrapChoiceGroupTemplate {
@@ -950,6 +997,7 @@ class _BreakfastBootstrapChoiceGroupTemplate {
     required this.includedQuantity,
     required this.sortOrder,
     required this.members,
+    this.explicitNoneLabel,
   });
 
   final String name;
@@ -958,6 +1006,7 @@ class _BreakfastBootstrapChoiceGroupTemplate {
   final int includedQuantity;
   final int sortOrder;
   final List<_BreakfastBootstrapChoiceMemberTemplate> members;
+  final String? explicitNoneLabel;
 }
 
 class _BreakfastBootstrapChoiceMemberTemplate {
@@ -987,6 +1036,7 @@ _defaultBreakfastChoiceGroupTemplates =
         maxSelect: 1,
         includedQuantity: 1,
         sortOrder: 1,
+        explicitNoneLabel: 'No drink',
         members: <_BreakfastBootstrapChoiceMemberTemplate>[
           _BreakfastBootstrapChoiceMemberTemplate(<String>{'tea'}),
           _BreakfastBootstrapChoiceMemberTemplate(<String>{
@@ -1002,6 +1052,7 @@ _defaultBreakfastChoiceGroupTemplates =
         maxSelect: 1,
         includedQuantity: 1,
         sortOrder: 2,
+        explicitNoneLabel: 'No toast/bread',
         members: <_BreakfastBootstrapChoiceMemberTemplate>[
           _BreakfastBootstrapChoiceMemberTemplate(<String>{'toasts', 'toast'}),
           _BreakfastBootstrapChoiceMemberTemplate(<String>{'breads', 'bread'}),

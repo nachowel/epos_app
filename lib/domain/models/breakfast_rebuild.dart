@@ -150,6 +150,7 @@ class BreakfastChoiceGroupConfig {
     required this.includedQuantity,
     required this.sortOrder,
     required this.members,
+    this.explicitNoneLabel,
   });
 
   final int groupId;
@@ -159,6 +160,15 @@ class BreakfastChoiceGroupConfig {
   final int includedQuantity;
   final int sortOrder;
   final List<BreakfastChoiceGroupMemberConfig> members;
+  final String? explicitNoneLabel;
+
+  bool get allowsExplicitNoneSelection =>
+      explicitNoneLabel != null && explicitNoneLabel!.trim().isNotEmpty;
+
+  String get explicitNoneDisplayLabel =>
+      explicitNoneLabel?.trim().isNotEmpty == true
+      ? explicitNoneLabel!.trim()
+      : breakfastNoneChoiceDisplayName;
 
   bool containsProduct(int productId) {
     for (final BreakfastChoiceGroupMemberConfig member in members) {

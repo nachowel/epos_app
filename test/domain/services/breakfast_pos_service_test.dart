@@ -103,10 +103,13 @@ void main() {
       },
     );
 
-    test('explicit none is rejected for required grouped choices', () async {
+    test('explicit none is allowed for required-answer grouped choices', () async {
       final app_db.AppDatabase db = createTestDatabase();
       addTearDown(db.close);
-      final _BreakfastPosFixture fixture = await _seedBreakfastPosFixture(db);
+      final _BreakfastPosFixture fixture = await _seedBreakfastPosFixture(
+        db,
+        explicitNoneLabel: 'No drink',
+      );
       final BreakfastPosService service = BreakfastPosService(
         breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
       );
@@ -129,22 +132,20 @@ void main() {
         ),
       );
 
-      expect(preview.canConfirm, isFalse);
-      expect(
-        preview.validationMessages,
-        contains('Choose an option for Drink choice.'),
-      );
+      expect(preview.canConfirm, isTrue);
+      expect(preview.validationMessages, isEmpty);
       expect(preview.rebuildResult.lineSnapshot.lineTotalMinor, 600);
     });
 
     test(
-      'explicit none remains available for optional grouped choices',
+      'explicit none remains available when the group is configured for it',
       () async {
         final app_db.AppDatabase db = createTestDatabase();
         addTearDown(db.close);
         final _BreakfastPosFixture fixture = await _seedBreakfastPosFixture(
           db,
           groupMinSelect: 0,
+          explicitNoneLabel: 'No drink',
         );
         final BreakfastPosService service = BreakfastPosService(
           breakfastConfigurationRepository: BreakfastConfigurationRepository(
@@ -337,6 +338,7 @@ Future<_BreakfastPosFixture> _seedBreakfastPosFixture(
   int groupMaxSelect = 1,
   String rootCategoryName = 'Set Breakfast',
   String rootProductName = 'Set Breakfast',
+  String? explicitNoneLabel,
 }) async {
   final int breakfastCategoryId = await insertCategory(
     db,
@@ -436,6 +438,20 @@ Future<_BreakfastPosFixture> _seedBreakfastPosFixture(
 
   await insertChoiceMember(itemProductId: teaProductId, label: 'Tea');
   await insertChoiceMember(itemProductId: coffeeProductId, label: 'Coffee');
+  if (explicitNoneLabel != null) {
+    await db
+        .into(db.productModifiers)
+        .insert(
+          app_db.ProductModifiersCompanion.insert(
+            productId: rootProductId,
+            groupId: Value<int?>(drinkGroupId),
+            itemProductId: const Value<int?>(null),
+            name: explicitNoneLabel,
+            type: 'choice',
+            extraPriceMinor: const Value<int>(0),
+          ),
+        );
+  }
   await db
       .into(db.productModifiers)
       .insert(

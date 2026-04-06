@@ -767,13 +767,15 @@ class ReportService {
         for (final OrderModifier modifier in modifiers) {
           final ModifierChargeReason? reason = modifier.chargeReason;
           final int? itemProductId = modifier.itemProductId;
-          if (reason != null &&
-              reason != ModifierChargeReason.removalDiscount &&
-              !(reason == ModifierChargeReason.includedChoice &&
-                  itemProductId == null)) {
+          if (reason != null && reason != ModifierChargeReason.removalDiscount) {
             final _ChargeReasonAccumulator accumulator = reasonBuckets
                 .putIfAbsent(reason, _ChargeReasonAccumulator.new);
             accumulator.eventCount += 1;
+            if (reason == ModifierChargeReason.includedChoice &&
+                itemProductId == null) {
+              accumulator.totalQuantity += modifier.quantity;
+              accumulator.revenueMinor += modifier.priceEffectMinor;
+            }
           }
           if (itemProductId != null) {
             itemProductIds.add(itemProductId);
@@ -791,6 +793,8 @@ class ReportService {
                 line.productId,
               );
         configurationCache[line.productId] = configuration;
+        final Map<int, String> fallbackExplicitNoneLabelsByGroupId =
+            _collectExplicitNoneLabelsByGroupId(modifiers);
 
         if (configuration == null) {
           final BreakfastRequestedState requestedState =
@@ -828,6 +832,8 @@ class ReportService {
             choiceBuckets: choiceBuckets,
             dataQualityNotes: dataQualityNotes,
             fallbackItemNames: fallbackItemNames,
+            fallbackExplicitNoneLabelsByGroupId:
+                fallbackExplicitNoneLabelsByGroupId,
             itemProductIds: itemProductIds,
           );
           _accumulateBundleVariant(
@@ -835,6 +841,9 @@ class ReportService {
             rootProductName: line.productName,
             lineRevenueMinor: line.lineTotalMinor,
             requestedState: requestedState,
+            configuration: null,
+            fallbackExplicitNoneLabelsByGroupId:
+                fallbackExplicitNoneLabelsByGroupId,
             variantBuckets: variantBuckets,
           );
           continue;
@@ -871,6 +880,7 @@ class ReportService {
           choiceBuckets: choiceBuckets,
           dataQualityNotes: dataQualityNotes,
           fallbackItemNames: fallbackItemNames,
+          fallbackExplicitNoneLabelsByGroupId: fallbackExplicitNoneLabelsByGroupId,
           itemProductIds: itemProductIds,
         );
         _accumulateBundleVariant(
@@ -878,6 +888,8 @@ class ReportService {
           rootProductName: line.productName,
           lineRevenueMinor: line.lineTotalMinor,
           requestedState: requestedState,
+          configuration: configuration,
+          fallbackExplicitNoneLabelsByGroupId: fallbackExplicitNoneLabelsByGroupId,
           variantBuckets: variantBuckets,
         );
       }
@@ -951,7 +963,7 @@ class ReportService {
                 groupId: entry.key.groupId,
                 groupName: entry.value.groupName,
                 itemProductId: entry.key.itemProductId,
-                itemName: resolveItemName(entry.key.itemProductId),
+                itemName: entry.value.itemName,
                 selectionCount: entry.value.selectionCount,
                 totalSelectedQuantity: entry.value.totalSelectedQuantity,
                 distributionPercent: totalForGroup <= 0
@@ -1062,9 +1074,11 @@ class ReportService {
                     orderCount: entry.value.orderCount,
                     revenueMinor: entry.value.revenueMinor,
                     chosenItemProductIds: entry.value.chosenItemProductIds,
-                    chosenItemNames: entry.value.chosenItemProductIds
-                        .map(resolveItemName)
-                        .toList(growable: false),
+                    chosenItemNames: entry.value.chosenItemNames.isEmpty
+                        ? entry.value.chosenItemProductIds
+                              .map(resolveItemName)
+                              .toList(growable: false)
+                        : entry.value.chosenItemNames,
                     removedItemProductIds: entry.value.removedItemProductIds,
                     removedItemNames: entry.value.removedItemProductIds
                         .map(resolveItemName)
@@ -1358,35 +1372,46 @@ class ReportService {
     choiceBuckets,
     required Set<String> dataQualityNotes,
     required Map<int, String> fallbackItemNames,
+    required Map<int, String> fallbackExplicitNoneLabelsByGroupId,
     required Set<int> itemProductIds,
   }) {
     final DateTime trendDate = DateTime(paidAt.year, paidAt.month, paidAt.day);
     for (final BreakfastChosenGroupRequest choice
         in requestedState.chosenGroups) {
       final int? selectedItemProductId = choice.selectedItemProductId;
-      if (selectedItemProductId == null || choice.requestedQuantity <= 0) {
+      if (choice.requestedQuantity <= 0) {
         continue;
       }
       final BreakfastChoiceGroupConfig? group = configuration?.findGroup(
         choice.groupId,
       );
-      final BreakfastChoiceGroupMemberConfig? member = group?.findMember(
-        selectedItemProductId,
-      );
+      final BreakfastChoiceGroupMemberConfig? member = selectedItemProductId ==
+              null
+          ? null
+          : group?.findMember(selectedItemProductId);
       if (group == null) {
         dataQualityNotes.add(
           'Choice-group analytics for root product $rootProductId are using archived group ${choice.groupId} from persisted semantic modifiers because the current configuration no longer contains that group.',
         );
-      } else if (member == null) {
+      } else if (selectedItemProductId != null && member == null) {
         dataQualityNotes.add(
           'Choice-group analytics for root product $rootProductId are using persisted group ${group.groupId} for item $selectedItemProductId because the current configuration no longer matches that historical membership.',
         );
       }
-      itemProductIds.add(selectedItemProductId);
-      fallbackItemNames.putIfAbsent(
-        selectedItemProductId,
-        () => member?.displayName ?? 'Product $selectedItemProductId',
-      );
+      final String itemName;
+      if (selectedItemProductId == null) {
+        itemName =
+            group?.explicitNoneDisplayLabel ??
+            fallbackExplicitNoneLabelsByGroupId[choice.groupId] ??
+            breakfastNoneChoiceDisplayName;
+      } else {
+        itemProductIds.add(selectedItemProductId);
+        fallbackItemNames.putIfAbsent(
+          selectedItemProductId,
+          () => member?.displayName ?? 'Product $selectedItemProductId',
+        );
+        itemName = member?.displayName ?? 'Product $selectedItemProductId';
+      }
       choiceBuckets.putIfAbsent(
           _ChoiceAnalyticsKey(
             rootProductId: rootProductId,
@@ -1396,6 +1421,7 @@ class ReportService {
           () => _ChoiceSelectionAccumulator(
             rootProductName: rootProductName,
             groupName: group?.groupName ?? 'Group #${choice.groupId}',
+            itemName: itemName,
           ),
         )
         ..selectionCount += 1
@@ -1409,23 +1435,44 @@ class ReportService {
     required String rootProductName,
     required int lineRevenueMinor,
     required BreakfastRequestedState requestedState,
+    required BreakfastSetConfiguration? configuration,
+    required Map<int, String> fallbackExplicitNoneLabelsByGroupId,
     required Map<_VariantAnalyticsKey, _VariantAccumulator> variantBuckets,
   }) {
-    final List<_VariantItem> chosenItems =
+    final List<_VariantChoiceAnswer> chosenItems =
         requestedState.chosenGroups
             .where(
-              (BreakfastChosenGroupRequest choice) =>
-                  choice.selectedItemProductId != null &&
-                  choice.requestedQuantity > 0,
+              (BreakfastChosenGroupRequest choice) => choice.requestedQuantity > 0,
             )
             .map(
-              (BreakfastChosenGroupRequest choice) => _VariantItem(
-                productId: choice.selectedItemProductId!,
-                quantity: choice.requestedQuantity,
-              ),
+              (BreakfastChosenGroupRequest choice) {
+                final BreakfastChoiceGroupConfig? group = configuration?.findGroup(
+                  choice.groupId,
+                );
+                final int? selectedItemProductId = choice.selectedItemProductId;
+                final BreakfastChoiceGroupMemberConfig? member =
+                    selectedItemProductId == null
+                    ? null
+                    : group?.findMember(selectedItemProductId);
+                final String displayName = selectedItemProductId == null
+                    ? group?.explicitNoneDisplayLabel ??
+                          fallbackExplicitNoneLabelsByGroupId[choice.groupId] ??
+                          breakfastNoneChoiceDisplayName
+                    : member?.displayName ?? 'Product $selectedItemProductId';
+                final String stableKey = selectedItemProductId == null
+                    ? 'g${choice.groupId}=none:${choice.requestedQuantity}'
+                    : 'p${selectedItemProductId}x${choice.requestedQuantity}';
+                return _VariantChoiceAnswer(
+                  groupId: choice.groupId,
+                  productId: selectedItemProductId,
+                  quantity: choice.requestedQuantity,
+                  displayName: displayName,
+                  stableKey: stableKey,
+                );
+              },
             )
             .toList(growable: true)
-          ..sort(_compareVariantItems);
+          ..sort(_compareVariantChoiceAnswers);
     final List<_VariantItem> removedItems =
         requestedState.removedSetItems
             .where(
@@ -1464,7 +1511,11 @@ class ReportService {
         () => _VariantAccumulator(
           rootProductName: rootProductName,
           chosenItemProductIds: chosenItems
-              .map((_VariantItem item) => item.productId)
+              .where((_VariantChoiceAnswer item) => item.productId != null)
+              .map((_VariantChoiceAnswer item) => item.productId!)
+              .toList(growable: false),
+          chosenItemNames: chosenItems
+              .map((_VariantChoiceAnswer item) => item.displayName)
               .toList(growable: false),
           removedItemProductIds: removedItems
               .map((_VariantItem item) => item.productId)
@@ -1545,7 +1596,7 @@ class ReportService {
     if (groupCompare != 0) {
       return groupCompare;
     }
-    return a.itemProductId.compareTo(b.itemProductId);
+    return (a.itemProductId ?? -1).compareTo(b.itemProductId ?? -1);
   }
 
   int _compareVariantItems(_VariantItem a, _VariantItem b) {
@@ -1556,12 +1607,36 @@ class ReportService {
     return a.quantity.compareTo(b.quantity);
   }
 
+  int _compareVariantChoiceAnswers(
+    _VariantChoiceAnswer a,
+    _VariantChoiceAnswer b,
+  ) {
+    final int groupCompare = a.groupId.compareTo(b.groupId);
+    if (groupCompare != 0) {
+      return groupCompare;
+    }
+    final int productCompare = (a.productId ?? -1).compareTo(b.productId ?? -1);
+    if (productCompare != 0) {
+      return productCompare;
+    }
+    return a.quantity.compareTo(b.quantity);
+  }
+
   String _buildVariantKey({
-    required List<_VariantItem> chosenItems,
+    required List<_VariantChoiceAnswer> chosenItems,
     required List<_VariantItem> removedItems,
     required List<_VariantItem> addedItems,
   }) {
-    String serialize(List<_VariantItem> items) {
+    String serializeChoiceAnswers(List<_VariantChoiceAnswer> items) {
+      if (items.isEmpty) {
+        return '-';
+      }
+      return items
+          .map((_VariantChoiceAnswer item) => item.stableKey)
+          .join('|');
+    }
+
+    String serializeItems(List<_VariantItem> items) {
       if (items.isEmpty) {
         return '-';
       }
@@ -1570,7 +1645,26 @@ class ReportService {
           .join('|');
     }
 
-    return 'choices:${serialize(chosenItems)};removed:${serialize(removedItems)};added:${serialize(addedItems)}';
+    return 'choices:${serializeChoiceAnswers(chosenItems)};removed:${serializeItems(removedItems)};added:${serializeItems(addedItems)}';
+  }
+
+  Map<int, String> _collectExplicitNoneLabelsByGroupId(
+    List<OrderModifier> modifiers,
+  ) {
+    final Map<int, String> labels = <int, String>{};
+    for (final OrderModifier modifier in modifiers) {
+      if (modifier.action != ModifierAction.choice ||
+          modifier.chargeReason != ModifierChargeReason.includedChoice ||
+          modifier.itemProductId != null ||
+          modifier.sourceGroupId == null) {
+        continue;
+      }
+      final String label = modifier.itemName.trim();
+      if (label.isNotEmpty) {
+        labels[modifier.sourceGroupId!] = label;
+      }
+    }
+    return labels;
   }
 
   _AnalyticsWindow _resolveAnalyticsWindow({
@@ -1781,7 +1875,7 @@ class _ChoiceAnalyticsKey {
 
   final int rootProductId;
   final int groupId;
-  final int itemProductId;
+  final int? itemProductId;
 
   @override
   bool operator ==(Object other) {
@@ -1816,10 +1910,12 @@ class _ChoiceSelectionAccumulator {
   _ChoiceSelectionAccumulator({
     required this.rootProductName,
     required this.groupName,
+    required this.itemName,
   });
 
   final String rootProductName;
   final String groupName;
+  final String itemName;
   final Map<DateTime, _TrendAccumulator> _trendByDate =
       <DateTime, _TrendAccumulator>{};
   int selectionCount = 0;
@@ -1884,16 +1980,34 @@ class _VariantAccumulator {
   _VariantAccumulator({
     required this.rootProductName,
     required this.chosenItemProductIds,
+    this.chosenItemNames = const <String>[],
     required this.removedItemProductIds,
     required this.addedItemProductIds,
   });
 
   final String rootProductName;
   final List<int> chosenItemProductIds;
+  final List<String> chosenItemNames;
   final List<int> removedItemProductIds;
   final List<int> addedItemProductIds;
   int orderCount = 0;
   int revenueMinor = 0;
+}
+
+class _VariantChoiceAnswer {
+  const _VariantChoiceAnswer({
+    required this.groupId,
+    required this.productId,
+    required this.quantity,
+    required this.displayName,
+    required this.stableKey,
+  });
+
+  final int groupId;
+  final int? productId;
+  final int quantity;
+  final String displayName;
+  final String stableKey;
 }
 
 class _VariantItem {

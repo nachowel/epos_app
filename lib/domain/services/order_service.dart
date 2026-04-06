@@ -1652,7 +1652,7 @@ class OrderService {
           nextChoice != null &&
           nextChoice.requestedQuantity > 0 &&
           nextChoice.selectedItemProductId == null;
-      if (nextIsExplicitNone ||
+      if ((nextIsExplicitNone && !group.allowsExplicitNoneSelection) ||
           (hadConcreteSelection && removedConcreteSelection)) {
         codes.add(BreakfastEditErrorCode.invalidChoiceQuantity);
       }

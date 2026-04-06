@@ -103,6 +103,7 @@ class SemanticChoiceGroupDraft {
     required this.includedQuantity,
     required this.sortOrder,
     required this.members,
+    this.explicitNoneLabel,
   });
 
   final int? id;
@@ -112,6 +113,7 @@ class SemanticChoiceGroupDraft {
   final int includedQuantity;
   final int sortOrder;
   final List<SemanticChoiceMemberDraft> members;
+  final String? explicitNoneLabel;
 
   SemanticChoiceGroupDraft copyWith({
     Object? id = _unsetNullableField,
@@ -121,6 +123,7 @@ class SemanticChoiceGroupDraft {
     int? includedQuantity,
     int? sortOrder,
     List<SemanticChoiceMemberDraft>? members,
+    Object? explicitNoneLabel = _unsetNullableField,
   }) {
     return SemanticChoiceGroupDraft(
       id: identical(id, _unsetNullableField) ? this.id : id as int?,
@@ -130,6 +133,9 @@ class SemanticChoiceGroupDraft {
       includedQuantity: includedQuantity ?? this.includedQuantity,
       sortOrder: sortOrder ?? this.sortOrder,
       members: members ?? this.members,
+      explicitNoneLabel: identical(explicitNoneLabel, _unsetNullableField)
+          ? this.explicitNoneLabel
+          : explicitNoneLabel as String?,
     );
   }
 }

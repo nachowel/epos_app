@@ -387,7 +387,7 @@ class BreakfastRebuildEngine {
         continue;
       }
       if (explicitNoneSelections.isNotEmpty) {
-        if (group.minSelect > 0) {
+        if (!group.allowsExplicitNoneSelection) {
           errors.add(BreakfastEditErrorCode.invalidChoiceQuantity);
           continue;
         }
@@ -404,7 +404,7 @@ class BreakfastRebuildEngine {
           _NormalizedChoiceSelection(
             group: group,
             selectedItemProductId: null,
-            displayName: breakfastNoneChoiceDisplayName,
+            displayName: group.explicitNoneDisplayLabel,
             requestedQuantity: noneQuantity,
           ),
         );

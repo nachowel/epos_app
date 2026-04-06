@@ -221,6 +221,100 @@ void main() {
     );
 
     test(
+      'analytics include explicit no-answer breakfast selections',
+      () async {
+        final AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+
+        final _SemanticReportFixture fixture = await _seedSemanticReportFixture(
+          db,
+        );
+        await db
+            .into(db.productModifiers)
+            .insert(
+              ProductModifiersCompanion.insert(
+                productId: fixture.rootProductId,
+                groupId: Value<int?>(fixture.drinkGroupId),
+                itemProductId: const Value<int?>(null),
+                name: 'No drink',
+                type: 'choice',
+                extraPriceMinor: const Value<int>(0),
+              ),
+            );
+
+        final int transactionId = await insertTransaction(
+          db,
+          uuid: 'semantic-report-tx-3',
+          shiftId: fixture.shiftId,
+          userId: fixture.cashierUser.id,
+          status: 'paid',
+          totalAmountMinor: 600,
+          paidAt: DateTime(2026, 4, 3, 11, 0),
+        );
+        await insertPayment(
+          db,
+          uuid: 'semantic-report-payment-3',
+          transactionId: transactionId,
+          method: 'cash',
+          amountMinor: 600,
+          paidAt: DateTime(2026, 4, 3, 11, 0),
+        );
+        await _insertSemanticLine(
+          db,
+          transactionId: transactionId,
+          lineUuid: 'semantic-line-3',
+          rootProductId: fixture.rootProductId,
+          rootProductName: 'Set Breakfast',
+          basePriceMinor: 600,
+          lineTotalMinor: 600,
+          modifiers: <_TestModifierRow>[
+            _TestModifierRow(
+              uuid: 'semantic-mod-10',
+              action: 'choice',
+              itemName: 'Bread text fallback',
+              quantity: 1,
+              itemProductId: fixture.breadProductId,
+              sourceGroupId: fixture.breadGroupId,
+              chargeReason: 'included_choice',
+              sortKey: 10,
+            ),
+            _TestModifierRow(
+              uuid: 'semantic-mod-11',
+              action: 'choice',
+              itemName: 'No drink',
+              quantity: 1,
+              itemProductId: null,
+              sourceGroupId: fixture.drinkGroupId,
+              chargeReason: 'included_choice',
+              sortKey: 11,
+            ),
+          ],
+        );
+
+        final ReportService service = _makeReportService(db);
+        final SemanticSalesAnalytics analytics =
+            (await service.getShiftReport(fixture.shiftId))
+                .semanticSalesAnalytics;
+
+        final noDrinkChoice = analytics.choiceSelections.singleWhere(
+          (SemanticChoiceSelectionAnalytics entry) =>
+              entry.groupId == fixture.drinkGroupId &&
+              entry.itemProductId == null,
+        );
+        expect(noDrinkChoice.itemName, 'No drink');
+        expect(noDrinkChoice.selectionCount, 1);
+        expect(noDrinkChoice.totalSelectedQuantity, 1);
+
+        final includedChoiceBreakdown = analytics.chargeReasonBreakdown
+            .singleWhere(
+              (SemanticChargeReasonAnalytics entry) =>
+                  entry.chargeReason == ModifierChargeReason.includedChoice,
+            );
+        expect(includedChoiceBreakdown.totalQuantity, 6);
+      },
+    );
+
+    test(
       'grouped standard meal lines expand quantity for paid swap, extras, and discounts',
       () async {
         final AppDatabase db = createTestDatabase();
@@ -237,9 +331,9 @@ void main() {
             );
         final ReportService service = _makeReportService(db);
 
-        final SemanticSalesAnalytics analytics =
-            (await service.getShiftReport(fixture.shiftId))
-                .semanticSalesAnalytics;
+        final SemanticSalesAnalytics analytics = (await service.getShiftReport(
+          fixture.shiftId,
+        )).semanticSalesAnalytics;
         final SemanticRootProductAnalytics root = analytics.rootProducts
             .singleWhere(
               (SemanticRootProductAnalytics entry) =>
@@ -269,9 +363,8 @@ void main() {
               (SemanticMealRevenueAnalytics entry) =>
                   entry.rootProductId == fixture.rootProductId,
             );
-        final SemanticMealAppliedRuleAnalytics appliedRule = analytics
-            .appliedMealRules
-            .single;
+        final SemanticMealAppliedRuleAnalytics appliedRule =
+            analytics.appliedMealRules.single;
         final SemanticBundleVariantAnalytics variant = analytics.bundleVariants
             .singleWhere(
               (SemanticBundleVariantAnalytics entry) =>
@@ -300,7 +393,10 @@ void main() {
         expect(mealRevenue.swapActionCount, 2);
         expect(mealRevenue.extraActionCount, 2);
         expect(mealRevenue.discountActionCount, 2);
-        expect(appliedRule.ruleType, MealAdjustmentPricingRuleType.removeOnly.name);
+        expect(
+          appliedRule.ruleType,
+          MealAdjustmentPricingRuleType.removeOnly.name,
+        );
         expect(appliedRule.applicationCount, 2);
         expect(appliedRule.totalImpactMinor, -100);
         expect(variant.orderCount, 2);
@@ -308,50 +404,97 @@ void main() {
       },
     );
 
-    test('standard meal free swaps contribute zero revenue in analytics',
-        () async {
-      final AppDatabase db = createTestDatabase();
-      addTearDown(db.close);
+    test(
+      'grouped combo discounts override removal discounts in analytics',
+      () async {
+        final AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
 
-      final _StandardMealReportFixture fixture =
-          await _seedStandardMealReportFixture(
-            db,
-            freeSwapLimit: 1,
-            swapFixedDeltaMinor: 50,
-            addGroupedQuantity: 1,
-            includeExtra: false,
-            removeSide: false,
-          );
-      final ReportService service = _makeReportService(db);
+        final _StandardMealReportFixture fixture =
+            await _seedStandardMealReportFixture(
+              db,
+              freeSwapLimit: 0,
+              swapFixedDeltaMinor: 50,
+              addGroupedQuantity: 3,
+              includeExtra: true,
+              removeSide: true,
+              includeComboDiscount: true,
+            );
+        final ReportService service = _makeReportService(db);
 
-      final SemanticSalesAnalytics analytics =
-          (await service.getShiftReport(fixture.shiftId)).semanticSalesAnalytics;
-      final SemanticChargeReasonAnalytics freeSwapBreakdown = analytics
-          .chargeReasonBreakdown
-          .singleWhere(
+        final SemanticSalesAnalytics analytics = (await service.getShiftReport(
+          fixture.shiftId,
+        )).semanticSalesAnalytics;
+        final SemanticChargeReasonAnalytics comboBreakdown = analytics
+            .chargeReasonBreakdown
+            .singleWhere(
+              (SemanticChargeReasonAnalytics entry) =>
+                  entry.chargeReason == ModifierChargeReason.comboDiscount,
+            );
+        final SemanticMealRevenueAnalytics mealRevenue = analytics
+            .mealRevenueBreakdown
+            .singleWhere(
+              (SemanticMealRevenueAnalytics entry) =>
+                  entry.rootProductId == fixture.rootProductId,
+            );
+
+        expect(
+          analytics.chargeReasonBreakdown.any(
             (SemanticChargeReasonAnalytics entry) =>
-                entry.chargeReason == ModifierChargeReason.freeSwap,
-          );
-      final SemanticItemBehaviorAnalytics addedSwap = analytics.addedItems
-          .singleWhere(
-            (SemanticItemBehaviorAnalytics entry) =>
-                entry.itemProductId == fixture.swapItemProductId,
-          );
+                entry.chargeReason == ModifierChargeReason.removalDiscount,
+          ),
+          isFalse,
+        );
+        expect(comboBreakdown.eventCount, 3);
+        expect(comboBreakdown.totalQuantity, 3);
+        expect(comboBreakdown.revenueMinor, -375);
+        expect(mealRevenue.discountTotalMinor, -375);
+        expect(mealRevenue.netRevenueMinor, 3075);
+        expect(mealRevenue.removeActionCount, 3);
+      },
+    );
 
-      expect(freeSwapBreakdown.eventCount, 1);
-      expect(freeSwapBreakdown.totalQuantity, 1);
-      expect(freeSwapBreakdown.revenueMinor, 0);
-      expect(addedSwap.revenueMinor, 0);
-      expect(
-        analytics.mealRevenueBreakdown.single.freeSwapCount,
-        1,
-      );
-      expect(
-        analytics.mealRevenueBreakdown.single.paidSwapRevenueMinor,
-        0,
-      );
-      expect(analytics.appliedMealRules, isEmpty);
-    });
+    test(
+      'standard meal free swaps contribute zero revenue in analytics',
+      () async {
+        final AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+
+        final _StandardMealReportFixture fixture =
+            await _seedStandardMealReportFixture(
+              db,
+              freeSwapLimit: 1,
+              swapFixedDeltaMinor: 50,
+              addGroupedQuantity: 1,
+              includeExtra: false,
+              removeSide: false,
+            );
+        final ReportService service = _makeReportService(db);
+
+        final SemanticSalesAnalytics analytics = (await service.getShiftReport(
+          fixture.shiftId,
+        )).semanticSalesAnalytics;
+        final SemanticChargeReasonAnalytics freeSwapBreakdown = analytics
+            .chargeReasonBreakdown
+            .singleWhere(
+              (SemanticChargeReasonAnalytics entry) =>
+                  entry.chargeReason == ModifierChargeReason.freeSwap,
+            );
+        final SemanticItemBehaviorAnalytics addedSwap = analytics.addedItems
+            .singleWhere(
+              (SemanticItemBehaviorAnalytics entry) =>
+                  entry.itemProductId == fixture.swapItemProductId,
+            );
+
+        expect(freeSwapBreakdown.eventCount, 1);
+        expect(freeSwapBreakdown.totalQuantity, 1);
+        expect(freeSwapBreakdown.revenueMinor, 0);
+        expect(addedSwap.revenueMinor, 0);
+        expect(analytics.mealRevenueBreakdown.single.freeSwapCount, 1);
+        expect(analytics.mealRevenueBreakdown.single.paidSwapRevenueMinor, 0);
+        expect(analytics.appliedMealRules, isEmpty);
+      },
+    );
 
     test(
       'legacy standard meal lines stay in root revenue totals but emit data-quality notes',
@@ -374,14 +517,17 @@ void main() {
         );
         final ReportService service = _makeReportService(db);
 
-        final SemanticSalesAnalytics analytics =
-            (await service.getShiftReport(fixture.shiftId)).semanticSalesAnalytics;
+        final SemanticSalesAnalytics analytics = (await service.getShiftReport(
+          fixture.shiftId,
+        )).semanticSalesAnalytics;
 
         expect(
-          analytics.rootProducts.singleWhere(
-            (SemanticRootProductAnalytics entry) =>
-                entry.rootProductId == fixture.rootProductId,
-          ).revenueMinor,
+          analytics.rootProducts
+              .singleWhere(
+                (SemanticRootProductAnalytics entry) =>
+                    entry.rootProductId == fixture.rootProductId,
+              )
+              .revenueMinor,
           1000,
         );
         expect(analytics.mealRevenueBreakdown, isEmpty);
@@ -392,7 +538,8 @@ void main() {
             contains('Legacy standard meal lines without persisted snapshots'),
           ),
         );
-      });
+      },
+    );
   });
 }
 
@@ -744,6 +891,7 @@ Future<_StandardMealReportFixture> _seedStandardMealReportFixture(
   required int addGroupedQuantity,
   required bool includeExtra,
   required bool removeSide,
+  bool includeComboDiscount = false,
 }) async {
   final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
   final int shiftId = await insertShift(db, openedBy: cashierId);
@@ -841,6 +989,36 @@ Future<_StandardMealReportFixture> _seedStandardMealReportFixture(
                   ),
                 ],
               ),
+              if (includeComboDiscount)
+                MealAdjustmentPricingRuleDraft(
+                  id: 930,
+                  name: 'No side plus extra combo',
+                  ruleType: MealAdjustmentPricingRuleType.combo,
+                  priceDeltaMinor: -125,
+                  priority: 10,
+                  isActive: true,
+                  conditions: <MealAdjustmentPricingRuleConditionDraft>[
+                    MealAdjustmentPricingRuleConditionDraft(
+                      conditionType:
+                          MealAdjustmentPricingRuleConditionType.swapToItem,
+                      componentKey: 'main',
+                      itemProductId: swapItemProductId,
+                      quantity: 1,
+                    ),
+                    MealAdjustmentPricingRuleConditionDraft(
+                      conditionType: MealAdjustmentPricingRuleConditionType
+                          .removedComponent,
+                      componentKey: 'side',
+                      quantity: 1,
+                    ),
+                    MealAdjustmentPricingRuleConditionDraft(
+                      conditionType:
+                          MealAdjustmentPricingRuleConditionType.extraItem,
+                      itemProductId: extraItemProductId,
+                      quantity: 1,
+                    ),
+                  ],
+                ),
             ]
           : const <MealAdjustmentPricingRuleDraft>[],
     ),
@@ -872,7 +1050,9 @@ Future<_StandardMealReportFixture> _seedStandardMealReportFixture(
   final MealCustomizationRequest request = MealCustomizationRequest(
     productId: rootProductId,
     profileId: profileId,
-    removedComponentKeys: removeSide ? const <String>['side'] : const <String>[],
+    removedComponentKeys: removeSide
+        ? const <String>['side']
+        : const <String>[],
     swapSelections: <MealCustomizationComponentSelection>[
       MealCustomizationComponentSelection(
         componentKey: 'main',
@@ -903,9 +1083,7 @@ Future<_StandardMealReportFixture> _seedStandardMealReportFixture(
   ))!;
   final DateTime paidAt = DateTime(2026, 4, 3, 12, 0);
   await (db.update(db.transactions)
-        ..where(
-          ($TransactionsTable table) => table.id.equals(transaction.id),
-        ))
+        ..where(($TransactionsTable table) => table.id.equals(transaction.id)))
       .write(
         TransactionsCompanion(
           status: const Value<String>('paid'),
@@ -926,7 +1104,9 @@ Future<_StandardMealReportFixture> _seedStandardMealReportFixture(
     shiftId: shiftId,
     rootProductId: rootProductId,
     swapItemProductId: swapItemProductId,
-    transactionLineId: (await transactionRepository.getLines(transaction.id)).single.id,
+    transactionLineId: (await transactionRepository.getLines(
+      transaction.id,
+    )).single.id,
   );
 }
 

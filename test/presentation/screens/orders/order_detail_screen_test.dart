@@ -587,7 +587,7 @@ void main() {
     },
   );
 
-  testWidgets('breakfast modifier popup hides None for required groups', (
+  testWidgets('breakfast modifier popup shows explicit no-answer options for required groups', (
     WidgetTester tester,
   ) async {
     final _BreakfastUiFixture fixture = await _pumpBreakfastOrderDetail(
@@ -611,14 +611,16 @@ void main() {
       find.byKey(
         ValueKey<String>('breakfast-choice-none-${fixture.hotDrinkGroupId}'),
       ),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       find.byKey(
         ValueKey<String>('breakfast-choice-none-${fixture.toastBreadGroupId!}'),
       ),
-      findsNothing,
+      findsOneWidget,
     );
+    expect(find.text('No drink'), findsOneWidget);
+    expect(find.text('No toast/bread'), findsOneWidget);
     expect(find.text('Tea'), findsOneWidget);
     expect(find.text('Coffee'), findsOneWidget);
     expect(find.text('Toast'), findsOneWidget);
@@ -876,6 +878,24 @@ Future<_BreakfastUiFixture> _seedBreakfastUiFixture(
         );
   }
 
+  Future<void> insertExplicitNoneChoice({
+    required int groupId,
+    required String label,
+  }) async {
+    await db
+        .into(db.productModifiers)
+        .insert(
+          app_db.ProductModifiersCompanion.insert(
+            productId: set4ProductId,
+            groupId: Value<int?>(groupId),
+            itemProductId: const Value<int?>(null),
+            name: label,
+            type: 'choice',
+            extraPriceMinor: const Value<int>(0),
+          ),
+        );
+  }
+
   await insertChoice(
     groupId: hotDrinkGroupId,
     itemProductId: teaProductId,
@@ -886,6 +906,7 @@ Future<_BreakfastUiFixture> _seedBreakfastUiFixture(
     itemProductId: coffeeProductId,
     label: 'Coffee',
   );
+  await insertExplicitNoneChoice(groupId: hotDrinkGroupId, label: 'No drink');
   if (toastBreadGroupId != null) {
     await insertChoice(
       groupId: toastBreadGroupId,
@@ -896,6 +917,10 @@ Future<_BreakfastUiFixture> _seedBreakfastUiFixture(
       groupId: toastBreadGroupId,
       itemProductId: breadProductId,
       label: 'Bread',
+    );
+    await insertExplicitNoneChoice(
+      groupId: toastBreadGroupId,
+      label: 'No toast/bread',
     );
   }
 

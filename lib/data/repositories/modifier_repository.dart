@@ -36,6 +36,7 @@ class ModifierRepository {
     int? groupId,
     int? itemProductId,
   }) {
+    _validateGenericModifierWrite(type);
     return _database
         .into(_database.productModifiers)
         .insert(
@@ -61,6 +62,9 @@ class ModifierRepository {
     int? extraPriceMinor,
     bool? isActive,
   }) async {
+    if (type == ModifierType.choice) {
+      _validateGenericModifierWrite(type!);
+    }
     final int updatedCount =
         await (_database.update(
           _database.productModifiers,
@@ -85,6 +89,14 @@ class ModifierRepository {
         );
 
     return updatedCount > 0;
+  }
+
+  void _validateGenericModifierWrite(ModifierType type) {
+    if (type == ModifierType.choice) {
+      throw ValidationException(
+        'Grouped choice modifiers must be managed through breakfast set configuration.',
+      );
+    }
   }
 
   Future<bool> toggleActive(int id, bool isActive) async {

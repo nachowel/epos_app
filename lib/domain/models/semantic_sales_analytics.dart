@@ -120,7 +120,7 @@ class SemanticChoiceSelectionAnalytics {
   final String rootProductName;
   final int groupId;
   final String groupName;
-  final int itemProductId;
+  final int? itemProductId;
   final String itemName;
   final int selectionCount;
   final int totalSelectedQuantity;

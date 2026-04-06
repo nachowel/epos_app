@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:epos_app/data/database/app_database.dart' as app_db;
 import 'package:epos_app/data/repositories/modifier_repository.dart';
+import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/domain/models/product_modifier.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -140,6 +141,33 @@ void main() {
             ModifierType.included,
             ModifierType.choice,
           ]),
+        );
+      },
+    );
+
+    test(
+      'rejects grouped choice writes through the generic repository',
+      () async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final _ModifierFixture fixture = await _seedModifierFixture(db);
+        final ModifierRepository repository = ModifierRepository(db);
+
+        await expectLater(
+          () => repository.insert(
+            productId: fixture.rootProductId,
+            name: 'Tea',
+            type: ModifierType.choice,
+            groupId: fixture.groupId,
+            itemProductId: fixture.choiceProductId,
+          ),
+          throwsA(
+            isA<ValidationException>().having(
+              (ValidationException error) => error.message,
+              'message',
+              contains('breakfast set configuration'),
+            ),
+          ),
         );
       },
     );
