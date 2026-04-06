@@ -66,7 +66,7 @@ Every product under the `Set Breakfast` category must expose these two groups.
 #### Group 1: Tea or Coffee
 
 - `name = 'Tea or Coffee'`
-- `min_select = 0`
+- `min_select = 1`
 - `max_select = 1`
 - `included_quantity = 1`
 - `sort_order = 1`
@@ -79,9 +79,9 @@ Allowed members:
 #### Group 2: Toast or Bread
 
 - `name = 'Toast or Bread'`
-- `min_select = 0`
+- `min_select = 1`
 - `max_select = 1`
-- `included_quantity = 2`
+- `included_quantity = 1`
 - `sort_order = 2`
 
 Allowed members:
@@ -91,9 +91,10 @@ Allowed members:
 
 Interpretation:
 
-- Only `2 toast` or `2 bread` is supported.
+- Customer must choose exactly one member from each required group.
+- `Toast or Bread` means one included bread-path selection, not a two-unit allowance.
+- Required groups do not support `None`.
 - Mixed split such as `1 toast + 1 bread` is not supported by this contract.
-- The later UI and domain layers must present this as a single-choice path with quantity allowance, not as two independent included picks.
 
 ## Generic Structure Template
 
@@ -122,7 +123,8 @@ Admin/repository interpretation:
 - `set_items` define removable components.
 - `modifier_groups` define included choices.
 - `product_modifiers(type = 'choice')` define the allowed members of each choice group.
-- Extras and swaps are not configured as separate menu structures in this phase. They will be derived later from product roles and pricing logic.
+- Extras are configured separately through `product_modifiers(type = 'extra')`.
+- Swap behavior remains a runtime pricing/classification concern, not a separate menu structure.
 
 ## Temporary Example Data
 
@@ -214,7 +216,7 @@ Future admin/dashboard configuration must reject or warn on these invalid setups
     - choice group members
 13. Dashboard editing must label example data as temporary or placeholder when seeded for demo/testing.
 14. Future validation must preserve the core invariant:
-    - choice may become `extra_add`
+    - required breakfast choice groups remain one-of-one selections
     - choice may never become swap replacement
 
 ## Non-Goals

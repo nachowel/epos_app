@@ -20,7 +20,7 @@ If two sources disagree, follow the hierarchy below.
 These are the highest authority for current technical reality:
 
 1. `lib/data/database/app_database.dart`
-2. `lib/data/database/migrations/*`
+2. embedded migration functions and raw SQL defined in `lib/data/database/app_database.dart`
 3. any generated schema-compatible runtime behavior already enforced by live code
 
 Interpretation:
@@ -193,7 +193,7 @@ When using Codex, Claude, Cursor, or other AI tools:
 Always instruct the model to follow this order:
 
 1. `SYSTEM_OF_TRUTH.md`
-2. live schema and migrations
+2. live schema and embedded migrations in `app_database.dart`
 3. relevant feature contract docs
 4. `CLAUDE.md`
 5. `schema.md`

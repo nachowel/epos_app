@@ -8,9 +8,9 @@ This file is a **coding and workflow guidance document**, NOT the final authorit
 
 ### 🔴 Always follow this authority order:
 
-1. `docs/SYSTEM_OF_TRUTH.md`
+1. `SYSTEM_OF_TRUTH.md`
 2. `lib/data/database/app_database.dart`
-3. `lib/data/database/migrations/*`
+3. embedded migration logic in `lib/data/database/app_database.dart`
 4. Feature contract docs (`docs/*contract*.md`)
 5. `CLAUDE.md` (this file)
 6. `schema.md`
@@ -117,7 +117,7 @@ System supports:
 Rules:
 
 * `included_choice` → free
-* overflow → `extra_add`
+* default breakfast groups are one-of-one selections
 * NEVER participates in swap
 
 ---
@@ -331,7 +331,7 @@ When using Codex / Claude / Cursor:
 ALWAYS start with:
 
 ```text
-Follow docs/SYSTEM_OF_TRUTH.md first.
+Follow SYSTEM_OF_TRUTH.md first.
 Do not infer behavior from legacy flat modifier logic.
 Use breakfast contract docs for set behavior.
 ```

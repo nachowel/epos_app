@@ -14,6 +14,51 @@ import '../../support/test_database.dart';
 void main() {
   group('BreakfastPosService', () {
     test(
+      'configured breakfast products route to the semantic bundle engine regardless of category',
+      () async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final BreakfastPosService service = BreakfastPosService(
+          breakfastConfigurationRepository: BreakfastConfigurationRepository(
+            db,
+          ),
+        );
+
+        final List<_BreakfastPosFixture> fixtures = <_BreakfastPosFixture>[
+          await _seedBreakfastPosFixture(
+            db,
+            rootCategoryName: 'Set Breakfast',
+            rootProductName: 'Big Breakfast',
+          ),
+          await _seedBreakfastPosFixture(
+            db,
+            rootCategoryName: 'Pancake Breakfast',
+            rootProductName: 'Pancake Breakfast 1',
+          ),
+          await _seedBreakfastPosFixture(
+            db,
+            rootCategoryName: 'Healthy Breakfast',
+            rootProductName: 'Eggs Benedict',
+          ),
+        ];
+
+        for (final _BreakfastPosFixture fixture in fixtures) {
+          expect(
+            await service.getSelectionPath(fixture.rootProduct),
+            PosProductSelectionPath.semanticBundle,
+          );
+          final BreakfastPosEditorData editorData = await service
+              .loadEditorData(product: fixture.rootProduct);
+          expect(editorData.profile.type, ProductMenuConfigType.semanticSet);
+          expect(
+            editorData.configuration.setRootProductId,
+            fixture.rootProduct.id,
+          );
+        }
+      },
+    );
+
+    test(
       'required grouped choices must be completed before confirmation',
       () async {
         final app_db.AppDatabase db = createTestDatabase();
@@ -58,12 +103,49 @@ void main() {
       },
     );
 
+    test('explicit none is rejected for required grouped choices', () async {
+      final app_db.AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+      final _BreakfastPosFixture fixture = await _seedBreakfastPosFixture(db);
+      final BreakfastPosService service = BreakfastPosService(
+        breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
+      );
+
+      final BreakfastPosEditorData initial = await service.loadEditorData(
+        product: fixture.rootProduct,
+      );
+
+      final BreakfastPosSelectionPreview preview = service.previewSelection(
+        product: fixture.rootProduct,
+        configuration: initial.configuration,
+        requestedState: BreakfastRequestedState(
+          chosenGroups: <BreakfastChosenGroupRequest>[
+            BreakfastChosenGroupRequest(
+              groupId: fixture.drinkGroupId,
+              selectedItemProductId: null,
+              requestedQuantity: 1,
+            ),
+          ],
+        ),
+      );
+
+      expect(preview.canConfirm, isFalse);
+      expect(
+        preview.validationMessages,
+        contains('Choose an option for Drink choice.'),
+      );
+      expect(preview.rebuildResult.lineSnapshot.lineTotalMinor, 600);
+    });
+
     test(
-      'explicit none satisfies required grouped choice validation',
+      'explicit none remains available for optional grouped choices',
       () async {
         final app_db.AppDatabase db = createTestDatabase();
         addTearDown(db.close);
-        final _BreakfastPosFixture fixture = await _seedBreakfastPosFixture(db);
+        final _BreakfastPosFixture fixture = await _seedBreakfastPosFixture(
+          db,
+          groupMinSelect: 0,
+        );
         final BreakfastPosService service = BreakfastPosService(
           breakfastConfigurationRepository: BreakfastConfigurationRepository(
             db,
@@ -251,18 +333,21 @@ extension on BreakfastLineEdit {
 
 Future<_BreakfastPosFixture> _seedBreakfastPosFixture(
   app_db.AppDatabase db, {
+  int groupMinSelect = 1,
   int groupMaxSelect = 1,
+  String rootCategoryName = 'Set Breakfast',
+  String rootProductName = 'Set Breakfast',
 }) async {
   final int breakfastCategoryId = await insertCategory(
     db,
-    name: 'Set Breakfast',
+    name: rootCategoryName,
   );
   final int drinkCategoryId = await insertCategory(db, name: 'Drinks');
 
   final int rootProductId = await insertProduct(
     db,
     categoryId: breakfastCategoryId,
-    name: 'Set Breakfast',
+    name: rootProductName,
     priceMinor: 600,
   );
   final int eggProductId = await insertProduct(
@@ -324,7 +409,7 @@ Future<_BreakfastPosFixture> _seedBreakfastPosFixture(
         app_db.ModifierGroupsCompanion.insert(
           productId: rootProductId,
           name: 'Drink choice',
-          minSelect: const Value<int>(1),
+          minSelect: Value<int>(groupMinSelect),
           maxSelect: Value<int>(groupMaxSelect),
           includedQuantity: const Value<int>(1),
           sortOrder: const Value<int>(1),
@@ -367,7 +452,7 @@ Future<_BreakfastPosFixture> _seedBreakfastPosFixture(
     rootProduct: Product(
       id: rootProductId,
       categoryId: breakfastCategoryId,
-      name: 'Set Breakfast',
+      name: rootProductName,
       priceMinor: 600,
       imageUrl: null,
       hasModifiers: false,

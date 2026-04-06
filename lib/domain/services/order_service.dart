@@ -397,6 +397,23 @@ class OrderService {
             configuration: configuration,
             requestedState: nextRequestedState,
           );
+      final List<BreakfastEditErrorCode> invalidChoiceTransitionCodes =
+          _validateRequiredChoiceTransitions(
+            configuration: configuration,
+            currentRequestedState: currentRequestedState,
+            nextRequestedState: normalizedRequestedState,
+          );
+      if (invalidChoiceTransitionCodes.isNotEmpty) {
+        _logBreakfastEditRejected(
+          lineUuid: workingLine.uuid,
+          transactionLineId: workingLine.id,
+          codes: invalidChoiceTransitionCodes,
+        );
+        throw BreakfastEditRejectedException(
+          codes: invalidChoiceTransitionCodes,
+          transactionLineId: workingLine.id,
+        );
+      }
 
       final BreakfastRebuildResult rebuildResult = _breakfastRebuildEngine
           .rebuild(
@@ -495,7 +512,8 @@ class OrderService {
         TransactionLine line,
         TransactionStatus status,
         DateTime transactionUpdatedAt,
-      })? initialContext = await _transactionRepository.getLineContext(
+      })?
+      initialContext = await _transactionRepository.getLineContext(
         transactionLineId,
       );
       if (initialContext == null) {
@@ -571,7 +589,8 @@ class OrderService {
         throw error;
       }
 
-      final Product product = await _requiredProductRepository.getById(
+      final Product product =
+          await _requiredProductRepository.getById(
             initialContext.line.productId,
           ) ??
           (throw NotFoundException(
@@ -609,7 +628,9 @@ class OrderService {
           transactionLineId: previousLineId,
           snapshot: nextSnapshot,
         );
-        persistedLine = await _transactionRepository.getLineById(previousLineId);
+        persistedLine = await _transactionRepository.getLineById(
+          previousLineId,
+        );
       } else {
         final TransactionLine? existingLine = await _transactionRepository
             .findDraftMealCustomizationLineByIdentity(
@@ -623,7 +644,9 @@ class OrderService {
             transactionLineId: existingLine.id,
             incrementBy: previousQuantity,
           );
-          await _transactionRepository.deleteDraftLineCompletely(previousLineId);
+          await _transactionRepository.deleteDraftLineCompletely(
+            previousLineId,
+          );
           persistedLine = await _transactionRepository.getLineById(
             existingLine.id,
           );
@@ -664,7 +687,8 @@ class OrderService {
           'merged_into_existing_line': mergedIntoExistingLine,
           'previous_identity': previousIdentity,
           'next_identity': nextIdentity,
-          if (mergedTargetLineId != null) 'merged_target_line_id': mergedTargetLineId,
+          if (mergedTargetLineId != null)
+            'merged_target_line_id': mergedTargetLineId,
           if (actorUserId != null) 'actor_user_id': actorUserId,
         },
       );
@@ -690,7 +714,8 @@ class OrderService {
         TransactionLine line,
         TransactionStatus status,
         DateTime transactionUpdatedAt,
-      })? initialContext = await _transactionRepository.getLineContext(
+      })?
+      initialContext = await _transactionRepository.getLineContext(
         transactionLineId,
       );
       if (initialContext == null) {
@@ -728,7 +753,8 @@ class OrderService {
         );
       }
 
-      final Product product = await _requiredProductRepository.getById(
+      final Product product =
+          await _requiredProductRepository.getById(
             initialContext.line.productId,
           ) ??
           (throw NotFoundException(
@@ -758,7 +784,9 @@ class OrderService {
 
       // Step 1: Decrement the original grouped line by 1.
       // Precondition guarantees qty >= 2, so this leaves qty >= 1.
-      await _transactionRepository.decrementLineQuantityOrDelete(previousLineId);
+      await _transactionRepository.decrementLineQuantityOrDelete(
+        previousLineId,
+      );
 
       // Step 2: Determine where the split unit lands.
       TransactionLine? resultLine;
@@ -794,7 +822,9 @@ class OrderService {
             transactionLineId: existingLine.id,
             incrementBy: 1,
           );
-          resultLine = await _transactionRepository.getLineById(existingLine.id);
+          resultLine = await _transactionRepository.getLineById(
+            existingLine.id,
+          );
           mergedIntoExistingLine = true;
           mergeTargetLineId = existingLine.id;
         } else {
@@ -824,8 +854,8 @@ class OrderService {
         message: mergedIntoExistingLine
             ? 'Single unit split from grouped line and merged into an existing line.'
             : nextIdentity == previousIdentity
-                ? 'Single unit edit produced same identity; re-merged into original line.'
-                : 'Single unit split from grouped line and created as new line.',
+            ? 'Single unit edit produced same identity; re-merged into original line.'
+            : 'Single unit split from grouped line and created as new line.',
         metadata: <String, Object?>{
           'transaction_id': transactionId,
           'source_line_id': previousLineId,
@@ -836,7 +866,8 @@ class OrderService {
           'merged_into_existing_line': mergedIntoExistingLine,
           'previous_identity': previousIdentity,
           'next_identity': nextIdentity,
-          if (mergeTargetLineId != null) 'merge_target_line_id': mergeTargetLineId,
+          if (mergeTargetLineId != null)
+            'merge_target_line_id': mergeTargetLineId,
           if (actorUserId != null) 'actor_user_id': actorUserId,
         },
       );
@@ -859,7 +890,8 @@ class OrderService {
         TransactionLine line,
         TransactionStatus status,
         DateTime transactionUpdatedAt,
-      })? initialContext = await _transactionRepository.getLineContext(
+      })?
+      initialContext = await _transactionRepository.getLineContext(
         transactionLineId,
       );
       if (initialContext == null) {
@@ -886,7 +918,8 @@ class OrderService {
         );
       }
 
-      final Product product = await _requiredProductRepository.getById(
+      final Product product =
+          await _requiredProductRepository.getById(
             initialContext.line.productId,
           ) ??
           (throw NotFoundException(
@@ -1580,6 +1613,54 @@ class OrderService {
     return codes;
   }
 
+  List<BreakfastEditErrorCode> _validateRequiredChoiceTransitions({
+    required BreakfastSetConfiguration configuration,
+    required BreakfastRequestedState currentRequestedState,
+    required BreakfastRequestedState nextRequestedState,
+  }) {
+    final Map<int, BreakfastChosenGroupRequest> currentChoicesByGroupId =
+        <int, BreakfastChosenGroupRequest>{
+          for (final BreakfastChosenGroupRequest choice
+              in currentRequestedState.chosenGroups)
+            choice.groupId: choice,
+        };
+    final Map<int, BreakfastChosenGroupRequest> nextChoicesByGroupId =
+        <int, BreakfastChosenGroupRequest>{
+          for (final BreakfastChosenGroupRequest choice
+              in nextRequestedState.chosenGroups)
+            choice.groupId: choice,
+        };
+    final Set<BreakfastEditErrorCode> codes = <BreakfastEditErrorCode>{};
+
+    for (final BreakfastChoiceGroupConfig group in configuration.choiceGroups) {
+      if (group.minSelect <= 0) {
+        continue;
+      }
+      final BreakfastChosenGroupRequest? currentChoice =
+          currentChoicesByGroupId[group.groupId];
+      final BreakfastChosenGroupRequest? nextChoice =
+          nextChoicesByGroupId[group.groupId];
+      final bool hadConcreteSelection =
+          currentChoice != null &&
+          currentChoice.requestedQuantity > 0 &&
+          currentChoice.selectedItemProductId != null;
+      final bool removedConcreteSelection =
+          nextChoice == null ||
+          nextChoice.requestedQuantity <= 0 ||
+          nextChoice.selectedItemProductId == null;
+      final bool nextIsExplicitNone =
+          nextChoice != null &&
+          nextChoice.requestedQuantity > 0 &&
+          nextChoice.selectedItemProductId == null;
+      if (nextIsExplicitNone ||
+          (hadConcreteSelection && removedConcreteSelection)) {
+        codes.add(BreakfastEditErrorCode.invalidChoiceQuantity);
+      }
+    }
+
+    return codes.toList(growable: false);
+  }
+
   String _buildShortContent(List<TransactionLine> lines) {
     if (lines.isEmpty) {
       return 'No items';
@@ -1722,7 +1803,7 @@ class OrderService {
       throw MealCustomizationRuntimeConfigurationException(
         productId: product.id,
         profileId: profileId,
-          detail: validationResult.message,
+        detail: validationResult.message,
       );
     }
 
@@ -1772,11 +1853,8 @@ class OrderService {
     }
 
     await _ensureProductAvailableForSale(context.product.id);
-    final MealCustomizationResolvedSnapshot snapshot =
-        _mealCustomizationEngine.evaluate(
-          profile: context.profile,
-          request: normalizedRequest,
-        );
+    final MealCustomizationResolvedSnapshot snapshot = _mealCustomizationEngine
+        .evaluate(profile: context.profile, request: normalizedRequest);
     final TransactionLine? persistedLine = await _transactionRepository
         .runInTransaction(() async {
           final TransactionLine? existingLine = await _transactionRepository

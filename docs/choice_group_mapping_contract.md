@@ -84,7 +84,7 @@ Note:
 
 - this field is not used for breakfast pricing semantics
 - pricing for choice members is determined later by the domain engine
-- choice overflow may still produce `extra_add` rows with full product pricing
+- current breakfast default groups are single-selection only and do not support choice overflow
 
 Interpretation:
 
@@ -175,45 +175,29 @@ When a valid included choice is selected, write one `order_modifiers` row:
 Examples:
 
 - `Tea or Coffee` -> `tea` selected -> `quantity = 1`
-- `Toast or Bread` -> `toast` selected -> `quantity = 2`
+- `Toast or Bread` -> `toast` selected -> `quantity = 1`
 
-### No choice made
+### Explicit none for optional groups
 
-If no choice is made:
+If an optional group is explicitly set to `None`, write one `order_modifiers` row:
 
-- no `order_modifiers` choice row is created
+- `action = 'choice'`
+- `charge_reason = 'included_choice'`
+- `item_product_id = null`
+- `quantity = 1`
 
-This matches the optional-choice rule:
+This path is only valid when:
 
 - `min_select = 0`
-- customer may choose one option or none
+- the runtime intentionally supports a none choice for that group
 
-### Allowance exceeded
-
-If included allowance is exceeded, write a separate `order_modifiers` add row:
-
-- `action = 'add'`
-- `charge_reason = 'extra_add'`
-- `item_product_id = same real product`
-- `quantity = excess quantity`
-
-Example:
-
-- group `Toast or Bread`
-- included quantity = 2
-- customer chooses `toast`
-- customer wants total `4 toast`
-
-Write:
-
-- one `choice / included_choice / toast / quantity=2`
-- one `add / extra_add / toast / quantity=2`
+Required breakfast groups do not support `None`.
 
 Critical invariants:
 
 - choice rows NEVER participate in swap matching
 - choice selection does NOT consume replacement pool
-- choice overflow becomes `extra_add`, not swap
+- default breakfast required groups persist one `included_choice` row only
 
 ## Guardrails
 
@@ -225,17 +209,17 @@ The following rules are mandatory for future admin flows and repository validati
    - `group_id IS NOT NULL`
    - `item_product_id IS NOT NULL`
 4. Non-choice `product_modifiers` rows may keep `item_product_id = NULL`.
-5. Choice products can later become `extra_add`.
+5. Required breakfast groups must remain one-of-one selections in POS and runtime.
 6. Choice products can never become swap replacements.
 7. Choice products must never be matched against pending removals from `set_items`.
-8. `order_modifiers.item_product_id` must carry the real selected product for both:
-   - `included_choice`
-   - `extra_add` overflow
+8. `order_modifiers.item_product_id` must carry the real selected product for `included_choice`, unless the group is explicitly set to optional `None`.
 9. If a choice member points at a missing or inactive real product, future admin validation should reject the configuration.
 10. The `Toast or Bread` group must still enforce:
-    - `min_select = 0`
+    - `min_select = 1`
     - `max_select = 1`
-    - `included_quantity = 2`
+    - `included_quantity = 1`
+    - exactly one selected member
+    - no `None`
     - no mixed split support
 11. `modifier_groups` must satisfy `min_select <= max_select`.
 12. `included_quantity` must not exceed `max_select`.

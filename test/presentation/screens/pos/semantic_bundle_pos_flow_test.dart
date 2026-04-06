@@ -446,7 +446,8 @@ void main() {
       expect(tester.getSize(confirmButton).height, greaterThanOrEqualTo(58));
       expect(tester.getSize(confirmButton).width, greaterThanOrEqualTo(188));
       expect(
-        tester.getTopLeft(confirmButton).dx - tester.getTopRight(cancelButton).dx,
+        tester.getTopLeft(confirmButton).dx -
+            tester.getTopRight(cancelButton).dx,
         greaterThanOrEqualTo(12),
       );
       expect(find.text('Drink: Missing'), findsNothing);
@@ -486,7 +487,7 @@ void main() {
             'semantic-sticky-choice-none-${fixture.drinkGroupId}',
           ),
         ),
-        findsOneWidget,
+        findsNothing,
       );
       final Finder includedSection = find.byKey(
         const ValueKey<String>('semantic-section-included-items'),
@@ -575,7 +576,8 @@ void main() {
                 fixture.drinkGroupId,
               )
               .having(
-                (BreakfastChosenGroupRequest group) => group.selectedItemProductId,
+                (BreakfastChosenGroupRequest group) =>
+                    group.selectedItemProductId,
                 'selectedItemProductId',
                 fixture.latteProductId,
               ),
@@ -586,7 +588,8 @@ void main() {
                 fixture.breadGroupId,
               )
               .having(
-                (BreakfastChosenGroupRequest group) => group.selectedItemProductId,
+                (BreakfastChosenGroupRequest group) =>
+                    group.selectedItemProductId,
                 'selectedItemProductId',
                 fixture.toastProductId,
               ),
@@ -675,7 +678,8 @@ void main() {
                 fixture.drinkGroupId,
               )
               .having(
-                (BreakfastChosenGroupRequest group) => group.selectedItemProductId,
+                (BreakfastChosenGroupRequest group) =>
+                    group.selectedItemProductId,
                 'selectedItemProductId',
                 fixture.teaProductId,
               ),
@@ -686,7 +690,8 @@ void main() {
                 fixture.breadGroupId,
               )
               .having(
-                (BreakfastChosenGroupRequest group) => group.selectedItemProductId,
+                (BreakfastChosenGroupRequest group) =>
+                    group.selectedItemProductId,
                 'selectedItemProductId',
                 fixture.toastProductId,
               ),
@@ -796,7 +801,8 @@ void main() {
                 fixture.drinkGroupId,
               )
               .having(
-                (BreakfastChosenGroupRequest group) => group.selectedItemProductId,
+                (BreakfastChosenGroupRequest group) =>
+                    group.selectedItemProductId,
                 'selectedItemProductId',
                 fixture.latteProductId,
               ),
@@ -807,7 +813,8 @@ void main() {
                 fixture.breadGroupId,
               )
               .having(
-                (BreakfastChosenGroupRequest group) => group.selectedItemProductId,
+                (BreakfastChosenGroupRequest group) =>
+                    group.selectedItemProductId,
                 'selectedItemProductId',
                 fixture.toastProductId,
               ),
@@ -1208,7 +1215,7 @@ void main() {
     );
   });
 
-  testWidgets('semantic editor shows and accepts None for required choices', (
+  testWidgets('semantic editor hides None for required choices', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -1243,14 +1250,21 @@ void main() {
       find.byKey(
         ValueKey<String>('semantic-choice-none-${fixture.drinkGroupId}'),
       ),
-      findsOneWidget,
+      findsNothing,
     );
 
-    final Finder noneChoice = find.byKey(
-      ValueKey<String>('semantic-choice-none-${fixture.drinkGroupId}'),
+    final ElevatedButton disabledConfirm = tester.widget<ElevatedButton>(
+      find.byKey(const ValueKey<String>('semantic-bundle-confirm')),
     );
-    await tester.ensureVisible(noneChoice);
-    await tester.tap(noneChoice, warnIfMissed: false);
+    expect(disabledConfirm.onPressed, isNotNull);
+
+    final Finder teaChoice = find.byKey(
+      ValueKey<String>(
+        'semantic-choice-select-${fixture.drinkGroupId}-${fixture.teaProductId}',
+      ),
+    );
+    await tester.ensureVisible(teaChoice);
+    await tester.tap(teaChoice, warnIfMissed: false);
     await tester.pumpAndSettle();
 
     final ElevatedButton enabledConfirm = tester.widget<ElevatedButton>(
@@ -1273,157 +1287,152 @@ void main() {
         .chosenGroups
         .single;
     expect(chosenGroup.groupId, fixture.drinkGroupId);
-    expect(chosenGroup.selectedItemProductId, isNull);
+    expect(chosenGroup.selectedItemProductId, fixture.teaProductId);
     expect(chosenGroup.requestedQuantity, 1);
   });
 
-  testWidgets(
-    'semantic editor renders None for every required group and allows confirm once all are satisfied',
-    (WidgetTester tester) async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final AppDatabase db = createTestDatabase();
-      addTearDown(db.close);
+  testWidgets('semantic editor requires concrete selections for every required group', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final AppDatabase db = createTestDatabase();
+    addTearDown(db.close);
 
-      final _PosSemanticFixture fixture = await _seedPosSemanticFixture(
-        db,
-        includeBreadGroup: true,
-      );
-      final ProviderContainer container = ProviderContainer(
-        overrides: <Override>[
-          appDatabaseProvider.overrideWithValue(db),
-          sharedPreferencesProvider.overrideWithValue(prefs),
-          ordersNotifierProvider.overrideWith(
-            (Ref ref) => _StaticOrdersNotifier(ref),
+    final _PosSemanticFixture fixture = await _seedPosSemanticFixture(
+      db,
+      includeBreadGroup: true,
+    );
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        appDatabaseProvider.overrideWithValue(db),
+        sharedPreferencesProvider.overrideWithValue(prefs),
+        ordersNotifierProvider.overrideWith(
+          (Ref ref) => _StaticOrdersNotifier(ref),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(authNotifierProvider.notifier)
+        .loadUserById(fixture.cashierId);
+    await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
+
+    await tester.pumpWidget(_testApp(container));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Set Breakfast').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Drink choice'), findsOneWidget);
+    expect(find.text('Bread choice'), findsOneWidget);
+    expect(find.text('Drink: Missing'), findsNothing);
+    expect(find.text('Bread: Missing'), findsNothing);
+    expect(find.text('2 pending'), findsNothing);
+    expect(find.text('Pending'), findsNothing);
+    expect(
+      find.byKey(
+        ValueKey<String>(
+          'semantic-sticky-choice-select-${fixture.drinkGroupId}-${fixture.teaProductId}',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        ValueKey<String>('semantic-sticky-choice-none-${fixture.drinkGroupId}'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byKey(
+        ValueKey<String>(
+          'semantic-sticky-choice-none-${fixture.breadGroupId!}',
+        ),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byKey(
+        ValueKey<String>('semantic-choice-none-${fixture.drinkGroupId}'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byKey(
+        ValueKey<String>('semantic-choice-none-${fixture.breadGroupId!}'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byKey(
+        ValueKey<String>(
+          'semantic-choice-select-${fixture.drinkGroupId}-${fixture.teaProductId}',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Coffee'), findsWidgets);
+    expect(find.text('Toast'), findsWidgets);
+    expect(find.text('Bread'), findsWidgets);
+
+    ElevatedButton confirm = tester.widget<ElevatedButton>(
+      find.byKey(const ValueKey<String>('semantic-bundle-confirm')),
+    );
+    expect(confirm.onPressed, isNotNull);
+
+    await tester.tap(
+      find.byKey(
+        ValueKey<String>(
+          'semantic-choice-select-${fixture.drinkGroupId}-${fixture.teaProductId}',
+        ),
+      ),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+
+    confirm = tester.widget<ElevatedButton>(
+      find.byKey(const ValueKey<String>('semantic-bundle-confirm')),
+    );
+    expect(confirm.onPressed, isNotNull);
+
+    await tester.tap(
+      find.byKey(
+        ValueKey<String>(
+          'semantic-choice-select-${fixture.breadGroupId!}-${fixture.toastProductId!}',
+        ),
+      ),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+
+    confirm = tester.widget<ElevatedButton>(
+      find.byKey(const ValueKey<String>('semantic-bundle-confirm')),
+    );
+    expect(confirm.onPressed, isNotNull);
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('semantic-bundle-confirm')),
+    );
+    await tester.pumpAndSettle();
+
+    final cartState = container.read(cartNotifierProvider);
+    expect(cartState.items, hasLength(1));
+    expect(
+      cartState.items.single.breakfastSelection!.requestedState.chosenGroups,
+      hasLength(2),
+    );
+    expect(
+      cartState.items.single.breakfastSelection!.requestedState.chosenGroups
+          .every(
+            (group) =>
+                group.selectedItemProductId != null &&
+                group.requestedQuantity == 1,
           ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      await container
-          .read(authNotifierProvider.notifier)
-          .loadUserById(fixture.cashierId);
-      await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
-
-      await tester.pumpWidget(_testApp(container));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Set Breakfast').last);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Drink choice'), findsOneWidget);
-      expect(find.text('Bread choice'), findsOneWidget);
-      expect(find.text('Drink: Missing'), findsNothing);
-      expect(find.text('Bread: Missing'), findsNothing);
-      expect(find.text('2 pending'), findsNothing);
-      expect(find.text('Pending'), findsNothing);
-      expect(
-        find.byKey(
-          ValueKey<String>(
-            'semantic-sticky-choice-select-${fixture.drinkGroupId}-${fixture.teaProductId}',
-          ),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(
-          ValueKey<String>('semantic-sticky-choice-none-${fixture.drinkGroupId}'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(
-          ValueKey<String>('semantic-sticky-choice-none-${fixture.breadGroupId!}'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(
-          ValueKey<String>('semantic-choice-none-${fixture.drinkGroupId}'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(
-          ValueKey<String>('semantic-choice-none-${fixture.breadGroupId!}'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(
-          ValueKey<String>(
-            'semantic-choice-select-${fixture.drinkGroupId}-${fixture.teaProductId}',
-          ),
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('Coffee'), findsWidgets);
-      expect(find.text('Toast'), findsWidgets);
-      expect(find.text('Bread'), findsWidgets);
-
-      ElevatedButton confirm = tester.widget<ElevatedButton>(
-        find.byKey(const ValueKey<String>('semantic-bundle-confirm')),
-      );
-      expect(confirm.onPressed, isNotNull);
-
-      await tester.ensureVisible(
-        find.byKey(
-          ValueKey<String>('semantic-choice-none-${fixture.drinkGroupId}'),
-        ),
-      );
-      await tester.tap(
-        find.byKey(
-          ValueKey<String>('semantic-choice-none-${fixture.drinkGroupId}'),
-        ),
-        warnIfMissed: false,
-      );
-      await tester.pumpAndSettle();
-
-      confirm = tester.widget<ElevatedButton>(
-        find.byKey(const ValueKey<String>('semantic-bundle-confirm')),
-      );
-      expect(confirm.onPressed, isNotNull);
-
-      await tester.ensureVisible(
-        find.byKey(
-          ValueKey<String>('semantic-choice-none-${fixture.breadGroupId!}'),
-        ),
-      );
-      await tester.tap(
-        find.byKey(
-          ValueKey<String>('semantic-choice-none-${fixture.breadGroupId!}'),
-        ),
-        warnIfMissed: false,
-      );
-      await tester.pumpAndSettle();
-
-      confirm = tester.widget<ElevatedButton>(
-        find.byKey(const ValueKey<String>('semantic-bundle-confirm')),
-      );
-      expect(confirm.onPressed, isNotNull);
-
-      await tester.tap(
-        find.byKey(const ValueKey<String>('semantic-bundle-confirm')),
-      );
-      await tester.pumpAndSettle();
-
-      final cartState = container.read(cartNotifierProvider);
-      expect(cartState.items, hasLength(1));
-      expect(
-        cartState.items.single.breakfastSelection!.requestedState.chosenGroups,
-        hasLength(2),
-      );
-      expect(
-        cartState.items.single.breakfastSelection!.requestedState.chosenGroups
-            .every(
-              (group) =>
-                  group.selectedItemProductId == null &&
-                  group.requestedQuantity == 1,
-            ),
-        isTrue,
-      );
-    },
-  );
+      isTrue,
+    );
+  });
 
   testWidgets('flat modifier products still use the legacy popup path', (
     WidgetTester tester,

@@ -949,6 +949,18 @@ class $MealAdjustmentProfilesTable extends MealAdjustmentProfiles
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _profileKindMeta = const VerificationMeta(
+    'profileKind',
+  );
+  @override
+  late final GeneratedColumn<String> profileKind = GeneratedColumn<String>(
+    'profile_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('standard'),
+  );
   static const VerificationMeta _freeSwapLimitMeta = const VerificationMeta(
     'freeSwapLimit',
   );
@@ -961,6 +973,40 @@ class $MealAdjustmentProfilesTable extends MealAdjustmentProfiles
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _sandwichSurchargeMinorMeta =
+      const VerificationMeta('sandwichSurchargeMinor');
+  @override
+  late final GeneratedColumn<int> sandwichSurchargeMinor = GeneratedColumn<int>(
+    'sandwich_surcharge_minor',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(100),
+  );
+  static const VerificationMeta _baguetteSurchargeMinorMeta =
+      const VerificationMeta('baguetteSurchargeMinor');
+  @override
+  late final GeneratedColumn<int> baguetteSurchargeMinor = GeneratedColumn<int>(
+    'baguette_surcharge_minor',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(180),
+  );
+  static const VerificationMeta _sandwichSauceOptionsJsonMeta =
+      const VerificationMeta('sandwichSauceOptionsJson');
+  @override
+  late final GeneratedColumn<String> sandwichSauceOptionsJson =
+      GeneratedColumn<String>(
+        'sandwich_sauce_options_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(_defaultSandwichSauceOptionsJson),
+      );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -1005,7 +1051,11 @@ class $MealAdjustmentProfilesTable extends MealAdjustmentProfiles
     id,
     name,
     description,
+    profileKind,
     freeSwapLimit,
+    sandwichSurchargeMinor,
+    baguetteSurchargeMinor,
+    sandwichSauceOptionsJson,
     isActive,
     createdAt,
     updatedAt,
@@ -1042,12 +1092,48 @@ class $MealAdjustmentProfilesTable extends MealAdjustmentProfiles
         ),
       );
     }
+    if (data.containsKey('profile_kind')) {
+      context.handle(
+        _profileKindMeta,
+        profileKind.isAcceptableOrUnknown(
+          data['profile_kind']!,
+          _profileKindMeta,
+        ),
+      );
+    }
     if (data.containsKey('free_swap_limit')) {
       context.handle(
         _freeSwapLimitMeta,
         freeSwapLimit.isAcceptableOrUnknown(
           data['free_swap_limit']!,
           _freeSwapLimitMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sandwich_surcharge_minor')) {
+      context.handle(
+        _sandwichSurchargeMinorMeta,
+        sandwichSurchargeMinor.isAcceptableOrUnknown(
+          data['sandwich_surcharge_minor']!,
+          _sandwichSurchargeMinorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('baguette_surcharge_minor')) {
+      context.handle(
+        _baguetteSurchargeMinorMeta,
+        baguetteSurchargeMinor.isAcceptableOrUnknown(
+          data['baguette_surcharge_minor']!,
+          _baguetteSurchargeMinorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sandwich_sauce_options_json')) {
+      context.handle(
+        _sandwichSauceOptionsJsonMeta,
+        sandwichSauceOptionsJson.isAcceptableOrUnknown(
+          data['sandwich_sauce_options_json']!,
+          _sandwichSauceOptionsJsonMeta,
         ),
       );
     }
@@ -1090,9 +1176,25 @@ class $MealAdjustmentProfilesTable extends MealAdjustmentProfiles
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       ),
+      profileKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}profile_kind'],
+      )!,
       freeSwapLimit: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}free_swap_limit'],
+      )!,
+      sandwichSurchargeMinor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sandwich_surcharge_minor'],
+      )!,
+      baguetteSurchargeMinor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}baguette_surcharge_minor'],
+      )!,
+      sandwichSauceOptionsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sandwich_sauce_options_json'],
       )!,
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
@@ -1120,7 +1222,11 @@ class MealAdjustmentProfile extends DataClass
   final int id;
   final String name;
   final String? description;
+  final String profileKind;
   final int freeSwapLimit;
+  final int sandwichSurchargeMinor;
+  final int baguetteSurchargeMinor;
+  final String sandwichSauceOptionsJson;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -1128,7 +1234,11 @@ class MealAdjustmentProfile extends DataClass
     required this.id,
     required this.name,
     this.description,
+    required this.profileKind,
     required this.freeSwapLimit,
+    required this.sandwichSurchargeMinor,
+    required this.baguetteSurchargeMinor,
+    required this.sandwichSauceOptionsJson,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
@@ -1141,7 +1251,13 @@ class MealAdjustmentProfile extends DataClass
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
+    map['profile_kind'] = Variable<String>(profileKind);
     map['free_swap_limit'] = Variable<int>(freeSwapLimit);
+    map['sandwich_surcharge_minor'] = Variable<int>(sandwichSurchargeMinor);
+    map['baguette_surcharge_minor'] = Variable<int>(baguetteSurchargeMinor);
+    map['sandwich_sauce_options_json'] = Variable<String>(
+      sandwichSauceOptionsJson,
+    );
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -1155,7 +1271,11 @@ class MealAdjustmentProfile extends DataClass
       description: description == null && nullToAbsent
           ? const Value.absent()
           : Value(description),
+      profileKind: Value(profileKind),
       freeSwapLimit: Value(freeSwapLimit),
+      sandwichSurchargeMinor: Value(sandwichSurchargeMinor),
+      baguetteSurchargeMinor: Value(baguetteSurchargeMinor),
+      sandwichSauceOptionsJson: Value(sandwichSauceOptionsJson),
       isActive: Value(isActive),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -1171,7 +1291,17 @@ class MealAdjustmentProfile extends DataClass
       id: serializer.fromJson<int>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String?>(json['description']),
+      profileKind: serializer.fromJson<String>(json['profileKind']),
       freeSwapLimit: serializer.fromJson<int>(json['freeSwapLimit']),
+      sandwichSurchargeMinor: serializer.fromJson<int>(
+        json['sandwichSurchargeMinor'],
+      ),
+      baguetteSurchargeMinor: serializer.fromJson<int>(
+        json['baguetteSurchargeMinor'],
+      ),
+      sandwichSauceOptionsJson: serializer.fromJson<String>(
+        json['sandwichSauceOptionsJson'],
+      ),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -1184,7 +1314,13 @@ class MealAdjustmentProfile extends DataClass
       'id': serializer.toJson<int>(id),
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String?>(description),
+      'profileKind': serializer.toJson<String>(profileKind),
       'freeSwapLimit': serializer.toJson<int>(freeSwapLimit),
+      'sandwichSurchargeMinor': serializer.toJson<int>(sandwichSurchargeMinor),
+      'baguetteSurchargeMinor': serializer.toJson<int>(baguetteSurchargeMinor),
+      'sandwichSauceOptionsJson': serializer.toJson<String>(
+        sandwichSauceOptionsJson,
+      ),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -1195,7 +1331,11 @@ class MealAdjustmentProfile extends DataClass
     int? id,
     String? name,
     Value<String?> description = const Value.absent(),
+    String? profileKind,
     int? freeSwapLimit,
+    int? sandwichSurchargeMinor,
+    int? baguetteSurchargeMinor,
+    String? sandwichSauceOptionsJson,
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -1203,7 +1343,14 @@ class MealAdjustmentProfile extends DataClass
     id: id ?? this.id,
     name: name ?? this.name,
     description: description.present ? description.value : this.description,
+    profileKind: profileKind ?? this.profileKind,
     freeSwapLimit: freeSwapLimit ?? this.freeSwapLimit,
+    sandwichSurchargeMinor:
+        sandwichSurchargeMinor ?? this.sandwichSurchargeMinor,
+    baguetteSurchargeMinor:
+        baguetteSurchargeMinor ?? this.baguetteSurchargeMinor,
+    sandwichSauceOptionsJson:
+        sandwichSauceOptionsJson ?? this.sandwichSauceOptionsJson,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -1217,9 +1364,21 @@ class MealAdjustmentProfile extends DataClass
       description: data.description.present
           ? data.description.value
           : this.description,
+      profileKind: data.profileKind.present
+          ? data.profileKind.value
+          : this.profileKind,
       freeSwapLimit: data.freeSwapLimit.present
           ? data.freeSwapLimit.value
           : this.freeSwapLimit,
+      sandwichSurchargeMinor: data.sandwichSurchargeMinor.present
+          ? data.sandwichSurchargeMinor.value
+          : this.sandwichSurchargeMinor,
+      baguetteSurchargeMinor: data.baguetteSurchargeMinor.present
+          ? data.baguetteSurchargeMinor.value
+          : this.baguetteSurchargeMinor,
+      sandwichSauceOptionsJson: data.sandwichSauceOptionsJson.present
+          ? data.sandwichSauceOptionsJson.value
+          : this.sandwichSauceOptionsJson,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -1232,7 +1391,11 @@ class MealAdjustmentProfile extends DataClass
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
+          ..write('profileKind: $profileKind, ')
           ..write('freeSwapLimit: $freeSwapLimit, ')
+          ..write('sandwichSurchargeMinor: $sandwichSurchargeMinor, ')
+          ..write('baguetteSurchargeMinor: $baguetteSurchargeMinor, ')
+          ..write('sandwichSauceOptionsJson: $sandwichSauceOptionsJson, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -1245,7 +1408,11 @@ class MealAdjustmentProfile extends DataClass
     id,
     name,
     description,
+    profileKind,
     freeSwapLimit,
+    sandwichSurchargeMinor,
+    baguetteSurchargeMinor,
+    sandwichSauceOptionsJson,
     isActive,
     createdAt,
     updatedAt,
@@ -1257,7 +1424,11 @@ class MealAdjustmentProfile extends DataClass
           other.id == this.id &&
           other.name == this.name &&
           other.description == this.description &&
+          other.profileKind == this.profileKind &&
           other.freeSwapLimit == this.freeSwapLimit &&
+          other.sandwichSurchargeMinor == this.sandwichSurchargeMinor &&
+          other.baguetteSurchargeMinor == this.baguetteSurchargeMinor &&
+          other.sandwichSauceOptionsJson == this.sandwichSauceOptionsJson &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -1268,7 +1439,11 @@ class MealAdjustmentProfilesCompanion
   final Value<int> id;
   final Value<String> name;
   final Value<String?> description;
+  final Value<String> profileKind;
   final Value<int> freeSwapLimit;
+  final Value<int> sandwichSurchargeMinor;
+  final Value<int> baguetteSurchargeMinor;
+  final Value<String> sandwichSauceOptionsJson;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -1276,7 +1451,11 @@ class MealAdjustmentProfilesCompanion
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.description = const Value.absent(),
+    this.profileKind = const Value.absent(),
     this.freeSwapLimit = const Value.absent(),
+    this.sandwichSurchargeMinor = const Value.absent(),
+    this.baguetteSurchargeMinor = const Value.absent(),
+    this.sandwichSauceOptionsJson = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1285,7 +1464,11 @@ class MealAdjustmentProfilesCompanion
     this.id = const Value.absent(),
     required String name,
     this.description = const Value.absent(),
+    this.profileKind = const Value.absent(),
     this.freeSwapLimit = const Value.absent(),
+    this.sandwichSurchargeMinor = const Value.absent(),
+    this.baguetteSurchargeMinor = const Value.absent(),
+    this.sandwichSauceOptionsJson = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1294,7 +1477,11 @@ class MealAdjustmentProfilesCompanion
     Expression<int>? id,
     Expression<String>? name,
     Expression<String>? description,
+    Expression<String>? profileKind,
     Expression<int>? freeSwapLimit,
+    Expression<int>? sandwichSurchargeMinor,
+    Expression<int>? baguetteSurchargeMinor,
+    Expression<String>? sandwichSauceOptionsJson,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -1303,7 +1490,14 @@ class MealAdjustmentProfilesCompanion
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (description != null) 'description': description,
+      if (profileKind != null) 'profile_kind': profileKind,
       if (freeSwapLimit != null) 'free_swap_limit': freeSwapLimit,
+      if (sandwichSurchargeMinor != null)
+        'sandwich_surcharge_minor': sandwichSurchargeMinor,
+      if (baguetteSurchargeMinor != null)
+        'baguette_surcharge_minor': baguetteSurchargeMinor,
+      if (sandwichSauceOptionsJson != null)
+        'sandwich_sauce_options_json': sandwichSauceOptionsJson,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1314,7 +1508,11 @@ class MealAdjustmentProfilesCompanion
     Value<int>? id,
     Value<String>? name,
     Value<String?>? description,
+    Value<String>? profileKind,
     Value<int>? freeSwapLimit,
+    Value<int>? sandwichSurchargeMinor,
+    Value<int>? baguetteSurchargeMinor,
+    Value<String>? sandwichSauceOptionsJson,
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -1323,7 +1521,14 @@ class MealAdjustmentProfilesCompanion
       id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
+      profileKind: profileKind ?? this.profileKind,
       freeSwapLimit: freeSwapLimit ?? this.freeSwapLimit,
+      sandwichSurchargeMinor:
+          sandwichSurchargeMinor ?? this.sandwichSurchargeMinor,
+      baguetteSurchargeMinor:
+          baguetteSurchargeMinor ?? this.baguetteSurchargeMinor,
+      sandwichSauceOptionsJson:
+          sandwichSauceOptionsJson ?? this.sandwichSauceOptionsJson,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1342,8 +1547,26 @@ class MealAdjustmentProfilesCompanion
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
+    if (profileKind.present) {
+      map['profile_kind'] = Variable<String>(profileKind.value);
+    }
     if (freeSwapLimit.present) {
       map['free_swap_limit'] = Variable<int>(freeSwapLimit.value);
+    }
+    if (sandwichSurchargeMinor.present) {
+      map['sandwich_surcharge_minor'] = Variable<int>(
+        sandwichSurchargeMinor.value,
+      );
+    }
+    if (baguetteSurchargeMinor.present) {
+      map['baguette_surcharge_minor'] = Variable<int>(
+        baguetteSurchargeMinor.value,
+      );
+    }
+    if (sandwichSauceOptionsJson.present) {
+      map['sandwich_sauce_options_json'] = Variable<String>(
+        sandwichSauceOptionsJson.value,
+      );
     }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
@@ -1363,7 +1586,11 @@ class MealAdjustmentProfilesCompanion
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
+          ..write('profileKind: $profileKind, ')
           ..write('freeSwapLimit: $freeSwapLimit, ')
+          ..write('sandwichSurchargeMinor: $sandwichSurchargeMinor, ')
+          ..write('baguetteSurchargeMinor: $baguetteSurchargeMinor, ')
+          ..write('sandwichSauceOptionsJson: $sandwichSauceOptionsJson, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -16735,7 +16962,11 @@ typedef $$MealAdjustmentProfilesTableCreateCompanionBuilder =
       Value<int> id,
       required String name,
       Value<String?> description,
+      Value<String> profileKind,
       Value<int> freeSwapLimit,
+      Value<int> sandwichSurchargeMinor,
+      Value<int> baguetteSurchargeMinor,
+      Value<String> sandwichSauceOptionsJson,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -16745,7 +16976,11 @@ typedef $$MealAdjustmentProfilesTableUpdateCompanionBuilder =
       Value<int> id,
       Value<String> name,
       Value<String?> description,
+      Value<String> profileKind,
       Value<int> freeSwapLimit,
+      Value<int> sandwichSurchargeMinor,
+      Value<int> baguetteSurchargeMinor,
+      Value<String> sandwichSauceOptionsJson,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -16894,8 +17129,28 @@ class $$MealAdjustmentProfilesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get profileKind => $composableBuilder(
+    column: $table.profileKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get freeSwapLimit => $composableBuilder(
     column: $table.freeSwapLimit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sandwichSurchargeMinor => $composableBuilder(
+    column: $table.sandwichSurchargeMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get baguetteSurchargeMinor => $composableBuilder(
+    column: $table.baguetteSurchargeMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sandwichSauceOptionsJson => $composableBuilder(
+    column: $table.sandwichSauceOptionsJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -17049,8 +17304,28 @@ class $$MealAdjustmentProfilesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get profileKind => $composableBuilder(
+    column: $table.profileKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get freeSwapLimit => $composableBuilder(
     column: $table.freeSwapLimit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sandwichSurchargeMinor => $composableBuilder(
+    column: $table.sandwichSurchargeMinor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get baguetteSurchargeMinor => $composableBuilder(
+    column: $table.baguetteSurchargeMinor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sandwichSauceOptionsJson => $composableBuilder(
+    column: $table.sandwichSauceOptionsJson,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -17090,8 +17365,28 @@ class $$MealAdjustmentProfilesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get profileKind => $composableBuilder(
+    column: $table.profileKind,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get freeSwapLimit => $composableBuilder(
     column: $table.freeSwapLimit,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sandwichSurchargeMinor => $composableBuilder(
+    column: $table.sandwichSurchargeMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get baguetteSurchargeMinor => $composableBuilder(
+    column: $table.baguetteSurchargeMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sandwichSauceOptionsJson => $composableBuilder(
+    column: $table.sandwichSauceOptionsJson,
     builder: (column) => column,
   );
 
@@ -17264,7 +17559,11 @@ class $$MealAdjustmentProfilesTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<String> profileKind = const Value.absent(),
                 Value<int> freeSwapLimit = const Value.absent(),
+                Value<int> sandwichSurchargeMinor = const Value.absent(),
+                Value<int> baguetteSurchargeMinor = const Value.absent(),
+                Value<String> sandwichSauceOptionsJson = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -17272,7 +17571,11 @@ class $$MealAdjustmentProfilesTableTableManager
                 id: id,
                 name: name,
                 description: description,
+                profileKind: profileKind,
                 freeSwapLimit: freeSwapLimit,
+                sandwichSurchargeMinor: sandwichSurchargeMinor,
+                baguetteSurchargeMinor: baguetteSurchargeMinor,
+                sandwichSauceOptionsJson: sandwichSauceOptionsJson,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -17282,7 +17585,11 @@ class $$MealAdjustmentProfilesTableTableManager
                 Value<int> id = const Value.absent(),
                 required String name,
                 Value<String?> description = const Value.absent(),
+                Value<String> profileKind = const Value.absent(),
                 Value<int> freeSwapLimit = const Value.absent(),
+                Value<int> sandwichSurchargeMinor = const Value.absent(),
+                Value<int> baguetteSurchargeMinor = const Value.absent(),
+                Value<String> sandwichSauceOptionsJson = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -17290,7 +17597,11 @@ class $$MealAdjustmentProfilesTableTableManager
                 id: id,
                 name: name,
                 description: description,
+                profileKind: profileKind,
                 freeSwapLimit: freeSwapLimit,
+                sandwichSurchargeMinor: sandwichSurchargeMinor,
+                baguetteSurchargeMinor: baguetteSurchargeMinor,
+                sandwichSauceOptionsJson: sandwichSauceOptionsJson,
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

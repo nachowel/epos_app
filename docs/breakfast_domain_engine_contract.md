@@ -154,11 +154,12 @@ requested_quantity
 
 Interpretation:
 
-- `selected_item_product_id = null` means no choice made
+- `selected_item_product_id = null` with `requested_quantity > 0` means explicit none
 - `requested_quantity = 0` means no choice made
-- for `Tea or Coffee`, valid included quantity is `0` or `1`
-- for `Toast or Bread`, valid included quantity is `0` or `2`
-- overflow beyond included allowance is allowed and later classified as `extra_add`
+- optional groups may use explicit none
+- required breakfast groups must use one real selected product
+- supported breakfast defaults use `min_select = 1`, `max_select = 1`, `included_quantity = 1`
+- quantities above `max_select` are invalid
 
 ## Domain Output Model
 
@@ -281,40 +282,37 @@ If removal quantity exceeds available removable units, return validation error.
 
 For each `chosen_groups[]` row:
 
-1. If group omitted or selected product is null or quantity is 0:
+1. If group is optional and omitted, emit no choice row
+2. If selected product is null:
+   - allow it only as explicit none for optional groups
+3. If quantity is 0:
    - emit no choice row
-2. Validate selected product is a real member of the group via `item_product_id`
-3. Validate group-specific quantity rules
+4. Validate selected product is a real member of the group via `item_product_id`
+5. Validate group-specific quantity rules
 
 Breakfast-specific contract:
 
-- `Tea or Coffee`: allowed included quantity is `0` or `1`
-- `Toast or Bread`: allowed included quantity is `0` or `2`
+- default `Tea or Coffee`: exactly one selected member
+- default `Toast or Bread`: exactly one selected member
+- required groups do not allow explicit none
 - mixed split is invalid because one group can have only one selected product
 
-### Step 5. Classify included choice and choice overflow
+### Step 5. Classify included choice rows
 
 For each valid group selection:
 
-1. `included_qty = min(requested_quantity, included_quantity)`
-2. `overflow_qty = max(requested_quantity - included_quantity, 0)`
-3. If `included_qty > 0`, emit:
+1. `included_qty = requested_quantity`
+2. If `included_qty > 0`, emit:
    - `action = 'choice'`
    - `charge_reason = 'included_choice'`
    - `item_product_id = selected product`
    - `quantity = included_qty`
    - `price_effect_minor = 0`
-4. If `overflow_qty > 0`, emit:
-   - `action = 'add'`
-   - `charge_reason = 'extra_add'`
-   - `item_product_id = same selected product`
-   - `quantity = overflow_qty`
-   - `price_effect_minor = overflow_qty * real product price`
 
 Important:
 
 - choice rows never enter swap matching
-- choice products can become `extra_add`
+- supported breakfast default choice groups do not produce overflow rows
 - choice-capable products must never consume pending replacement units
 
 ### Step 6. Build pending replacement pool
@@ -509,9 +507,9 @@ BreakfastRebuildResult rebuild(BreakfastRebuildInput input) {
 3. Removal quantity cannot exceed default removable quantity.
 4. Choice selection must reference a real group member product.
 5. Choice selection must use at most one selected product per group.
-6. `Tea or Coffee` valid included quantities are `0` or `1`.
-7. `Toast or Bread` valid included quantities are `0` or `2`.
-8. Mixed toast/bread split is invalid.
+6. Default `Tea or Coffee` selections use quantity `1`.
+7. Default `Toast or Bread` selections use quantity `1`.
+8. Required groups reject explicit none.
 9. Choice-capable products must never consume pending replacement units.
 10. Nonexistent product ids or group ids are invalid.
 11. Negative quantity is invalid everywhere.
@@ -541,14 +539,14 @@ BreakfastRebuildResult rebuild(BreakfastRebuildInput input) {
 7. Choose tea within allowance.
    Expected: one `included_choice` row, quantity `1`.
 
-8. Choose no hot drink.
-   Expected: no choice row.
+8. Choose optional none for an optional group.
+   Expected: one zero-price `choice / included_choice / item_product_id = null` row.
 
-9. Choose toast quantity `2`.
-   Expected: one `included_choice` row, quantity `2`.
+9. Choose toast quantity `1`.
+   Expected: one `included_choice` row, quantity `1`.
 
-10. Choose toast quantity `4`.
-    Expected: one `included_choice` row qty `2`, one `extra_add` row qty `2`.
+10. Choose toast quantity `2`.
+    Expected: validation error because the supported max selection is `1`.
 
 11. Attempt `1 toast + 1 bread`.
     Expected: validation error, no mixed split support.
@@ -575,8 +573,8 @@ BreakfastRebuildResult rebuild(BreakfastRebuildInput input) {
 | `third_replacement_is_paid_swap` | three removes, three non-choice adds | third unit `paid_swap` |
 | `paid_swap_uses_full_added_product_price` | third replacement product price known | paid amount equals full added product price |
 | `choice_within_allowance_creates_included_choice` | tea selected qty `1` | `choice/included_choice` row |
-| `choice_none_creates_no_row` | null selection | no choice row |
-| `choice_overflow_becomes_extra_add` | toast selected qty `4` | included qty `2`, extra qty `2` |
+| `optional_none_creates_explicit_none_row` | optional group explicit none | one zero-price `choice` row with `item_product_id = null` |
+| `required_choice_rejects_quantity_above_max` | toast selected qty `2` | validation error |
 | `choice_never_consumes_swap_pool` | remove component + add tea | tea becomes `extra_add`, replacement pool unchanged |
 | `toast_bread_mixed_split_is_invalid` | toast and bread requested together | validation error |
 | `remove_quantity_cannot_exceed_default` | remove qty larger than available | validation error |

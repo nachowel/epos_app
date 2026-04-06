@@ -260,6 +260,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(
+        find.byKey(const ValueKey<String>('meal-edit-scope-dialog')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey<String>('meal-edit-scope-all')),
+      );
+      await tester.pumpAndSettle();
+
       expect(find.text('Edit meal: Burger Meal'), findsOneWidget);
       expect(
         find.byKey(
@@ -267,12 +276,15 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('Editing applies to all 2 items'), findsOneWidget);
+      expect(
+        find.textContaining('Editing applies to all 2 items'),
+        findsOneWidget,
+      );
       expect(find.text('Save changes'), findsOneWidget);
     },
   );
 
-  testWidgets('legacy meal lines show disabled edit and explicit message', (
+  testWidgets('legacy meal lines show recreate action and explicit message', (
     WidgetTester tester,
   ) async {
     final _MealUiFixture fixture = await _pumpMealOrderDetail(
@@ -280,14 +292,21 @@ void main() {
       makeLegacy: true,
     );
 
-    final OutlinedButton editButton = tester.widget<OutlinedButton>(
+    expect(
       find.byKey(ValueKey<String>('detail-edit-meal-${fixture.lineId}')),
+      findsNothing,
     );
 
-    expect(editButton.onPressed, isNull);
+    final OutlinedButton recreateButton = tester.widget<OutlinedButton>(
+      find.byKey(ValueKey<String>('detail-recreate-meal-${fixture.lineId}')),
+    );
+
+    expect(recreateButton.onPressed, isNotNull);
     expect(find.text('Legacy meal line'), findsOneWidget);
     expect(
-      find.text('This item was created before the new system and cannot be edited.'),
+      find.text(
+        'This item was created before the new system and cannot be edited.',
+      ),
       findsOneWidget,
     );
   });
@@ -568,65 +587,43 @@ void main() {
     },
   );
 
-  testWidgets(
-    'breakfast modifier popup shows None for each required group and persists a second-group None selection',
-    (WidgetTester tester) async {
-      final _BreakfastUiFixture fixture = await _pumpBreakfastOrderDetail(
-        tester,
-        includeBreadGroup: true,
-        requiredChoices: true,
-      );
+  testWidgets('breakfast modifier popup hides None for required groups', (
+    WidgetTester tester,
+  ) async {
+    final _BreakfastUiFixture fixture = await _pumpBreakfastOrderDetail(
+      tester,
+      includeBreadGroup: true,
+      requiredChoices: true,
+    );
 
-      await tester.tap(
-        find.byKey(ValueKey<String>('detail-edit-breakfast-${fixture.lineId}')),
-      );
-      await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(ValueKey<String>('detail-edit-breakfast-${fixture.lineId}')),
+    );
+    await tester.pumpAndSettle();
 
-      expect(
-        find.byKey(const ValueKey<String>('breakfast-popup')),
-        findsOneWidget,
-      );
-      expect(find.text('Tea or Coffee'), findsOneWidget);
-      expect(find.text('Toast or Bread'), findsOneWidget);
-      expect(
-        find.byKey(
-          ValueKey<String>('breakfast-choice-none-${fixture.hotDrinkGroupId}'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(
-          ValueKey<String>(
-            'breakfast-choice-none-${fixture.toastBreadGroupId!}',
-          ),
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('Tea'), findsOneWidget);
-      expect(find.text('Coffee'), findsOneWidget);
-      expect(find.text('Toast'), findsOneWidget);
-      expect(find.text('Bread'), findsOneWidget);
-
-      await _tapVisible(
-        tester,
-        find.byKey(
-          ValueKey<String>(
-            'breakfast-choice-none-${fixture.toastBreadGroupId!}',
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        await _countExplicitNoneRows(
-          fixture.database,
-          lineId: fixture.lineId,
-          groupId: fixture.toastBreadGroupId!,
-        ),
-        1,
-      );
-    },
-  );
+    expect(
+      find.byKey(const ValueKey<String>('breakfast-popup')),
+      findsOneWidget,
+    );
+    expect(find.text('Tea or Coffee'), findsOneWidget);
+    expect(find.text('Toast or Bread'), findsOneWidget);
+    expect(
+      find.byKey(
+        ValueKey<String>('breakfast-choice-none-${fixture.hotDrinkGroupId}'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byKey(
+        ValueKey<String>('breakfast-choice-none-${fixture.toastBreadGroupId!}'),
+      ),
+      findsNothing,
+    );
+    expect(find.text('Tea'), findsOneWidget);
+    expect(find.text('Coffee'), findsOneWidget);
+    expect(find.text('Toast'), findsOneWidget);
+    expect(find.text('Bread'), findsOneWidget);
+  });
 }
 
 Widget _localizedTestApp(
@@ -1061,17 +1058,19 @@ Future<_MealUiFixture> _seedMealUiFixture(
     status: 'draft',
     totalAmountMinor: 1000 * lineQuantity,
   );
-  final int lineId = await db.into(db.transactionLines).insert(
-    app_db.TransactionLinesCompanion.insert(
-      uuid: 'meal-detail-line',
-      transactionId: transactionId,
-      productId: mealProductId,
-      productName: 'Burger Meal',
-      unitPriceMinor: 1000,
-      quantity: Value<int>(lineQuantity),
-      lineTotalMinor: 1000 * lineQuantity,
-    ),
-  );
+  final int lineId = await db
+      .into(db.transactionLines)
+      .insert(
+        app_db.TransactionLinesCompanion.insert(
+          uuid: 'meal-detail-line',
+          transactionId: transactionId,
+          productId: mealProductId,
+          productName: 'Burger Meal',
+          unitPriceMinor: 1000,
+          quantity: Value<int>(lineQuantity),
+          lineTotalMinor: 1000 * lineQuantity,
+        ),
+      );
 
   final TransactionRepository transactionRepository = TransactionRepository(db);
   await transactionRepository.replaceMealCustomizationLineSnapshot(

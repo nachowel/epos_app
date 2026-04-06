@@ -270,7 +270,8 @@ class _SemanticBundleEditorDialogState
         changed = true;
         continue;
       }
-      if (normalizedDefault == breakfastNoneChoiceDisplayName.toLowerCase()) {
+      if (group.minSelect == 0 &&
+          normalizedDefault == breakfastNoneChoiceDisplayName.toLowerCase()) {
         nextState = BreakfastLineEdit.chooseGroup(
           groupId: group.groupId,
           selectedItemProductId: null,
@@ -442,10 +443,14 @@ class _SemanticBundleEditorDialogState
         target.itemProductId: target,
     };
     final int pendingRequiredChoiceCount = editorData.configuration.choiceGroups
-        .where(
-          (BreakfastChoiceGroupConfig group) =>
-              selectedChoices[group.groupId] == null,
-        )
+        .where((BreakfastChoiceGroupConfig group) {
+          final BreakfastChosenGroupRequest? choice =
+              selectedChoices[group.groupId];
+          if (choice == null) {
+            return true;
+          }
+          return group.minSelect > 0 && choice.isExplicitNone;
+        })
         .length;
     final String? blockingMessage =
         preview.canConfirm || preview.validationMessages.isEmpty
@@ -664,6 +669,11 @@ class _SemanticBundleEditorDialogState
                               currentChoice?.selectedItemProductId;
                           final bool isExplicitNone =
                               currentChoice?.isExplicitNone ?? false;
+                          final bool supportsExplicitNone =
+                              group.minSelect == 0;
+                          final bool hasSatisfiedSelection =
+                              currentChoice != null &&
+                              (supportsExplicitNone || !isExplicitNone);
                           return Container(
                             margin: const EdgeInsets.only(
                               bottom: AppSizes.spacingXs,
@@ -690,12 +700,12 @@ class _SemanticBundleEditorDialogState
                                       ),
                                     ),
                                     _SectionMetaPill(
-                                      label: currentChoice == null
-                                          ? 'Pending'
-                                          : 'Done',
-                                      tone: currentChoice == null
-                                          ? _SectionMetaTone.warning
-                                          : _SectionMetaTone.neutral,
+                                      label: hasSatisfiedSelection
+                                          ? 'Done'
+                                          : 'Pending',
+                                      tone: hasSatisfiedSelection
+                                          ? _SectionMetaTone.neutral
+                                          : _SectionMetaTone.warning,
                                     ),
                                   ],
                                 ),
@@ -718,26 +728,28 @@ class _SemanticBundleEditorDialogState
                                             : constraints.maxWidth;
 
                                         final List<Widget> options = <Widget>[
-                                          SizedBox(
-                                            width: optionWidth,
-                                            child: _ChoiceOptionButton(
-                                              optionKey: ValueKey<String>(
-                                                'semantic-choice-none-${group.groupId}',
+                                          if (supportsExplicitNone)
+                                            SizedBox(
+                                              width: optionWidth,
+                                              child: _ChoiceOptionButton(
+                                                optionKey: ValueKey<String>(
+                                                  'semantic-choice-none-${group.groupId}',
+                                                ),
+                                                label:
+                                                    breakfastNoneChoiceDisplayName,
+                                                selected: isExplicitNone,
+                                                onTap: () {
+                                                  _apply(
+                                                    BreakfastLineEdit.chooseGroup(
+                                                      groupId: group.groupId,
+                                                      selectedItemProductId:
+                                                          null,
+                                                      quantity: 1,
+                                                    ),
+                                                  );
+                                                },
                                               ),
-                                              label:
-                                                  breakfastNoneChoiceDisplayName,
-                                              selected: isExplicitNone,
-                                              onTap: () {
-                                                _apply(
-                                                  BreakfastLineEdit.chooseGroup(
-                                                    groupId: group.groupId,
-                                                    selectedItemProductId: null,
-                                                    quantity: 1,
-                                                  ),
-                                                );
-                                              },
                                             ),
-                                          ),
                                           ...group.members.map((
                                             BreakfastChoiceGroupMemberConfig
                                             member,
@@ -1123,11 +1135,13 @@ class _StickyShortcutBar extends StatelessWidget {
 
     return Row(
       children: groupWidgets
-          .expand((Widget groupWidget) => <Widget>[
-                groupWidget,
-                if (groupWidget != groupWidgets.last)
-                  const SizedBox(width: AppSizes.spacingSm),
-              ])
+          .expand(
+            (Widget groupWidget) => <Widget>[
+              groupWidget,
+              if (groupWidget != groupWidgets.last)
+                const SizedBox(width: AppSizes.spacingSm),
+            ],
+          )
           .toList(growable: false),
     );
   }
@@ -1168,6 +1182,7 @@ class _StickyShortcutGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final int? selectedId = currentChoice?.selectedItemProductId;
     final bool isExplicitNone = currentChoice?.isExplicitNone ?? false;
+    final bool supportsExplicitNone = group.minSelect == 0;
     final List<Widget> buttons = <Widget>[
       ...group.members.map(
         (BreakfastChoiceGroupMemberConfig member) => Expanded(
@@ -1189,32 +1204,35 @@ class _StickyShortcutGroup extends StatelessWidget {
           ),
         ),
       ),
-      Expanded(
-        child: _StickyChoiceButton(
-          buttonKey: ValueKey<String>(
-            'semantic-sticky-choice-none-${group.groupId}',
+      if (supportsExplicitNone)
+        Expanded(
+          child: _StickyChoiceButton(
+            buttonKey: ValueKey<String>(
+              'semantic-sticky-choice-none-${group.groupId}',
+            ),
+            semanticLabel: '$semanticLabel $breakfastNoneChoiceDisplayName',
+            label: breakfastNoneChoiceDisplayName,
+            selected: isExplicitNone,
+            weakened: true,
+            onTap: () {
+              onSelectChoice(
+                group: group,
+                selectedItemProductId: null,
+                quantity: 1,
+              );
+            },
           ),
-          semanticLabel: '$semanticLabel $breakfastNoneChoiceDisplayName',
-          label: breakfastNoneChoiceDisplayName,
-          selected: isExplicitNone,
-          weakened: true,
-          onTap: () {
-            onSelectChoice(
-              group: group,
-              selectedItemProductId: null,
-              quantity: 1,
-            );
-          },
         ),
-      ),
     ];
 
     return Row(
       children: buttons
-          .expand((Widget button) => <Widget>[
-                button,
-                if (button != buttons.last) const SizedBox(width: 6),
-              ])
+          .expand(
+            (Widget button) => <Widget>[
+              button,
+              if (button != buttons.last) const SizedBox(width: 6),
+            ],
+          )
           .toList(growable: false),
     );
   }

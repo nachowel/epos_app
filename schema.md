@@ -12,7 +12,7 @@ It is NOT the highest authority.
 
 1. `SYSTEM_OF_TRUTH.md`
 2. `lib/data/database/app_database.dart`
-3. `lib/data/database/migrations/*`
+3. embedded migration logic in `lib/data/database/app_database.dart`
 4. breakfast/menu-engine contract chain:
    * `docs/menu_product_role_contract.md`
    * `docs/set_breakfast_configuration_contract.md`
@@ -458,6 +458,7 @@ Notes:
 
 * only set-root products should own breakfast `modifier_groups`
 * breakfast contracts require the `Tea or Coffee` and `Toast or Bread` group pattern for breakfast set roots
+* current breakfast defaults treat both groups as required single selections with `min_select = max_select = included_quantity = 1`
 * those group names are contract-level configuration examples, not a replacement for live menu data
 
 ---
@@ -501,7 +502,7 @@ Note:
 | included_choice | included choice within group allowance   |
 | free_swap       | matched replacement within free limit    |
 | paid_swap       | matched replacement after free limit     |
-| extra_add       | direct extra or choice overflow          |
+| extra_add       | direct extra outside swap replacement    |
 
 Live schema compatibility note:
 
@@ -538,14 +539,13 @@ Critical invariant:
 * choice members are defined by `product_modifiers(type = 'choice')`
 * `item_product_id` is the real product identity
 * choice does NOT consume swap pool
-* choice can overflow → `extra_add`
+* supported breakfast default groups are single-selection only
 
 ---
 
 ### Extra logic
 
 * direct add with no eligible pending replacement → `extra_add`
-* choice overflow → `extra_add`
 
 ---
 

@@ -273,7 +273,7 @@ Any of the following differences require separate transaction lines:
 1. different set-root product
 2. different removed set-item state
 3. different included-choice selection
-4. different choice overflow quantity
+4. different optional-none vs concrete-choice state
 5. different direct extras
 6. different swap classification outcome
 7. different `charge_reason` composition
@@ -372,7 +372,7 @@ OrderService.editBreakfastLine(request) {
 | `cancelled_line_is_not_editable` | edit on cancelled breakfast line | structured rejection |
 | `successful_edit_recalculates_transaction_totals` | valid breakfast edit | transaction totals updated after persistence |
 | `remove_only_snapshot_persists_zero_price_effect_rows` | remove item with no replacement | `remove` rows preserved and totals unchanged except configured discounts |
-| `choice_overflow_persists_as_two_rows` | toast qty `4` | one `included_choice` row and one `extra_add` row |
+| `required_choice_persists_as_single_row` | toast qty `1` | one `included_choice` row |
 | `choice_product_never_persists_as_swap` | remove component then add tea | tea persisted as `extra_add`, not `free_swap` or `paid_swap` |
 | `third_replacement_persists_as_paid_swap` | three replacement units | third unit persisted with `paid_swap` semantics |
 | `different_breakfast_configs_split_lines` | two same root products with different choices/modifiers | separate transaction lines |

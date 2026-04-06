@@ -178,9 +178,9 @@ void main() {
         await fixture.service.editBreakfastLine(
           transactionLineId: line.id,
           edit: BreakfastLineEdit.chooseGroup(
-            groupId: fixture.toastBreadGroupId,
-            selectedItemProductId: fixture.toastProductId,
-            quantity: 4,
+            groupId: fixture.hotDrinkGroupId,
+            selectedItemProductId: fixture.teaProductId,
+            quantity: 1,
           ),
         );
 
@@ -188,7 +188,7 @@ void main() {
             .editBreakfastLine(
               transactionLineId: line.id,
               edit: BreakfastLineEdit.clearGroup(
-                groupId: fixture.toastBreadGroupId,
+                groupId: fixture.hotDrinkGroupId,
               ),
             );
 
@@ -201,6 +201,48 @@ void main() {
         expect(clearedLine.lineTotalMinor, 400);
         expect(refreshedOrder.modifierTotalMinor, 0);
         expect(refreshedOrder.totalAmountMinor, 400);
+      },
+    );
+
+    test(
+      'required toast or bread cannot be cleared back to no selection',
+      () async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
+
+        final Transaction order = await fixture.service.createOrder(
+          currentUser: fixture.cashier,
+        );
+        final TransactionLine line = await fixture.service.addProductToOrder(
+          transactionId: order.id,
+          productId: fixture.set4ProductId,
+        );
+
+        await fixture.service.editBreakfastLine(
+          transactionLineId: line.id,
+          edit: BreakfastLineEdit.chooseGroup(
+            groupId: fixture.toastBreadGroupId,
+            selectedItemProductId: fixture.toastProductId,
+            quantity: 1,
+          ),
+        );
+
+        await expectLater(
+          fixture.service.editBreakfastLine(
+            transactionLineId: line.id,
+            edit: BreakfastLineEdit.clearGroup(
+              groupId: fixture.toastBreadGroupId,
+            ),
+          ),
+          throwsA(
+            isA<BreakfastEditRejectedException>().having(
+              (BreakfastEditRejectedException error) => error.codes,
+              'codes',
+              contains(BreakfastEditErrorCode.invalidChoiceQuantity),
+            ),
+          ),
+        );
       },
     );
 
@@ -375,7 +417,7 @@ void main() {
             edit: BreakfastLineEdit.chooseGroup(
               groupId: fixture.toastBreadGroupId,
               selectedItemProductId: fixture.toastProductId,
-              quantity: 4,
+              quantity: 1,
             ),
           );
 
@@ -384,10 +426,10 @@ void main() {
       final Transaction refreshedOrder = (await fixture.service.getOrderById(
         order.id,
       ))!;
-      expect(modifiers, hasLength(2));
-      expect(updatedLine.lineTotalMinor, 600);
-      expect(refreshedOrder.modifierTotalMinor, 200);
-      expect(refreshedOrder.totalAmountMinor, 600);
+      expect(modifiers, hasLength(1));
+      expect(updatedLine.lineTotalMinor, 400);
+      expect(refreshedOrder.modifierTotalMinor, 0);
+      expect(refreshedOrder.totalAmountMinor, 400);
     });
 
     test('timestamp_updates_only_on_success', () async {
@@ -750,9 +792,9 @@ Future<_BreakfastFixture> _seedBreakfastFixture(
         app_db.ModifierGroupsCompanion.insert(
           productId: set4ProductId,
           name: 'Toast or Bread',
-          minSelect: const Value<int>(0),
-          maxSelect: const Value<int>(2),
-          includedQuantity: const Value<int>(2),
+          minSelect: const Value<int>(1),
+          maxSelect: const Value<int>(1),
+          includedQuantity: const Value<int>(1),
           sortOrder: const Value<int>(2),
         ),
       );

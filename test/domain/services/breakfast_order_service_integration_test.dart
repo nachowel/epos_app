@@ -18,7 +18,7 @@ import '../../support/test_database.dart';
 void main() {
   group('Breakfast runtime integration', () {
     test(
-      'choice overflow persists semantic rows and recalculates totals',
+      'required toast or bread persists as a single included choice row',
       () async {
         final db = createTestDatabase();
         addTearDown(db.close);
@@ -37,46 +37,36 @@ void main() {
           edit: BreakfastLineEdit.chooseGroup(
             groupId: fixture.toastBreadGroupId,
             selectedItemProductId: fixture.toastProductId,
-            quantity: 4,
+            quantity: 1,
           ),
         );
 
         final modifiers = await fixture.service.getLineModifiers(
           updatedLine.id,
         );
-        expect(modifiers, hasLength(2));
+        expect(modifiers, hasLength(1));
 
-        final OrderModifier includedChoice = modifiers.firstWhere(
-          (OrderModifier modifier) =>
-              modifier.action == ModifierAction.choice &&
-              modifier.chargeReason == ModifierChargeReason.includedChoice,
-        );
-        final OrderModifier overflow = modifiers.firstWhere(
-          (OrderModifier modifier) =>
-              modifier.action == ModifierAction.add &&
-              modifier.chargeReason == ModifierChargeReason.extraAdd,
-        );
+        final OrderModifier includedChoice = modifiers.single;
 
         expect(includedChoice.itemProductId, fixture.toastProductId);
-        expect(includedChoice.quantity, 2);
+        expect(includedChoice.quantity, 1);
         expect(includedChoice.unitPriceMinor, 100);
         expect(includedChoice.priceEffectMinor, 0);
-
-        expect(overflow.itemProductId, fixture.toastProductId);
-        expect(overflow.quantity, 2);
-        expect(overflow.unitPriceMinor, 100);
-        expect(overflow.priceEffectMinor, 200);
-        expect(overflow.extraPriceMinor, 200);
+        expect(includedChoice.action, ModifierAction.choice);
+        expect(
+          includedChoice.chargeReason,
+          ModifierChargeReason.includedChoice,
+        );
 
         final refreshedOrder = await fixture.service.getOrderById(order.id);
-        expect(updatedLine.lineTotalMinor, 600);
-        expect(refreshedOrder!.modifierTotalMinor, 200);
-        expect(refreshedOrder.totalAmountMinor, 600);
+        expect(updatedLine.lineTotalMinor, 400);
+        expect(refreshedOrder!.modifierTotalMinor, 0);
+        expect(refreshedOrder.totalAmountMinor, 400);
       },
     );
 
     test(
-      'rebuild clears prior classified rows instead of patching incrementally',
+      'rebuild clears prior classified rows when an optional choice is removed',
       () async {
         final db = createTestDatabase();
         addTearDown(db.close);
@@ -93,16 +83,16 @@ void main() {
         await fixture.service.editBreakfastLine(
           transactionLineId: line.id,
           edit: BreakfastLineEdit.chooseGroup(
-            groupId: fixture.toastBreadGroupId,
-            selectedItemProductId: fixture.toastProductId,
-            quantity: 4,
+            groupId: fixture.hotDrinkGroupId,
+            selectedItemProductId: fixture.teaProductId,
+            quantity: 1,
           ),
         );
         final TransactionLine afterClear = await fixture.service
             .editBreakfastLine(
               transactionLineId: line.id,
               edit: BreakfastLineEdit.clearGroup(
-                groupId: fixture.toastBreadGroupId,
+                groupId: fixture.hotDrinkGroupId,
               ),
             );
 
@@ -570,9 +560,9 @@ Future<_BreakfastFixture> _seedBreakfastFixture(app_db.AppDatabase db) async {
         app_db.ModifierGroupsCompanion.insert(
           productId: set4ProductId,
           name: 'Toast or Bread',
-          minSelect: const Value<int>(0),
-          maxSelect: const Value<int>(2),
-          includedQuantity: const Value<int>(2),
+          minSelect: const Value<int>(1),
+          maxSelect: const Value<int>(1),
+          includedQuantity: const Value<int>(1),
           sortOrder: const Value<int>(2),
         ),
       );

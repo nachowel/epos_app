@@ -238,14 +238,12 @@ class _BreakfastModifierPopupState
                                 currentChoice = chosenGroups[group.groupId];
                                 final bool isExplicitNone =
                                     currentChoice?.isExplicitNone ?? false;
+                                final bool supportsExplicitNone =
+                                    group.minSelect == 0;
                                 final int groupQuantity =
                                     currentChoice?.requestedQuantity ?? 0;
                                 final int? selectedProductId =
                                     currentChoice?.selectedItemProductId;
-                                final int quantityStep =
-                                    group.includedQuantity > 1
-                                    ? group.includedQuantity
-                                    : 1;
                                 return Padding(
                                   padding: const EdgeInsets.only(
                                     bottom: AppSizes.spacingMd,
@@ -267,27 +265,29 @@ class _BreakfastModifierPopupState
                                         spacing: 8,
                                         runSpacing: 8,
                                         children: <Widget>[
-                                          ChoiceChip(
-                                            key: ValueKey<String>(
-                                              'breakfast-choice-none-${group.groupId}',
+                                          if (supportsExplicitNone)
+                                            ChoiceChip(
+                                              key: ValueKey<String>(
+                                                'breakfast-choice-none-${group.groupId}',
+                                              ),
+                                              label: const Text(
+                                                breakfastNoneChoiceDisplayName,
+                                              ),
+                                              selected: isExplicitNone,
+                                              onSelected: _isSubmitting
+                                                  ? null
+                                                  : (_) {
+                                                      _applyEdit(
+                                                        BreakfastLineEdit.chooseGroup(
+                                                          groupId:
+                                                              group.groupId,
+                                                          selectedItemProductId:
+                                                              null,
+                                                          quantity: 1,
+                                                        ),
+                                                      );
+                                                    },
                                             ),
-                                            label: const Text(
-                                              breakfastNoneChoiceDisplayName,
-                                            ),
-                                            selected: isExplicitNone,
-                                            onSelected: _isSubmitting
-                                                ? null
-                                                : (_) {
-                                                    _applyEdit(
-                                                      BreakfastLineEdit.chooseGroup(
-                                                        groupId: group.groupId,
-                                                        selectedItemProductId:
-                                                            null,
-                                                        quantity: 1,
-                                                      ),
-                                                    );
-                                                  },
-                                          ),
                                           ...group.members.map((
                                             BreakfastChoiceGroupMemberConfig
                                             member,
@@ -348,7 +348,8 @@ class _BreakfastModifierPopupState
                                             ),
                                             onPressed:
                                                 _isSubmitting ||
-                                                    selectedProductId == null
+                                                    selectedProductId == null ||
+                                                    group.minSelect > 0
                                                 ? null
                                                 : () {
                                                     _applyEdit(
@@ -364,11 +365,17 @@ class _BreakfastModifierPopupState
                                             quantity: groupQuantity,
                                             canDecrease:
                                                 !_isSubmitting &&
-                                                groupQuantity > 0 &&
-                                                !isExplicitNone,
+                                                selectedProductId != null &&
+                                                !isExplicitNone &&
+                                                (group.minSelect > 0
+                                                    ? groupQuantity >
+                                                          group.minSelect
+                                                    : groupQuantity > 0),
                                             canIncrease:
                                                 !_isSubmitting &&
-                                                selectedProductId != null,
+                                                selectedProductId != null &&
+                                                !(group.minSelect > 0 &&
+                                                    group.maxSelect == 1),
                                             decrementKey: ValueKey<String>(
                                               'breakfast-choice-dec-${group.groupId}',
                                             ),
@@ -380,7 +387,7 @@ class _BreakfastModifierPopupState
                                                 return;
                                               }
                                               final int nextQuantity =
-                                                  groupQuantity - quantityStep;
+                                                  groupQuantity - 1;
                                               if (nextQuantity <= 0) {
                                                 _applyEdit(
                                                   BreakfastLineEdit.clearGroup(
@@ -407,9 +414,7 @@ class _BreakfastModifierPopupState
                                                   groupId: group.groupId,
                                                   selectedItemProductId:
                                                       selectedProductId,
-                                                  quantity:
-                                                      groupQuantity +
-                                                      quantityStep,
+                                                  quantity: groupQuantity + 1,
                                                 ),
                                               );
                                             },

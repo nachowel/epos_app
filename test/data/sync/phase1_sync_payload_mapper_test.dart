@@ -216,26 +216,23 @@ void main() {
         );
         expect(lineRecord.payload['removal_discount_total_minor'], 0);
 
-        final SyncGraphRecord extraAddRecord = modifierRecords.singleWhere(
+        final SyncGraphRecord choiceRecord = modifierRecords.singleWhere(
           (SyncGraphRecord record) =>
-              record.payload['charge_reason'] == 'extra_add',
+              record.payload['charge_reason'] == 'included_choice',
         );
-        expect(
-          extraAddRecord.payload['item_product_id'],
-          fixture.toastProductId,
-        );
-        expect(extraAddRecord.payload['charge_reason'], 'extra_add');
-        expect(extraAddRecord.payload['unit_price_minor'], 100);
-        expect(extraAddRecord.payload['price_effect_minor'], 200);
-        expect(extraAddRecord.payload['sort_key'], isNonZero);
-        expect(extraAddRecord.payload.containsKey('extra_price_minor'), isTrue);
-        expect(extraAddRecord.payload['extra_price_minor'], 9999);
+        expect(choiceRecord.payload['item_product_id'], fixture.toastProductId);
+        expect(choiceRecord.payload['charge_reason'], 'included_choice');
+        expect(choiceRecord.payload['unit_price_minor'], 100);
+        expect(choiceRecord.payload['price_effect_minor'], 0);
+        expect(choiceRecord.payload['sort_key'], isNonZero);
+        expect(choiceRecord.payload.containsKey('extra_price_minor'), isTrue);
+        expect(choiceRecord.payload['extra_price_minor'], 9999);
 
-        expect(transactionRecord.payload['modifier_total_minor'], 200);
-        expect(lineRecord.payload['line_total_minor'], 600);
+        expect(transactionRecord.payload['modifier_total_minor'], 0);
+        expect(lineRecord.payload['line_total_minor'], 400);
         expect(
-          extraAddRecord.payload['price_effect_minor'],
-          isNot(extraAddRecord.payload['extra_price_minor']),
+          choiceRecord.payload['price_effect_minor'],
+          isNot(choiceRecord.payload['extra_price_minor']),
         );
 
         final List<String> payloadModifierUuids = modifierRecords
@@ -439,9 +436,9 @@ Future<_BreakfastPayloadFixture> _createPaidBreakfastPayloadFixture(
         app_db.ModifierGroupsCompanion.insert(
           productId: set4ProductId,
           name: 'Toast or Bread',
-          minSelect: const Value<int>(0),
-          maxSelect: const Value<int>(2),
-          includedQuantity: const Value<int>(2),
+          minSelect: const Value<int>(1),
+          maxSelect: const Value<int>(1),
+          includedQuantity: const Value<int>(1),
           sortOrder: const Value<int>(2),
         ),
       );
@@ -541,7 +538,7 @@ Future<_BreakfastPayloadFixture> _createPaidBreakfastPayloadFixture(
     edit: BreakfastLineEdit.chooseGroup(
       groupId: toastBreadGroupId,
       selectedItemProductId: toastProductId,
-      quantity: 4,
+      quantity: 1,
     ),
   );
 
@@ -559,7 +556,8 @@ Future<_BreakfastPayloadFixture> _createPaidBreakfastPayloadFixture(
 
   final int extraAddId = semanticRows
       .singleWhere(
-        (QueryRow row) => row.read<String>('charge_reason') == 'extra_add',
+        (QueryRow row) =>
+            row.read<String>('charge_reason') == 'included_choice',
       )
       .read<int>('id');
   await db.customStatement(

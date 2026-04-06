@@ -277,42 +277,30 @@ void main() {
       expect(result.lineSnapshot.lineTotalMinor, 400);
     });
 
-    test('choice overflow becomes extra_add', () {
-      final BreakfastRebuildResult result = engine.rebuild(
-        _input(
-          requestedState: const BreakfastRequestedState(
-            chosenGroups: <BreakfastChosenGroupRequest>[
-              BreakfastChosenGroupRequest(
-                groupId: _toastBreadGroupId,
-                selectedItemProductId: _toastId,
-                requestedQuantity: 4,
-              ),
-            ],
+    test(
+      'toast or bread rejects quantities above the single selection limit',
+      () {
+        final BreakfastRebuildResult result = engine.rebuild(
+          _input(
+            requestedState: const BreakfastRequestedState(
+              chosenGroups: <BreakfastChosenGroupRequest>[
+                BreakfastChosenGroupRequest(
+                  groupId: _toastBreadGroupId,
+                  selectedItemProductId: _toastId,
+                  requestedQuantity: 2,
+                ),
+              ],
+            ),
           ),
-        ),
-      );
+        );
 
-      final BreakfastClassifiedModifier included = result.classifiedModifiers
-          .singleWhere(
-            (BreakfastClassifiedModifier row) =>
-                row.chargeReason == ModifierChargeReason.includedChoice,
-          );
-      final BreakfastClassifiedModifier overflow = result.classifiedModifiers
-          .singleWhere(
-            (BreakfastClassifiedModifier row) =>
-                row.chargeReason == ModifierChargeReason.extraAdd,
-          );
-
-      expect(result.validationErrors, isEmpty);
-      expect(included.quantity, 2);
-      expect(included.itemProductId, _toastId);
-      expect(overflow.quantity, 2);
-      expect(overflow.itemProductId, _toastId);
-      expect(overflow.priceEffectMinor, 200);
-      expect(result.pricingBreakdown.extraAddTotalMinor, 200);
-      expect(result.lineSnapshot.modifierTotalMinor, 200);
-      expect(result.lineSnapshot.lineTotalMinor, 600);
-    });
+        expect(
+          result.validationErrors,
+          contains(BreakfastEditErrorCode.invalidChoiceQuantity),
+        );
+        expect(result.classifiedModifiers, isEmpty);
+      },
+    );
 
     test('choice product never consumes swap pool', () {
       final BreakfastRebuildResult result = engine.rebuild(
@@ -354,6 +342,28 @@ void main() {
       expect(result.lineSnapshot.modifierTotalMinor, 150);
     });
 
+    test('explicit none is rejected for required toast or bread', () {
+      final BreakfastRebuildResult result = engine.rebuild(
+        _input(
+          requestedState: const BreakfastRequestedState(
+            chosenGroups: <BreakfastChosenGroupRequest>[
+              BreakfastChosenGroupRequest(
+                groupId: _toastBreadGroupId,
+                selectedItemProductId: null,
+                requestedQuantity: 1,
+              ),
+            ],
+          ),
+        ),
+      );
+
+      expect(
+        result.validationErrors,
+        contains(BreakfastEditErrorCode.invalidChoiceQuantity),
+      );
+      expect(result.classifiedModifiers, isEmpty);
+    });
+
     test('mixed toast/bread invalid', () {
       final BreakfastRebuildResult result = engine.rebuild(
         _input(
@@ -376,7 +386,7 @@ void main() {
 
       expect(
         result.validationErrors,
-        contains(BreakfastEditErrorCode.mixedToastBreadNotSupported),
+        contains(BreakfastEditErrorCode.invalidChoiceGroup),
       );
       expect(result.classifiedModifiers, isEmpty);
     });
@@ -427,7 +437,7 @@ void main() {
             BreakfastChosenGroupRequest(
               groupId: _toastBreadGroupId,
               selectedItemProductId: _toastId,
-              requestedQuantity: 4,
+              requestedQuantity: 1,
             ),
           ],
         ),
@@ -608,9 +618,9 @@ BreakfastSetConfiguration _configuration() {
         BreakfastChoiceGroupConfig(
           groupId: _toastBreadGroupId,
           groupName: 'Toast or Bread',
-          minSelect: 0,
-          maxSelect: 2,
-          includedQuantity: 2,
+          minSelect: 1,
+          maxSelect: 1,
+          includedQuantity: 1,
           sortOrder: 2,
           members: <BreakfastChoiceGroupMemberConfig>[
             BreakfastChoiceGroupMemberConfig(

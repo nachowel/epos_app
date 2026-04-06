@@ -93,11 +93,11 @@ These are business truths already agreed for breakfast configuration:
 4. Choice-capable products are `included_choice` eligible.
 5. Choice-capable products are `extra_add` eligible.
 6. Choice-capable products are never swap replacements.
-7. Choice groups are optional and may be left unanswered.
+7. Default breakfast choice groups are required and must be answered with a real product selection.
 8. All breakfast-set roots must carry the required breakfast choice pattern:
    - `Tea or Coffee`
    - `Toast or Bread`
-9. The `Toast or Bread` pattern supports only `2 toast` or `2 bread`.
+9. The `Toast or Bread` pattern supports exactly one selection: `toast` or `bread`.
 10. Mixed split is not supported.
 
 ## Already Enforced By Schema
@@ -124,7 +124,7 @@ Important limitation:
 
 ## Admin Validation Requirements
 
-These rules are only documented now and must later be enforced by admin/dashboard validation:
+These rules are enforced by the current admin/dashboard validation path:
 
 1. A set-root product cannot be added as its own `set_item`.
 2. A set-root product cannot be added as another set root's removable component unless a later contract explicitly allows it.
@@ -138,15 +138,15 @@ These rules are only documented now and must later be enforced by admin/dashboar
 10. Future extra-only products must not appear in breakfast choice groups unless a later contract explicitly expands eligibility.
 11. Example products such as `Set 4` and `Set 9` must be clearly treated as placeholder/demo configuration, not production truth.
 
-## Future Domain Runtime Enforcement Requirements
+## Domain Runtime Enforcement Requirements
 
-These rules are only documented now and must later be enforced by domain runtime validation:
+These rules are enforced by the current runtime validation path:
 
 1. Pending replacement matching must only consider removable `set_items`.
 2. Choice-capable products must never satisfy pending swap/replacement matching.
-3. A choice overflow path may become `extra_add`.
-4. A choice selection with no customer input must produce no `order_modifiers` choice row.
-5. `Toast or Bread` must remain a single-path selection with quantity allowance, not a mixed split.
+3. Required breakfast groups must reject explicit `None`.
+4. Optional groups may persist an explicit `None` choice row.
+5. `Toast or Bread` must remain a single required choice, not a quantity allowance or mixed split.
 6. Runtime selection logic must reject impossible states even if malformed data slips past admin setup.
 
 ## Enforcement Boundary Summary

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart' show Value;
+import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/data/database/app_database.dart' as app_db;
 import 'package:epos_app/data/repositories/breakfast_configuration_repository.dart';
 import 'package:epos_app/data/repositories/shift_repository.dart';
@@ -187,7 +188,7 @@ void main() {
   );
 
   test(
-    'checkout persists explicit none choices without pricing impact',
+    'checkout rejects explicit none for required breakfast choices',
     () async {
       final app_db.AppDatabase db = createTestDatabase();
       addTearDown(db.close);
@@ -196,57 +197,23 @@ void main() {
       final BreakfastPosService posService = BreakfastPosService(
         breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
       );
-      final selection = await posService.buildCartSelection(
-        product: fixture.rootProduct,
-        requestedState: BreakfastLineEdit.chooseGroup(
-          groupId: fixture.drinkGroupId,
-          selectedItemProductId: null,
-          quantity: 1,
-        ).applyTo(const BreakfastRequestedState()),
-      );
-
-      final OrderService orderService = OrderService(
-        shiftSessionService: ShiftSessionService(fixture.shiftRepository),
-        transactionRepository: TransactionRepository(db),
-        transactionStateRepository: TransactionStateRepository(db),
-        breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
-      );
-      final CheckoutService checkoutService = CheckoutService(
-        shiftSessionService: ShiftSessionService(fixture.shiftRepository),
-        orderService: orderService,
-        printerService: PrinterService(TransactionRepository(db)),
-      );
-
-      final transaction = await checkoutService.checkoutCart(
-        currentUser: fixture.cashier,
-        cartItems: <CheckoutItem>[
-          CheckoutItem(
-            productId: fixture.rootProduct.id,
+      await expectLater(
+        () => posService.buildCartSelection(
+          product: fixture.rootProduct,
+          requestedState: BreakfastLineEdit.chooseGroup(
+            groupId: fixture.drinkGroupId,
+            selectedItemProductId: null,
             quantity: 1,
-            modifiers: const <CheckoutModifier>[],
-            breakfastSelection: selection,
+          ).applyTo(const BreakfastRequestedState()),
+        ),
+        throwsA(
+          isA<ValidationException>().having(
+            (ValidationException error) => error.message,
+            'message',
+            contains('Choose an option for Drink choice.'),
           ),
-        ],
-        idempotencyKey: 'semantic-checkout-none-test',
-        immediatePaymentMethod: null,
+        ),
       );
-
-      final List<TransactionLine> lines = await orderService.getOrderLines(
-        transaction.id,
-      );
-      final List<OrderModifier> modifiers = await orderService.getLineModifiers(
-        lines.single.id,
-      );
-
-      expect(lines.single.lineTotalMinor, fixture.rootProduct.priceMinor);
-      expect(modifiers, hasLength(1));
-      expect(modifiers.single.itemProductId, isNull);
-      expect(
-        modifiers.single.chargeReason,
-        ModifierChargeReason.includedChoice,
-      );
-      expect(modifiers.single.sourceGroupId, fixture.drinkGroupId);
-      expect(transaction.modifierTotalMinor, 0);
     },
   );
 

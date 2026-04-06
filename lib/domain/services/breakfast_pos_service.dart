@@ -360,7 +360,10 @@ class BreakfastPosService {
     for (final BreakfastChoiceGroupConfig group in configuration.choiceGroups) {
       final BreakfastChosenGroupRequest? choice =
           choicesByGroupId[group.groupId];
-      final bool hasSelection = choice?.hasSelection ?? false;
+      final bool hasSelection =
+          choice != null &&
+          choice.requestedQuantity > 0 &&
+          (!choice.isExplicitNone || group.minSelect == 0);
 
       if (group.maxSelect > 1) {
         messages.add(

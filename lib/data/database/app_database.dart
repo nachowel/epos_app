@@ -11,6 +11,9 @@ import '../../domain/models/migration_log_entry.dart';
 
 part 'app_database.g.dart';
 
+const String _defaultSandwichSauceOptionsJson =
+    '["ketchup","mayo","brownSauce","chilliSauce"]';
+
 class Users extends Table {
   IntColumn get id => integer().autoIncrement()();
 
@@ -94,8 +97,23 @@ class MealAdjustmentProfiles extends Table {
 
   TextColumn get description => text().nullable()();
 
+  TextColumn get profileKind =>
+      text().named('profile_kind').withDefault(const Constant('standard'))();
+
   IntColumn get freeSwapLimit =>
       integer().named('free_swap_limit').withDefault(const Constant(0))();
+
+  IntColumn get sandwichSurchargeMinor => integer()
+      .named('sandwich_surcharge_minor')
+      .withDefault(const Constant(100))();
+
+  IntColumn get baguetteSurchargeMinor => integer()
+      .named('baguette_surcharge_minor')
+      .withDefault(const Constant(180))();
+
+  TextColumn get sandwichSauceOptionsJson => text()
+      .named('sandwich_sauce_options_json')
+      .withDefault(const Constant(_defaultSandwichSauceOptionsJson))();
 
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 
@@ -106,7 +124,10 @@ class MealAdjustmentProfiles extends Table {
   @override
   List<String> get customConstraints => <String>[
     'CHECK (length(trim(name)) > 0)',
+    "CHECK (profile_kind IN ('standard','sandwich'))",
     'CHECK (free_swap_limit >= 0)',
+    'CHECK (sandwich_surcharge_minor >= 0)',
+    'CHECK (baguette_surcharge_minor >= 0)',
   ];
 }
 
@@ -878,7 +899,7 @@ class AppDatabase extends _$AppDatabase {
     return AppDatabase(NativeDatabase(file));
   }
 
-  static const int currentSchemaVersion = 25;
+  static const int currentSchemaVersion = 28;
   final List<MigrationLogEntry> _migrationHistory = <MigrationLogEntry>[];
   MigrationLogEntry? _lastMigrationFailure;
 
@@ -1109,6 +1130,30 @@ class AppDatabase extends _$AppDatabase {
           action: _migrateToV25,
         );
       }
+      if (from < 26) {
+        await _runMigrationStep(
+          step: 'migrate_v26',
+          fromVersion: from < 25 ? 25 : from,
+          toVersion: 26,
+          action: _migrateToV26,
+        );
+      }
+      if (from < 27) {
+        await _runMigrationStep(
+          step: 'migrate_v27',
+          fromVersion: from < 26 ? 26 : from,
+          toVersion: 27,
+          action: _migrateToV27,
+        );
+      }
+      if (from < 28) {
+        await _runMigrationStep(
+          step: 'migrate_v28',
+          fromVersion: from < 27 ? 27 : from,
+          toVersion: 28,
+          action: _migrateToV28,
+        );
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
@@ -1171,7 +1216,11 @@ class AppDatabase extends _$AppDatabase {
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         description TEXT NULL,
+        profile_kind TEXT NOT NULL DEFAULT 'standard' CHECK (profile_kind IN ('standard','sandwich')),
         free_swap_limit INTEGER NOT NULL DEFAULT 0 CHECK (free_swap_limit >= 0),
+        sandwich_surcharge_minor INTEGER NOT NULL DEFAULT 100 CHECK (sandwich_surcharge_minor >= 0),
+        baguette_surcharge_minor INTEGER NOT NULL DEFAULT 180 CHECK (baguette_surcharge_minor >= 0),
+        sandwich_sauce_options_json TEXT NOT NULL DEFAULT '["ketchup","mayo","brownSauce","chilliSauce"]',
         is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
@@ -2974,7 +3023,11 @@ class AppDatabase extends _$AppDatabase {
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         description TEXT NULL,
+        profile_kind TEXT NOT NULL DEFAULT 'standard' CHECK (profile_kind IN ('standard','sandwich')),
         free_swap_limit INTEGER NOT NULL DEFAULT 0 CHECK (free_swap_limit >= 0),
+        sandwich_surcharge_minor INTEGER NOT NULL DEFAULT 100 CHECK (sandwich_surcharge_minor >= 0),
+        baguette_surcharge_minor INTEGER NOT NULL DEFAULT 180 CHECK (baguette_surcharge_minor >= 0),
+        sandwich_sauce_options_json TEXT NOT NULL DEFAULT '["ketchup","mayo","brownSauce","chilliSauce"]',
         is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
@@ -3141,7 +3194,9 @@ class AppDatabase extends _$AppDatabase {
     try {
       await customStatement('DROP INDEX IF EXISTS idx_transactions_shift;');
       await customStatement('DROP INDEX IF EXISTS idx_transactions_user;');
-      await customStatement('ALTER TABLE transactions RENAME TO transactions_legacy_v24;');
+      await customStatement(
+        'ALTER TABLE transactions RENAME TO transactions_legacy_v24;',
+      );
       await customStatement('''
         CREATE TABLE transactions (
           id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -3206,10 +3261,18 @@ class AppDatabase extends _$AppDatabase {
       await customStatement('DROP TABLE transactions_legacy_v24;');
 
       await customStatement('DROP INDEX IF EXISTS idx_order_modifiers_line;');
-      await customStatement('DROP INDEX IF EXISTS idx_order_modifiers_item_product;');
-      await customStatement('DROP INDEX IF EXISTS idx_order_modifiers_item_product_semantics;');
-      await customStatement('DROP INDEX IF EXISTS idx_order_modifiers_source_group;');
-      await customStatement('ALTER TABLE order_modifiers RENAME TO order_modifiers_legacy_v24;');
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_order_modifiers_item_product;',
+      );
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_order_modifiers_item_product_semantics;',
+      );
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_order_modifiers_source_group;',
+      );
+      await customStatement(
+        'ALTER TABLE order_modifiers RENAME TO order_modifiers_legacy_v24;',
+      );
       await customStatement('''
         CREATE TABLE order_modifiers (
           id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -3325,6 +3388,118 @@ class AppDatabase extends _$AppDatabase {
     await _createMealCustomizationSnapshotFkEmulation();
   }
 
+  Future<void> _migrateToV26() async {
+    final bool hasProfileKind = await _tableHasColumn(
+      tableName: 'meal_adjustment_profiles',
+      columnName: 'profile_kind',
+    );
+    if (!hasProfileKind) {
+      await customStatement(
+        "ALTER TABLE meal_adjustment_profiles ADD COLUMN profile_kind TEXT NOT NULL DEFAULT 'standard' CHECK (profile_kind IN ('standard','sandwich'));",
+      );
+    }
+  }
+
+  Future<void> _migrateToV27() async {
+    final String tableName = 'meal_adjustment_profiles';
+    final bool hasSandwichSurchargeMinor = await _tableHasColumn(
+      tableName: tableName,
+      columnName: 'sandwich_surcharge_minor',
+    );
+    if (!hasSandwichSurchargeMinor) {
+      await customStatement(
+        "ALTER TABLE meal_adjustment_profiles ADD COLUMN sandwich_surcharge_minor INTEGER NOT NULL DEFAULT 100 CHECK (sandwich_surcharge_minor >= 0);",
+      );
+    }
+
+    final bool hasBaguetteSurchargeMinor = await _tableHasColumn(
+      tableName: tableName,
+      columnName: 'baguette_surcharge_minor',
+    );
+    if (!hasBaguetteSurchargeMinor) {
+      await customStatement(
+        "ALTER TABLE meal_adjustment_profiles ADD COLUMN baguette_surcharge_minor INTEGER NOT NULL DEFAULT 180 CHECK (baguette_surcharge_minor >= 0);",
+      );
+    }
+
+    final bool hasSandwichSauceOptionsJson = await _tableHasColumn(
+      tableName: tableName,
+      columnName: 'sandwich_sauce_options_json',
+    );
+    if (!hasSandwichSauceOptionsJson) {
+      await customStatement(
+        "ALTER TABLE meal_adjustment_profiles ADD COLUMN sandwich_sauce_options_json TEXT NOT NULL DEFAULT '[\"ketchup\",\"mayo\",\"brownSauce\",\"chilliSauce\"]';",
+      );
+    }
+  }
+
+  Future<void> _migrateToV28() async {
+    final List<QueryRow> legacyReferences = await customSelect('''
+      SELECT type, name, tbl_name, sql
+      FROM sqlite_master
+      WHERE sql LIKE '%transactions_legacy_v24%'
+      ''').get();
+    if (legacyReferences.isEmpty) {
+      return;
+    }
+
+    final bool legacyTableExists = await _tableExists(
+      'transactions_legacy_v24',
+    );
+    if (legacyTableExists) {
+      throw StateError(
+        'Legacy table transactions_legacy_v24 still exists. Manual recovery or a dev reset is required before migration can continue.',
+      );
+    }
+
+    final int legacyAlterTable = await _pragmaIntValue('legacy_alter_table');
+    await customStatement('PRAGMA foreign_keys = OFF;');
+    await customStatement('PRAGMA legacy_alter_table = OFF;');
+    try {
+      // SQLite rewrote child table references to transactions_legacy_v24 during
+      // v24's parent-table rename. Renaming the live transactions table
+      // through the legacy name forces SQLite to rewrite those references back
+      // to transactions without rebuilding every dependent table.
+      await customStatement(
+        'ALTER TABLE transactions RENAME TO transactions_legacy_v24;',
+      );
+      await customStatement(
+        'ALTER TABLE transactions_legacy_v24 RENAME TO transactions;',
+      );
+
+      final List<QueryRow> remainingLegacyReferences = await customSelect('''
+        SELECT type, name
+        FROM sqlite_master
+        WHERE sql LIKE '%transactions_legacy_v24%'
+        ''').get();
+      for (final QueryRow row in remainingLegacyReferences) {
+        final String type = row.read<String>('type');
+        final String name = row.read<String>('name');
+        if (type == 'trigger') {
+          await customStatement('DROP TRIGGER IF EXISTS "$name";');
+        } else if (type == 'view') {
+          await customStatement('DROP VIEW IF EXISTS "$name";');
+        }
+      }
+
+      final List<QueryRow> blockingLegacyReferences = await customSelect('''
+        SELECT type, name
+        FROM sqlite_master
+        WHERE sql LIKE '%transactions_legacy_v24%'
+        ''').get();
+      if (blockingLegacyReferences.isNotEmpty) {
+        throw StateError(
+          'Schema still contains transactions_legacy_v24 references after v28 repair.',
+        );
+      }
+    } finally {
+      await customStatement(
+        'PRAGMA legacy_alter_table = ${legacyAlterTable == 0 ? 'OFF' : 'ON'};',
+      );
+      await customStatement('PRAGMA foreign_keys = ON;');
+    }
+  }
+
   Future<void> _createSyncRootSnapshotTable() async {
     await customStatement('''
       CREATE TABLE IF NOT EXISTS sync_queue_root_graph_snapshots (
@@ -3400,6 +3575,11 @@ class AppDatabase extends _$AppDatabase {
       variables: <Variable<Object>>[Variable<String>(tableName)],
     ).getSingleOrNull();
     return row != null;
+  }
+
+  Future<int> _pragmaIntValue(String pragmaName) async {
+    final QueryRow row = await customSelect('PRAGMA $pragmaName;').getSingle();
+    return (row.data.values.first as num).toInt();
   }
 
   Future<void> _runMigrationStep({

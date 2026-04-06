@@ -28,7 +28,7 @@ Authority chain for this document:
 * name: Choice Pool Isolation
 * layer: domain engine
 * purpose: prevent choice-capable products from corrupting swap accounting
-* exact rule: `product_modifiers(type='choice')` members and all classified choice rows must never enter or consume `pendingReplacementUnits`; choice overflow must classify only as `extra_add`
+* exact rule: `product_modifiers(type='choice')` members and all classified choice rows must never enter or consume `pendingReplacementUnits`; required breakfast choice groups remain single-selection paths
 * failure behavior: internal invariant failure; abort rebuild with a deterministic domain assertion failure
 * where it should be enforced: `BreakfastRebuildEngine` during choice normalization and add-unit classification, plus domain tests
 
@@ -171,7 +171,7 @@ Authority chain for this document:
 1. Choice-capable products never consume pending replacement units.
 2. Swap matching uses only removed `set_items` units.
 3. First `free_swap_limit` eligible matched replacements classify as `free_swap`; all later matched replacements classify as `paid_swap`.
-4. Choice overflow always classifies as `extra_add`.
+4. Required breakfast groups reject explicit none and over-limit quantities.
 5. Choice rows always use `action='choice'` and `charge_reason='included_choice'`.
 6. Added choice-capable products never classify as `free_swap` or `paid_swap`.
 7. Rebuild output is deterministic: identical input produces identical row ordering, quantities, totals, and metadata.
@@ -217,7 +217,7 @@ Authority chain for this document:
 * top-priority test cases:
   * identical rebuild input => identical output
   * remove-only state stays valid and reportable
-  * choice overflow becomes `extra_add`, not swap
+  * required breakfast choices stay one-of-one and never become swap
   * third replacement = `paid_swap`
   * choice product never enters swap pool
   * choice-capable direct add remains `extra_add` after removals
@@ -250,7 +250,7 @@ Authority chain for this document:
   * invalid edit leaves no partial persisted state
   * `draft` editable, `sent/paid/cancelled` rejected
   * requested state is not inferred from classified snapshot rows without explicit reverse-mapping contract
-  * choice overflow persists as `included_choice` plus `extra_add`
+  * required toast/bread persists as a single `included_choice` row
   * choice product never persists as swap
   * third replacement persists as `paid_swap`
   * overlapping breakfast edits detect stale snapshot and abort the later edit safely
@@ -298,8 +298,8 @@ Authority chain for this document:
    How to catch it: repository test that totals recompute from committed persisted rows only and rejects intermediate state sources
 6. Bug: `extra_price_minor` leaks into active breakfast semantics
    How to catch it: repository and migration tests comparing semantic totals against `price_effect_minor`, not compatibility residue
-7. Bug: choice overflow misclassified as swap
-   How to catch it: domain and integration tests for `choice_overflow => extra_add`
+7. Bug: required breakfast choice allows `None` or over-limit quantities
+   How to catch it: domain, POS, and integration tests that reject required-group explicit none and quantity above `max_select`
 8. Bug: third eligible replacement still classified as `free_swap`
    How to catch it: domain boundary test around `free_swap_limit` and persisted integration verification
 9. Bug: merge logic collapses two non-identical breakfast lines
