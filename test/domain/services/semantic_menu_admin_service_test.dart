@@ -188,6 +188,79 @@ void main() {
     );
 
     test(
+      'validateConfiguration allows fixed-set configs with included items and zero choice groups',
+      () async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final _SemanticFixture fixture = await _seedSemanticFixture(db);
+        final SemanticMenuAdminService service = _createService(db);
+
+        final SemanticMenuValidationResult result = await service
+            .validateConfiguration(
+              configuration: SemanticProductConfigurationDraft(
+                productId: fixture.rootProductId,
+                setItems: <SemanticSetItemDraft>[
+                  SemanticSetItemDraft(
+                    itemProductId: fixture.eggProductId,
+                    itemName: 'Egg',
+                    defaultQuantity: 1,
+                    isRemovable: true,
+                    sortOrder: 0,
+                  ),
+                ],
+                choiceGroups: const <SemanticChoiceGroupDraft>[],
+              ),
+            );
+
+        expect(result.errors, isEmpty);
+        expect(result.warnings, isEmpty);
+        expect(result.canSave, isTrue);
+      },
+    );
+
+    test(
+      'validateConfiguration rejects explicitly required choice groups that are missing members',
+      () async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final _SemanticFixture fixture = await _seedSemanticFixture(db);
+        final SemanticMenuAdminService service = _createService(db);
+
+        final SemanticMenuValidationResult result = await service
+            .validateConfiguration(
+              configuration: SemanticProductConfigurationDraft(
+                productId: fixture.rootProductId,
+                setItems: <SemanticSetItemDraft>[
+                  SemanticSetItemDraft(
+                    itemProductId: fixture.eggProductId,
+                    itemName: 'Egg',
+                    defaultQuantity: 1,
+                    isRemovable: true,
+                    sortOrder: 0,
+                  ),
+                ],
+                choiceGroups: <SemanticChoiceGroupDraft>[
+                  const SemanticChoiceGroupDraft(
+                    name: 'Tea or Coffee',
+                    minSelect: 1,
+                    maxSelect: 1,
+                    includedQuantity: 1,
+                    sortOrder: 0,
+                    members: <SemanticChoiceMemberDraft>[],
+                  ),
+                ],
+              ),
+            );
+
+        expect(result.canSave, isFalse);
+        expect(
+          result.errors,
+          contains('Choice groups must contain at least one member.'),
+        );
+      },
+    );
+
+    test(
       'old and new sets both receive an empty included-item pool when Breakfast Items has no active products',
       () async {
         final app_db.AppDatabase db = createTestDatabase();

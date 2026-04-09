@@ -22,6 +22,7 @@ import '../models/shift.dart';
 import '../models/shift_report.dart';
 import '../models/sync_runtime_state.dart';
 import '../models/sync_failure_guidance.dart';
+import '../models/sync_graph_requeue_result.dart';
 import '../models/sync_monitor_snapshot.dart';
 import '../models/sync_operations_summary.dart';
 import '../models/sync_queue_item.dart';
@@ -77,9 +78,18 @@ class ProductDeletionAnalysis {
       mealPricingRuleReferenceCount > 0;
 }
 
+class BulkModifierCreateResult {
+  const BulkModifierCreateResult({
+    required this.createdCount,
+    required this.skippedCount,
+  });
+
+  final int createdCount;
+  final int skippedCount;
+}
+
 class AdminService {
   static const String archivedCategoryName = 'Archived Products';
-  static const String setBreakfastCategoryName = 'Set Breakfast';
   static const int defaultSyncMaxRetryAttempts = 5;
   static const Duration defaultProcessingStuckThreshold = Duration(minutes: 2);
 
@@ -302,6 +312,7 @@ class AdminService {
 
   Future<int> createBreakfastSetRoot({
     required User user,
+    required int categoryId,
     required String name,
     required int priceMinor,
     bool isActive = true,
@@ -309,26 +320,26 @@ class AdminService {
     int? sortOrder,
   }) async {
     _ensureAdmin(user);
-    _validateRequiredName(name, fieldName: 'Set name');
+    _validateRequiredName(name, fieldName: 'Product name');
     _validateNonNegative(priceMinor, fieldName: 'price_minor');
+    await _requireCategory(categoryId);
 
-    final Category? breakfastCategory = await _categoryRepository
-        .findByNameIgnoreCase(setBreakfastCategoryName);
-    if (breakfastCategory == null) {
-      throw ValidationException(
-        'Set Breakfast category is required before creating a breakfast set.',
-      );
+    final Category? targetCategory = await _categoryRepository.getById(
+      categoryId,
+    );
+    if (targetCategory == null) {
+      throw ValidationException('Category selection is required.');
     }
 
     final List<Product> categoryProducts = await _productRepository
-        .getByCategory(breakfastCategory.id, activeOnly: false);
+        .getByCategory(targetCategory.id, activeOnly: false);
     final String normalizedName = name.trim().toLowerCase();
     final bool duplicateExists = categoryProducts.any(
       (Product product) => product.name.trim().toLowerCase() == normalizedName,
     );
     if (duplicateExists) {
       throw ValidationException(
-        'A breakfast set with this name already exists in Set Breakfast.',
+        'A breakfast / set-style product with this name already exists in ${targetCategory.name}.',
       );
     }
 
@@ -340,7 +351,7 @@ class AdminService {
 
     final int productId = await createProduct(
       user: user,
-      categoryId: breakfastCategory.id,
+      categoryId: targetCategory.id,
       name: name.trim(),
       priceMinor: priceMinor,
       hasModifiers: false,
@@ -560,9 +571,15 @@ class AdminService {
     required ModifierType type,
     required int extraPriceMinor,
     bool isActive = true,
+    int? itemProductId,
+    ModifierPriceBehavior? priceBehavior,
+    ModifierUiSection? uiSection,
   }) async {
     _ensureAdmin(user);
     await _requireProduct(productId);
+    if (itemProductId != null) {
+      await _requireProduct(itemProductId);
+    }
     _validateRequiredName(name, fieldName: 'Modifier name');
     _validateNonNegative(extraPriceMinor, fieldName: 'extra_price_minor');
 
@@ -572,6 +589,9 @@ class AdminService {
       type: type,
       extraPriceMinor: type == ModifierType.extra ? extraPriceMinor : 0,
       isActive: isActive,
+      itemProductId: itemProductId,
+      priceBehavior: priceBehavior,
+      uiSection: uiSection,
     );
   }
 
@@ -583,9 +603,15 @@ class AdminService {
     required ModifierType type,
     required int extraPriceMinor,
     required bool isActive,
+    int? itemProductId,
+    ModifierPriceBehavior? priceBehavior,
+    ModifierUiSection? uiSection,
   }) async {
     _ensureAdmin(user);
     await _requireProduct(productId);
+    if (itemProductId != null) {
+      await _requireProduct(itemProductId);
+    }
     _validateRequiredName(name, fieldName: 'Modifier name');
     _validateNonNegative(extraPriceMinor, fieldName: 'extra_price_minor');
 
@@ -596,10 +622,44 @@ class AdminService {
       type: type,
       extraPriceMinor: type == ModifierType.extra ? extraPriceMinor : 0,
       isActive: isActive,
+      itemProductId: itemProductId,
+      priceBehavior: priceBehavior,
+      uiSection: uiSection,
     );
     if (!updated) {
       throw NotFoundException('Modifier not found: $id');
     }
+  }
+
+  Future<BulkModifierCreateResult> bulkCreateModifiersFromCategory({
+    required User user,
+    required int productId,
+    required int sourceCategoryId,
+    required ModifierType type,
+    required bool isActive,
+    ModifierPriceBehavior? priceBehavior,
+    ModifierUiSection? uiSection,
+  }) async {
+    _ensureAdmin(user);
+    await _requireProduct(productId);
+    await _requireCategory(sourceCategoryId);
+
+    final List<Product> categoryProducts = await _productRepository
+        .getByCategory(sourceCategoryId, activeOnly: true);
+    final BulkModifierInsertResult result = await _modifierRepository
+        .insertBulkLinkedProducts(
+          productId: productId,
+          linkedProducts: categoryProducts,
+          type: type,
+          isActive: isActive,
+          priceBehavior: priceBehavior,
+          uiSection: uiSection,
+        );
+
+    return BulkModifierCreateResult(
+      createdCount: result.createdCount,
+      skippedCount: result.skippedCount,
+    );
   }
 
   Future<void> toggleModifierActive({
@@ -610,6 +670,14 @@ class AdminService {
     _ensureAdmin(user);
     final bool updated = await _modifierRepository.toggleActive(id, isActive);
     if (!updated) {
+      throw NotFoundException('Modifier not found: $id');
+    }
+  }
+
+  Future<void> deleteModifier({required User user, required int id}) async {
+    _ensureAdmin(user);
+    final bool deleted = await _modifierRepository.deleteModifier(id);
+    if (!deleted) {
       throw NotFoundException('Modifier not found: $id');
     }
   }
@@ -801,6 +869,31 @@ class AdminService {
       throw ValidationException(guidance.nextStep);
     }
     await _syncQueueRepository.resetAttempts(itemId);
+  }
+
+  Future<SyncGraphRequeueResult> requeueTransactionGraphFromCurrentSnapshot({
+    required User user,
+    required String transactionUuid,
+  }) async {
+    _ensureAdmin(user);
+    final SyncGraphRequeueResult result = await _syncQueueRepository
+        .requeueTransactionGraphFromCurrentSnapshot(transactionUuid);
+    _logger.audit(
+      eventType: 'admin_sync_graph_requeued',
+      entityId: transactionUuid,
+      message:
+          'Admin re-queued a fresh transaction graph snapshot from current local state.',
+      metadata: <String, Object?>{
+        'root_queue_row_id': result.rootQueueId,
+        'record_count': result.createdItems.length,
+        'transaction_idempotency_key': result.transactionIdempotencyKey,
+        'tables': result.createdItems
+            .map((SyncGraphRequeueItem item) => item.tableName)
+            .toSet()
+            .toList(growable: false),
+      },
+    );
+    return result;
   }
 
   Future<SyncRetryAllResult> retryAllSyncItems({required User user}) async {

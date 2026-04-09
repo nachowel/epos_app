@@ -160,11 +160,13 @@ class SemanticMenuPolicyService {
       }
     }
 
-    if (configuration.hasSemanticStructure &&
+    if (configuration.choiceGroups.isNotEmpty &&
         !configuration.choiceGroups.any(
           (SemanticChoiceGroupDraft group) => group.minSelect > 0,
         )) {
-      warnings.add('This set has no required choice groups defined.');
+      warnings.add(
+        'Configured choice groups are all optional. Confirm that this product does not require a mandatory choice.',
+      );
     }
     if (configuration.choiceGroups.any(
       (SemanticChoiceGroupDraft group) => group.maxSelect > 1,
@@ -286,10 +288,13 @@ class SemanticMenuPolicyService {
       }
     }
 
-    if (!configuration.choiceGroups.any(
-      (BreakfastChoiceGroupConfig group) => group.minSelect > 0,
-    )) {
-      warnings.add('This set has no required choice groups defined.');
+    if (configuration.choiceGroups.isNotEmpty &&
+        !configuration.choiceGroups.any(
+          (BreakfastChoiceGroupConfig group) => group.minSelect > 0,
+        )) {
+      warnings.add(
+        'Configured choice groups are all optional. Confirm that this product does not require a mandatory choice.',
+      );
     }
     if (configuration.choiceGroups.any(
       (BreakfastChoiceGroupConfig group) => group.maxSelect > 1,

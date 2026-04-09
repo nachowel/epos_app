@@ -9,9 +9,9 @@ import '../../domain/models/semantic_product_configuration.dart';
 import '../../domain/models/user.dart';
 import 'auth_provider.dart';
 
-const String _setBreakfastCategoryName = 'Set Breakfast';
-
 enum BreakfastSetValidationState { valid, incomplete, invalid }
+
+enum BreakfastSetValidationFilter { all, valid, invalid, incomplete }
 
 class AdminBreakfastSetListItem {
   const AdminBreakfastSetListItem({
@@ -33,41 +33,58 @@ class AdminBreakfastSetListItem {
 
 class AdminBreakfastSetsState {
   const AdminBreakfastSetsState({
+    required this.allItems,
     required this.items,
+    required this.availableCategories,
+    required this.searchQuery,
+    required this.validationFilter,
     required this.isLoading,
     required this.isCreating,
     required this.errorMessage,
-    required this.hasBreakfastCategory,
   });
 
   const AdminBreakfastSetsState.initial()
-    : items = const <AdminBreakfastSetListItem>[],
+    : allItems = const <AdminBreakfastSetListItem>[],
+      items = const <AdminBreakfastSetListItem>[],
+      availableCategories = const <Category>[],
+      searchQuery = '',
+      validationFilter = BreakfastSetValidationFilter.all,
       isLoading = false,
       isCreating = false,
-      errorMessage = null,
-      hasBreakfastCategory = true;
+      errorMessage = null;
 
+  final List<AdminBreakfastSetListItem> allItems;
   final List<AdminBreakfastSetListItem> items;
+  final List<Category> availableCategories;
+  final String searchQuery;
+  final BreakfastSetValidationFilter validationFilter;
   final bool isLoading;
   final bool isCreating;
   final String? errorMessage;
-  final bool hasBreakfastCategory;
+
+  int get totalItemCount => allItems.length;
 
   AdminBreakfastSetsState copyWith({
+    List<AdminBreakfastSetListItem>? allItems,
     List<AdminBreakfastSetListItem>? items,
+    List<Category>? availableCategories,
+    String? searchQuery,
+    BreakfastSetValidationFilter? validationFilter,
     bool? isLoading,
     bool? isCreating,
     Object? errorMessage = _unset,
-    bool? hasBreakfastCategory,
   }) {
     return AdminBreakfastSetsState(
+      allItems: allItems ?? this.allItems,
       items: items ?? this.items,
+      availableCategories: availableCategories ?? this.availableCategories,
+      searchQuery: searchQuery ?? this.searchQuery,
+      validationFilter: validationFilter ?? this.validationFilter,
       isLoading: isLoading ?? this.isLoading,
       isCreating: isCreating ?? this.isCreating,
       errorMessage: errorMessage == _unset
           ? this.errorMessage
           : errorMessage as String?,
-      hasBreakfastCategory: hasBreakfastCategory ?? this.hasBreakfastCategory,
     );
   }
 }
@@ -82,32 +99,43 @@ class AdminBreakfastSetsNotifier
   Future<void> load() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final Category? breakfastCategory = await _loadBreakfastCategory();
-      if (breakfastCategory == null) {
-        state = state.copyWith(
-          items: const <AdminBreakfastSetListItem>[],
-          isLoading: false,
-          isCreating: false,
-          errorMessage: null,
-          hasBreakfastCategory: false,
-        );
-        return;
-      }
-
-      final List<Product> products = await _ref
+      final List<Category> categories = await _ref
+          .read(categoryRepositoryProvider)
+          .getAll(activeOnly: false);
+      final List<Category> availableCategories =
+          categories
+              .where((Category category) => category.isActive)
+              .toList(growable: false)
+            ..sort(
+              (Category left, Category right) =>
+                  left.sortOrder != right.sortOrder
+                  ? left.sortOrder.compareTo(right.sortOrder)
+                  : left.name.toLowerCase().compareTo(right.name.toLowerCase()),
+            );
+      final Map<int, String> categoryNamesById = <int, String>{
+        for (final Category category in categories) category.id: category.name,
+      };
+      final List<Product> allProducts = await _ref
           .read(productRepositoryProvider)
-          .getByCategory(breakfastCategory.id, activeOnly: false);
+          .getAll(activeOnly: false);
       final Map<int, ProductMenuConfigurationProfile> profiles = await _ref
           .read(breakfastConfigurationRepositoryProvider)
           .loadConfigurationProfiles(
-            products.map((Product product) => product.id),
+            allProducts.map((Product product) => product.id),
           );
+      final List<Product> products = allProducts
+          .where(
+            (Product product) =>
+                profiles[product.id]?.hasSemanticSetConfig ?? false,
+          )
+          .toList(growable: false);
       final List<AdminBreakfastSetListItem> items =
           await Future.wait<AdminBreakfastSetListItem>(
             products.map(
               (Product product) => _buildListItem(
                 product: product,
-                categoryName: breakfastCategory.name,
+                categoryName:
+                    categoryNamesById[product.categoryId] ?? 'Unknown Category',
                 profile:
                     profiles[product.id] ??
                     ProductMenuConfigurationProfile(
@@ -120,13 +148,20 @@ class AdminBreakfastSetsNotifier
               ),
             ),
           );
+      final List<AdminBreakfastSetListItem> immutableItems =
+          List<AdminBreakfastSetListItem>.unmodifiable(items);
 
       state = state.copyWith(
-        items: List<AdminBreakfastSetListItem>.unmodifiable(items),
+        allItems: immutableItems,
+        items: _applyFilters(
+          items: immutableItems,
+          searchQuery: state.searchQuery,
+          validationFilter: state.validationFilter,
+        ),
+        availableCategories: List<Category>.unmodifiable(availableCategories),
         isLoading: false,
         isCreating: false,
         errorMessage: null,
-        hasBreakfastCategory: true,
       );
     } catch (error, stackTrace) {
       state = state.copyWith(
@@ -143,6 +178,7 @@ class AdminBreakfastSetsNotifier
   }
 
   Future<int?> createBreakfastSetRoot({
+    required int categoryId,
     required String name,
     required int priceMinor,
     required bool isActive,
@@ -160,6 +196,7 @@ class AdminBreakfastSetsNotifier
           .read(adminServiceProvider)
           .createBreakfastSetRoot(
             user: currentUser,
+            categoryId: categoryId,
             name: name,
             priceMinor: priceMinor,
             isActive: isActive,
@@ -180,6 +217,31 @@ class AdminBreakfastSetsNotifier
       );
       return null;
     }
+  }
+
+  void updateSearchQuery(String value) {
+    final String normalizedQuery = value.trim();
+    state = state.copyWith(
+      searchQuery: normalizedQuery,
+      items: _applyFilters(
+        items: state.allItems,
+        searchQuery: normalizedQuery,
+        validationFilter: state.validationFilter,
+      ),
+      errorMessage: null,
+    );
+  }
+
+  void updateValidationFilter(BreakfastSetValidationFilter filter) {
+    state = state.copyWith(
+      validationFilter: filter,
+      items: _applyFilters(
+        items: state.allItems,
+        searchQuery: state.searchQuery,
+        validationFilter: filter,
+      ),
+      errorMessage: null,
+    );
   }
 
   Future<AdminBreakfastSetListItem> _buildListItem({
@@ -293,17 +355,48 @@ class AdminBreakfastSetsNotifier
     return '${visibleIssues.join('; ')} +$hiddenIssueCount more.';
   }
 
-  Future<Category?> _loadBreakfastCategory() async {
-    final List<Category> categories = await _ref
-        .read(categoryRepositoryProvider)
-        .getAll(activeOnly: false);
-    for (final Category category in categories) {
-      if (category.name.trim().toLowerCase() ==
-          _setBreakfastCategoryName.toLowerCase()) {
-        return category;
-      }
+  List<AdminBreakfastSetListItem> _applyFilters({
+    required List<AdminBreakfastSetListItem> items,
+    required String searchQuery,
+    required BreakfastSetValidationFilter validationFilter,
+  }) {
+    final String normalizedQuery = searchQuery.trim().toLowerCase();
+    return items
+        .where((AdminBreakfastSetListItem item) {
+          if (!_matchesValidationFilter(item, validationFilter)) {
+            return false;
+          }
+          if (normalizedQuery.isEmpty) {
+            return true;
+          }
+          return _searchableTermsForItem(
+            item,
+          ).any((String term) => term.contains(normalizedQuery));
+        })
+        .toList(growable: false);
+  }
+
+  bool _matchesValidationFilter(
+    AdminBreakfastSetListItem item,
+    BreakfastSetValidationFilter filter,
+  ) {
+    switch (filter) {
+      case BreakfastSetValidationFilter.all:
+        return true;
+      case BreakfastSetValidationFilter.valid:
+        return item.validationState == BreakfastSetValidationState.valid;
+      case BreakfastSetValidationFilter.invalid:
+        return item.validationState == BreakfastSetValidationState.invalid;
+      case BreakfastSetValidationFilter.incomplete:
+        return item.validationState == BreakfastSetValidationState.incomplete;
     }
-    return null;
+  }
+
+  List<String> _searchableTermsForItem(AdminBreakfastSetListItem item) {
+    return <String>[
+      item.product.name.trim().toLowerCase(),
+      item.categoryName.trim().toLowerCase(),
+    ];
   }
 }
 

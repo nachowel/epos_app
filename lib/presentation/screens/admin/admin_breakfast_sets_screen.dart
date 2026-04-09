@@ -5,17 +5,22 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../domain/models/category.dart';
 import '../../providers/admin_breakfast_sets_provider.dart';
 import 'widgets/admin_scaffold.dart';
 
-const String _screenTitle = 'Breakfast Set Configuration';
+const String _screenTitle = 'Breakfast / Set-style Products';
 const String _screenRoute = '/admin/breakfast-sets';
 const String _screenInfoMessage =
-    'Review breakfast set roots here before wiring the dedicated editor. This screen uses live repository data and shows whether each set is ready, incomplete, or invalid.';
+    'Review breakfast/set-style products across POS categories. Category controls where a product appears in POS; semantic configuration controls which breakfast/set engine it uses.';
+const String _searchHint = 'Search breakfast/set products...';
+const String _resultSummaryLabel = 'Showing';
+const String _filteredEmptyMessage =
+    'No breakfast/set-style products match your filters.';
 const String _deleteStubMessage =
-    'Breakfast set delete flow is not available yet.';
+    'Breakfast / set-style product delete flow is not available yet.';
 const String _createSuccessMessage =
-    'Breakfast set created. Configure included items and choices.';
+    'Breakfast / set-style product created. Configure included items and choices.';
 
 class AdminBreakfastSetsScreen extends ConsumerStatefulWidget {
   const AdminBreakfastSetsScreen({super.key});
@@ -27,12 +32,21 @@ class AdminBreakfastSetsScreen extends ConsumerStatefulWidget {
 
 class _AdminBreakfastSetsScreenState
     extends ConsumerState<AdminBreakfastSetsScreen> {
+  late final TextEditingController _searchController;
+
   @override
   void initState() {
     super.initState();
+    _searchController = TextEditingController();
     Future<void>.microtask(
       () => ref.read(adminBreakfastSetsNotifierProvider.notifier).load(),
     );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -60,7 +74,7 @@ class _AdminBreakfastSetsScreenState
                     ),
                     const SizedBox(height: AppSizes.spacingXs),
                     const Text(
-                      'Set Breakfast category products only.',
+                      'Configuration controls breakfast/set behavior, not category.',
                       style: TextStyle(color: AppColors.textSecondary),
                     ),
                   ],
@@ -70,15 +84,84 @@ class _AdminBreakfastSetsScreenState
               ElevatedButton.icon(
                 key: const ValueKey<String>('breakfast-set-new'),
                 onPressed:
-                    state.hasBreakfastCategory &&
+                    state.availableCategories.isNotEmpty &&
                         !state.isLoading &&
                         !state.isCreating
                     ? _openCreateSetDialog
                     : null,
                 icon: const Icon(Icons.add_rounded),
-                label: const Text('New Set'),
+                label: const Text('New Breakfast / Set-style Product'),
               ),
             ],
+          ),
+          const SizedBox(height: AppSizes.spacingMd),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                flex: 3,
+                child: TextField(
+                  key: const ValueKey<String>('breakfast-set-search'),
+                  controller: _searchController,
+                  onChanged: (String value) => ref
+                      .read(adminBreakfastSetsNotifierProvider.notifier)
+                      .updateSearchQuery(value),
+                  decoration: InputDecoration(
+                    hintText: _searchHint,
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSizes.spacingMd),
+              SizedBox(
+                width: 220,
+                child: DropdownButtonFormField<BreakfastSetValidationFilter>(
+                  key: const ValueKey<String>(
+                    'breakfast-set-validation-filter',
+                  ),
+                  value: state.validationFilter,
+                  decoration: InputDecoration(
+                    labelText: 'Validation',
+                    filled: true,
+                    fillColor: AppColors.surface,
+                  ),
+                  items: BreakfastSetValidationFilter.values
+                      .map(
+                        (BreakfastSetValidationFilter filter) =>
+                            DropdownMenuItem<BreakfastSetValidationFilter>(
+                              value: filter,
+                              child: Text(_validationFilterLabel(filter)),
+                            ),
+                      )
+                      .toList(growable: false),
+                  onChanged: (BreakfastSetValidationFilter? value) {
+                    if (value == null) {
+                      return;
+                    }
+                    ref
+                        .read(adminBreakfastSetsNotifierProvider.notifier)
+                        .updateValidationFilter(value);
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSizes.spacingSm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '$_resultSummaryLabel ${state.items.length} of ${state.totalItemCount} products',
+              key: const ValueKey<String>('breakfast-set-result-summary'),
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           const SizedBox(height: AppSizes.spacingMd),
           Expanded(
@@ -101,16 +184,13 @@ class _AdminBreakfastSetsScreenState
                       padding: EdgeInsets.all(AppSizes.spacingXl),
                       child: Center(child: CircularProgressIndicator()),
                     )
-                  else if (!state.hasBreakfastCategory)
+                  else if (state.totalItemCount == 0)
                     const _EmptyState(
                       message:
-                          'No `Set Breakfast` category exists yet. Breakfast set roots will appear here once that category is available.',
+                          'No breakfast/set-style products have semantic configuration yet.',
                     )
                   else if (state.items.isEmpty)
-                    const _EmptyState(
-                      message:
-                          'No breakfast set-root products found in `Set Breakfast` yet.',
-                    )
+                    const _EmptyState(message: _filteredEmptyMessage)
                   else
                     ...state.items.map(
                       (AdminBreakfastSetListItem item) => Padding(
@@ -142,10 +222,14 @@ class _AdminBreakfastSetsScreenState
   }
 
   Future<void> _openCreateSetDialog() async {
+    final AdminBreakfastSetsState state = ref.read(
+      adminBreakfastSetsNotifierProvider,
+    );
     final _CreateBreakfastSetFormResult? result =
         await showDialog<_CreateBreakfastSetFormResult>(
           context: context,
-          builder: (BuildContext context) => const _CreateBreakfastSetDialog(),
+          builder: (BuildContext context) =>
+              _CreateBreakfastSetDialog(categories: state.availableCategories),
         );
     if (result == null) {
       return;
@@ -154,6 +238,7 @@ class _AdminBreakfastSetsScreenState
     final int? productId = await ref
         .read(adminBreakfastSetsNotifierProvider.notifier)
         .createBreakfastSetRoot(
+          categoryId: result.categoryId,
           name: result.name,
           priceMinor: result.priceMinor,
           isActive: result.isActive,
@@ -168,7 +253,7 @@ class _AdminBreakfastSetsScreenState
         SnackBar(
           content: Text(
             ref.read(adminBreakfastSetsNotifierProvider).errorMessage ??
-                'Failed to create breakfast set.',
+                'Failed to create breakfast / set-style product.',
           ),
         ),
       );
@@ -179,6 +264,19 @@ class _AdminBreakfastSetsScreenState
       context,
     ).showSnackBar(const SnackBar(content: Text(_createSuccessMessage)));
     context.go('/admin/breakfast-sets/$productId');
+  }
+}
+
+String _validationFilterLabel(BreakfastSetValidationFilter filter) {
+  switch (filter) {
+    case BreakfastSetValidationFilter.all:
+      return 'All';
+    case BreakfastSetValidationFilter.valid:
+      return 'Valid';
+    case BreakfastSetValidationFilter.invalid:
+      return 'Invalid';
+    case BreakfastSetValidationFilter.incomplete:
+      return 'Incomplete';
   }
 }
 
@@ -423,7 +521,9 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _CreateBreakfastSetDialog extends StatefulWidget {
-  const _CreateBreakfastSetDialog();
+  const _CreateBreakfastSetDialog({required this.categories});
+
+  final List<Category> categories;
 
   @override
   State<_CreateBreakfastSetDialog> createState() =>
@@ -434,6 +534,7 @@ class _CreateBreakfastSetDialogState extends State<_CreateBreakfastSetDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _priceController;
+  int? _categoryId;
   bool _isActive = true;
   bool _isVisibleOnPos = true;
 
@@ -456,7 +557,7 @@ class _CreateBreakfastSetDialogState extends State<_CreateBreakfastSetDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Create Breakfast Set'),
+      title: const Text('Create Breakfast / Set-style Product'),
       content: SizedBox(
         width: 420,
         child: Form(
@@ -464,14 +565,38 @@ class _CreateBreakfastSetDialogState extends State<_CreateBreakfastSetDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
+              DropdownButtonFormField<int>(
+                key: const ValueKey<String>('breakfast-set-create-category'),
+                value: _categoryId,
+                decoration: const InputDecoration(labelText: 'POS Category'),
+                hint: const Text('Choose a category'),
+                items: widget.categories
+                    .map(
+                      (Category category) => DropdownMenuItem<int>(
+                        value: category.id,
+                        child: Text(category.name),
+                      ),
+                    )
+                    .toList(growable: false),
+                onChanged: (int? value) {
+                  setState(() => _categoryId = value);
+                },
+                validator: (int? value) {
+                  if (value == null) {
+                    return 'POS category is required.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: AppSizes.spacingMd),
               TextFormField(
                 key: const ValueKey<String>('breakfast-set-create-name'),
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Set Name'),
+                decoration: const InputDecoration(labelText: 'Product Name'),
                 textInputAction: TextInputAction.next,
                 validator: (String? value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Set name is required.';
+                    return 'Product name is required.';
                   }
                   return null;
                 },
@@ -500,6 +625,14 @@ class _CreateBreakfastSetDialogState extends State<_CreateBreakfastSetDialog> {
                 },
               ),
               const SizedBox(height: AppSizes.spacingMd),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Use this for products that share the breakfast/set engine. POS category controls placement only.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+              const SizedBox(height: AppSizes.spacingMd),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _isActive,
@@ -525,7 +658,7 @@ class _CreateBreakfastSetDialogState extends State<_CreateBreakfastSetDialog> {
         ElevatedButton(
           key: const ValueKey<String>('breakfast-set-create-submit'),
           onPressed: _submit,
-          child: const Text('Create Set'),
+          child: const Text('Create Product'),
         ),
       ],
     );
@@ -546,6 +679,7 @@ class _CreateBreakfastSetDialogState extends State<_CreateBreakfastSetDialog> {
 
     Navigator.of(context).pop(
       _CreateBreakfastSetFormResult(
+        categoryId: _categoryId!,
         name: _nameController.text.trim(),
         priceMinor: priceMinor,
         isActive: _isActive,
@@ -557,12 +691,14 @@ class _CreateBreakfastSetDialogState extends State<_CreateBreakfastSetDialog> {
 
 class _CreateBreakfastSetFormResult {
   const _CreateBreakfastSetFormResult({
+    required this.categoryId,
     required this.name,
     required this.priceMinor,
     required this.isActive,
     required this.isVisibleOnPos,
   });
 
+  final int categoryId;
   final String name;
   final int priceMinor;
   final bool isActive;

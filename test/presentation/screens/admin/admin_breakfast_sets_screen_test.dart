@@ -27,7 +27,7 @@ void main() {
   });
 
   testWidgets(
-    'breakfast set list shows repository-backed valid, incomplete, and invalid roots',
+    'breakfast set list shows repository-backed valid and invalid configured roots',
     (WidgetTester tester) async {
       _setLargeView(tester);
       final AppDatabase db = createTestDatabase();
@@ -53,16 +53,10 @@ void main() {
         name: 'Set 1',
         priceMinor: 850,
       );
-      final int incompleteRootId = await insertProduct(
-        db,
-        categoryId: setBreakfastCategoryId,
-        name: 'Set 2',
-        priceMinor: 950,
-      );
       final int invalidRootId = await insertProduct(
         db,
         categoryId: setBreakfastCategoryId,
-        name: 'Set 3',
+        name: 'Set 2',
         priceMinor: 1050,
       );
 
@@ -215,7 +209,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AdminBreakfastSetsScreen), findsOneWidget);
-      expect(find.text('Breakfast Set Configuration'), findsWidgets);
+      expect(find.text('Breakfast / Set-style Products'), findsWidgets);
       expect(
         find.byKey(const ValueKey<String>('breakfast-set-new')),
         findsOneWidget,
@@ -263,25 +257,6 @@ void main() {
 
       expect(
         find.descendant(
-          of: find.byKey(
-            ValueKey<String>('breakfast-set-card-$incompleteRootId'),
-          ),
-          matching: find.text('Incomplete'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(
-            ValueKey<String>('breakfast-set-card-$incompleteRootId'),
-          ),
-          matching: find.text('Configuration not started.'),
-        ),
-        findsOneWidget,
-      );
-
-      expect(
-        find.descendant(
           of: find.byKey(ValueKey<String>('breakfast-set-card-$invalidRootId')),
           matching: find.text('Invalid'),
         ),
@@ -308,6 +283,154 @@ void main() {
     },
   );
 
+  testWidgets('breakfast set search filters by product name', (
+    WidgetTester tester,
+  ) async {
+    final _BreakfastSetFilterHarness harness =
+        await _pumpBreakfastSetFilterHarness(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('breakfast-set-search')),
+      '  sunrise combo  ',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(ValueKey<String>('breakfast-set-card-${harness.validRootId}')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        ValueKey<String>('breakfast-set-card-${harness.invalidRootId}'),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byKey(
+        ValueKey<String>('breakfast-set-card-${harness.incompleteRootId}'),
+      ),
+      findsNothing,
+    );
+    expect(find.text('Showing 1 of 3 products'), findsOneWidget);
+  });
+
+  testWidgets('breakfast set search filters by category name', (
+    WidgetTester tester,
+  ) async {
+    final _BreakfastSetFilterHarness harness =
+        await _pumpBreakfastSetFilterHarness(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('breakfast-set-search')),
+      ' brunch specials ',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(
+        ValueKey<String>('breakfast-set-card-${harness.invalidRootId}'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(ValueKey<String>('breakfast-set-card-${harness.validRootId}')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(
+        ValueKey<String>('breakfast-set-card-${harness.incompleteRootId}'),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('breakfast set validation filter narrows the list', (
+    WidgetTester tester,
+  ) async {
+    final _BreakfastSetFilterHarness harness =
+        await _pumpBreakfastSetFilterHarness(tester);
+
+    await _selectPageDropdownOption(
+      tester,
+      fieldKey: 'breakfast-set-validation-filter',
+      optionText: 'Incomplete',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(
+        ValueKey<String>('breakfast-set-card-${harness.incompleteRootId}'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(ValueKey<String>('breakfast-set-card-${harness.validRootId}')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(
+        ValueKey<String>('breakfast-set-card-${harness.invalidRootId}'),
+      ),
+      findsNothing,
+    );
+    expect(find.text('Showing 1 of 3 products'), findsOneWidget);
+  });
+
+  testWidgets('breakfast set search and validation filter combine', (
+    WidgetTester tester,
+  ) async {
+    final _BreakfastSetFilterHarness harness =
+        await _pumpBreakfastSetFilterHarness(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('breakfast-set-search')),
+      'morning',
+    );
+    await tester.pumpAndSettle();
+    await _selectPageDropdownOption(
+      tester,
+      fieldKey: 'breakfast-set-validation-filter',
+      optionText: 'Incomplete',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(
+        ValueKey<String>('breakfast-set-card-${harness.incompleteRootId}'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(ValueKey<String>('breakfast-set-card-${harness.validRootId}')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(
+        ValueKey<String>('breakfast-set-card-${harness.invalidRootId}'),
+      ),
+      findsNothing,
+    );
+    expect(find.text('Showing 1 of 3 products'), findsOneWidget);
+  });
+
+  testWidgets('breakfast set empty state renders when filters match nothing', (
+    WidgetTester tester,
+  ) async {
+    await _pumpBreakfastSetFilterHarness(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('breakfast-set-search')),
+      'no-such-breakfast-set',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('No breakfast/set-style products match your filters.'),
+      findsOneWidget,
+    );
+    expect(find.text('Showing 0 of 3 products'), findsOneWidget);
+  });
+
   testWidgets(
     'breakfast set new button opens a real create dialog with validation',
     (WidgetTester tester) async {
@@ -316,10 +439,8 @@ void main() {
       addTearDown(db.close);
 
       await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
-      final int setBreakfastCategoryId = await insertCategory(
-        db,
-        name: 'Set Breakfast',
-      );
+      await insertCategory(db, name: 'Set Breakfast');
+      await insertCategory(db, name: 'Pancake Breakfast');
 
       final ProviderContainer container = ProviderContainer(
         overrides: <Override>[
@@ -344,7 +465,11 @@ void main() {
       await tester.tap(find.byKey(const ValueKey<String>('breakfast-set-new')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Create Breakfast Set'), findsOneWidget);
+      expect(find.text('Create Breakfast / Set-style Product'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('breakfast-set-create-category')),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const ValueKey<String>('breakfast-set-create-name')),
         findsOneWidget,
@@ -363,9 +488,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Set name is required.'), findsOneWidget);
+      expect(find.text('POS category is required.'), findsOneWidget);
+      expect(find.text('Product name is required.'), findsOneWidget);
       expect(find.text('Enter a valid base price.'), findsNothing);
 
+      await _selectDialogDropdownOption(
+        tester,
+        fieldKey: 'breakfast-set-create-category',
+        optionText: 'Pancake Breakfast',
+      );
       await tester.enterText(
         find.byKey(const ValueKey<String>('breakfast-set-create-name')),
         'Set New',
@@ -380,7 +511,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Enter a valid base price.'), findsOneWidget);
-      expect(find.text('Create Breakfast Set'), findsOneWidget);
+      expect(find.text('Create Breakfast / Set-style Product'), findsOneWidget);
     },
   );
 
@@ -395,6 +526,10 @@ void main() {
       final int setBreakfastCategoryId = await insertCategory(
         db,
         name: 'Set Breakfast',
+      );
+      final int pancakeBreakfastCategoryId = await insertCategory(
+        db,
+        name: 'Pancake Breakfast',
       );
       final int breakfastItemsCategoryId = await insertCategory(
         db,
@@ -458,6 +593,11 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey<String>('breakfast-set-new')));
       await tester.pumpAndSettle();
+      await _selectDialogDropdownOption(
+        tester,
+        fieldKey: 'breakfast-set-create-category',
+        optionText: 'Pancake Breakfast',
+      );
 
       await tester.enterText(
         find.byKey(const ValueKey<String>('breakfast-set-create-name')),
@@ -475,20 +615,26 @@ void main() {
       expect(find.byType(AdminBreakfastSetEditorScreen), findsOneWidget);
       expect(
         find.text(
-          'Breakfast set created. Configure included items and choices.',
+          'Breakfast / set-style product created. Configure included items and choices.',
         ),
         findsOneWidget,
       );
 
       final products = await ProductRepository(
         db,
-      ).getByCategory(setBreakfastCategoryId, activeOnly: false);
+      ).getByCategory(pancakeBreakfastCategoryId, activeOnly: false);
       expect(products, hasLength(1));
       expect(products.single.name, 'Set Fresh');
       expect(products.single.priceMinor, 950);
       expect(products.single.isActive, isTrue);
       expect(products.single.isVisibleOnPos, isTrue);
       expect(products.single.hasModifiers, isFalse);
+      expect(
+        await ProductRepository(
+          db,
+        ).getByCategory(setBreakfastCategoryId, activeOnly: false),
+        isEmpty,
+      );
 
       final BreakfastConfigurationRepository breakfastRepository =
           BreakfastConfigurationRepository(db);
@@ -563,30 +709,6 @@ void main() {
         ),
         findsOneWidget,
       );
-
-      container.read(appRouterProvider).go('/admin/products');
-      await tester.pumpAndSettle();
-
-      final Finder productTile = find.byKey(
-        ValueKey<String>('product-tile-${products.single.id}'),
-      );
-      expect(productTile, findsOneWidget);
-      expect(
-        find.descendant(
-          of: productTile,
-          matching: find.text('Type: Set Product'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: productTile,
-          matching: find.byKey(
-            ValueKey<String>('product-set-builder-${products.single.id}'),
-          ),
-        ),
-        findsOneWidget,
-      );
     },
   );
 
@@ -622,6 +744,11 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey<String>('breakfast-set-new')));
       await tester.pumpAndSettle();
+      await _selectDialogDropdownOption(
+        tester,
+        fieldKey: 'breakfast-set-create-category',
+        optionText: 'Set Breakfast',
+      );
 
       await tester.enterText(
         find.byKey(const ValueKey<String>('breakfast-set-create-name')),
@@ -710,6 +837,11 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey<String>('breakfast-set-new')));
       await tester.pumpAndSettle();
+      await _selectDialogDropdownOption(
+        tester,
+        fieldKey: 'breakfast-set-create-category',
+        optionText: 'Set Breakfast',
+      );
       await tester.enterText(
         find.byKey(const ValueKey<String>('breakfast-set-create-name')),
         'Set Empty Pool',
@@ -779,74 +911,90 @@ void main() {
     },
   );
 
-  testWidgets('breakfast set create blocks duplicate names in Set Breakfast', (
-    WidgetTester tester,
-  ) async {
-    _setLargeView(tester);
-    final AppDatabase db = createTestDatabase();
-    addTearDown(db.close);
+  testWidgets(
+    'breakfast set create blocks duplicate names in the selected category',
+    (WidgetTester tester) async {
+      _setLargeView(tester);
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
 
-    await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
-    final int setBreakfastCategoryId = await insertCategory(
-      db,
-      name: 'Set Breakfast',
-    );
-    await insertProduct(
-      db,
-      categoryId: setBreakfastCategoryId,
-      name: 'Set Existing',
-      priceMinor: 800,
-    );
+      await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+      final int setBreakfastCategoryId = await insertCategory(
+        db,
+        name: 'Set Breakfast',
+      );
+      final int pancakeBreakfastCategoryId = await insertCategory(
+        db,
+        name: 'Pancake Breakfast',
+      );
+      await insertProduct(
+        db,
+        categoryId: pancakeBreakfastCategoryId,
+        name: 'Set Existing',
+        priceMinor: 800,
+      );
 
-    final ProviderContainer container = ProviderContainer(
-      overrides: <Override>[
-        appDatabaseProvider.overrideWithValue(db),
-        sharedPreferencesProvider.overrideWithValue(_testPrefs),
-      ],
-    );
-    addTearDown(container.dispose);
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(_testPrefs),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const _TestRouterApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await _loginWithPin(tester, '9999');
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _TestRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _loginWithPin(tester, '9999');
 
-    container.read(appRouterProvider).go('/admin/breakfast-sets');
-    await tester.pumpAndSettle();
+      container.read(appRouterProvider).go('/admin/breakfast-sets');
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey<String>('breakfast-set-new')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey<String>('breakfast-set-new')));
+      await tester.pumpAndSettle();
+      await _selectDialogDropdownOption(
+        tester,
+        fieldKey: 'breakfast-set-create-category',
+        optionText: 'Pancake Breakfast',
+      );
 
-    await tester.enterText(
-      find.byKey(const ValueKey<String>('breakfast-set-create-name')),
-      'Set Existing',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey<String>('breakfast-set-create-price')),
-      '10.00',
-    );
-    await tester.tap(
-      find.byKey(const ValueKey<String>('breakfast-set-create-submit')),
-    );
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('breakfast-set-create-name')),
+        'Set Existing',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('breakfast-set-create-price')),
+        '10.00',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey<String>('breakfast-set-create-submit')),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byType(AdminBreakfastSetsScreen), findsOneWidget);
-    expect(
-      find.text(
-        'A breakfast set with this name already exists in Set Breakfast.',
-      ),
-      findsWidgets,
-    );
+      expect(find.byType(AdminBreakfastSetsScreen), findsOneWidget);
+      expect(
+        find.text(
+          'A breakfast / set-style product with this name already exists in Pancake Breakfast.',
+        ),
+        findsWidgets,
+      );
 
-    final products = await ProductRepository(
-      db,
-    ).getByCategory(setBreakfastCategoryId, activeOnly: false);
-    expect(products, hasLength(1));
-  });
+      final products = await ProductRepository(
+        db,
+      ).getByCategory(pancakeBreakfastCategoryId, activeOnly: false);
+      expect(products, hasLength(1));
+      expect(
+        await ProductRepository(
+          db,
+        ).getByCategory(setBreakfastCategoryId, activeOnly: false),
+        isEmpty,
+      );
+    },
+  );
 
   testWidgets(
     'breakfast set list treats saved required choice groups the same way as the editor',
@@ -974,6 +1122,46 @@ class _TestRouterApp extends ConsumerWidget {
   }
 }
 
+Future<_BreakfastSetFilterHarness> _pumpBreakfastSetFilterHarness(
+  WidgetTester tester,
+) async {
+  _setLargeView(tester);
+  final AppDatabase db = createTestDatabase();
+  addTearDown(db.close);
+  final _BreakfastSetFilterFixture fixture = await _seedBreakfastSetFilterData(
+    db,
+  );
+
+  final ProviderContainer container = ProviderContainer(
+    overrides: <Override>[
+      appDatabaseProvider.overrideWithValue(db),
+      sharedPreferencesProvider.overrideWithValue(_testPrefs),
+    ],
+  );
+  addTearDown(container.dispose);
+
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: const _TestRouterApp(),
+    ),
+  );
+  await tester.pumpAndSettle();
+  await _loginWithPin(tester, '9999');
+
+  container.read(appRouterProvider).go('/admin/breakfast-sets');
+  await tester.pumpAndSettle();
+
+  expect(find.byType(AdminBreakfastSetsScreen), findsOneWidget);
+  expect(find.text('Showing 3 of 3 products'), findsOneWidget);
+
+  return _BreakfastSetFilterHarness(
+    validRootId: fixture.validRootId,
+    invalidRootId: fixture.invalidRootId,
+    incompleteRootId: fixture.incompleteRootId,
+  );
+}
+
 Future<void> _loginWithPin(WidgetTester tester, String pin) async {
   await tester.enterText(find.byType(TextField), pin);
   await tester.tap(find.text(AppStrings.loginButton));
@@ -981,9 +1169,215 @@ Future<void> _loginWithPin(WidgetTester tester, String pin) async {
   expect(find.byType(PosScreen), findsOneWidget);
 }
 
+Future<void> _selectDialogDropdownOption(
+  WidgetTester tester, {
+  required String fieldKey,
+  required String optionText,
+}) async {
+  await _selectPageDropdownOption(
+    tester,
+    fieldKey: fieldKey,
+    optionText: optionText,
+  );
+}
+
+Future<void> _selectPageDropdownOption(
+  WidgetTester tester, {
+  required String fieldKey,
+  required String optionText,
+}) async {
+  await tester.tap(find.byKey(ValueKey<String>(fieldKey)));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(optionText).last);
+  await tester.pumpAndSettle();
+}
+
 void _setLargeView(WidgetTester tester) {
   tester.view.physicalSize = const Size(1440, 2200);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Future<_BreakfastSetFilterFixture> _seedBreakfastSetFilterData(
+  AppDatabase db,
+) async {
+  await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+  final int setBreakfastCategoryId = await insertCategory(
+    db,
+    name: 'Set Breakfast',
+  );
+  final int pancakeBreakfastCategoryId = await insertCategory(
+    db,
+    name: 'Pancake Breakfast',
+  );
+  final int brunchSpecialsCategoryId = await insertCategory(
+    db,
+    name: 'Brunch Specials',
+  );
+  final int breakfastItemsCategoryId = await insertCategory(
+    db,
+    name: 'Breakfast Items',
+  );
+  final int hotDrinksCategoryId = await insertCategory(db, name: 'Hot Drinks');
+
+  final int validRootId = await insertProduct(
+    db,
+    categoryId: pancakeBreakfastCategoryId,
+    name: 'Sunrise Combo',
+    priceMinor: 850,
+  );
+  final int invalidRootId = await insertProduct(
+    db,
+    categoryId: brunchSpecialsCategoryId,
+    name: 'Brunch Combo',
+    priceMinor: 1050,
+  );
+  final int incompleteRootId = await insertProduct(
+    db,
+    categoryId: setBreakfastCategoryId,
+    name: 'Morning Starter',
+    priceMinor: 920,
+  );
+
+  final int eggId = await insertProduct(
+    db,
+    categoryId: breakfastItemsCategoryId,
+    name: 'Egg',
+    priceMinor: 120,
+  );
+  final int baconId = await insertProduct(
+    db,
+    categoryId: breakfastItemsCategoryId,
+    name: 'Bacon',
+    priceMinor: 180,
+  );
+  final int teaId = await insertProduct(
+    db,
+    categoryId: hotDrinksCategoryId,
+    name: 'Tea',
+    priceMinor: 150,
+  );
+  final int coffeeId = await insertProduct(
+    db,
+    categoryId: hotDrinksCategoryId,
+    name: 'Coffee',
+    priceMinor: 180,
+  );
+
+  await db
+      .into(db.setItems)
+      .insert(
+        SetItemsCompanion.insert(
+          productId: validRootId,
+          itemProductId: eggId,
+          defaultQuantity: const Value<int>(1),
+          sortOrder: const Value<int>(0),
+        ),
+      );
+  final int validChoiceGroupId = await db
+      .into(db.modifierGroups)
+      .insert(
+        ModifierGroupsCompanion.insert(
+          productId: validRootId,
+          name: 'Tea or Coffee',
+        ),
+      );
+  await db
+      .into(db.productModifiers)
+      .insert(
+        ProductModifiersCompanion.insert(
+          productId: validRootId,
+          groupId: Value<int?>(validChoiceGroupId),
+          itemProductId: Value<int?>(teaId),
+          name: 'Tea',
+          type: 'choice',
+        ),
+      );
+  await db
+      .into(db.productModifiers)
+      .insert(
+        ProductModifiersCompanion.insert(
+          productId: validRootId,
+          groupId: Value<int?>(validChoiceGroupId),
+          itemProductId: Value<int?>(coffeeId),
+          name: 'Coffee',
+          type: 'choice',
+        ),
+      );
+
+  await db
+      .into(db.setItems)
+      .insert(
+        SetItemsCompanion.insert(
+          productId: invalidRootId,
+          itemProductId: validRootId,
+          defaultQuantity: const Value<int>(1),
+          sortOrder: const Value<int>(0),
+        ),
+      );
+
+  await db
+      .into(db.setItems)
+      .insert(
+        SetItemsCompanion.insert(
+          productId: incompleteRootId,
+          itemProductId: baconId,
+          defaultQuantity: const Value<int>(1),
+          sortOrder: const Value<int>(0),
+        ),
+      );
+  final int incompleteChoiceGroupId = await db
+      .into(db.modifierGroups)
+      .insert(
+        ModifierGroupsCompanion.insert(
+          productId: incompleteRootId,
+          name: 'Optional Drink',
+          minSelect: const Value<int>(0),
+          maxSelect: const Value<int>(1),
+          includedQuantity: const Value<int>(1),
+          sortOrder: const Value<int>(0),
+        ),
+      );
+  await db
+      .into(db.productModifiers)
+      .insert(
+        ProductModifiersCompanion.insert(
+          productId: incompleteRootId,
+          groupId: Value<int?>(incompleteChoiceGroupId),
+          itemProductId: Value<int?>(teaId),
+          name: 'Tea',
+          type: 'choice',
+        ),
+      );
+
+  return _BreakfastSetFilterFixture(
+    validRootId: validRootId,
+    invalidRootId: invalidRootId,
+    incompleteRootId: incompleteRootId,
+  );
+}
+
+class _BreakfastSetFilterHarness {
+  const _BreakfastSetFilterHarness({
+    required this.validRootId,
+    required this.invalidRootId,
+    required this.incompleteRootId,
+  });
+
+  final int validRootId;
+  final int invalidRootId;
+  final int incompleteRootId;
+}
+
+class _BreakfastSetFilterFixture {
+  const _BreakfastSetFilterFixture({
+    required this.validRootId,
+    required this.invalidRootId,
+    required this.incompleteRootId,
+  });
+
+  final int validRootId;
+  final int invalidRootId;
+  final int incompleteRootId;
 }

@@ -222,7 +222,7 @@ void main() {
   );
 
   testWidgets(
-    'breakfast set editor keeps save disabled for an incomplete draft',
+    'breakfast set editor keeps save disabled when configured choice groups are all optional',
     (WidgetTester tester) async {
       _setLargeView(tester);
       final AppDatabase db = createTestDatabase();
@@ -325,7 +325,9 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('This set has no required choice groups defined.'),
+        find.text(
+          'Configured choice groups are all optional. Confirm that this product does not require a mandatory choice.',
+        ),
         findsOneWidget,
       );
 
@@ -333,6 +335,84 @@ void main() {
         find.byKey(const ValueKey<String>('breakfast-editor-save')),
       );
       expect(saveButton.onPressed, isNull);
+    },
+  );
+
+  testWidgets(
+    'breakfast set editor enables save for a valid fixed-set draft with no choice groups',
+    (WidgetTester tester) async {
+      _setLargeView(tester);
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+
+      await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+      final int brunchCategoryId = await insertCategory(
+        db,
+        name: 'Chef Specials',
+      );
+      final int breakfastItemsCategoryId = await insertCategory(
+        db,
+        name: 'Breakfast Items',
+      );
+      final int rootProductId = await insertProduct(
+        db,
+        categoryId: brunchCategoryId,
+        name: 'Fixed Brunch Plate',
+        priceMinor: 1195,
+      );
+      final int eggId = await insertProduct(
+        db,
+        categoryId: breakfastItemsCategoryId,
+        name: 'Egg',
+        priceMinor: 120,
+      );
+
+      await db
+          .into(db.setItems)
+          .insert(
+            SetItemsCompanion.insert(
+              productId: rootProductId,
+              itemProductId: eggId,
+              defaultQuantity: const Value<int>(1),
+              sortOrder: const Value<int>(0),
+            ),
+          );
+
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(_testPrefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _TestRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _loginWithPin(tester, '9999');
+
+      container
+          .read(appRouterProvider)
+          .go('/admin/breakfast-sets/$rootProductId');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Valid'), findsOneWidget);
+      expect(find.text('Draft is valid. Save is available.'), findsOneWidget);
+      expect(
+        find.text(
+          'Configured choice groups are all optional. Confirm that this product does not require a mandatory choice.',
+        ),
+        findsNothing,
+      );
+
+      final ElevatedButton saveButton = tester.widget<ElevatedButton>(
+        find.byKey(const ValueKey<String>('breakfast-editor-save')),
+      );
+      expect(saveButton.onPressed, isNotNull);
     },
   );
 
