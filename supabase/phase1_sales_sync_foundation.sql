@@ -51,6 +51,10 @@ create table if not exists public.transaction_lines (
   product_name text not null,
   unit_price_minor integer not null check (unit_price_minor >= 0),
   quantity integer not null check (quantity > 0),
+  pricing_mode text not null default 'standard'
+    check (pricing_mode in ('standard', 'set')),
+  removal_discount_total_minor integer not null default 0
+    check (removal_discount_total_minor >= 0),
   line_total_minor integer not null check (line_total_minor >= 0)
 );
 
@@ -58,9 +62,34 @@ create table if not exists public.order_modifiers (
   uuid uuid primary key,
   transaction_line_uuid uuid not null
     references public.transaction_lines (uuid) on delete restrict,
-  action text not null check (action in ('remove', 'add')),
+  action text not null check (action in ('remove', 'add', 'choice')),
   item_name text not null,
-  extra_price_minor integer not null default 0 check (extra_price_minor >= 0)
+  extra_price_minor integer not null default 0 check (extra_price_minor >= 0),
+  quantity integer not null default 1 check (quantity > 0),
+  item_product_id bigint null,
+  charge_reason text null
+    check (
+      charge_reason is null or
+      charge_reason in (
+        'extra_add',
+        'free_swap',
+        'paid_swap',
+        'included_choice',
+        'removal_discount',
+        'combo_discount'
+      )
+    ),
+  unit_price_minor integer not null default 0 check (unit_price_minor >= 0),
+  price_effect_minor integer not null default 0,
+  sort_key integer not null default 0,
+  price_behavior text null
+    check (price_behavior is null or price_behavior in ('free', 'paid')),
+  ui_section text null
+    check (
+      ui_section is null or
+      ui_section in ('toppings', 'sauces', 'add_ins')
+    ),
+  check (action != 'choice' or charge_reason = 'included_choice')
 );
 
 create table if not exists public.payments (

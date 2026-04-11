@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/data/database/app_database.dart' as app_db;
 import 'package:epos_app/data/repositories/breakfast_configuration_repository.dart';
+import 'package:epos_app/data/repositories/product_repository.dart';
 import 'package:epos_app/domain/models/breakfast_line_edit.dart';
 import 'package:epos_app/domain/models/breakfast_rebuild.dart';
 import 'package:epos_app/domain/models/product.dart';
@@ -13,6 +14,61 @@ import '../../support/test_database.dart';
 
 void main() {
   group('BreakfastPosService', () {
+    test(
+      'normal product with product-linked flat modifiers stays on legacy flat popup path',
+      () async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final BreakfastPosService service = BreakfastPosService(
+          breakfastConfigurationRepository: BreakfastConfigurationRepository(
+            db,
+          ),
+        );
+
+        final int categoryId = await insertCategory(db, name: 'Burgers');
+        final int rootProductId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Burger',
+          priceMinor: 700,
+          hasModifiers: true,
+        );
+        final int chipsProductId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Chips',
+          priceMinor: 150,
+          isVisibleOnPos: false,
+        );
+        final Product rootProduct = (await ProductRepository(
+          db,
+        ).getById(rootProductId))!;
+
+        await db
+            .into(db.productModifiers)
+            .insert(
+              app_db.ProductModifiersCompanion.insert(
+                productId: rootProductId,
+                itemProductId: Value<int?>(chipsProductId),
+                name: 'Chips',
+                type: 'extra',
+                extraPriceMinor: const Value<int>(150),
+                priceBehavior: const Value<String?>('paid'),
+                uiSection: const Value<String?>('add_ins'),
+              ),
+            );
+
+        expect(
+          await service.getSelectionPath(rootProduct),
+          PosProductSelectionPath.legacyFlat,
+        );
+        await expectLater(
+          () => service.loadEditorData(product: rootProduct),
+          throwsA(isA<ValidationException>()),
+        );
+      },
+    );
+
     test(
       'configured breakfast products route to the semantic bundle engine regardless of category',
       () async {
@@ -103,39 +159,44 @@ void main() {
       },
     );
 
-    test('explicit none is allowed for required-answer grouped choices', () async {
-      final app_db.AppDatabase db = createTestDatabase();
-      addTearDown(db.close);
-      final _BreakfastPosFixture fixture = await _seedBreakfastPosFixture(
-        db,
-        explicitNoneLabel: 'No drink',
-      );
-      final BreakfastPosService service = BreakfastPosService(
-        breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
-      );
+    test(
+      'explicit none is allowed for required-answer grouped choices',
+      () async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final _BreakfastPosFixture fixture = await _seedBreakfastPosFixture(
+          db,
+          explicitNoneLabel: 'No drink',
+        );
+        final BreakfastPosService service = BreakfastPosService(
+          breakfastConfigurationRepository: BreakfastConfigurationRepository(
+            db,
+          ),
+        );
 
-      final BreakfastPosEditorData initial = await service.loadEditorData(
-        product: fixture.rootProduct,
-      );
+        final BreakfastPosEditorData initial = await service.loadEditorData(
+          product: fixture.rootProduct,
+        );
 
-      final BreakfastPosSelectionPreview preview = service.previewSelection(
-        product: fixture.rootProduct,
-        configuration: initial.configuration,
-        requestedState: BreakfastRequestedState(
-          chosenGroups: <BreakfastChosenGroupRequest>[
-            BreakfastChosenGroupRequest(
-              groupId: fixture.drinkGroupId,
-              selectedItemProductId: null,
-              requestedQuantity: 1,
-            ),
-          ],
-        ),
-      );
+        final BreakfastPosSelectionPreview preview = service.previewSelection(
+          product: fixture.rootProduct,
+          configuration: initial.configuration,
+          requestedState: BreakfastRequestedState(
+            chosenGroups: <BreakfastChosenGroupRequest>[
+              BreakfastChosenGroupRequest(
+                groupId: fixture.drinkGroupId,
+                selectedItemProductId: null,
+                requestedQuantity: 1,
+              ),
+            ],
+          ),
+        );
 
-      expect(preview.canConfirm, isTrue);
-      expect(preview.validationMessages, isEmpty);
-      expect(preview.rebuildResult.lineSnapshot.lineTotalMinor, 600);
-    });
+        expect(preview.canConfirm, isTrue);
+        expect(preview.validationMessages, isEmpty);
+        expect(preview.rebuildResult.lineSnapshot.lineTotalMinor, 600);
+      },
+    );
 
     test(
       'explicit none remains available when the group is configured for it',

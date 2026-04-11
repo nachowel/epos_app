@@ -88,6 +88,32 @@ void main() {
       );
     });
 
+    test(
+      'assignProfileToProduct rejects breakfast semantic roots before saving',
+      () async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final _AdminFixture fixture = await _seedAdminFixture(db);
+        final MealAdjustmentAdminService service = _createService(db);
+
+        await expectLater(
+          service.assignProfileToProduct(
+            productId: fixture.breakfastProductId,
+            profileId: fixture.profileId,
+          ),
+          throwsA(
+            isA<MealAdjustmentProfileValidationException>().having(
+              (MealAdjustmentProfileValidationException error) => error.message,
+              'message',
+              contains(
+                'Product "Set Breakfast" cannot use meal-adjustment profile "Burger Meal Profile" because it is configured as a breakfast semantic root product.',
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
     test('previewEvaluation returns persistence-ready snapshot', () async {
       final app_db.AppDatabase db = createTestDatabase();
       addTearDown(db.close);

@@ -18,6 +18,8 @@ class AdminMealProfilesScreen extends ConsumerStatefulWidget {
 
 class _AdminMealProfilesScreenState
     extends ConsumerState<AdminMealProfilesScreen> {
+  _MealProfileFilter _filter = _MealProfileFilter.all;
+
   @override
   void initState() {
     super.initState();
@@ -28,8 +30,21 @@ class _AdminMealProfilesScreenState
 
   @override
   Widget build(BuildContext context) {
-    final AdminMealProfilesState state =
-        ref.watch(adminMealProfilesNotifierProvider);
+    final AdminMealProfilesState state = ref.watch(
+      adminMealProfilesNotifierProvider,
+    );
+    final List<MealAdjustmentProfile> visibleProfiles = state.profiles
+        .where((MealAdjustmentProfile profile) {
+          switch (_filter) {
+            case _MealProfileFilter.all:
+              return true;
+            case _MealProfileFilter.standard:
+              return profile.kind == MealAdjustmentProfileKind.standard;
+            case _MealProfileFilter.sandwich:
+              return profile.kind == MealAdjustmentProfileKind.sandwich;
+          }
+        })
+        .toList(growable: false);
 
     return AdminScaffold(
       title: 'Meal Profiles',
@@ -40,7 +55,7 @@ class _AdminMealProfilesScreenState
             children: <Widget>[
               Expanded(
                 child: Text(
-                  'Manage meal customization profiles. Create, duplicate, archive, or delete profiles and assign them to products.',
+                  'Manage both Standard Meal Profiles and Sandwich Profiles here. Create, duplicate, archive, or assign profiles without leaving the Meal Profiles screen.',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: AppSizes.fontSm,
@@ -57,6 +72,46 @@ class _AdminMealProfilesScreenState
             ],
           ),
           const SizedBox(height: AppSizes.spacingMd),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: AppSizes.spacingSm,
+              runSpacing: AppSizes.spacingSm,
+              children: <Widget>[
+                _ProfileFilterChip(
+                  key: const ValueKey<String>('meal-profile-filter-all'),
+                  label: 'All',
+                  selected: _filter == _MealProfileFilter.all,
+                  onSelected: () {
+                    setState(() {
+                      _filter = _MealProfileFilter.all;
+                    });
+                  },
+                ),
+                _ProfileFilterChip(
+                  key: const ValueKey<String>('meal-profile-filter-standard'),
+                  label: 'Standard',
+                  selected: _filter == _MealProfileFilter.standard,
+                  onSelected: () {
+                    setState(() {
+                      _filter = _MealProfileFilter.standard;
+                    });
+                  },
+                ),
+                _ProfileFilterChip(
+                  key: const ValueKey<String>('meal-profile-filter-sandwich'),
+                  label: 'Sandwich',
+                  selected: _filter == _MealProfileFilter.sandwich,
+                  onSelected: () {
+                    setState(() {
+                      _filter = _MealProfileFilter.sandwich;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSizes.spacingMd),
           if (state.errorMessage != null)
             _MessageBanner(
               message: state.errorMessage!,
@@ -71,41 +126,45 @@ class _AdminMealProfilesScreenState
             child: state.isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : state.profiles.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No meal profiles yet. Create one to get started.',
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => ref
-                            .read(adminMealProfilesNotifierProvider.notifier)
-                            .load(),
-                        child: ListView.builder(
-                          itemCount: state.profiles.length,
-                          itemBuilder: (BuildContext context, int index) {
-                            final MealAdjustmentProfile profile =
-                                state.profiles[index];
-                            return _ProfileCard(
-                              profile: profile,
-                              productCount:
-                                  state.productCountByProfileId[profile.id] ??
-                                  0,
-                              healthStatus:
-                                  state.healthByProfileId[profile.id] ??
-                                  MealAdjustmentHealthStatus.invalid,
-                              isSaving: state.isSaving,
-                              onEdit: () => context.go(
-                                '/admin/meal-profiles/${profile.id}',
-                              ),
-                              onDuplicate: () => _duplicateProfile(profile),
-                              onArchive: () => _archiveProfile(profile),
-                              onDelete: () =>
-                                  _confirmDeleteProfile(profile, state),
-                            );
-                          },
-                        ),
-                      ),
+                ? const Center(
+                    child: Text(
+                      'No meal profiles yet. Create one to get started.',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  )
+                : visibleProfiles.isEmpty
+                ? Center(
+                    child: Text(
+                      'No ${_filterEmptyStateLabel(_filter)} profiles match this filter.',
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: () => ref
+                        .read(adminMealProfilesNotifierProvider.notifier)
+                        .load(),
+                    child: ListView.builder(
+                      itemCount: visibleProfiles.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        final MealAdjustmentProfile profile =
+                            visibleProfiles[index];
+                        return _ProfileCard(
+                          profile: profile,
+                          productCount:
+                              state.productCountByProfileId[profile.id] ?? 0,
+                          healthStatus:
+                              state.healthByProfileId[profile.id] ??
+                              MealAdjustmentHealthStatus.invalid,
+                          isSaving: state.isSaving,
+                          onEdit: () =>
+                              context.go('/admin/meal-profiles/${profile.id}'),
+                          onDuplicate: () => _duplicateProfile(profile),
+                          onArchive: () => _archiveProfile(profile),
+                          onDelete: () => _confirmDeleteProfile(profile, state),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -113,18 +172,23 @@ class _AdminMealProfilesScreenState
   }
 
   Future<void> _showCreateDialog() async {
-    final _CreateProfileResult? result =
-        await showDialog<_CreateProfileResult>(
+    final MealAdjustmentProfileKind? kind =
+        await showDialog<MealAdjustmentProfileKind>(
           context: context,
-          builder: (BuildContext context) => const _CreateProfileDialog(),
+          builder: (BuildContext context) => const _ProfileTypePickerDialog(),
         );
+    if (kind == null || !mounted) return;
+    final _CreateProfileResult? result = await showDialog<_CreateProfileResult>(
+      context: context,
+      builder: (BuildContext context) => _CreateProfileDialog(kind: kind),
+    );
     if (result == null) return;
     final int? profileId = await ref
         .read(adminMealProfilesNotifierProvider.notifier)
         .createProfile(
           name: result.name,
-          description:
-              result.description.isEmpty ? null : result.description,
+          description: result.description.isEmpty ? null : result.description,
+          kind: result.kind,
           freeSwapLimit: result.freeSwapLimit,
         );
     if (profileId != null && mounted) {
@@ -175,8 +239,7 @@ class _AdminMealProfilesScreenState
     MealAdjustmentProfile profile,
     AdminMealProfilesState state,
   ) async {
-    final int productCount =
-        state.productCountByProfileId[profile.id] ?? 0;
+    final int productCount = state.productCountByProfileId[profile.id] ?? 0;
     if (productCount > 0) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -243,6 +306,7 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isSandwich = profile.kind == MealAdjustmentProfileKind.sandwich;
     return Opacity(
       opacity: profile.isActive ? 1 : 0.62,
       child: Card(
@@ -278,6 +342,10 @@ class _ProfileCard extends StatelessWidget {
                         : AppColors.textSecondary,
                   ),
                   _StatusChip(
+                    label: _profileKindBadgeLabel(profile.kind),
+                    color: isSandwich ? AppColors.primary : AppColors.success,
+                  ),
+                  _StatusChip(
                     label: 'Health: ${healthStatus.name}',
                     color: _healthColor(healthStatus),
                   ),
@@ -287,11 +355,25 @@ class _ProfileCard extends StatelessWidget {
                         ? AppColors.primary
                         : AppColors.textSecondary,
                   ),
-                  _StatusChip(
-                    label: 'Free swaps: ${profile.freeSwapLimit}',
-                    color: AppColors.textSecondary,
-                  ),
+                  if (isSandwich)
+                    const _StatusChip(
+                      label: 'Bread + sauce + toast flow',
+                      color: AppColors.textSecondary,
+                    )
+                  else
+                    _StatusChip(
+                      label: 'Free swaps: ${profile.freeSwapLimit}',
+                      color: AppColors.textSecondary,
+                    ),
                 ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _profileKindSummary(profile.kind),
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -310,17 +392,14 @@ class _ProfileCard extends StatelessWidget {
               ),
               if (profile.isActive)
                 OutlinedButton(
-                  key: ValueKey<String>(
-                    'meal-profile-archive-${profile.id}',
-                  ),
+                  key: ValueKey<String>('meal-profile-archive-${profile.id}'),
                   onPressed: isSaving ? null : onArchive,
                   child: const Text('Archive'),
                 ),
               TextButton(
                 key: ValueKey<String>('meal-profile-del-${profile.id}'),
                 onPressed: isSaving ? null : onDelete,
-                style:
-                    TextButton.styleFrom(foregroundColor: AppColors.error),
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
                 child: const Text('Delete'),
               ),
             ],
@@ -339,16 +418,20 @@ class _CreateProfileResult {
   const _CreateProfileResult({
     required this.name,
     required this.description,
+    required this.kind,
     required this.freeSwapLimit,
   });
 
   final String name;
   final String description;
+  final MealAdjustmentProfileKind kind;
   final int freeSwapLimit;
 }
 
 class _CreateProfileDialog extends StatefulWidget {
-  const _CreateProfileDialog();
+  const _CreateProfileDialog({required this.kind});
+
+  final MealAdjustmentProfileKind kind;
 
   @override
   State<_CreateProfileDialog> createState() => _CreateProfileDialogState();
@@ -357,8 +440,9 @@ class _CreateProfileDialog extends StatefulWidget {
 class _CreateProfileDialogState extends State<_CreateProfileDialog> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _freeSwapController =
-      TextEditingController(text: '0');
+  final TextEditingController _freeSwapController = TextEditingController(
+    text: '0',
+  );
 
   @override
   void dispose() {
@@ -370,13 +454,16 @@ class _CreateProfileDialogState extends State<_CreateProfileDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isSandwich = widget.kind == MealAdjustmentProfileKind.sandwich;
     return AlertDialog(
-      title: const Text('Create Meal Profile'),
+      title: Text('Create ${_profileKindName(widget.kind)}'),
       content: SizedBox(
         width: 420,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
+            _CreateProfileHelperBanner(kind: widget.kind),
+            const SizedBox(height: AppSizes.spacingSm),
             TextField(
               key: const ValueKey<String>('meal-profile-create-name'),
               controller: _nameController,
@@ -391,15 +478,15 @@ class _CreateProfileDialogState extends State<_CreateProfileDialog> {
                 labelText: 'Description (optional)',
               ),
             ),
-            const SizedBox(height: AppSizes.spacingSm),
-            TextField(
-              key: const ValueKey<String>('meal-profile-create-swaps'),
-              controller: _freeSwapController,
-              decoration: const InputDecoration(
-                labelText: 'Free swap limit',
+            if (!isSandwich) ...<Widget>[
+              const SizedBox(height: AppSizes.spacingSm),
+              TextField(
+                key: const ValueKey<String>('meal-profile-create-swaps'),
+                controller: _freeSwapController,
+                decoration: const InputDecoration(labelText: 'Free swap limit'),
+                keyboardType: TextInputType.number,
               ),
-              keyboardType: TextInputType.number,
-            ),
+            ],
           ],
         ),
       ),
@@ -417,6 +504,7 @@ class _CreateProfileDialogState extends State<_CreateProfileDialog> {
               _CreateProfileResult(
                 name: name,
                 description: _descriptionController.text.trim(),
+                kind: widget.kind,
                 freeSwapLimit:
                     int.tryParse(_freeSwapController.text.trim()) ?? 0,
               ),
@@ -462,6 +550,159 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
+class _ProfileFilterChip extends StatelessWidget {
+  const _ProfileFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+    );
+  }
+}
+
+class _ProfileTypePickerDialog extends StatelessWidget {
+  const _ProfileTypePickerDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Choose Profile Type'),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            _ProfileTypeChoiceTile(
+              key: const ValueKey<String>('meal-profile-kind-standard'),
+              kind: MealAdjustmentProfileKind.standard,
+              onTap: () =>
+                  Navigator.of(context).pop(MealAdjustmentProfileKind.standard),
+            ),
+            const SizedBox(height: AppSizes.spacingSm),
+            _ProfileTypeChoiceTile(
+              key: const ValueKey<String>('meal-profile-kind-sandwich'),
+              kind: MealAdjustmentProfileKind.sandwich,
+              onTap: () =>
+                  Navigator.of(context).pop(MealAdjustmentProfileKind.sandwich),
+            ),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileTypeChoiceTile extends StatelessWidget {
+  const _ProfileTypeChoiceTile({
+    super.key,
+    required this.kind,
+    required this.onTap,
+  });
+
+  final MealAdjustmentProfileKind kind;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppSizes.spacingMd),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          border: Border.all(
+            color: kind == MealAdjustmentProfileKind.sandwich
+                ? AppColors.primary.withValues(alpha: 0.4)
+                : AppColors.border,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    _profileKindName(kind),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                _StatusChip(
+                  label: _profileKindBadgeLabel(kind),
+                  color: kind == MealAdjustmentProfileKind.sandwich
+                      ? AppColors.primary
+                      : AppColors.success,
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _profileKindSummary(kind),
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CreateProfileHelperBanner extends StatelessWidget {
+  const _CreateProfileHelperBanner({required this.kind});
+
+  final MealAdjustmentProfileKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isSandwich = kind == MealAdjustmentProfileKind.sandwich;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSizes.spacingSm),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        isSandwich
+            ? 'This sandwich profile defines editable bread surcharges, enabled free sauces, sandwich-only toast, and paid add-ins.'
+            : 'This standard meal profile defines components, swaps, add-ins, and pricing rules.',
+        style: const TextStyle(
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
 class _MessageBanner extends StatelessWidget {
   const _MessageBanner({required this.message, required this.color});
 
@@ -497,3 +738,47 @@ Color _healthColor(MealAdjustmentHealthStatus status) {
       return AppColors.error;
   }
 }
+
+String _profileKindLabel(MealAdjustmentProfileKind kind) {
+  return _profileKindName(kind);
+}
+
+String _profileKindName(MealAdjustmentProfileKind kind) {
+  switch (kind) {
+    case MealAdjustmentProfileKind.standard:
+      return 'Standard Meal Profile';
+    case MealAdjustmentProfileKind.sandwich:
+      return 'Sandwich Profile';
+  }
+}
+
+String _profileKindBadgeLabel(MealAdjustmentProfileKind kind) {
+  switch (kind) {
+    case MealAdjustmentProfileKind.standard:
+      return 'STANDARD';
+    case MealAdjustmentProfileKind.sandwich:
+      return 'SANDWICH';
+  }
+}
+
+String _profileKindSummary(MealAdjustmentProfileKind kind) {
+  switch (kind) {
+    case MealAdjustmentProfileKind.standard:
+      return 'Standard meal behaviour with components, swaps, add-ins, and pricing rules.';
+    case MealAdjustmentProfileKind.sandwich:
+      return 'Sandwich behaviour with editable bread surcharges, free multi-select sauces, sandwich-only toast, and paid add-ins.';
+  }
+}
+
+String _filterEmptyStateLabel(_MealProfileFilter filter) {
+  switch (filter) {
+    case _MealProfileFilter.all:
+      return 'meal';
+    case _MealProfileFilter.standard:
+      return 'standard';
+    case _MealProfileFilter.sandwich:
+      return 'sandwich';
+  }
+}
+
+enum _MealProfileFilter { all, standard, sandwich }

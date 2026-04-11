@@ -23,6 +23,7 @@ import '../models/order_modifier.dart';
 import '../models/payment.dart';
 import '../models/print_job.dart';
 import '../models/product.dart';
+import '../models/product_modifier.dart';
 import '../models/transaction.dart';
 import '../models/transaction_line.dart';
 import '../models/user.dart';
@@ -218,12 +219,16 @@ class OrderService {
     required ModifierAction action,
     required String itemName,
     required int extraPriceMinor,
+    ModifierPriceBehavior? priceBehavior,
+    ModifierUiSection? uiSection,
   }) async {
     final OrderModifier modifier = await _transactionRepository.addModifier(
       transactionLineId: transactionLineId,
       action: action,
       itemName: itemName,
       extraPriceMinor: extraPriceMinor,
+      priceBehavior: priceBehavior,
+      uiSection: uiSection,
     );
     final int transactionId = await _transactionRepository
         .getTransactionIdByLine(transactionLineId);
@@ -1215,6 +1220,8 @@ class OrderService {
             action: modifier.action,
             itemName: modifier.itemName,
             extraPriceMinor: modifier.extraPriceMinor,
+            priceBehavior: modifier.priceBehavior,
+            uiSection: modifier.uiSection,
           );
         }
       }
@@ -1325,7 +1332,7 @@ class OrderService {
       _logger.warn(
         eventType: 'order_cancelled',
         entityId: transaction.uuid,
-        message: 'Open order cancelled.',
+        message: 'Sent order cancelled.',
         metadata: <String, Object?>{'cancelled_by': currentUser.id},
       );
     });
@@ -1808,14 +1815,16 @@ class OrderService {
     }
 
     if (enforceBreakfastCompatibility) {
-      final Set<int> breakfastProductIds = await repository
-          .loadBreakfastSemanticProductIds(<int>[product.id]);
-      if (breakfastProductIds.contains(product.id)) {
+      final Set<int> breakfastRootProductIds = await repository
+          .loadBreakfastSemanticRootProductIds(<int>[product.id]);
+      if (breakfastRootProductIds.contains(product.id)) {
         throw MealCustomizationRuntimeConfigurationException(
           productId: product.id,
           profileId: profileId,
-          detail:
-              'Breakfast semantic products cannot carry a meal-adjustment profile.',
+          detail: _buildBreakfastCompatibilityMessage(
+            productName: product.name,
+            profileName: draft.name,
+          ),
         );
       }
     }
@@ -1824,6 +1833,13 @@ class OrderService {
       product: product,
       profile: draft.toRuntimeProfile(profileId: profileId),
     );
+  }
+
+  String _buildBreakfastCompatibilityMessage({
+    required String productName,
+    required String profileName,
+  }) {
+    return 'Product "$productName" cannot use meal-adjustment profile "$profileName" because it is configured as a breakfast semantic root product.';
   }
 
   Future<TransactionLine> _addMealCustomizationToOrder({

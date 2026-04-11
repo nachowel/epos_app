@@ -13,6 +13,7 @@ import 'package:epos_app/data/sync/sync_transaction_graph.dart';
 import 'package:epos_app/domain/models/breakfast_line_edit.dart';
 import 'package:epos_app/domain/models/order_modifier.dart';
 import 'package:epos_app/domain/models/payment.dart';
+import 'package:epos_app/domain/models/product_modifier.dart';
 import 'package:epos_app/domain/models/transaction.dart';
 import 'package:epos_app/domain/models/transaction_line.dart';
 import 'package:epos_app/domain/models/user.dart';
@@ -117,6 +118,8 @@ void main() {
             'unit_price_minor',
             'price_effect_minor',
             'sort_key',
+            'price_behavior',
+            'ui_section',
           }),
         );
         expect(modifierRecord.payload.containsKey('id'), isFalse);
@@ -136,6 +139,8 @@ void main() {
         expect(modifierRecord.payload['unit_price_minor'], 75);
         expect(modifierRecord.payload['price_effect_minor'], 75);
         expect(modifierRecord.payload['sort_key'], 0);
+        expect(modifierRecord.payload['price_behavior'], isNull);
+        expect(modifierRecord.payload['ui_section'], isNull);
 
         final SyncGraphRecord paymentRecord = _recordFor(graph, 'payments');
         expect(
@@ -154,6 +159,34 @@ void main() {
           paymentRecord.payload['transaction_uuid'],
           fixture.transaction.uuid,
         );
+      },
+    );
+
+    test(
+      'structured burger modifiers include price behavior and UI section',
+      () async {
+        final AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final _PayloadFixture fixture = await _createPaidFixture(
+          db,
+          withModifier: true,
+          modifierPriceBehavior: ModifierPriceBehavior.paid,
+          modifierUiSection: ModifierUiSection.addIns,
+        );
+        final SyncTransactionGraph graph =
+            await SyncPayloadRepository(
+              db,
+            ).buildTransactionGraph(fixture.transaction.uuid) ??
+            (throw StateError('Expected a paid graph payload.'));
+
+        final SyncGraphRecord modifierRecord = _recordFor(
+          graph,
+          'order_modifiers',
+        );
+
+        expect(modifierRecord.payload['item_name'], 'Extra Shot');
+        expect(modifierRecord.payload['price_behavior'], 'paid');
+        expect(modifierRecord.payload['ui_section'], 'add_ins');
       },
     );
 
@@ -270,6 +303,8 @@ class _BreakfastPayloadFixture {
 Future<_PayloadFixture> _createPaidFixture(
   AppDatabase db, {
   required bool withModifier,
+  ModifierPriceBehavior? modifierPriceBehavior,
+  ModifierUiSection? modifierUiSection,
 }) async {
   final SyncQueueRepository syncQueueRepository = SyncQueueRepository(db);
   final _FixtureContext fixture = await _createFixtureContext(
@@ -282,6 +317,8 @@ Future<_PayloadFixture> _createPaidFixture(
       action: ModifierAction.add,
       itemName: 'Extra Shot',
       extraPriceMinor: 75,
+      priceBehavior: modifierPriceBehavior,
+      uiSection: modifierUiSection,
     );
   }
   await fixture.orderService.sendOrder(

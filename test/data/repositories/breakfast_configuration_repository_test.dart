@@ -9,6 +9,53 @@ import '../../support/test_database.dart';
 void main() {
   group('BreakfastConfigurationRepository', () {
     test(
+      'product-linked flat extras do not classify a normal product as semantic set config',
+      () async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final BreakfastConfigurationRepository repository =
+            BreakfastConfigurationRepository(db);
+        final int categoryId = await insertCategory(db, name: 'Burgers');
+        final int burgerId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Burger',
+          priceMinor: 700,
+          hasModifiers: true,
+        );
+        final int chipsId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Chips',
+          priceMinor: 150,
+          isVisibleOnPos: false,
+        );
+
+        await db
+            .into(db.productModifiers)
+            .insert(
+              app_db.ProductModifiersCompanion.insert(
+                productId: burgerId,
+                itemProductId: Value<int?>(chipsId),
+                name: 'Chips',
+                type: 'extra',
+                extraPriceMinor: const Value<int>(150),
+                priceBehavior: const Value<String?>('paid'),
+                uiSection: const Value<String?>('add_ins'),
+              ),
+            );
+
+        final profiles = await repository.loadConfigurationProfiles(<int>[
+          burgerId,
+        ]);
+
+        expect(profiles[burgerId]?.flatModifierCount, 0);
+        expect(profiles[burgerId]?.extraPoolCount, 1);
+        expect(profiles[burgerId]?.hasSemanticSetConfig, isFalse);
+      },
+    );
+
+    test(
       'bootstrapBreakfastSetRoot seeds default breakfast choice groups and members once',
       () async {
         final app_db.AppDatabase db = createTestDatabase();
@@ -307,9 +354,7 @@ void main() {
       );
     });
 
-    test(
-      'loads explicit none choice rows as group answer options',
-      () async {
+    test('loads explicit none choice rows as group answer options', () async {
       final app_db.AppDatabase db = createTestDatabase();
       addTearDown(db.close);
       final _BreakfastConfigFixture fixture = await _seedFixture(db);

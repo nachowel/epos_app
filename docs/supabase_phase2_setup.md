@@ -47,6 +47,9 @@ Client finalized local transaction graph’i üretir.
 Remote write kararı local tarafta verilir.
 Edge Function service-role ile mirror tablolarına upsert yapar.
 
+`order_modifiers` payload'ı semantic snapshot alanlarını aynen mirror'a taşır.
+Structured burger rows geldiğinde `price_behavior` ve `ui_section` nullable alanları da payload içinde korunur.
+
 Bu mimaride:
 
 - local transaction/payment lifecycle authority değişmez

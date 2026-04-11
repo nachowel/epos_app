@@ -1,27 +1,40 @@
 import '../../domain/models/breakfast_cart_selection.dart';
 import '../../domain/models/meal_customization.dart';
 import '../../domain/models/order_modifier.dart';
+import '../../domain/models/product_modifier.dart';
 
 class CartModifier {
   const CartModifier({
     required this.action,
     required this.itemName,
     required this.extraPriceMinor,
+    this.priceBehavior,
+    this.uiSection,
   });
 
   final ModifierAction action;
   final String itemName;
   final int extraPriceMinor;
+  final ModifierPriceBehavior? priceBehavior;
+  final ModifierUiSection? uiSection;
 
   CartModifier copyWith({
     ModifierAction? action,
     String? itemName,
     int? extraPriceMinor,
+    Object? priceBehavior = _unsetCartModifierField,
+    Object? uiSection = _unsetCartModifierField,
   }) {
     return CartModifier(
       action: action ?? this.action,
       itemName: itemName ?? this.itemName,
       extraPriceMinor: extraPriceMinor ?? this.extraPriceMinor,
+      priceBehavior: identical(priceBehavior, _unsetCartModifierField)
+          ? this.priceBehavior
+          : priceBehavior as ModifierPriceBehavior?,
+      uiSection: identical(uiSection, _unsetCartModifierField)
+          ? this.uiSection
+          : uiSection as ModifierUiSection?,
     );
   }
 }
@@ -116,3 +129,4 @@ class CartItem {
 
 const Object _unsetBreakfastSelection = Object();
 const Object _unsetMealCustomizationSelection = Object();
+const Object _unsetCartModifierField = Object();

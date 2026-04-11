@@ -28,6 +28,47 @@ void main() {
       expect(request.extraSelections.single.quantity, 2);
     });
 
+    test('editor state carries explicit keep remove swap modes', () {
+      const MealCustomizationEditorState editorState =
+          MealCustomizationEditorState(
+            componentSelections: <MealCustomizationComponentState>[
+              MealCustomizationComponentState(
+                componentKey: 'main',
+                mode: MealComponentSelectionMode.swap,
+                swapTargetItemProductId: 22,
+              ),
+              MealCustomizationComponentState(
+                componentKey: 'side',
+                mode: MealComponentSelectionMode.remove,
+              ),
+            ],
+            extraSelections: <MealCustomizationExtraSelection>[
+              MealCustomizationExtraSelection(itemProductId: 33, quantity: 2),
+            ],
+          );
+
+      final MealCustomizationRequest request = editorState.toRequest(
+        productId: 10,
+        profileId: 5,
+      );
+
+      expect(
+        editorState.selectionForComponent('drink').mode,
+        MealComponentSelectionMode.keep,
+      );
+      expect(request.removedComponentKeys, <String>['side']);
+      expect(
+        request.swapSelections,
+        const <MealCustomizationComponentSelection>[
+          MealCustomizationComponentSelection(
+            componentKey: 'main',
+            targetItemProductId: 22,
+            quantity: 1,
+          ),
+        ],
+      );
+    });
+
     test('resolved snapshot and persistence preview stay deterministic', () {
       const MealCustomizationResolvedSnapshot first =
           MealCustomizationResolvedSnapshot(
@@ -127,6 +168,25 @@ void main() {
       expect(first.toPersistencePreview(), second.toPersistencePreview());
       expect(first.toReportingSummary(), second.toReportingSummary());
       expect(first.appliedRuleIds, <int>[99]);
+    });
+
+    test('sandwich selection round-trips legacy and multi-sauce json', () {
+      final SandwichCustomizationSelection multiSauce =
+          SandwichCustomizationSelection.fromJson(<String, Object?>{
+            'bread_type': 'sandwich',
+            'sauce_product_ids': <int>[401, 402],
+            'toast_option': 'toasted',
+          });
+      final SandwichCustomizationSelection legacySingleSauce =
+          SandwichCustomizationSelection.fromJson(<String, Object?>{
+            'bread_type': 'roll',
+            'sauce_type': 'mayo',
+          });
+
+      expect(multiSauce.sauceProductIds, <int>[401, 402]);
+      expect(legacySingleSauce.sauceProductIds, isEmpty);
+      expect(legacySingleSauce.legacySauceLookupKeys, <String>['mayo']);
+      expect(multiSauce.toJson()['sauce_product_ids'], <int>[401, 402]);
     });
   });
 }

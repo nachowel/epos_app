@@ -76,11 +76,23 @@ class _TestAppDatabase extends AppDatabase {
         free_swap_limit INTEGER NOT NULL DEFAULT 0 CHECK (free_swap_limit >= 0),
         sandwich_surcharge_minor INTEGER NOT NULL DEFAULT 100 CHECK (sandwich_surcharge_minor >= 0),
         baguette_surcharge_minor INTEGER NOT NULL DEFAULT 180 CHECK (baguette_surcharge_minor >= 0),
-        sandwich_sauce_options_json TEXT NOT NULL DEFAULT '["ketchup","mayo","brownSauce","chilliSauce"]',
+        sandwich_sauce_options_json TEXT NOT NULL DEFAULT '[]',
         is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
         CHECK (length(trim(name)) > 0)
+      );
+    ''');
+    await customStatement('''
+      CREATE TABLE sandwich_sauce_migration_audits (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        profile_id INTEGER NULL,
+        legacy_value TEXT NOT NULL,
+        matched_product_id INTEGER NULL,
+        matched_product_name TEXT NULL,
+        status TEXT NOT NULL CHECK (status IN ('mapped','unmatched','ambiguous')),
+        detail TEXT NULL,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
     ''');
     await customStatement('''
@@ -229,6 +241,8 @@ class _TestAppDatabase extends AppDatabase {
         name TEXT NOT NULL,
         type TEXT NOT NULL CHECK (type IN ('included','extra','choice')),
         extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
+        price_behavior TEXT NULL CHECK (price_behavior IS NULL OR price_behavior IN ('free','paid')),
+        ui_section TEXT NULL CHECK (ui_section IS NULL OR ui_section IN ('toppings','sauces','add_ins')),
         is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
         CHECK ((type = 'choice' AND group_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))
       );
@@ -307,6 +321,8 @@ class _TestAppDatabase extends AppDatabase {
         unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
         price_effect_minor INTEGER NOT NULL DEFAULT 0,
         sort_key INTEGER NOT NULL DEFAULT 0,
+        price_behavior TEXT NULL CHECK (price_behavior IS NULL OR price_behavior IN ('free','paid')),
+        ui_section TEXT NULL CHECK (ui_section IS NULL OR ui_section IN ('toppings','sauces','add_ins')),
         CHECK (action != 'choice' OR charge_reason = 'included_choice')
       );
     ''');
@@ -899,6 +915,7 @@ Future<int> insertShift(
 Future<int> insertCategory(
   AppDatabase db, {
   required String name,
+  String? imageUrl,
   int sortOrder = 0,
   bool isActive = true,
 }) {
@@ -907,6 +924,7 @@ Future<int> insertCategory(
       .insert(
         CategoriesCompanion.insert(
           name: name,
+          imageUrl: Value<String?>(imageUrl),
           sortOrder: Value<int>(sortOrder),
           isActive: Value<bool>(isActive),
         ),

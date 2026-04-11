@@ -1,9 +1,12 @@
 import 'package:drift/drift.dart';
 
+import '../../core/errors/exceptions.dart';
+import '../../domain/models/sync_graph_requeue_result.dart';
 import '../../domain/models/sync_queue_item.dart';
 import '../database/app_database.dart' as db;
 import '../sync/sync_graph_checksum_calculator.dart';
 import '../sync/sync_payload_repository.dart';
+import '../sync/sync_transaction_graph.dart';
 
 const String _rootGraphSnapshotsTable = 'sync_queue_root_graph_snapshots';
 const String _rootGraphSnapshotIndex =
@@ -66,6 +69,79 @@ class SyncQueueRepository {
     });
   }
 
+  Future<SyncGraphRequeueResult> requeueTransactionGraphFromCurrentSnapshot(
+    String transactionUuid,
+  ) async {
+    final SyncPayloadRepository payloadRepository = SyncPayloadRepository(
+      _database,
+    );
+    final graph = await payloadRepository.buildTransactionGraph(
+      transactionUuid,
+    );
+    if (graph == null) {
+      throw StateError(
+        'Cannot requeue a sync snapshot for missing transaction $transactionUuid.',
+      );
+    }
+    await _assertNoActiveGraphQueueItems(graph);
+
+    final String checksum = const SyncGraphChecksumCalculator().calculate(
+      graph,
+    );
+    return _database.transaction(() async {
+      final DateTime now = DateTime.now();
+      final List<SyncGraphRequeueItem> createdItems = <SyncGraphRequeueItem>[];
+      int? rootQueueId;
+
+      for (final record in graph.records) {
+        final int queueId = await _database
+            .into(_database.syncQueue)
+            .insert(
+              db.SyncQueueCompanion.insert(
+                queueTableName: record.tableName,
+                recordUuid: record.recordUuid,
+                createdAt: Value<DateTime>(now),
+                status: const Value<String>('pending'),
+                attemptCount: const Value<int>(0),
+                lastAttemptAt: const Value<DateTime?>(null),
+                syncedAt: const Value<DateTime?>(null),
+                errorMessage: const Value<String?>(null),
+              ),
+            );
+        createdItems.add(
+          SyncGraphRequeueItem(
+            queueId: queueId,
+            tableName: record.tableName,
+            recordUuid: record.recordUuid,
+          ),
+        );
+        if (record.tableName == 'transactions' &&
+            record.recordUuid == transactionUuid) {
+          rootQueueId = queueId;
+        }
+      }
+
+      if (rootQueueId == null) {
+        throw StateError(
+          'Cannot requeue a sync snapshot without a transaction root row.',
+        );
+      }
+
+      await _upsertTransactionRootChecksum(
+        queueId: rootQueueId,
+        transactionUuid: transactionUuid,
+        checksum: checksum,
+      );
+
+      return SyncGraphRequeueResult(
+        rootRecordUuid: transactionUuid,
+        rootQueueId: rootQueueId,
+        transactionIdempotencyKey: graph.transactionIdempotencyKey,
+        createdItems: createdItems,
+      );
+    });
+  }
+
   Future<SyncQueueEnqueueResult> _addToQueueInternal(
     String tableName,
     String recordUuid,
@@ -90,12 +166,14 @@ class SyncQueueRepository {
               .getSingleOrNull();
 
       if (existing == null) {
-        final int queueId = await _database.into(_database.syncQueue).insert(
-          db.SyncQueueCompanion.insert(
-            queueTableName: tableName,
-            recordUuid: recordUuid,
-          ),
-        );
+        final int queueId = await _database
+            .into(_database.syncQueue)
+            .insert(
+              db.SyncQueueCompanion.insert(
+                queueTableName: tableName,
+                recordUuid: recordUuid,
+              ),
+            );
         return SyncQueueEnqueueResult(
           queueId: queueId,
           previousStatus: null,
@@ -105,13 +183,15 @@ class SyncQueueRepository {
       }
 
       if (existing.status == 'processing') {
-        final int queueId = await _database.into(_database.syncQueue).insert(
-          db.SyncQueueCompanion.insert(
-            queueTableName: tableName,
-            recordUuid: recordUuid,
-            createdAt: Value<DateTime>(now),
-          ),
-        );
+        final int queueId = await _database
+            .into(_database.syncQueue)
+            .insert(
+              db.SyncQueueCompanion.insert(
+                queueTableName: tableName,
+                recordUuid: recordUuid,
+                createdAt: Value<DateTime>(now),
+              ),
+            );
         return SyncQueueEnqueueResult(
           queueId: queueId,
           previousStatus: SyncQueueStatus.processing,
@@ -237,8 +317,8 @@ class SyncQueueRepository {
                 ]);
               })
               ..orderBy(<OrderingTerm Function(db.$SyncQueueTable)>[
-                (db.$SyncQueueTable t) => OrderingTerm.asc(t.createdAt),
-                (db.$SyncQueueTable t) => OrderingTerm.asc(t.id),
+                (db.$SyncQueueTable t) => OrderingTerm.desc(t.createdAt),
+                (db.$SyncQueueTable t) => OrderingTerm.desc(t.id),
               ])
               ..limit(limit))
             .get();
@@ -337,7 +417,7 @@ class SyncQueueRepository {
   }
 
   Future<SyncQueueItem?> getLatestFailedItem() async {
-    final db.SyncQueueData? row =
+    final List<db.SyncQueueData> rows =
         await (_database.select(_database.syncQueue)
               ..where((db.$SyncQueueTable t) => t.status.equals('failed'))
               ..orderBy(<OrderingTerm Function(db.$SyncQueueTable)>[
@@ -346,9 +426,10 @@ class SyncQueueRepository {
                 (db.$SyncQueueTable t) => OrderingTerm.desc(t.createdAt),
                 (db.$SyncQueueTable t) => OrderingTerm.desc(t.id),
               ])
-              ..limit(1))
-            .getSingleOrNull();
+              ..limit(64))
+            .get();
 
+    final db.SyncQueueData? row = _selectPreferredLatestFailedRow(rows);
     return row == null ? null : _mapQueueItem(row);
   }
 
@@ -704,6 +785,29 @@ class SyncQueueRepository {
     );
   }
 
+  db.SyncQueueData? _selectPreferredLatestFailedRow(
+    List<db.SyncQueueData> rows,
+  ) {
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    final db.SyncQueueData newest = rows.first;
+    final List<db.SyncQueueData> sameBatch = rows.where((db.SyncQueueData row) {
+      return row.lastAttemptAt == newest.lastAttemptAt &&
+          row.createdAt == newest.createdAt &&
+          row.errorMessage == newest.errorMessage;
+    }).toList(growable: false);
+
+    for (final db.SyncQueueData row in sameBatch) {
+      if (row.queueTableName == 'transactions') {
+        return row;
+      }
+    }
+
+    return newest;
+  }
+
   SyncQueueOperation _operationFromDb(String value) {
     switch (value) {
       case 'upsert':
@@ -823,5 +927,36 @@ class SyncQueueRepository {
       CREATE INDEX IF NOT EXISTS $_rootGraphSnapshotIndex
       ON $_rootGraphSnapshotsTable(transaction_uuid, queue_id);
     ''');
+  }
+
+  Future<void> _assertNoActiveGraphQueueItems(
+    SyncTransactionGraph graph,
+  ) async {
+    final List<String> activeRefs = <String>[];
+    for (final record in graph.records) {
+      final db.SyncQueueData? latest =
+          await (_database.select(_database.syncQueue)
+                ..where((db.$SyncQueueTable t) {
+                  return t.queueTableName.equals(record.tableName) &
+                      t.recordUuid.equals(record.recordUuid);
+                })
+                ..orderBy(<OrderingTerm Function(db.$SyncQueueTable)>[
+                  (db.$SyncQueueTable t) => OrderingTerm.desc(t.id),
+                ])
+                ..limit(1))
+              .getSingleOrNull();
+      if (latest == null) {
+        continue;
+      }
+      if (latest.status == 'pending' || latest.status == 'processing') {
+        activeRefs.add('${record.tableName}:${record.recordUuid}');
+      }
+    }
+    if (activeRefs.isEmpty) {
+      return;
+    }
+    throw ValidationException(
+      'Cannot fresh-requeue while active sync queue rows still exist for: ${activeRefs.join(', ')}',
+    );
   }
 }

@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 
 import '../../core/errors/exceptions.dart';
 import '../../domain/models/order_modifier.dart';
+import '../../domain/models/product_modifier.dart';
 import '../../domain/models/transaction_line.dart';
 import '../database/app_database.dart' as db;
 
@@ -61,6 +62,10 @@ class TransactionPersistenceMapper {
       unitPriceMinor: Value<int>(modifier.unitPriceMinor),
       priceEffectMinor: Value<int>(modifier.priceEffectMinor),
       sortKey: Value<int>(modifier.sortKey),
+      priceBehavior: Value<String?>(
+        _modifierPriceBehaviorToDb(modifier.priceBehavior),
+      ),
+      uiSection: Value<String?>(_modifierUiSectionToDb(modifier.uiSection)),
     );
   }
 
@@ -79,6 +84,8 @@ class TransactionPersistenceMapper {
       unitPriceMinor: row.unitPriceMinor,
       priceEffectMinor: row.priceEffectMinor,
       sortKey: row.sortKey,
+      priceBehavior: _modifierPriceBehaviorFromDb(row.priceBehavior),
+      uiSection: _modifierUiSectionFromDb(row.uiSection),
     );
   }
 
@@ -92,6 +99,18 @@ class TransactionPersistenceMapper {
 
   String? modifierChargeReasonToDb(ModifierChargeReason? value) =>
       _modifierChargeReasonToDb(value);
+
+  ModifierPriceBehavior? modifierPriceBehaviorFromDb(String? value) =>
+      _modifierPriceBehaviorFromDb(value);
+
+  String? modifierPriceBehaviorToDb(ModifierPriceBehavior? value) =>
+      _modifierPriceBehaviorToDb(value);
+
+  ModifierUiSection? modifierUiSectionFromDb(String? value) =>
+      _modifierUiSectionFromDb(value);
+
+  String? modifierUiSectionToDb(ModifierUiSection? value) =>
+      _modifierUiSectionToDb(value);
 
   TransactionLinePricingMode pricingModeFromDb(String value) =>
       _pricingModeFromDb(value);
@@ -160,6 +179,58 @@ class TransactionPersistenceMapper {
         return 'removal_discount';
       case ModifierChargeReason.comboDiscount:
         return 'combo_discount';
+    }
+  }
+
+  ModifierPriceBehavior? _modifierPriceBehaviorFromDb(String? value) {
+    switch (value) {
+      case null:
+        return null;
+      case 'free':
+        return ModifierPriceBehavior.free;
+      case 'paid':
+        return ModifierPriceBehavior.paid;
+      default:
+        throw DatabaseException('Unknown modifier price behavior: $value');
+    }
+  }
+
+  String? _modifierPriceBehaviorToDb(ModifierPriceBehavior? value) {
+    switch (value) {
+      case null:
+        return null;
+      case ModifierPriceBehavior.free:
+        return 'free';
+      case ModifierPriceBehavior.paid:
+        return 'paid';
+    }
+  }
+
+  ModifierUiSection? _modifierUiSectionFromDb(String? value) {
+    switch (value) {
+      case null:
+        return null;
+      case 'toppings':
+        return ModifierUiSection.toppings;
+      case 'sauces':
+        return ModifierUiSection.sauces;
+      case 'add_ins':
+        return ModifierUiSection.addIns;
+      default:
+        throw DatabaseException('Unknown modifier UI section: $value');
+    }
+  }
+
+  String? _modifierUiSectionToDb(ModifierUiSection? value) {
+    switch (value) {
+      case null:
+        return null;
+      case ModifierUiSection.toppings:
+        return 'toppings';
+      case ModifierUiSection.sauces:
+        return 'sauces';
+      case ModifierUiSection.addIns:
+        return 'add_ins';
     }
   }
 

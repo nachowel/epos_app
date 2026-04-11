@@ -6,7 +6,6 @@ import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/errors/error_mapper.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/utils/currency_formatter.dart';
-import '../../../../domain/models/breakfast_cart_selection.dart';
 import '../../../../domain/models/breakfast_cooking_instruction.dart';
 import '../../../../domain/models/breakfast_line_edit.dart';
 import '../../../../domain/models/breakfast_rebuild.dart';
@@ -567,50 +566,78 @@ class _SemanticBundleEditorDialogState
                   trailing: _SectionMetaPill(
                     label: '${editorData.configuration.setItems.length} items',
                   ),
-                  child: Column(
-                    children: editorData.configuration.setItems
-                        .map((BreakfastSetItemConfig item) {
-                          final int removedQuantity =
-                              removedQuantities[item.itemProductId] ?? 0;
-                          return _IncludedItemRow(
-                            item: item,
-                            removedQuantity: removedQuantity,
-                            selectorExpanded:
-                                _expandedRemovalSelectorProductId ==
-                                item.itemProductId,
-                            cookingTarget:
-                                cookingTargetsByProductId[item.itemProductId],
-                            selectedCookingInstruction:
-                                selectedCookingInstructions[item.itemProductId],
-                            cookingSelectorExpanded:
-                                _expandedCookingSelectorProductId ==
-                                item.itemProductId,
-                            onToggle: () => _handleIncludedItemToggle(
-                              item: item,
-                              removedQuantity: removedQuantity,
-                            ),
-                            onSelectRemovedQuantity: (int quantity) =>
-                                _selectRemovedQuantity(
-                                  item: item,
-                                  quantity: quantity,
-                                ),
-                            onOpenSelector: () {
-                              setState(() {
-                                _expandedRemovalSelectorProductId =
-                                    item.itemProductId;
-                              });
-                            },
-                            onToggleCookingSelector: () =>
-                                _toggleCookingSelector(item.itemProductId),
-                            onSelectCookingInstruction:
-                                (BreakfastCookingInstructionOption? option) =>
-                                    _selectCookingInstruction(
-                                      itemProductId: item.itemProductId,
-                                      option: option,
+                  child: LayoutBuilder(
+                    builder:
+                        (BuildContext context, BoxConstraints constraints) {
+                          final double tileWidth = constraints.maxWidth >= 900
+                              ? (constraints.maxWidth -
+                                        AppSizes.spacingXs * 3) /
+                                    4
+                              : constraints.maxWidth >= 660
+                              ? (constraints.maxWidth -
+                                        AppSizes.spacingXs * 2) /
+                                    3
+                              : constraints.maxWidth >= 460
+                              ? (constraints.maxWidth - AppSizes.spacingXs) / 2
+                              : constraints.maxWidth;
+                          return Wrap(
+                            spacing: AppSizes.spacingXs,
+                            runSpacing: AppSizes.spacingXs,
+                            children: editorData.configuration.setItems
+                                .map((BreakfastSetItemConfig item) {
+                                  final int removedQuantity =
+                                      removedQuantities[item.itemProductId] ??
+                                      0;
+                                  return SizedBox(
+                                    width: tileWidth,
+                                    child: _IncludedItemRow(
+                                      item: item,
+                                      removedQuantity: removedQuantity,
+                                      selectorExpanded:
+                                          _expandedRemovalSelectorProductId ==
+                                          item.itemProductId,
+                                      cookingTarget:
+                                          cookingTargetsByProductId[item
+                                              .itemProductId],
+                                      selectedCookingInstruction:
+                                          selectedCookingInstructions[item
+                                              .itemProductId],
+                                      cookingSelectorExpanded:
+                                          _expandedCookingSelectorProductId ==
+                                          item.itemProductId,
+                                      onToggle: () => _handleIncludedItemToggle(
+                                        item: item,
+                                        removedQuantity: removedQuantity,
+                                      ),
+                                      onSelectRemovedQuantity: (int quantity) =>
+                                          _selectRemovedQuantity(
+                                            item: item,
+                                            quantity: quantity,
+                                          ),
+                                      onOpenSelector: () {
+                                        setState(() {
+                                          _expandedRemovalSelectorProductId =
+                                              item.itemProductId;
+                                        });
+                                      },
+                                      onToggleCookingSelector: () =>
+                                          _toggleCookingSelector(
+                                            item.itemProductId,
+                                          ),
+                                      onSelectCookingInstruction:
+                                          (
+                                            BreakfastCookingInstructionOption?
+                                            option,
+                                          ) => _selectCookingInstruction(
+                                            itemProductId: item.itemProductId,
+                                            option: option,
+                                          ),
                                     ),
+                                  );
+                                })
+                                .toList(growable: false),
                           );
-                        })
-                        .toList(growable: false),
+                        },
                   ),
                 ),
                 const SizedBox(height: AppSizes.spacingSm),
@@ -755,8 +782,8 @@ class _SemanticBundleEditorDialogState
                                                 optionKey: ValueKey<String>(
                                                   'semantic-choice-none-${group.groupId}',
                                                 ),
-                                                label:
-                                                    group.explicitNoneDisplayLabel,
+                                                label: group
+                                                    .explicitNoneDisplayLabel,
                                                 selected: isExplicitNone,
                                                 onTap: () {
                                                   _apply(
@@ -1334,44 +1361,34 @@ class _RowActionPill extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     required this.keyValue,
-    this.emphasized = false,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback onPressed;
   final Key keyValue;
-  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
-    final Color foreground = emphasized
-        ? AppColors.primary
-        : AppColors.textSecondary;
+    final Color foreground = AppColors.textSecondary;
     return OutlinedButton.icon(
       key: keyValue,
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size(0, 40),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        minimumSize: const Size(0, 34),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         visualDensity: VisualDensity.compact,
-        backgroundColor: emphasized
-            ? AppColors.primary.withValues(alpha: 0.12)
-            : AppColors.surface,
-        side: BorderSide(
-          color: emphasized
-              ? AppColors.primary.withValues(alpha: 0.32)
-              : AppColors.border,
-        ),
+        backgroundColor: AppColors.surface,
+        side: BorderSide(color: AppColors.border),
         foregroundColor: foreground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       ),
-      icon: Icon(icon, size: 17),
+      icon: Icon(icon, size: 15),
       label: Text(
         label,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: 11.5,
           fontWeight: FontWeight.w800,
           color: foreground,
         ),
@@ -1687,10 +1704,12 @@ class _IncludedItemRow extends StatelessWidget {
 
   String get _subtitle {
     if (!item.isRemovable) {
-      return '${item.defaultQuantity} included · fixed';
+      return item.defaultQuantity > 1
+          ? '${item.defaultQuantity} included · fixed'
+          : 'Fixed';
     }
     if (removedQuantity == 0) {
-      return '${item.defaultQuantity} included';
+      return _isMultiQuantity ? '${item.defaultQuantity} included' : '';
     }
     if (_remainingQuantity <= 0) {
       return '$removedQuantity removed';
@@ -1709,19 +1728,6 @@ class _IncludedItemRow extends StatelessWidget {
       return AppColors.error;
     }
     return AppColors.warning;
-  }
-
-  IconData get _controlIcon {
-    if (!item.isRemovable) {
-      return Icons.lock_outline_rounded;
-    }
-    if (removedQuantity == 0) {
-      return Icons.check_rounded;
-    }
-    if (_remainingQuantity <= 0) {
-      return Icons.remove_circle_rounded;
-    }
-    return Icons.remove_rounded;
   }
 
   Color get _rowBackgroundColor {
@@ -1744,6 +1750,26 @@ class _IncludedItemRow extends StatelessWidget {
     return _accentColor.withValues(alpha: 0.32);
   }
 
+  Color get _chipBackgroundColor {
+    if (!item.isRemovable) {
+      return AppColors.surface;
+    }
+    if (removedQuantity == 0) {
+      return AppColors.surface;
+    }
+    return _accentColor.withValues(alpha: 0.12);
+  }
+
+  Color get _chipTextColor {
+    if (!item.isRemovable) {
+      return AppColors.textPrimary;
+    }
+    if (removedQuantity == 0) {
+      return AppColors.textPrimary;
+    }
+    return _accentColor;
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool showSelector =
@@ -1757,131 +1783,225 @@ class _IncludedItemRow extends StatelessWidget {
         removedQuantity > 0 &&
         !selectorExpanded;
     final String? cookingLabel = selectedCookingInstruction?.instructionLabel;
+    final bool hasStatus = _subtitle.isNotEmpty;
+    final BorderRadius chipRadius = BorderRadius.circular(AppSizes.radiusMd);
+    final BorderRadius chipActionRadius = BorderRadius.circular(
+      AppSizes.radiusMd - 1,
+    );
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
+      constraints: const BoxConstraints(minHeight: 84),
       decoration: BoxDecoration(
         color: _rowBackgroundColor,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
         border: Border.all(color: _rowBorderColor),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.spacingSm,
-          vertical: 6,
-        ),
+        padding: const EdgeInsets.all(AppSizes.spacingSm),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                _IncludedItemControl(
-                  key: ValueKey<String>(
-                    'semantic-include-${item.itemProductId}',
-                  ),
-                  icon: _controlIcon,
-                  accentColor: _accentColor,
-                  enabled: item.isRemovable,
-                  onPressed: item.isRemovable ? onToggle : null,
+            Container(
+              height: 48,
+              decoration: BoxDecoration(
+                color: _chipBackgroundColor,
+                borderRadius: chipRadius,
+                border: Border.all(
+                  color: showSelector || showCookingSelector
+                      ? _accentColor.withValues(alpha: 0.4)
+                      : _rowBorderColor,
+                  width:
+                      removedQuantity > 0 ||
+                          showSelector ||
+                          showCookingSelector ||
+                          cookingLabel != null
+                      ? 1.4
+                      : 1,
                 ),
-                const SizedBox(width: AppSizes.spacingSm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        item.itemName,
-                        style: const TextStyle(
-                          fontSize: AppSizes.fontSm,
-                          fontWeight: FontWeight.w800,
+              ),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        key: ValueKey<String>(
+                          'semantic-include-${item.itemProductId}',
+                        ),
+                        onTap: item.isRemovable ? onToggle : null,
+                        borderRadius: hasCookingTrigger
+                            ? BorderRadius.only(
+                                topLeft: chipActionRadius.topLeft,
+                                bottomLeft: chipActionRadius.bottomLeft,
+                              )
+                            : chipActionRadius,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              item.itemName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: _chipTextColor,
+                                height: 1,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      if (cookingLabel != null) ...<Widget>[
-                        const SizedBox(height: 1),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            '${item.itemName} — $cookingLabel',
+                    ),
+                  ),
+                  if (hasCookingTrigger) ...<Widget>[
+                    Container(width: 1, height: 24, color: _rowBorderColor),
+                    SizedBox(
+                      width: 40,
+                      height: 48,
+                      child: Tooltip(
+                        message: cookingLabel ?? 'Cook',
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
                             key: ValueKey<String>(
-                              'semantic-cooking-status-${item.itemProductId}',
+                              'semantic-cooking-trigger-${item.itemProductId}',
                             ),
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12,
+                            onTap: onToggleCookingSelector,
+                            borderRadius: BorderRadius.only(
+                              topRight: chipActionRadius.topRight,
+                              bottomRight: chipActionRadius.bottomRight,
                             ),
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 1),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: (removedQuantity == 0 && item.isRemovable
-                              ? AppColors.surface
-                              : _accentColor.withValues(alpha: 0.08)),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          _subtitle,
-                          key: ValueKey<String>(
-                            'semantic-include-status-${item.itemProductId}',
-                          ),
-                          style: TextStyle(
-                            color: removedQuantity == 0 && item.isRemovable
-                                ? AppColors.textSecondary
-                                : _accentColor,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
+                            child: Center(
+                              child: Container(
+                                width: 30,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  color:
+                                      cookingLabel != null ||
+                                          showCookingSelector
+                                      ? AppColors.primary.withValues(
+                                          alpha: 0.14,
+                                        )
+                                      : AppColors.surfaceAlt,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color:
+                                        cookingLabel != null ||
+                                            showCookingSelector
+                                        ? AppColors.primary.withValues(
+                                            alpha: 0.3,
+                                          )
+                                        : AppColors.border,
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.restaurant_menu_rounded,
+                                  size: 18,
+                                  color:
+                                      cookingLabel != null ||
+                                          showCookingSelector
+                                      ? AppColors.primary
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                if (!item.isRemovable)
-                  const SizedBox.shrink()
-                else if (showChangeAction)
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (hasStatus || cookingLabel != null) ...<Widget>[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: <Widget>[
+                  if (hasStatus)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: removedQuantity == 0 && item.isRemovable
+                            ? AppColors.surface
+                            : _accentColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        _subtitle,
+                        key: ValueKey<String>(
+                          'semantic-include-status-${item.itemProductId}',
+                        ),
+                        style: TextStyle(
+                          color: removedQuantity == 0 && item.isRemovable
+                              ? AppColors.textSecondary
+                              : _accentColor,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11.5,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  if (cookingLabel != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${item.itemName} — $cookingLabel',
+                        key: ValueKey<String>(
+                          'semantic-cooking-status-${item.itemProductId}',
+                        ),
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11.5,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: <Widget>[
+                if (showChangeAction)
                   _RowActionPill(
                     keyValue: ValueKey<String>(
                       'semantic-include-change-${item.itemProductId}',
                     ),
                     onPressed: onOpenSelector,
                     icon: Icons.tune_rounded,
-                    label: 'Change',
+                    label: 'Adjust',
                   ),
-                if (hasCookingTrigger) ...<Widget>[
-                  const SizedBox(width: AppSizes.spacingXs),
-                  _RowActionPill(
-                    keyValue: ValueKey<String>(
-                      'semantic-cooking-trigger-${item.itemProductId}',
-                    ),
-                    onPressed: onToggleCookingSelector,
-                    icon: Icons.restaurant_menu_rounded,
-                    label: cookingLabel ?? 'Cook',
-                    emphasized: cookingLabel != null || cookingSelectorExpanded,
-                  ),
-                ],
               ],
             ),
             if (showSelector) ...<Widget>[
-              const SizedBox(height: AppSizes.spacingXs),
-              Padding(
+              const SizedBox(height: 8),
+              Container(
                 key: ValueKey<String>(
                   'semantic-include-selector-${item.itemProductId}',
                 ),
-                padding: const EdgeInsets.only(left: 42),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                  border: Border.all(color: AppColors.border),
+                ),
                 child: Wrap(
                   spacing: AppSizes.spacingXs,
                   runSpacing: AppSizes.spacingXs,
@@ -1917,12 +2037,17 @@ class _IncludedItemRow extends StatelessWidget {
               ),
             ],
             if (showCookingSelector && cookingTarget != null) ...<Widget>[
-              const SizedBox(height: AppSizes.spacingXs),
-              Padding(
+              const SizedBox(height: 8),
+              Container(
                 key: ValueKey<String>(
                   'semantic-cooking-selector-${item.itemProductId}',
                 ),
-                padding: const EdgeInsets.only(left: 42),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                  border: Border.all(color: AppColors.border),
+                ),
                 child: Wrap(
                   spacing: AppSizes.spacingXs,
                   runSpacing: AppSizes.spacingXs,
@@ -1955,55 +2080,6 @@ class _IncludedItemRow extends StatelessWidget {
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _IncludedItemControl extends StatelessWidget {
-  const _IncludedItemControl({
-    required this.icon,
-    required this.accentColor,
-    required this.enabled,
-    required this.onPressed,
-    super.key,
-  });
-
-  final IconData icon;
-  final Color accentColor;
-  final bool enabled;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final Widget control = Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        color: enabled
-            ? accentColor.withValues(alpha: 0.12)
-            : AppColors.surface,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: enabled
-              ? accentColor.withValues(alpha: 0.35)
-              : AppColors.border,
-        ),
-      ),
-      alignment: Alignment.center,
-      child: Icon(icon, size: 17, color: accentColor),
-    );
-
-    if (!enabled || onPressed == null) {
-      return control;
-    }
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onPressed,
-        child: control,
       ),
     );
   }

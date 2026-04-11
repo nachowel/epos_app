@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../../core/errors/exceptions.dart';
@@ -48,6 +50,8 @@ class DriftMealAdjustmentProfileRepository
       id: graph.profile.id,
       name: graph.profile.name,
       description: graph.profile.description,
+      kind: _mapProfileKindFromDb(graph.profile.profileKind),
+      sandwichSettings: _mapSandwichSettings(graph.profile),
       freeSwapLimit: graph.profile.freeSwapLimit,
       isActive: graph.profile.isActive,
       createdAt: graph.profile.createdAt,
@@ -112,6 +116,8 @@ class DriftMealAdjustmentProfileRepository
       id: graph.profile.id,
       name: graph.profile.name,
       description: graph.profile.description,
+      kind: _mapProfileKindFromDb(graph.profile.profileKind),
+      sandwichSettings: _mapSandwichSettings(graph.profile),
       freeSwapLimit: graph.profile.freeSwapLimit,
       isActive: graph.profile.isActive,
       components: graph.components
@@ -175,7 +181,19 @@ class DriftMealAdjustmentProfileRepository
               db.MealAdjustmentProfilesCompanion.insert(
                 name: draft.name,
                 description: Value<String?>(draft.description),
+                profileKind: Value<String>(_mapProfileKind(draft.kind)),
                 freeSwapLimit: Value<int>(draft.freeSwapLimit),
+                sandwichSurchargeMinor: Value<int>(
+                  draft.sandwichSettings.sandwichSurchargeMinor,
+                ),
+                baguetteSurchargeMinor: Value<int>(
+                  draft.sandwichSettings.baguetteSurchargeMinor,
+                ),
+                sandwichSauceOptionsJson: Value<String>(
+                  _encodeSandwichSauceProductIdsJson(
+                    draft.sandwichSettings.sauceProductIds,
+                  ),
+                ),
                 isActive: Value<bool>(draft.isActive),
                 createdAt: Value<DateTime>(now),
                 updatedAt: Value<DateTime>(now),
@@ -190,7 +208,19 @@ class DriftMealAdjustmentProfileRepository
                   db.MealAdjustmentProfilesCompanion(
                     name: Value<String>(draft.name),
                     description: Value<String?>(draft.description),
+                    profileKind: Value<String>(_mapProfileKind(draft.kind)),
                     freeSwapLimit: Value<int>(draft.freeSwapLimit),
+                    sandwichSurchargeMinor: Value<int>(
+                      draft.sandwichSettings.sandwichSurchargeMinor,
+                    ),
+                    baguetteSurchargeMinor: Value<int>(
+                      draft.sandwichSettings.baguetteSurchargeMinor,
+                    ),
+                    sandwichSauceOptionsJson: Value<String>(
+                      _encodeSandwichSauceProductIdsJson(
+                        draft.sandwichSettings.sauceProductIds,
+                      ),
+                    ),
                     isActive: Value<bool>(draft.isActive),
                     updatedAt: Value<DateTime>(now),
                   ),
@@ -235,12 +265,11 @@ class DriftMealAdjustmentProfileRepository
             ),
           );
       await _deleteNestedProfileRows(profileId);
-      final int deletedCount = await (_database.delete(
-            _database.mealAdjustmentProfiles,
-          )..where(
-            (db.$MealAdjustmentProfilesTable t) => t.id.equals(profileId),
-          ))
-          .go();
+      final int deletedCount =
+          await (_database.delete(_database.mealAdjustmentProfiles)..where(
+                (db.$MealAdjustmentProfilesTable t) => t.id.equals(profileId),
+              ))
+              .go();
       return deletedCount > 0;
     });
   }
@@ -334,7 +363,7 @@ class DriftMealAdjustmentProfileRepository
   }
 
   @override
-  Future<Set<int>> loadBreakfastSemanticProductIds(
+  Future<Set<int>> loadBreakfastSemanticRootProductIds(
     Iterable<int> productIds,
   ) async {
     final List<int> ids = productIds.toSet().toList(growable: false);
@@ -345,28 +374,20 @@ class DriftMealAdjustmentProfileRepository
     final List<QueryRow> rows = await _database
         .customSelect(
           '''
-          SELECT product_id
-          FROM (
-            SELECT product_id
+          WITH semantic_roots AS (
+            SELECT DISTINCT product_id
             FROM set_items
-            WHERE product_id IN (${ids.join(',')})
             UNION
-            SELECT item_product_id AS product_id
-            FROM set_items
-            WHERE item_product_id IN (${ids.join(',')})
-            UNION
-            SELECT product_id
+            SELECT DISTINCT product_id
             FROM modifier_groups
-            WHERE product_id IN (${ids.join(',')})
             UNION
-            SELECT product_id
+            SELECT DISTINCT product_id
             FROM product_modifiers
-            WHERE product_id IN (${ids.join(',')})
-            UNION
-            SELECT item_product_id AS product_id
-            FROM product_modifiers
-            WHERE item_product_id IN (${ids.join(',')})
+            WHERE type = 'choice'
           )
+          SELECT DISTINCT product_id
+          FROM semantic_roots
+          WHERE product_id IN (${ids.join(',')})
           ''',
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _database.setItems,
@@ -603,11 +624,39 @@ class DriftMealAdjustmentProfileRepository
       id: row.id,
       name: row.name,
       description: row.description,
+      kind: _mapProfileKindFromDb(row.profileKind),
+      sandwichSettings: _mapSandwichSettings(row),
       freeSwapLimit: row.freeSwapLimit,
       isActive: row.isActive,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     );
+  }
+
+  SandwichProfileSettings _mapSandwichSettings(db.MealAdjustmentProfile row) {
+    return SandwichProfileSettings(
+      sandwichSurchargeMinor: row.sandwichSurchargeMinor,
+      baguetteSurchargeMinor: row.baguetteSurchargeMinor,
+      sauceProductIds: _decodeSandwichSauceProductIdsJson(
+        row.sandwichSauceOptionsJson,
+      ),
+    );
+  }
+
+  String _encodeSandwichSauceProductIdsJson(List<int> sauceProductIds) {
+    return jsonEncode(normalizeSandwichSauceProductIds(sauceProductIds));
+  }
+
+  List<int> _decodeSandwichSauceProductIdsJson(String rawJson) {
+    try {
+      final dynamic decoded = jsonDecode(rawJson);
+      if (decoded is! List<dynamic>) {
+        return const <int>[];
+      }
+      return normalizeSandwichSauceProductIds(decoded.whereType<int>());
+    } on Object {
+      return const <int>[];
+    }
   }
 
   MealAdjustmentProductSummary _mapProductSummaryRow(QueryRow row) {
@@ -628,6 +677,25 @@ class DriftMealAdjustmentProfileRepository
       case MealAdjustmentComponentOptionType.swap:
         return 'swap';
     }
+  }
+
+  String _mapProfileKind(MealAdjustmentProfileKind value) {
+    switch (value) {
+      case MealAdjustmentProfileKind.standard:
+        return 'standard';
+      case MealAdjustmentProfileKind.sandwich:
+        return 'sandwich';
+    }
+  }
+
+  MealAdjustmentProfileKind _mapProfileKindFromDb(String value) {
+    switch (value) {
+      case 'standard':
+        return MealAdjustmentProfileKind.standard;
+      case 'sandwich':
+        return MealAdjustmentProfileKind.sandwich;
+    }
+    throw StateError('Unknown meal adjustment profile kind: $value');
   }
 
   MealAdjustmentComponentOptionType _mapOptionTypeFromDb(String value) {

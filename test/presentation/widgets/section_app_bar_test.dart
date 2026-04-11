@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   const List<String> cashierNavLabels = <String>[
     'Dashboard',
+    'Categories',
     'POS',
     'Open Orders',
     'Reports',
@@ -59,7 +60,7 @@ void main() {
     );
     expect(
       SectionAppBar.debugNavigationStage(
-        viewportWidth: 960,
+        viewportWidth: 1080,
         compactVisual: true,
         navLabels: cashierNavLabels,
         logoutLabel: 'Logout',
@@ -107,6 +108,12 @@ void main() {
     expect(find.text('Navigation'), findsOneWidget);
     expect(
       find.byKey(const ValueKey<String>('section_app_bar_menu_nav_/dashboard')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        const ValueKey<String>('section_app_bar_menu_nav_/pos/categories'),
+      ),
       findsOneWidget,
     );
     expect(

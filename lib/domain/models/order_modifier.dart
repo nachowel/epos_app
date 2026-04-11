@@ -1,3 +1,5 @@
+import 'product_modifier.dart';
+
 enum ModifierAction { remove, add, choice }
 
 enum ModifierChargeReason {
@@ -24,6 +26,8 @@ class OrderModifier {
     this.unitPriceMinor = 0,
     this.priceEffectMinor = 0,
     this.sortKey = 0,
+    this.priceBehavior,
+    this.uiSection,
   });
 
   final int id;
@@ -39,6 +43,8 @@ class OrderModifier {
   final int unitPriceMinor;
   final int priceEffectMinor;
   final int sortKey;
+  final ModifierPriceBehavior? priceBehavior;
+  final ModifierUiSection? uiSection;
 
   OrderModifier copyWith({
     int? id,
@@ -54,6 +60,8 @@ class OrderModifier {
     int? unitPriceMinor,
     int? priceEffectMinor,
     int? sortKey,
+    Object? priceBehavior = _unsetPriceBehavior,
+    Object? uiSection = _unsetUiSection,
   }) {
     return OrderModifier(
       id: id ?? this.id,
@@ -75,6 +83,12 @@ class OrderModifier {
       unitPriceMinor: unitPriceMinor ?? this.unitPriceMinor,
       priceEffectMinor: priceEffectMinor ?? this.priceEffectMinor,
       sortKey: sortKey ?? this.sortKey,
+      priceBehavior: identical(priceBehavior, _unsetPriceBehavior)
+          ? this.priceBehavior
+          : priceBehavior as ModifierPriceBehavior?,
+      uiSection: identical(uiSection, _unsetUiSection)
+          ? this.uiSection
+          : uiSection as ModifierUiSection?,
     );
   }
 
@@ -96,7 +110,9 @@ class OrderModifier {
         other.quantity == quantity &&
         other.unitPriceMinor == unitPriceMinor &&
         other.priceEffectMinor == priceEffectMinor &&
-        other.sortKey == sortKey;
+        other.sortKey == sortKey &&
+        other.priceBehavior == priceBehavior &&
+        other.uiSection == uiSection;
   }
 
   @override
@@ -114,9 +130,13 @@ class OrderModifier {
     unitPriceMinor,
     priceEffectMinor,
     sortKey,
+    priceBehavior,
+    uiSection,
   );
 }
 
 const Object _unsetChargeReason = Object();
 const Object _unsetItemProductId = Object();
 const Object _unsetSourceGroupId = Object();
+const Object _unsetPriceBehavior = Object();
+const Object _unsetUiSection = Object();

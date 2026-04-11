@@ -21,7 +21,7 @@ If this file conflicts with:
 
 * live schema
 * migration history
-* breakfast/menu-engine contract docs
+* feature contract docs
 
 👉 **DO NOT follow this file. Follow higher authority and update this file later.**
 
@@ -59,13 +59,14 @@ presentation/ → UI only
 
 ### Reality layers:
 
-| Layer            | Truth Source                     |
-| ---------------- | -------------------------------- |
-| Schema           | `app_database.dart` + migrations |
-| Business rules   | domain services                  |
-| Breakfast engine | contract docs                    |
-| Coding rules     | this file                        |
-| Summary docs     | schema.md                        |
+| Layer                | Truth Source                                |
+| -------------------- | ------------------------------------------- |
+| Schema               | `app_database.dart` + migrations            |
+| Approved feature flow| contract docs                               |
+| Runtime enforcement  | domain services                             |
+| Breakfast engine     | contract docs                               |
+| Coding rules         | this file                                   |
+| Summary docs         | schema.md                                   |
 
 ---
 
@@ -192,21 +193,61 @@ input state → rebuild → output snapshot
 
 ## 🔄 TRANSACTION MODEL
 
-### ⚠️ IMPORTANT:
-
-Live schema may use:
+### Canonical persisted statuses:
 
 ```text
 draft / sent / paid / cancelled
 ```
 
-Older docs may show:
+Definitions:
+
+* `draft` = first product has already been added, transaction exists, order is still editable
+* `sent` = draft order has been submitted, order is no longer line-editable, payment/cancellation may proceed
+* `paid` = payment completed; terminal
+* `cancelled` = sent order cancelled without payment; terminal
+
+Allowed persisted transitions:
 
 ```text
-open / paid / cancelled
+pre-order -(first successful product add)-> draft
+draft -> sent
+sent -> paid
+sent -> cancelled
 ```
 
-👉 FOLLOW LIVE SCHEMA (`app_database.dart`)
+Legacy terminology rule:
+
+* `open` is deprecated legacy wording only
+* `open` may be used informally for active/open-order lists
+* `open` is NOT a canonical stored `transactions.status`
+
+### POS entry and transaction timing
+
+* Category Entry screen is the primary post-login and post-payment idle/start screen
+* Category Entry is navigation only
+* before the first product is added, the system is in pre-order state
+* pre-order state means no transaction, no cart exists as either persisted state or in-memory structured order, and no allocated `transaction_id`
+* tapping a category opens the POS screen with that category preselected
+* transaction/order creation happens only when the first product is successfully added to cart
+* no action other than successful first-product add may exit pre-order state
+* first product added creates the cart together with the transaction, and the cart is always tied to `transaction_id`
+* first-product add must atomically create the transaction, set `status = 'draft'`, insert the first line, compute totals, and set `updated_at`
+* do NOT create empty transactions from login, category taps, or screen entry
+* do NOT create temporary transactions or persist cart state before transaction creation
+* do NOT keep a parallel in-memory cart before transaction creation
+* do NOT simulate cart behavior without a real transaction
+* after payment, fully destroy cart state, clear selected category, close transaction context, and return to clean pre-order state
+
+### Order lifecycle rules
+
+* line-item mutation is allowed only in `draft`
+* payment is allowed only from `sent`
+* cancellation is allowed only from `sent`
+* discarding a `draft` deletes it; discard is not a `cancelled` transition
+* kitchen print is queued on `draft -> sent`
+* receipt print is queued on `sent -> paid`
+* active/open-order lists consist of `draft` and `sent`
+* `paid` and `cancelled` are terminal persisted states
 
 ---
 
@@ -268,7 +309,8 @@ Rules:
 ### Sync rules:
 
 * ONLY `paid` / `cancelled`
-* NEVER `open/draft`
+* NEVER `draft` / `sent`
+* NEVER treat `open` as a syncable stored status
 
 ### Write path:
 
@@ -298,6 +340,17 @@ local → sync queue → edge function → supabase
   * swap-aware display
   * clear labels
 
+### Category flow and ordering
+
+* Category Entry screen and POS screen are separate responsibilities
+* Category Entry screen has no sidebar and no cart interaction
+* POS screen owns product browsing, category sidebar switching, and cart building
+* all category displays must use `categories.sort_order`
+* do NOT add local screen-specific category sorting
+* do NOT add popularity-driven or featured-category ordering
+* admin category reorder must use long-press drag-and-drop with explicit Save / Cancel
+* do NOT auto-save category reorder on drop
+
 ---
 
 ## 🚫 ABSOLUTE NO-GO LIST
@@ -310,6 +363,14 @@ local → sync queue → edge function → supabase
 6. ❌ Multiple payments per transaction
 7. ❌ Let UI decide swap vs extra
 8. ❌ Use stale schema assumptions
+9. ❌ Create orders from category-only navigation
+10. ❌ Use different category ordering rules on different screens
+11. ❌ Allocate `transaction_id` before first product add
+12. ❌ Persist cart state without a transaction
+13. ❌ Maintain a parallel in-memory cart before transaction creation
+14. ❌ Simulate cart behavior without a real transaction
+15. ❌ Create a transaction without its first line in the same atomic flow
+16. ❌ Insert the first line without the transaction in the same atomic flow
 
 ---
 
@@ -334,6 +395,7 @@ ALWAYS start with:
 Follow SYSTEM_OF_TRUTH.md first.
 Do not infer behavior from legacy flat modifier logic.
 Use breakfast contract docs for set behavior.
+Use POS category-entry contract docs for start-flow and category ordering.
 ```
 
 ---

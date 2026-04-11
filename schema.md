@@ -13,7 +13,8 @@ It is NOT the highest authority.
 1. `SYSTEM_OF_TRUTH.md`
 2. `lib/data/database/app_database.dart`
 3. embedded migration logic in `lib/data/database/app_database.dart`
-4. breakfast/menu-engine contract chain:
+4. relevant feature contract docs, including:
+   * `docs/pos_category_entry_flow_contract.md`
    * `docs/menu_product_role_contract.md`
    * `docs/set_breakfast_configuration_contract.md`
    * `docs/choice_group_mapping_contract.md`
@@ -30,7 +31,7 @@ If this file conflicts with:
 
 * live schema
 * migration files
-* breakfast/menu-engine contracts
+* feature contract docs
 
 👉 **THIS FILE IS WRONG → update it later**
 
@@ -122,6 +123,13 @@ removal_discount_1_minor
 removal_discount_2_minor
 ```
 
+Notes:
+
+* `categories.sort_order` is the single persisted source of truth for category display order
+* the Category Entry screen and the POS category sidebar must use the same `sort_order`
+* the live schema does not define a separate featured-category field
+* the live schema does not define a separate popularity-order field
+
 ---
 
 ### 3. products
@@ -160,6 +168,8 @@ item_product_id (nullable for non-choice, required for choice)
 name
 type (included | extra | choice)
 extra_price_minor
+price_behavior (nullable: free | paid)
+ui_section (nullable: toppings | sauces | add_ins)
 is_active
 ```
 
@@ -167,6 +177,7 @@ Notes:
 
 * `type = 'choice'` members must reference real catalog products through `item_product_id`
 * breakfast choice members are owned through `modifier_groups`, not duplicated products
+* structured burger-style flat modifiers keep `type = 'extra'`; `price_behavior` and `ui_section` only add pricing/render metadata
 * legacy flat interpretation is baseline only; the current live table shape is authoritative here
 
 ---
@@ -208,16 +219,56 @@ kitchen_printed
 receipt_printed
 ```
 
+Notes:
+
+* a transaction is created only when the first product is successfully added to cart on the POS screen
+* before first product add, the system is in a pre-order state with no transaction row, no cart as either persisted state or in-memory structured order, and no allocated `transaction_id`
+* no action other than successful first-product add may exit pre-order state
+* first product add creates the cart together with the transaction, and that cart is always tied to `transaction_id`
+* first product add must atomically create the transaction, set `status = 'draft'`, insert the first `transaction_line`, compute totals, and set `updated_at`
+* login, Category Entry navigation, and category selection do not create transactions
+* after payment, the cart is fully destroyed, selected category is cleared, transaction context is closed, and the system returns to a clean pre-order state
+* parallel in-memory carts before transaction creation and simulated cart behavior without a real transaction are forbidden
+
 ### Current live status contract
 
 ```text id="c2r5sk"
 draft / sent / paid / cancelled
 ```
 
-Legacy baseline note:
+Operational meaning:
 
-* older `open` wording is legacy / migration compatibility language
-* current live schema contract is `draft / sent / paid / cancelled`
+* `draft` = persisted order exists and remains editable
+* `sent` = draft order has been submitted and is awaiting payment or cancellation
+* `paid` = payment completed; terminal
+* `cancelled` = sent order cancelled without payment; terminal
+
+Allowed transitions:
+
+* pre-order -> no persisted row
+* first successful product add -> `draft`
+* `draft -> sent`
+* `sent -> paid`
+* `sent -> cancelled`
+
+Forbidden transitions:
+
+* pre-order -> any persisted transaction without first product add
+* `draft -> paid`
+* `draft -> cancelled`
+* `paid -> *`
+* `cancelled -> *`
+
+Lifecycle notes:
+
+* only `draft` transactions are editable
+* only `sent` transactions are payable
+* only `sent` transactions are cancellable
+* discarding a `draft` deletes it; discard is not a persisted status transition
+* active/open-order lists are the combined set `draft + sent`
+* `open` may remain as a legacy umbrella label for active orders, but it is not a stored `transactions.status`
+* migration compatibility may still encounter older `open` language, but canonical persisted status truth is `draft / sent / paid / cancelled`
+* remote mirror sync accepts terminal states only: `paid` and `cancelled`
 
 ---
 
@@ -267,12 +318,15 @@ extra_price_minor
 unit_price_minor
 price_effect_minor
 sort_key
+price_behavior (nullable: free | paid)
+ui_section (nullable: toppings | sauces | add_ins)
 ```
 
 Notes:
 
 * `action = 'choice'` requires `charge_reason = 'included_choice'`
 * this table is semantic snapshot persistence, not cosmetic modifier text
+* structured burger selections persist as `action = 'add'` rows and carry nullable `price_behavior` / `ui_section` context for mirror analytics
 * breakfast contract semantics use the contract-defined subset; `removal_discount` remains live-schema-compatible
 
 ---

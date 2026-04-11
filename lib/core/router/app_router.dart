@@ -25,6 +25,7 @@ import '../../presentation/screens/auth/pin_screen.dart';
 import '../../presentation/screens/dashboard/cashier_dashboard_screen.dart';
 import '../../presentation/screens/orders/order_detail_screen.dart';
 import '../../presentation/screens/orders/open_orders_screen.dart';
+import '../../presentation/screens/pos/category_entry_screen.dart';
 import '../../presentation/screens/pos/pos_screen.dart';
 import '../../presentation/screens/reports/z_report_screen.dart';
 import '../../presentation/screens/shifts/shift_management_screen.dart';
@@ -37,14 +38,26 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
     routes: <RouteBase>[
       GoRoute(
         path: '/',
-        redirect: (_, __) => authState.currentUser == null ? '/login' : '/pos',
+        redirect: (_, __) =>
+            authState.currentUser == null ? '/login' : '/pos/categories',
       ),
       GoRoute(path: '/login', builder: (_, __) => const PinScreen()),
       GoRoute(
         path: '/dashboard',
         builder: (_, __) => const CashierDashboardScreen(),
       ),
-      GoRoute(path: '/pos', builder: (_, __) => const PosScreen()),
+      GoRoute(
+        path: '/pos/categories',
+        builder: (_, __) => const CategoryEntryScreen(),
+      ),
+      GoRoute(
+        path: '/pos',
+        builder: (_, GoRouterState state) => PosScreen(
+          initialCategoryId: int.tryParse(
+            state.uri.queryParameters['categoryId'] ?? '',
+          ),
+        ),
+      ),
       GoRoute(path: '/orders', builder: (_, __) => const OpenOrdersScreen()),
       GoRoute(
         path: '/shifts',
@@ -154,7 +167,7 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
         return '/login';
       }
       if (isLoggedIn && isLoginRoute) {
-        return '/pos';
+        return '/pos/categories';
       }
       if (isAdminRoute && currentUser?.role != UserRole.admin) {
         return '/';

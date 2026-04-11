@@ -166,6 +166,95 @@ void main() {
       expect(snapshot.appliedRuleIds, isNot(contains(901)));
     });
 
+    test('exact remove combo overrides additive remove-only rules', () {
+      final MealCustomizationResolvedSnapshot snapshot = engine.evaluate(
+        profile: _baseProfile(
+          pricingRules: const <MealAdjustmentPricingRule>[
+            MealAdjustmentPricingRule(
+              id: 910,
+              profileId: 10,
+              name: 'No main',
+              ruleType: MealAdjustmentPricingRuleType.removeOnly,
+              priceDeltaMinor: -100,
+              priority: 0,
+              isActive: true,
+              conditions: <MealAdjustmentPricingRuleCondition>[
+                MealAdjustmentPricingRuleCondition(
+                  id: 1,
+                  ruleId: 910,
+                  conditionType:
+                      MealAdjustmentPricingRuleConditionType.removedComponent,
+                  componentKey: 'main',
+                  quantity: 1,
+                ),
+              ],
+            ),
+            MealAdjustmentPricingRule(
+              id: 911,
+              profileId: 10,
+              name: 'No side',
+              ruleType: MealAdjustmentPricingRuleType.removeOnly,
+              priceDeltaMinor: -100,
+              priority: 0,
+              isActive: true,
+              conditions: <MealAdjustmentPricingRuleCondition>[
+                MealAdjustmentPricingRuleCondition(
+                  id: 2,
+                  ruleId: 911,
+                  conditionType:
+                      MealAdjustmentPricingRuleConditionType.removedComponent,
+                  componentKey: 'side',
+                  quantity: 1,
+                ),
+              ],
+            ),
+            MealAdjustmentPricingRule(
+              id: 912,
+              profileId: 10,
+              name: 'No main and no side',
+              ruleType: MealAdjustmentPricingRuleType.combo,
+              priceDeltaMinor: -250,
+              priority: 5,
+              isActive: true,
+              conditions: <MealAdjustmentPricingRuleCondition>[
+                MealAdjustmentPricingRuleCondition(
+                  id: 3,
+                  ruleId: 912,
+                  conditionType:
+                      MealAdjustmentPricingRuleConditionType.removedComponent,
+                  componentKey: 'main',
+                  quantity: 1,
+                ),
+                MealAdjustmentPricingRuleCondition(
+                  id: 4,
+                  ruleId: 912,
+                  conditionType:
+                      MealAdjustmentPricingRuleConditionType.removedComponent,
+                  componentKey: 'side',
+                  quantity: 1,
+                ),
+              ],
+            ),
+          ],
+        ),
+        request: const MealCustomizationRequest(
+          productId: 500,
+          profileId: 10,
+          removedComponentKeys: <String>['main', 'side'],
+        ),
+      );
+
+      expect(snapshot.totalAdjustmentMinor, -250);
+      expect(snapshot.triggeredDiscounts, hasLength(1));
+      expect(
+        snapshot.triggeredDiscounts.single.chargeReason,
+        MealCustomizationChargeReason.comboDiscount,
+      );
+      expect(snapshot.appliedRuleIds, contains(912));
+      expect(snapshot.appliedRuleIds, isNot(contains(910)));
+      expect(snapshot.appliedRuleIds, isNot(contains(911)));
+    });
+
     test('keeps swap and extra semantics separate', () {
       final MealCustomizationResolvedSnapshot snapshot = engine.evaluate(
         profile: _baseProfile(),
@@ -254,8 +343,10 @@ void main() {
         ),
       );
 
-      expect(snapshot.resolvedComponentActions.single.chargeReason,
-          MealCustomizationChargeReason.freeSwap);
+      expect(
+        snapshot.resolvedComponentActions.single.chargeReason,
+        MealCustomizationChargeReason.freeSwap,
+      );
       expect(snapshot.resolvedComponentActions.single.priceDeltaMinor, 0);
       expect(snapshot.totalAdjustmentMinor, 0);
     });
@@ -348,6 +439,88 @@ void main() {
       expect(first, second);
     });
 
+    test('ruleless remove stays valid with zero delta', () {
+      final MealCustomizationResolvedSnapshot snapshot = engine.evaluate(
+        profile: _baseProfile(
+          pricingRules: const <MealAdjustmentPricingRule>[],
+        ),
+        request: const MealCustomizationRequest(
+          productId: 500,
+          profileId: 10,
+          removedComponentKeys: <String>['side'],
+        ),
+      );
+
+      expect(snapshot.totalAdjustmentMinor, 0);
+      expect(
+        snapshot.resolvedComponentActions.single.action,
+        MealCustomizationAction.remove,
+      );
+      expect(snapshot.triggeredDiscounts, isEmpty);
+    });
+
+    test('rejects removing and swapping the same component', () {
+      expect(
+        () => engine.evaluate(
+          profile: _baseProfile(),
+          request: const MealCustomizationRequest(
+            productId: 500,
+            profileId: 10,
+            removedComponentKeys: <String>['main'],
+            swapSelections: <MealCustomizationComponentSelection>[
+              MealCustomizationComponentSelection(
+                componentKey: 'main',
+                targetItemProductId: 202,
+              ),
+            ],
+          ),
+        ),
+        throwsA(isA<MealCustomizationRequestRejectedException>()),
+      );
+    });
+
+    test('identity differs for keep remove and swap states', () {
+      final MealAdjustmentProfile profile = _baseProfile(freeSwapLimit: 0);
+      final MealCustomizationResolvedSnapshot keepSnapshot = engine.evaluate(
+        profile: profile,
+        request: const MealCustomizationRequest(productId: 500, profileId: 10),
+      );
+      final MealCustomizationResolvedSnapshot removeSnapshot = engine.evaluate(
+        profile: profile,
+        request: const MealCustomizationRequest(
+          productId: 500,
+          profileId: 10,
+          removedComponentKeys: <String>['side'],
+        ),
+      );
+      final MealCustomizationResolvedSnapshot swapSnapshot = engine.evaluate(
+        profile: profile,
+        request: const MealCustomizationRequest(
+          productId: 500,
+          profileId: 10,
+          swapSelections: <MealCustomizationComponentSelection>[
+            MealCustomizationComponentSelection(
+              componentKey: 'side',
+              targetItemProductId: 204,
+            ),
+          ],
+        ),
+      );
+
+      expect(
+        removeSnapshot.stableIdentityKey,
+        isNot(keepSnapshot.stableIdentityKey),
+      );
+      expect(
+        swapSnapshot.stableIdentityKey,
+        isNot(keepSnapshot.stableIdentityKey),
+      );
+      expect(
+        swapSnapshot.stableIdentityKey,
+        isNot(removeSnapshot.stableIdentityKey),
+      );
+    });
+
     test('rejects invalid request input', () {
       expect(
         () => engine.evaluate(
@@ -361,11 +534,80 @@ void main() {
         throwsA(isA<MealCustomizationRequestRejectedException>()),
       );
     });
+
+    test('sandwich flow applies bread surcharge and default toast', () {
+      final MealCustomizationResolvedSnapshot snapshot = engine.evaluate(
+        profile: _sandwichProfile(),
+        request: const MealCustomizationRequest(
+          productId: 700,
+          profileId: 30,
+          sandwichSelection: SandwichCustomizationSelection(
+            breadType: SandwichBreadType.sandwich,
+            sauceProductIds: <int>[601, 602],
+          ),
+          extraSelections: <MealCustomizationExtraSelection>[
+            MealCustomizationExtraSelection(itemProductId: 401, quantity: 1),
+          ],
+        ),
+      );
+
+      expect(snapshot.sandwichSelection, isNotNull);
+      expect(snapshot.sandwichSelection!.breadType, SandwichBreadType.sandwich);
+      expect(snapshot.sandwichSelection!.sauceProductIds, <int>[601, 602]);
+      expect(
+        snapshot.sandwichSelection!.toastOption,
+        SandwichToastOption.normal,
+      );
+      expect(snapshot.totalAdjustmentMinor, 300);
+      expect(snapshot.resolvedComponentActions, isEmpty);
+      expect(snapshot.resolvedExtraActions, hasLength(1));
+    });
+
+    test('sandwich flow rejects sauces that are disabled on the profile', () {
+      expect(
+        () => engine.evaluate(
+          profile: _sandwichProfile(
+            sandwichSettings: const SandwichProfileSettings(
+              sandwichSurchargeMinor: 125,
+              baguetteSurchargeMinor: 230,
+              sauceProductIds: <int>[601],
+            ),
+          ),
+          request: const MealCustomizationRequest(
+            productId: 700,
+            profileId: 30,
+            sandwichSelection: SandwichCustomizationSelection(
+              breadType: SandwichBreadType.roll,
+              sauceProductIds: <int>[603],
+            ),
+          ),
+        ),
+        throwsA(isA<MealCustomizationRequestRejectedException>()),
+      );
+    });
+
+    test('sandwich flow rejects toast when bread is not sandwich', () {
+      expect(
+        () => engine.evaluate(
+          profile: _sandwichProfile(),
+          request: const MealCustomizationRequest(
+            productId: 700,
+            profileId: 30,
+            sandwichSelection: SandwichCustomizationSelection(
+              breadType: SandwichBreadType.roll,
+              toastOption: SandwichToastOption.toasted,
+            ),
+          ),
+        ),
+        throwsA(isA<MealCustomizationRequestRejectedException>()),
+      );
+    });
   });
 }
 
 MealAdjustmentProfile _baseProfile({
   int freeSwapLimit = 1,
+  MealAdjustmentProfileKind kind = MealAdjustmentProfileKind.standard,
   List<MealAdjustmentPricingRule> pricingRules =
       const <MealAdjustmentPricingRule>[],
 }) {
@@ -373,6 +615,7 @@ MealAdjustmentProfile _baseProfile({
     id: 10,
     name: 'Combo meal',
     description: 'Standard meal profile',
+    kind: kind,
     freeSwapLimit: freeSwapLimit,
     isActive: true,
     components: const <MealAdjustmentComponent>[
@@ -467,5 +710,33 @@ MealAdjustmentProfile _baseProfile({
       ),
     ],
     pricingRules: pricingRules,
+  );
+}
+
+MealAdjustmentProfile _sandwichProfile({
+  SandwichProfileSettings sandwichSettings = const SandwichProfileSettings(
+    sandwichSurchargeMinor: 125,
+    baguetteSurchargeMinor: 230,
+    sauceProductIds: <int>[601, 602],
+  ),
+}) {
+  return MealAdjustmentProfile(
+    id: 30,
+    name: 'Sandwich profile',
+    description: 'Roll / sandwich / baguette flow',
+    kind: MealAdjustmentProfileKind.sandwich,
+    sandwichSettings: sandwichSettings,
+    freeSwapLimit: 0,
+    isActive: true,
+    extraOptions: <MealAdjustmentExtraOption>[
+      MealAdjustmentExtraOption(
+        id: 21,
+        profileId: 30,
+        itemProductId: 401,
+        fixedPriceDeltaMinor: 175,
+        sortOrder: 0,
+        isActive: true,
+      ),
+    ],
   );
 }

@@ -1,6 +1,7 @@
 import '../../core/errors/exceptions.dart';
 import '../models/meal_customization.dart';
 import '../models/order_modifier.dart';
+import '../models/product_modifier.dart';
 
 class MealCustomizationPersistenceProjection {
   const MealCustomizationPersistenceProjection({
@@ -29,6 +30,77 @@ class MealCustomizationPersistenceMapper {
   }) {
     final List<OrderModifier> modifiers = <OrderModifier>[];
     int sortKey = 10;
+    final int sandwichBreadPriceDeltaMinor = snapshot.sandwichSelection == null
+        ? 0
+        : snapshot.totalAdjustmentMinor -
+              snapshot.resolvedExtraActions.fold<int>(
+                0,
+                (int total, MealCustomizationSemanticAction action) =>
+                    total + action.priceDeltaMinor,
+              );
+
+    final SandwichCustomizationSelection? sandwichSelection =
+        snapshot.sandwichSelection;
+    if (sandwichSelection != null) {
+      final SandwichBreadType? breadType = sandwichSelection.breadType;
+      if (breadType != null) {
+        modifiers.add(
+          OrderModifier(
+            id: 0,
+            uuid: createUuid(),
+            transactionLineId: transactionLineId,
+            action: ModifierAction.choice,
+            itemName: sandwichBreadLabel(breadType),
+            extraPriceMinor: sandwichBreadPriceDeltaMinor,
+            chargeReason: ModifierChargeReason.includedChoice,
+            quantity: 1,
+            unitPriceMinor: sandwichBreadPriceDeltaMinor,
+            priceEffectMinor: sandwichBreadPriceDeltaMinor,
+            sortKey: sortKey,
+          ),
+        );
+        sortKey += 10;
+      }
+      for (final int sauceProductId in sandwichSelection.sauceProductIds) {
+        modifiers.add(
+          OrderModifier(
+            id: 0,
+            uuid: createUuid(),
+            transactionLineId: transactionLineId,
+            action: ModifierAction.choice,
+            itemName: _requireProductName(sauceProductId, productNamesById),
+            extraPriceMinor: 0,
+            chargeReason: ModifierChargeReason.includedChoice,
+            itemProductId: sauceProductId,
+            priceBehavior: ModifierPriceBehavior.free,
+            uiSection: ModifierUiSection.sauces,
+            quantity: 1,
+            unitPriceMinor: 0,
+            priceEffectMinor: 0,
+            sortKey: sortKey,
+          ),
+        );
+        sortKey += 10;
+      }
+      if (sandwichSelection.toastOption != null) {
+        modifiers.add(
+          OrderModifier(
+            id: 0,
+            uuid: createUuid(),
+            transactionLineId: transactionLineId,
+            action: ModifierAction.choice,
+            itemName: sandwichToastLabel(sandwichSelection.toastOption!),
+            extraPriceMinor: 0,
+            chargeReason: ModifierChargeReason.includedChoice,
+            quantity: 1,
+            unitPriceMinor: 0,
+            priceEffectMinor: 0,
+            sortKey: sortKey,
+          ),
+        );
+        sortKey += 10;
+      }
+    }
 
     for (final MealCustomizationSemanticAction action
         in snapshot.resolvedComponentActions) {
@@ -89,7 +161,10 @@ class MealCustomizationPersistenceMapper {
               uuid: createUuid(),
               transactionLineId: transactionLineId,
               action: ModifierAction.add,
-              itemName: _requireProductName(targetItemProductId, productNamesById),
+              itemName: _requireProductName(
+                targetItemProductId,
+                productNamesById,
+              ),
               extraPriceMinor: action.priceDeltaMinor < 0
                   ? 0
                   : action.priceDeltaMinor,
@@ -153,7 +228,9 @@ class MealCustomizationPersistenceMapper {
           transactionLineId: transactionLineId,
           action: ModifierAction.add,
           itemName: _requireProductName(itemProductId, productNamesById),
-          extraPriceMinor: action.priceDeltaMinor < 0 ? 0 : action.priceDeltaMinor,
+          extraPriceMinor: action.priceDeltaMinor < 0
+              ? 0
+              : action.priceDeltaMinor,
           chargeReason: _mapChargeReason(action.chargeReason),
           itemProductId: itemProductId,
           quantity: action.quantity,
@@ -211,10 +288,7 @@ class MealCustomizationPersistenceMapper {
     );
   }
 
-  String _requireProductName(
-    int productId,
-    Map<int, String> productNamesById,
-  ) {
+  String _requireProductName(int productId, Map<int, String> productNamesById) {
     final String? productName = productNamesById[productId];
     if (productName != null && productName.trim().isNotEmpty) {
       return productName;

@@ -17,6 +17,23 @@ type MirrorWriteRequest = {
   payments: Array<Record<string, unknown>>;
 };
 
+const orderModifierAllowedColumns = [
+  "uuid",
+  "transaction_line_uuid",
+  "action",
+  "item_name",
+  "extra_price_minor",
+  "quantity",
+  "item_product_id",
+  "charge_reason",
+  "unit_price_minor",
+  "price_effect_minor",
+  "sort_key",
+  "price_behavior",
+  "ui_section",
+] as const;
+const orderModifierAllowedColumnSet = new Set<string>(orderModifierAllowedColumns);
+
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
 }
@@ -163,6 +180,86 @@ function tableResult(
   };
 }
 
+function setIfDefined(
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown,
+) {
+  if (value !== undefined) {
+    target[key] = value;
+  }
+}
+
+export function sanitizeOrderModifierRow(
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+  setIfDefined(sanitized, "uuid", row["uuid"]);
+  setIfDefined(
+    sanitized,
+    "transaction_line_uuid",
+    row["transaction_line_uuid"],
+  );
+  setIfDefined(sanitized, "action", row["action"]);
+  setIfDefined(sanitized, "item_name", row["item_name"]);
+  setIfDefined(sanitized, "extra_price_minor", row["extra_price_minor"]);
+  setIfDefined(sanitized, "quantity", row["quantity"]);
+  setIfDefined(sanitized, "item_product_id", row["item_product_id"]);
+  setIfDefined(sanitized, "charge_reason", row["charge_reason"]);
+  setIfDefined(sanitized, "unit_price_minor", row["unit_price_minor"]);
+  setIfDefined(sanitized, "price_effect_minor", row["price_effect_minor"]);
+  setIfDefined(sanitized, "sort_key", row["sort_key"]);
+  setIfDefined(sanitized, "price_behavior", row["price_behavior"]);
+  setIfDefined(sanitized, "ui_section", row["ui_section"]);
+  return sanitized;
+}
+
+export function sanitizeOrderModifierRows(
+  rows: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> {
+  return rows.map((row) => sanitizeOrderModifierRow(row));
+}
+
+function findUnexpectedOrderModifierKeys(
+  row: Record<string, unknown> | null,
+): string[] {
+  if (row === null) {
+    return [];
+  }
+  return Object.keys(row).filter((key) => !orderModifierAllowedColumnSet.has(key));
+}
+
+function serializeSupabaseError(error: {
+  message: string;
+  details: string | null;
+  hint: string | null;
+  code: string;
+}): Record<string, unknown> {
+  return {
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+    code: error.code,
+  };
+}
+
+export function buildOrderModifierAuditContext(
+  rawRows: Array<Record<string, unknown>>,
+  sanitizedRows: Array<Record<string, unknown>>,
+): Record<string, unknown> {
+  const rawFirstRow = rawRows.length > 0 ? rawRows[0] : null;
+  const sanitizedFirstRow = sanitizedRows.length > 0 ? sanitizedRows[0] : null;
+  return {
+    row_count: sanitizedRows.length,
+    raw_first_row_keys: rawFirstRow === null ? [] : Object.keys(rawFirstRow),
+    raw_first_row_extra_keys: findUnexpectedOrderModifierKeys(rawFirstRow),
+    raw_first_row_sample: rawFirstRow,
+    sanitized_first_row_keys:
+      sanitizedFirstRow === null ? [] : Object.keys(sanitizedFirstRow),
+    sanitized_first_row_sample: sanitizedFirstRow,
+  };
+}
+
 function validateRequest(payload: unknown):
   | { ok: true; value: MirrorWriteRequest }
   | { ok: false; issues: string[] } {
@@ -260,7 +357,9 @@ function validateRequest(payload: unknown):
   };
 }
 
-Deno.serve(async (request: Request) => {
+export async function handleMirrorTransactionGraphRequest(
+  request: Request,
+): Promise<Response> {
   if (request.method !== "POST") {
     return jsonResponse(
       {
@@ -361,19 +460,42 @@ Deno.serve(async (request: Request) => {
     }
   }
 
-  const orderModifierUuids = payload.order_modifiers
+  const sanitizedOrderModifiers = sanitizeOrderModifierRows(
+    payload.order_modifiers,
+  );
+  const orderModifierAuditContext = buildOrderModifierAuditContext(
+    payload.order_modifiers,
+    sanitizedOrderModifiers,
+  );
+  const orderModifierUuids = sanitizedOrderModifiers
     .map((modifier) => typeof modifier["uuid"] === "string" ? modifier["uuid"] : null)
     .filter((uuid): uuid is string => uuid !== null);
   if (payload.order_modifiers.length > 0) {
+    console.log(
+      "[ORDER_MODIFIERS_AUDIT]",
+      JSON.stringify(orderModifierAuditContext),
+    );
     const modifierResult = await admin
       .from("order_modifiers")
-      .upsert(payload.order_modifiers, { onConflict: "uuid" });
+      .upsert(sanitizedOrderModifiers, { onConflict: "uuid" });
     if (modifierResult.error) {
+      const failureDetails = {
+        row_count: sanitizedOrderModifiers.length,
+        sanitized_first_row_sample:
+          orderModifierAuditContext["sanitized_first_row_sample"] ?? null,
+        raw_first_row_extra_keys:
+          orderModifierAuditContext["raw_first_row_extra_keys"] ?? [],
+        supabase_error: serializeSupabaseError(modifierResult.error),
+      };
+      console.error(
+        "[ORDER_MODIFIERS_UPSERT_FAILED]",
+        JSON.stringify(failureDetails),
+      );
       return tableFailure(
         "Failed to mirror order modifier snapshots",
         "order_modifiers",
         orderModifierUuids,
-        modifierResult.error.message,
+        failureDetails,
       );
     }
   }
@@ -402,7 +524,7 @@ Deno.serve(async (request: Request) => {
     mirrored_records:
       1 +
       payload.transaction_lines.length +
-      payload.order_modifiers.length +
+      sanitizedOrderModifiers.length +
       payload.payments.length,
     table_results: [
       tableResult("transactions", [payload.transaction_uuid]),
@@ -411,4 +533,8 @@ Deno.serve(async (request: Request) => {
       tableResult("payments", paymentUuids),
     ],
   });
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleMirrorTransactionGraphRequest);
+}

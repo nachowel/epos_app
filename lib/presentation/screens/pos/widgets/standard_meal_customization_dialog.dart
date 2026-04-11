@@ -461,9 +461,8 @@ class _StandardMealCustomizationDialogState
   }
 
   Widget _buildSandwichSauceSection() {
-    final List<SandwichSauceType> sauceOptions =
-        _profile.sandwichSettings.sauceOptions;
-    if (sauceOptions.isEmpty) {
+    final List<int> sauceProductIds = _profile.sandwichSettings.sauceProductIds;
+    if (sauceProductIds.isEmpty) {
       return const Text(
         'No sauces are enabled for this sandwich profile.',
         style: TextStyle(
@@ -475,15 +474,17 @@ class _StandardMealCustomizationDialogState
     return Wrap(
       spacing: AppSizes.spacingSm,
       runSpacing: AppSizes.spacingSm,
-      children: sauceOptions
-          .map((SandwichSauceType sauceType) {
+      children: sauceProductIds
+          .map((int sauceProductId) {
+            final String sauceLabel =
+                _productNamesById[sauceProductId] ?? 'Product $sauceProductId';
             return _ModeButton(
-              key: ValueKey<String>('meal-sandwich-sauce-${sauceType.name}'),
-              label: sandwichSauceLabel(sauceType),
-              selected: _editorState.sandwichSelection.sauceTypes.contains(
-                sauceType,
+              key: ValueKey<String>('meal-sandwich-sauce-$sauceProductId'),
+              label: sauceLabel,
+              selected: _editorState.sandwichSelection.sauceProductIds.contains(
+                sauceProductId,
               ),
-              onPressed: () => _toggleSandwichSauce(sauceType),
+              onPressed: () => _toggleSandwichSauce(sauceProductId),
             );
           })
           .toList(growable: false),
@@ -821,18 +822,19 @@ class _StandardMealCustomizationDialogState
     _setEditorState(_editorState.copyWith(sandwichSelection: selection));
   }
 
-  void _toggleSandwichSauce(SandwichSauceType sauceType) {
-    final List<SandwichSauceType> current = List<SandwichSauceType>.from(
-      _editorState.sandwichSelection.sauceTypes,
+  void _toggleSandwichSauce(int sauceProductId) {
+    final List<int> current = List<int>.from(
+      _editorState.sandwichSelection.sauceProductIds,
     );
-    if (current.contains(sauceType)) {
-      current.remove(sauceType);
+    if (current.contains(sauceProductId)) {
+      current.remove(sauceProductId);
     } else {
-      current.add(sauceType);
+      current.add(sauceProductId);
     }
     _updateSandwichSelection(
       _editorState.sandwichSelection.copyWith(
-        sauceTypes: normalizeSandwichSauceTypes(current),
+        sauceProductIds: normalizeSandwichSauceProductIds(current),
+        legacySauceLookupKeys: const <String>[],
       ),
     );
   }

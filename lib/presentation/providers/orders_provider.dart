@@ -302,7 +302,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       _ref.read(mealInsightsServiceProvider).invalidateSuggestionCache();
       await refreshOpenOrders();
       state = state.copyWith(
-        selectedOrderId: transaction.id,
+        selectedOrderId: transaction.status == TransactionStatus.paid
+            ? null
+            : transaction.id,
         isCheckoutLoading: false,
         errorMessage: null,
       );
@@ -534,7 +536,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
               );
           final bool isLegacyMealCustomizationLine =
               mealSnapshot == null &&
-              await transactionRepository.isLegacyMealCustomizationLine(line.id);
+              await transactionRepository.isLegacyMealCustomizationLine(
+                line.id,
+              );
           final bool isBreakfastConfigurable =
               transaction.status == TransactionStatus.draft &&
               await breakfastConfigurationRepository.hasSetConfiguration(
@@ -632,6 +636,20 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
   void clearError() {
     state = state.copyWith(errorMessage: null);
+  }
+
+  void resetPosSessionContext() {
+    _pendingIdempotencyKey = null;
+    state = state.copyWith(
+      selectedOrderId: null,
+      isRefreshing: false,
+      isCheckoutLoading: false,
+      isPaymentLoading: false,
+      isCancelLoading: false,
+      isPrintLoading: false,
+      isTableUpdateLoading: false,
+      errorMessage: null,
+    );
   }
 
   Future<BreakfastEditorData?> loadBreakfastEditorData({
@@ -744,8 +762,8 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             snapshot: snapshotRecord.snapshot,
             lineQuantity: line.quantity,
           );
-      final MealCustomizationPosEditorData editorData =
-          await posService.loadEditorDataForPersistedProfile(
+      final MealCustomizationPosEditorData editorData = await posService
+          .loadEditorDataForPersistedProfile(
             product: product,
             profileId: snapshotRecord.profileId,
             initialState: rehydration.editorState,
@@ -931,6 +949,8 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
                 action: modifier.action,
                 itemName: modifier.itemName,
                 extraPriceMinor: modifier.extraPriceMinor,
+                priceBehavior: modifier.priceBehavior,
+                uiSection: modifier.uiSection,
               ),
             )
             .toList(growable: false),

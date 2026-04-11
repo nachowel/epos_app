@@ -11,7 +11,7 @@ class Phase1SyncPayloadMapper {
       'user_local_id': row.userId,
       'table_number': row.tableNumber,
       // The live mirror schema accepts finalized rows only. Sync graph
-      // construction rejects draft/sent/open rows before this mapper runs.
+      // construction rejects draft/sent rows before this mapper runs.
       'status': Phase1SyncContract.mapLocalTransactionStatusToRemote(
         row.status,
       ),
@@ -61,6 +61,8 @@ class Phase1SyncPayloadMapper {
       'unit_price_minor': row.unitPriceMinor,
       'price_effect_minor': row.priceEffectMinor,
       'sort_key': row.sortKey,
+      'price_behavior': row.priceBehavior,
+      'ui_section': row.uiSection,
     };
   }
 

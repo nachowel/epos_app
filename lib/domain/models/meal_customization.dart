@@ -3,8 +3,11 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 
 import 'meal_adjustment_profile.dart';
+export 'sandwich.dart';
 
 enum MealCustomizationAction { remove, swap, extra, discount }
+
+enum MealComponentSelectionMode { keep, remove, swap }
 
 enum MealCustomizationChargeReason {
   freeSwap,
@@ -14,7 +17,94 @@ enum MealCustomizationChargeReason {
   comboDiscount,
 }
 
-enum MealCustomizationPersistenceLineKind { remove, swap, extra, discount }
+enum MealCustomizationPersistenceLineKind {
+  remove,
+  swap,
+  extra,
+  discount,
+  choice,
+}
+
+class SandwichCustomizationSelection {
+  const SandwichCustomizationSelection({
+    this.breadType,
+    this.sauceProductIds = const <int>[],
+    this.toastOption,
+    this.legacySauceLookupKeys = const <String>[],
+  });
+
+  final SandwichBreadType? breadType;
+  final List<int> sauceProductIds;
+  final SandwichToastOption? toastOption;
+  final List<String> legacySauceLookupKeys;
+
+  bool get hasLegacySauceSelection => legacySauceLookupKeys.isNotEmpty;
+
+  SandwichCustomizationSelection copyWith({
+    Object? breadType = _unsetNullableField,
+    List<int>? sauceProductIds,
+    Object? toastOption = _unsetNullableField,
+    Object? legacySauceLookupKeys = _unsetNullableField,
+  }) {
+    return SandwichCustomizationSelection(
+      breadType: identical(breadType, _unsetNullableField)
+          ? this.breadType
+          : breadType as SandwichBreadType?,
+      sauceProductIds: sauceProductIds ?? this.sauceProductIds,
+      toastOption: identical(toastOption, _unsetNullableField)
+          ? this.toastOption
+          : toastOption as SandwichToastOption?,
+      legacySauceLookupKeys:
+          identical(legacySauceLookupKeys, _unsetNullableField)
+          ? this.legacySauceLookupKeys
+          : legacySauceLookupKeys as List<String>,
+    );
+  }
+
+  Map<String, Object?> toJson() {
+    return <String, Object?>{
+      'bread_type': breadType?.name,
+      'sauce_product_ids': List<int>.from(sauceProductIds),
+      'toast_option': toastOption?.name,
+    };
+  }
+
+  factory SandwichCustomizationSelection.fromJson(Map<String, Object?> json) {
+    final List<int> parsedSauceProductIds = _sandwichSauceProductIdsFromJson(
+      json['sauce_product_ids'],
+    );
+    final List<String> legacySauceLookupKeys =
+        _legacySandwichSauceLookupKeysFromJson(
+          json['sauce_types'],
+          legacySingleSauce: json['sauce_type'] as String?,
+        );
+    return SandwichCustomizationSelection(
+      breadType: _sandwichBreadTypeFromJson(json['bread_type'] as String?),
+      sauceProductIds: parsedSauceProductIds,
+      toastOption: _sandwichToastOptionFromJson(
+        json['toast_option'] as String?,
+      ),
+      legacySauceLookupKeys: legacySauceLookupKeys,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SandwichCustomizationSelection &&
+        other.breadType == breadType &&
+        _listEquals(other.sauceProductIds, sauceProductIds) &&
+        other.toastOption == toastOption &&
+        _listEquals(other.legacySauceLookupKeys, legacySauceLookupKeys);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    breadType,
+    Object.hashAll(sauceProductIds),
+    toastOption,
+    Object.hashAll(legacySauceLookupKeys),
+  );
+}
 
 class MealCustomizationRequest {
   const MealCustomizationRequest({
@@ -23,6 +113,7 @@ class MealCustomizationRequest {
     this.removedComponentKeys = const <String>[],
     this.swapSelections = const <MealCustomizationComponentSelection>[],
     this.extraSelections = const <MealCustomizationExtraSelection>[],
+    this.sandwichSelection = const SandwichCustomizationSelection(),
   });
 
   final int productId;
@@ -30,6 +121,7 @@ class MealCustomizationRequest {
   final List<String> removedComponentKeys;
   final List<MealCustomizationComponentSelection> swapSelections;
   final List<MealCustomizationExtraSelection> extraSelections;
+  final SandwichCustomizationSelection sandwichSelection;
 
   MealCustomizationRequest copyWith({
     int? productId,
@@ -37,6 +129,7 @@ class MealCustomizationRequest {
     List<String>? removedComponentKeys,
     List<MealCustomizationComponentSelection>? swapSelections,
     List<MealCustomizationExtraSelection>? extraSelections,
+    SandwichCustomizationSelection? sandwichSelection,
   }) {
     return MealCustomizationRequest(
       productId: productId ?? this.productId,
@@ -46,6 +139,7 @@ class MealCustomizationRequest {
       removedComponentKeys: removedComponentKeys ?? this.removedComponentKeys,
       swapSelections: swapSelections ?? this.swapSelections,
       extraSelections: extraSelections ?? this.extraSelections,
+      sandwichSelection: sandwichSelection ?? this.sandwichSelection,
     );
   }
 
@@ -59,7 +153,8 @@ class MealCustomizationRequest {
         other.profileId == profileId &&
         _listEquals(other.removedComponentKeys, removedComponentKeys) &&
         _listEquals(other.swapSelections, swapSelections) &&
-        _listEquals(other.extraSelections, extraSelections);
+        _listEquals(other.extraSelections, extraSelections) &&
+        other.sandwichSelection == sandwichSelection;
   }
 
   @override
@@ -69,6 +164,7 @@ class MealCustomizationRequest {
     Object.hashAll(removedComponentKeys),
     Object.hashAll(swapSelections),
     Object.hashAll(extraSelections),
+    sandwichSelection,
   );
 }
 
@@ -76,6 +172,7 @@ class MealCustomizationResolvedSnapshot {
   const MealCustomizationResolvedSnapshot({
     required this.productId,
     required this.profileId,
+    this.sandwichSelection,
     this.resolvedComponentActions = const <MealCustomizationSemanticAction>[],
     this.resolvedExtraActions = const <MealCustomizationSemanticAction>[],
     this.triggeredDiscounts = const <MealCustomizationSemanticAction>[],
@@ -87,6 +184,7 @@ class MealCustomizationResolvedSnapshot {
 
   final int productId;
   final int profileId;
+  final SandwichCustomizationSelection? sandwichSelection;
   final List<MealCustomizationSemanticAction> resolvedComponentActions;
   final List<MealCustomizationSemanticAction> resolvedExtraActions;
   final List<MealCustomizationSemanticAction> triggeredDiscounts;
@@ -110,6 +208,7 @@ class MealCustomizationResolvedSnapshot {
     final Map<String, Object?> normalized = <String, Object?>{
       'product_id': productId,
       'profile_id': profileId,
+      'sandwich_selection': sandwichSelection?.toJson(),
       'resolved_component_actions': _normalizeActions(resolvedComponentActions),
       'resolved_extra_actions': _normalizeActions(resolvedExtraActions),
       'triggered_discounts': _normalizeActions(triggeredDiscounts),
@@ -120,29 +219,37 @@ class MealCustomizationResolvedSnapshot {
   }
 
   MealCustomizationEditorState toEditorState() {
-    final List<String> removedComponentKeys = resolvedComponentActions
-        .where((MealCustomizationSemanticAction action) {
-          return action.action == MealCustomizationAction.remove &&
-              action.componentKey != null;
-        })
-        .map((MealCustomizationSemanticAction action) => action.componentKey!)
-        .toList(growable: false);
-    final List<MealCustomizationComponentSelection> swapSelections =
+    final List<MealCustomizationComponentState> componentSelections =
         resolvedComponentActions
             .where((MealCustomizationSemanticAction action) {
-              return action.action == MealCustomizationAction.swap &&
-                  action.componentKey != null &&
-                  action.itemProductId != null;
+              return action.componentKey != null &&
+                  (action.action == MealCustomizationAction.remove ||
+                      action.action == MealCustomizationAction.swap);
             })
-            .map(
-              (MealCustomizationSemanticAction action) =>
-                  MealCustomizationComponentSelection(
+            .map((MealCustomizationSemanticAction action) {
+              switch (action.action) {
+                case MealCustomizationAction.remove:
+                  return MealCustomizationComponentState(
                     componentKey: action.componentKey!,
-                    targetItemProductId: action.itemProductId!,
+                    mode: MealComponentSelectionMode.remove,
                     quantity: action.quantity,
-                  ),
-            )
-            .toList(growable: false);
+                  );
+                case MealCustomizationAction.swap:
+                  return MealCustomizationComponentState(
+                    componentKey: action.componentKey!,
+                    mode: MealComponentSelectionMode.swap,
+                    swapTargetItemProductId: action.itemProductId!,
+                    quantity: action.quantity,
+                  );
+                case MealCustomizationAction.extra:
+                case MealCustomizationAction.discount:
+                  throw StateError(
+                    'Component rehydration received non-component action ${action.action.name}.',
+                  );
+              }
+            })
+            .toList(growable: false)
+          ..sort(_compareComponentStates);
     final List<MealCustomizationExtraSelection> extraSelections =
         resolvedExtraActions
             .where((MealCustomizationSemanticAction action) {
@@ -158,9 +265,10 @@ class MealCustomizationResolvedSnapshot {
             )
             .toList(growable: false);
     return MealCustomizationEditorState(
-      removedComponentKeys: removedComponentKeys,
-      swapSelections: swapSelections,
+      componentSelections: componentSelections,
       extraSelections: extraSelections,
+      sandwichSelection:
+          sandwichSelection ?? const SandwichCustomizationSelection(),
     );
   }
 
@@ -168,6 +276,7 @@ class MealCustomizationResolvedSnapshot {
     return <String, Object?>{
       'product_id': productId,
       'profile_id': profileId,
+      'sandwich_selection': sandwichSelection?.toJson(),
       'resolved_component_actions': resolvedComponentActions
           .map((MealCustomizationSemanticAction action) => action.toJson())
           .toList(growable: false),
@@ -186,10 +295,13 @@ class MealCustomizationResolvedSnapshot {
     };
   }
 
-  factory MealCustomizationResolvedSnapshot.fromJson(Map<String, Object?> json) {
+  factory MealCustomizationResolvedSnapshot.fromJson(
+    Map<String, Object?> json,
+  ) {
     return MealCustomizationResolvedSnapshot(
       productId: json['product_id'] as int,
       profileId: json['profile_id'] as int,
+      sandwichSelection: _sandwichSelectionFromJson(json['sandwich_selection']),
       resolvedComponentActions: _semanticActionListFromJson(
         json['resolved_component_actions'],
       ),
@@ -207,21 +319,23 @@ class MealCustomizationResolvedSnapshot {
   }
 
   MealCustomizationPersistencePreview toPersistencePreview() {
-    final List<MealCustomizationPersistencePreviewLine> lines = actions
-        .map(
-          (MealCustomizationSemanticAction action) =>
-              MealCustomizationPersistencePreviewLine(
-                kind: _mapPersistenceKind(action.action),
-                chargeReason: action.chargeReason,
-                componentKey: action.componentKey,
-                itemProductId: action.itemProductId,
-                sourceItemProductId: action.sourceItemProductId,
-                quantity: action.quantity,
-                priceDeltaMinor: action.priceDeltaMinor,
-                appliedRuleIds: action.appliedRuleIds,
-              ),
-        )
-        .toList(growable: false);
+    final List<MealCustomizationPersistencePreviewLine> lines =
+        <MealCustomizationPersistencePreviewLine>[
+          ..._sandwichPersistencePreviewLines(),
+          ...actions.map(
+            (MealCustomizationSemanticAction action) =>
+                MealCustomizationPersistencePreviewLine(
+                  kind: _mapPersistenceKind(action.action),
+                  chargeReason: action.chargeReason,
+                  componentKey: action.componentKey,
+                  itemProductId: action.itemProductId,
+                  sourceItemProductId: action.sourceItemProductId,
+                  quantity: action.quantity,
+                  priceDeltaMinor: action.priceDeltaMinor,
+                  appliedRuleIds: action.appliedRuleIds,
+                ),
+          ),
+        ];
     return MealCustomizationPersistencePreview(
       productId: productId,
       profileId: profileId,
@@ -281,6 +395,7 @@ class MealCustomizationResolvedSnapshot {
         _listEquals(other.resolvedExtraActions, resolvedExtraActions) &&
         _listEquals(other.triggeredDiscounts, triggeredDiscounts) &&
         _listEquals(other.appliedRules, appliedRules) &&
+        other.sandwichSelection == sandwichSelection &&
         other.totalAdjustmentMinor == totalAdjustmentMinor &&
         other.freeSwapCountUsed == freeSwapCountUsed &&
         other.paidSwapCountUsed == paidSwapCountUsed;
@@ -290,6 +405,7 @@ class MealCustomizationResolvedSnapshot {
   int get hashCode => Object.hash(
     productId,
     profileId,
+    sandwichSelection,
     Object.hashAll(resolvedComponentActions),
     Object.hashAll(resolvedExtraActions),
     Object.hashAll(triggeredDiscounts),
@@ -312,6 +428,56 @@ class MealCustomizationResolvedSnapshot {
       case MealCustomizationAction.discount:
         return MealCustomizationPersistenceLineKind.discount;
     }
+  }
+
+  List<MealCustomizationPersistencePreviewLine>
+  _sandwichPersistencePreviewLines() {
+    final SandwichCustomizationSelection? selection = sandwichSelection;
+    if (selection == null) {
+      return const <MealCustomizationPersistencePreviewLine>[];
+    }
+    final int sandwichBreadPriceDeltaMinor =
+        totalAdjustmentMinor -
+        resolvedExtraActions.fold<int>(
+          0,
+          (int total, MealCustomizationSemanticAction action) =>
+              total + action.priceDeltaMinor,
+        );
+    final List<MealCustomizationPersistencePreviewLine> lines =
+        <MealCustomizationPersistencePreviewLine>[];
+    final SandwichBreadType? breadType = selection.breadType;
+    if (breadType != null) {
+      lines.add(
+        MealCustomizationPersistencePreviewLine(
+          kind: MealCustomizationPersistenceLineKind.choice,
+          componentKey: 'sandwich_bread',
+          quantity: 1,
+          priceDeltaMinor: sandwichBreadPriceDeltaMinor,
+        ),
+      );
+    }
+    for (final int sauceProductId in selection.sauceProductIds) {
+      lines.add(
+        MealCustomizationPersistencePreviewLine(
+          kind: MealCustomizationPersistenceLineKind.choice,
+          componentKey: 'sandwich_sauce',
+          itemProductId: sauceProductId,
+          quantity: 1,
+          priceDeltaMinor: 0,
+        ),
+      );
+    }
+    if (selection.toastOption != null) {
+      lines.add(
+        MealCustomizationPersistencePreviewLine(
+          kind: MealCustomizationPersistenceLineKind.choice,
+          componentKey: 'sandwich_toast',
+          quantity: 1,
+          priceDeltaMinor: 0,
+        ),
+      );
+    }
+    return lines;
   }
 
   List<Map<String, Object?>> _normalizeActions(
@@ -360,6 +526,64 @@ class MealCustomizationComponentSelection {
 
   @override
   int get hashCode => Object.hash(componentKey, targetItemProductId, quantity);
+}
+
+class MealCustomizationComponentState {
+  const MealCustomizationComponentState({
+    required this.componentKey,
+    required this.mode,
+    this.swapTargetItemProductId,
+    this.quantity = 1,
+  }) : assert(
+         (mode == MealComponentSelectionMode.swap &&
+                 swapTargetItemProductId != null) ||
+             (mode != MealComponentSelectionMode.swap &&
+                 swapTargetItemProductId == null),
+         'Swap target must exist only for swap selections.',
+       );
+
+  final String componentKey;
+  final MealComponentSelectionMode mode;
+  final int? swapTargetItemProductId;
+  final int quantity;
+
+  bool get isKeep => mode == MealComponentSelectionMode.keep;
+  bool get isRemove => mode == MealComponentSelectionMode.remove;
+  bool get isSwap => mode == MealComponentSelectionMode.swap;
+
+  MealCustomizationComponentState copyWith({
+    String? componentKey,
+    MealComponentSelectionMode? mode,
+    Object? swapTargetItemProductId = _unsetNullableField,
+    int? quantity,
+  }) {
+    final MealComponentSelectionMode resolvedMode = mode ?? this.mode;
+    final int? resolvedSwapTargetItemProductId =
+        identical(swapTargetItemProductId, _unsetNullableField)
+        ? (resolvedMode == MealComponentSelectionMode.swap
+              ? this.swapTargetItemProductId
+              : null)
+        : swapTargetItemProductId as int?;
+    return MealCustomizationComponentState(
+      componentKey: componentKey ?? this.componentKey,
+      mode: resolvedMode,
+      swapTargetItemProductId: resolvedSwapTargetItemProductId,
+      quantity: quantity ?? this.quantity,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MealCustomizationComponentState &&
+        other.componentKey == componentKey &&
+        other.mode == mode &&
+        other.swapTargetItemProductId == swapTargetItemProductId &&
+        other.quantity == quantity;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(componentKey, mode, swapTargetItemProductId, quantity);
 }
 
 class MealCustomizationExtraSelection {
@@ -422,9 +646,7 @@ class MealCustomizationSemanticAction {
   factory MealCustomizationSemanticAction.fromJson(Map<String, Object?> json) {
     return MealCustomizationSemanticAction(
       action: MealCustomizationAction.values.byName(json['action'] as String),
-      chargeReason: _mealChargeReasonFromJson(
-        json['charge_reason'] as String?,
-      ),
+      chargeReason: _mealChargeReasonFromJson(json['charge_reason'] as String?),
       componentKey: json['component_key'] as String?,
       itemProductId: json['item_product_id'] as int?,
       sourceItemProductId: json['source_item_product_id'] as int?,
@@ -671,14 +893,57 @@ class MealCustomizationReportingSummary {
 
 class MealCustomizationEditorState {
   const MealCustomizationEditorState({
-    this.removedComponentKeys = const <String>[],
-    this.swapSelections = const <MealCustomizationComponentSelection>[],
+    this.componentSelections = const <MealCustomizationComponentState>[],
     this.extraSelections = const <MealCustomizationExtraSelection>[],
+    this.sandwichSelection = const SandwichCustomizationSelection(),
   });
 
-  final List<String> removedComponentKeys;
-  final List<MealCustomizationComponentSelection> swapSelections;
+  final List<MealCustomizationComponentState> componentSelections;
   final List<MealCustomizationExtraSelection> extraSelections;
+  final SandwichCustomizationSelection sandwichSelection;
+
+  List<String> get removedComponentKeys =>
+      componentSelections
+          .where(
+            (MealCustomizationComponentState selection) =>
+                selection.mode == MealComponentSelectionMode.remove,
+          )
+          .map(
+            (MealCustomizationComponentState selection) =>
+                selection.componentKey,
+          )
+          .toList(growable: false)
+        ..sort();
+
+  List<MealCustomizationComponentSelection> get swapSelections =>
+      componentSelections
+          .where(
+            (MealCustomizationComponentState selection) =>
+                selection.mode == MealComponentSelectionMode.swap,
+          )
+          .map(
+            (MealCustomizationComponentState selection) =>
+                MealCustomizationComponentSelection(
+                  componentKey: selection.componentKey,
+                  targetItemProductId: selection.swapTargetItemProductId!,
+                  quantity: selection.quantity,
+                ),
+          )
+          .toList(growable: false)
+        ..sort(_compareComponentSelections);
+
+  MealCustomizationComponentState selectionForComponent(String componentKey) {
+    for (final MealCustomizationComponentState selection
+        in componentSelections) {
+      if (selection.componentKey == componentKey) {
+        return selection;
+      }
+    }
+    return MealCustomizationComponentState(
+      componentKey: componentKey,
+      mode: MealComponentSelectionMode.keep,
+    );
+  }
 
   MealCustomizationRequest toRequest({
     required int productId,
@@ -690,34 +955,35 @@ class MealCustomizationEditorState {
       removedComponentKeys: removedComponentKeys,
       swapSelections: swapSelections,
       extraSelections: extraSelections,
+      sandwichSelection: sandwichSelection,
     );
   }
 
   MealCustomizationEditorState copyWith({
-    List<String>? removedComponentKeys,
-    List<MealCustomizationComponentSelection>? swapSelections,
+    List<MealCustomizationComponentState>? componentSelections,
     List<MealCustomizationExtraSelection>? extraSelections,
+    SandwichCustomizationSelection? sandwichSelection,
   }) {
     return MealCustomizationEditorState(
-      removedComponentKeys: removedComponentKeys ?? this.removedComponentKeys,
-      swapSelections: swapSelections ?? this.swapSelections,
+      componentSelections: componentSelections ?? this.componentSelections,
       extraSelections: extraSelections ?? this.extraSelections,
+      sandwichSelection: sandwichSelection ?? this.sandwichSelection,
     );
   }
 
   @override
   bool operator ==(Object other) {
     return other is MealCustomizationEditorState &&
-        _listEquals(other.removedComponentKeys, removedComponentKeys) &&
-        _listEquals(other.swapSelections, swapSelections) &&
-        _listEquals(other.extraSelections, extraSelections);
+        _listEquals(other.componentSelections, componentSelections) &&
+        _listEquals(other.extraSelections, extraSelections) &&
+        other.sandwichSelection == sandwichSelection;
   }
 
   @override
   int get hashCode => Object.hash(
-    Object.hashAll(removedComponentKeys),
-    Object.hashAll(swapSelections),
+    Object.hashAll(componentSelections),
     Object.hashAll(extraSelections),
+    sandwichSelection,
   );
 }
 
@@ -728,6 +994,7 @@ class MealCustomizationCartSelection {
     required this.stableIdentityKey,
     required this.summaryLines,
     required this.compactSummary,
+    this.displayName,
     required this.perUnitAdjustmentMinor,
     required this.perUnitLineTotalMinor,
   });
@@ -737,6 +1004,7 @@ class MealCustomizationCartSelection {
   final String stableIdentityKey;
   final List<String> summaryLines;
   final String compactSummary;
+  final String? displayName;
   final int perUnitAdjustmentMinor;
   final int perUnitLineTotalMinor;
 }
@@ -797,7 +1065,7 @@ List<MealCustomizationAppliedRule> _appliedRuleListFromJson(Object? value) {
 
 List<int> _intListFromJson(Object? value) {
   return ((value as List<Object?>?) ?? const <Object?>[])
-      .map((Object? entry) => entry as int)
+      .whereType<int>()
       .toList(growable: false);
 }
 
@@ -814,6 +1082,44 @@ MealCustomizationChargeReason? _mealChargeReasonFromJson(String? value) {
   return MealCustomizationChargeReason.values.byName(value);
 }
 
+SandwichCustomizationSelection? _sandwichSelectionFromJson(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  return SandwichCustomizationSelection.fromJson(
+    Map<String, Object?>.from(value as Map),
+  );
+}
+
+SandwichBreadType? _sandwichBreadTypeFromJson(String? value) {
+  if (value == null) {
+    return null;
+  }
+  return SandwichBreadType.values.byName(value);
+}
+
+List<int> _sandwichSauceProductIdsFromJson(Object? value) {
+  return normalizeSandwichSauceProductIds(_intListFromJson(value));
+}
+
+List<String> _legacySandwichSauceLookupKeysFromJson(
+  Object? value, {
+  required String? legacySingleSauce,
+}) {
+  final List<String> rawValues = <String>[
+    ...((value as List<Object?>?) ?? const <Object?>[]).whereType<String>(),
+    if (legacySingleSauce != null) legacySingleSauce,
+  ];
+  return normalizeLegacySandwichSauceLookupKeys(rawValues);
+}
+
+SandwichToastOption? _sandwichToastOptionFromJson(String? value) {
+  if (value == null) {
+    return null;
+  }
+  return SandwichToastOption.values.byName(value);
+}
+
 MealAdjustmentPricingRuleType _pricingRuleTypeFromJson(String value) {
   switch (value) {
     case 'removeOnly':
@@ -828,10 +1134,51 @@ MealAdjustmentPricingRuleType _pricingRuleTypeFromJson(String value) {
   throw ArgumentError.value(value, 'value', 'Unknown pricing rule type.');
 }
 
-int _compareNormalizedMaps(Map<String, Object?> left, Map<String, Object?> right) {
+int _compareNormalizedMaps(
+  Map<String, Object?> left,
+  Map<String, Object?> right,
+) {
   final String leftEncoded = jsonEncode(left);
   final String rightEncoded = jsonEncode(right);
   return leftEncoded.compareTo(rightEncoded);
+}
+
+int _compareComponentStates(
+  MealCustomizationComponentState left,
+  MealCustomizationComponentState right,
+) {
+  final int keyCompare = left.componentKey.compareTo(right.componentKey);
+  if (keyCompare != 0) {
+    return keyCompare;
+  }
+  final int modeCompare = left.mode.index.compareTo(right.mode.index);
+  if (modeCompare != 0) {
+    return modeCompare;
+  }
+  final int targetCompare = (left.swapTargetItemProductId ?? -1).compareTo(
+    right.swapTargetItemProductId ?? -1,
+  );
+  if (targetCompare != 0) {
+    return targetCompare;
+  }
+  return left.quantity.compareTo(right.quantity);
+}
+
+int _compareComponentSelections(
+  MealCustomizationComponentSelection left,
+  MealCustomizationComponentSelection right,
+) {
+  final int keyCompare = left.componentKey.compareTo(right.componentKey);
+  if (keyCompare != 0) {
+    return keyCompare;
+  }
+  final int itemCompare = left.targetItemProductId.compareTo(
+    right.targetItemProductId,
+  );
+  if (itemCompare != 0) {
+    return itemCompare;
+  }
+  return left.quantity.compareTo(right.quantity);
 }
 
 bool _listEquals<T>(List<T> a, List<T> b) {
@@ -887,8 +1234,13 @@ class MealQuickSuggestion {
 
   @override
   int get hashCode => Object.hash(
-    label, kind, componentKey, targetItemProductId,
-    itemProductId, quantity, usageCount,
+    label,
+    kind,
+    componentKey,
+    targetItemProductId,
+    itemProductId,
+    quantity,
+    usageCount,
   );
 }
 

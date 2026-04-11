@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../domain/models/sandwich.dart';
 import '../../domain/models/product.dart';
 import '../database/app_database.dart' as db;
 
@@ -98,6 +99,60 @@ class ProductRepository {
 
     final List<db.Product> rows = await query.get();
     return rows.map(_mapProduct).toList(growable: false);
+  }
+
+  Future<List<Product>> getSandwichSauceProducts({
+    bool activeOnly = true,
+  }) async {
+    final StringBuffer sql = StringBuffer('''
+      SELECT
+        p.id,
+        p.category_id,
+        p.meal_adjustment_profile_id,
+        p.name,
+        p.price_minor,
+        p.image_url,
+        p.has_modifiers,
+        p.is_active,
+        p.is_visible_on_pos,
+        p.sort_order
+      FROM products p
+      INNER JOIN categories c ON c.id = p.category_id
+      WHERE lower(trim(c.name)) = lower(trim(?))
+    ''');
+    if (activeOnly) {
+      sql.write(' AND p.is_active = 1');
+    }
+    sql.write(' ORDER BY p.sort_order ASC, p.id ASC');
+
+    final List<QueryRow> rows = await _database
+        .customSelect(
+          sql.toString(),
+          variables: <Variable<Object>>[Variable<String>(kSaucesCategoryName)],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _database.products,
+            _database.categories,
+          },
+        )
+        .get();
+    return rows
+        .map(
+          (QueryRow row) => Product(
+            id: row.read<int>('id'),
+            categoryId: row.read<int>('category_id'),
+            mealAdjustmentProfileId: row.readNullable<int>(
+              'meal_adjustment_profile_id',
+            ),
+            name: row.read<String>('name'),
+            priceMinor: row.read<int>('price_minor'),
+            imageUrl: row.readNullable<String>('image_url'),
+            hasModifiers: row.read<int>('has_modifiers') == 1,
+            isActive: row.read<int>('is_active') == 1,
+            isVisibleOnPos: row.read<int>('is_visible_on_pos') == 1,
+            sortOrder: row.read<int>('sort_order'),
+          ),
+        )
+        .toList(growable: false);
   }
 
   Future<Product?> getById(int id) async {
@@ -243,10 +298,7 @@ class ProductRepository {
           SELECT 1
           FROM product_modifiers
           WHERE product_id = ?
-            AND (
-              type = 'choice'
-              OR (type = 'extra' AND item_product_id IS NOT NULL)
-            )
+            AND type = 'choice'
           LIMIT 1
         )
         THEN 1

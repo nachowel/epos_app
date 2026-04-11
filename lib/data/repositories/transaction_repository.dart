@@ -11,6 +11,7 @@ import '../../domain/models/breakfast_rebuild.dart';
 import '../../domain/models/meal_customization.dart';
 import '../../domain/models/order_lifecycle_policy.dart';
 import '../../domain/models/order_modifier.dart';
+import '../../domain/models/product_modifier.dart';
 import '../../domain/models/shift_report_category_line.dart';
 import '../../domain/models/transaction_line.dart';
 import '../../domain/services/meal_customization_persistence_mapper.dart';
@@ -41,8 +42,7 @@ class TransactionRepository {
        _beforeBreakfastSnapshotFinancialRecompute =
            beforeBreakfastSnapshotFinancialRecompute,
        _persistenceMapper = persistenceMapper,
-       _mealCustomizationPersistenceMapper =
-           mealCustomizationPersistenceMapper;
+       _mealCustomizationPersistenceMapper = mealCustomizationPersistenceMapper;
 
   final db.AppDatabase _database;
   final Uuid _uuidGenerator;
@@ -298,6 +298,8 @@ class TransactionRepository {
     required ModifierAction action,
     required String itemName,
     required int extraPriceMinor,
+    ModifierPriceBehavior? priceBehavior,
+    ModifierUiSection? uiSection,
   }) async {
     if (extraPriceMinor < 0) {
       throw ValidationException('extraPriceMinor cannot be negative.');
@@ -324,6 +326,10 @@ class TransactionRepository {
             unitPriceMinor: Value<int>(extraPriceMinor),
             priceEffectMinor: Value<int>(extraPriceMinor),
             sortKey: const Value<int>(0),
+            priceBehavior: Value<String?>(
+              _modifierPriceBehaviorToDb(priceBehavior),
+            ),
+            uiSection: Value<String?>(_modifierUiSectionToDb(uiSection)),
           ),
         );
 
@@ -469,6 +475,8 @@ class TransactionRepository {
               unitPriceMinor: Value<int>(modifier.unitPriceMinor),
               priceEffectMinor: Value<int>(modifier.priceEffectMinor),
               sortKey: Value<int>(modifier.sortKey),
+              priceBehavior: Value<String?>(modifier.priceBehavior),
+              uiSection: Value<String?>(modifier.uiSection),
             ),
           );
     }
@@ -674,6 +682,9 @@ class TransactionRepository {
         referencedProductIds.add(sourceItemProductId);
       }
     }
+    referencedProductIds.addAll(
+      snapshot.sandwichSelection?.sauceProductIds ?? const <int>[],
+    );
     final Map<int, String> productNamesById = await _loadProductNamesByIds(
       referencedProductIds,
     );
@@ -699,9 +710,9 @@ class TransactionRepository {
           .go();
 
       for (final OrderModifier modifier in projection.modifiers) {
-        await _database.into(_database.orderModifiers).insert(
-          _persistenceMapper.orderModifierToCompanion(modifier),
-        );
+        await _database
+            .into(_database.orderModifiers)
+            .insert(_persistenceMapper.orderModifierToCompanion(modifier));
       }
 
       await _database.customUpdate(
@@ -806,7 +817,8 @@ class TransactionRepository {
       Variable<int>(transactionId),
       Variable<int>(productId),
       Variable<String>(customizationKey),
-      if (excludeTransactionLineId != null) Variable<int>(excludeTransactionLineId),
+      if (excludeTransactionLineId != null)
+        Variable<int>(excludeTransactionLineId),
     ];
     final QueryRow? row = await _database
         .customSelect(
@@ -845,7 +857,9 @@ class TransactionRepository {
         quantity: row.read<int>('quantity'),
         lineTotalMinor: row.read<int>('line_total_minor'),
         pricingMode: row.read<String>('pricing_mode'),
-        removalDiscountTotalMinor: row.read<int>('removal_discount_total_minor'),
+        removalDiscountTotalMinor: row.read<int>(
+          'removal_discount_total_minor',
+        ),
       ),
     );
   }
@@ -962,19 +976,21 @@ class TransactionRepository {
           variables: <Variable<Object>>[Variable<int>(productId)],
         )
         .get();
-    return rows.map((QueryRow row) {
-      return MealCustomizationPersistedSnapshotRecord(
-        transactionLineId: row.read<int>('transaction_line_id'),
-        productId: row.read<int>('product_id'),
-        profileId: row.read<int>('profile_id'),
-        customizationKey: row.read<String>('customization_key'),
-        snapshot: MealCustomizationResolvedSnapshot.fromJson(
-          Map<String, Object?>.from(
-            jsonDecode(row.read<String>('snapshot_json')) as Map,
-          ),
-        ),
-      );
-    }).toList(growable: false);
+    return rows
+        .map((QueryRow row) {
+          return MealCustomizationPersistedSnapshotRecord(
+            transactionLineId: row.read<int>('transaction_line_id'),
+            productId: row.read<int>('product_id'),
+            profileId: row.read<int>('profile_id'),
+            customizationKey: row.read<String>('customization_key'),
+            snapshot: MealCustomizationResolvedSnapshot.fromJson(
+              Map<String, Object?>.from(
+                jsonDecode(row.read<String>('snapshot_json')) as Map,
+              ),
+            ),
+          );
+        })
+        .toList(growable: false);
   }
 
   /// Counts legacy (non-snapshot-backed) meal customization lines for a
@@ -1009,18 +1025,14 @@ class TransactionRepository {
   Future<List<int>> getMealCustomizationActiveProductIds({
     int lookbackDays = 30,
   }) async {
-    final List<QueryRow> rows = await _database
-        .customSelect(
-          '''
+    final List<QueryRow> rows = await _database.customSelect('''
           SELECT DISTINCT ms.product_id
           FROM $_mealCustomizationSnapshotsTable ms
           INNER JOIN transaction_lines tl ON tl.id = ms.transaction_line_id
           INNER JOIN transactions tx ON tx.id = tl.transaction_id
           WHERE tx.created_at >= CAST(strftime('%s', 'now', '-$lookbackDays days') AS INTEGER)
           ORDER BY ms.product_id ASC
-          ''',
-        )
-        .get();
+          ''').get();
     return rows
         .map((QueryRow row) => row.read<int>('product_id'))
         .toList(growable: false);
@@ -1030,30 +1042,23 @@ class TransactionRepository {
   /// transaction_line_ids which no longer exist. Returns the count of
   /// cleaned-up rows.
   Future<int> cleanupOrphanMealCustomizationSnapshots() async {
-    final QueryRow result = await _database
-        .customSelect(
-          '''
+    final QueryRow result = await _database.customSelect('''
           SELECT COUNT(*) AS cnt
           FROM $_mealCustomizationSnapshotsTable ms
           WHERE NOT EXISTS (
             SELECT 1 FROM transaction_lines tl
             WHERE tl.id = ms.transaction_line_id
           )
-          ''',
-        )
-        .getSingle();
+          ''').getSingle();
     final int orphanCount = result.read<int>('cnt');
     if (orphanCount > 0) {
-      await _database.customUpdate(
-        '''
+      await _database.customUpdate('''
         DELETE FROM $_mealCustomizationSnapshotsTable
         WHERE NOT EXISTS (
           SELECT 1 FROM transaction_lines tl
           WHERE tl.id = $_mealCustomizationSnapshotsTable.transaction_line_id
         )
-        ''',
-        updates: <ResultSetImplementation<dynamic, dynamic>>{},
-      );
+        ''', updates: <ResultSetImplementation<dynamic, dynamic>>{});
     }
     return orphanCount;
   }
@@ -1061,9 +1066,7 @@ class TransactionRepository {
   /// Returns legacy meal line counts grouped by product ID.
   /// This is a lightweight query intended for admin visibility surfaces.
   Future<Map<int, int>> getLegacyMealCustomizationLineCountsByProduct() async {
-    final List<QueryRow> rows = await _database
-        .customSelect(
-          '''
+    final List<QueryRow> rows = await _database.customSelect('''
           SELECT tl.product_id, COUNT(*) AS cnt
           FROM transaction_lines tl
           WHERE tl.pricing_mode = 'standard'
@@ -1078,9 +1081,7 @@ class TransactionRepository {
             )
           GROUP BY tl.product_id
           ORDER BY cnt DESC
-          ''',
-        )
-        .get();
+          ''').get();
     return <int, int>{
       for (final QueryRow row in rows)
         row.read<int>('product_id'): row.read<int>('cnt'),
@@ -1712,10 +1713,9 @@ class TransactionRepository {
       return <int, String>{};
     }
 
-    final List<db.Product> rows =
-        await (_database.select(_database.products)
-              ..where((db.$ProductsTable t) => t.id.isIn(ids)))
-            .get();
+    final List<db.Product> rows = await (_database.select(
+      _database.products,
+    )..where((db.$ProductsTable t) => t.id.isIn(ids))).get();
     return <int, String>{for (final db.Product row in rows) row.id: row.name};
   }
 
@@ -1768,6 +1768,9 @@ class TransactionRepository {
   TransactionStatus _statusFromDb(String value) {
     switch (value) {
       case 'open':
+        // Legacy compatibility only: older persisted rows may still carry
+        // `open`, but migrations normalize that value to `sent`.
+        return TransactionStatus.sent;
       case 'draft':
         return TransactionStatus.draft;
       case 'sent':
@@ -1821,6 +1824,30 @@ class TransactionRepository {
         return 'removal_discount';
       case ModifierChargeReason.comboDiscount:
         return 'combo_discount';
+    }
+  }
+
+  String? _modifierPriceBehaviorToDb(ModifierPriceBehavior? value) {
+    switch (value) {
+      case null:
+        return null;
+      case ModifierPriceBehavior.free:
+        return 'free';
+      case ModifierPriceBehavior.paid:
+        return 'paid';
+    }
+  }
+
+  String? _modifierUiSectionToDb(ModifierUiSection? value) {
+    switch (value) {
+      case null:
+        return null;
+      case ModifierUiSection.toppings:
+        return 'toppings';
+      case ModifierUiSection.sauces:
+        return 'sauces';
+      case ModifierUiSection.addIns:
+        return 'add_ins';
     }
   }
 

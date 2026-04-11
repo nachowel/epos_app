@@ -263,10 +263,10 @@ class MealPricingExplanationBuilder {
     final SandwichCustomizationSelection selection =
         snapshot.sandwichSelection!;
     final List<PricingExplanationLine> lines = <PricingExplanationLine>[];
-    for (final SandwichSauceType sauceType in selection.sauceTypes) {
+    for (final int sauceProductId in selection.sauceProductIds) {
       lines.add(
         PricingExplanationLine(
-          label: sandwichSauceLabel(sauceType),
+          label: _resolveProductName(sauceProductId, productNamesById),
           priceEffectMinor: 0,
           type: 'choice',
         ),

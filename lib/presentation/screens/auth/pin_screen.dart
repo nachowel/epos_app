@@ -43,7 +43,7 @@ class _PinScreenState extends ConsumerState<PinScreen> {
       return;
     }
 
-    context.go('/pos');
+    context.go('/pos/categories');
   }
 
   void _showMessage(String message) {

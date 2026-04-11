@@ -18,6 +18,17 @@ class CurrencyFormatter {
   }
 
   static int? tryParseEditableMajorInput(String input) {
+    return _tryParseEditableMajorInput(input, allowNegative: false);
+  }
+
+  static int? tryParseSignedEditableMajorInput(String input) {
+    return _tryParseEditableMajorInput(input, allowNegative: true);
+  }
+
+  static int? _tryParseEditableMajorInput(
+    String input, {
+    required bool allowNegative,
+  }) {
     final String trimmed = input.trim();
     if (trimmed.isEmpty) {
       return null;
@@ -27,14 +38,23 @@ class CurrencyFormatter {
         .replaceAll('£', '')
         .replaceAll(RegExp(r'\s+'), '')
         .replaceAll(',', '.');
-    final RegExp validPattern = RegExp(r'^\d+(\.\d{1,2})?$');
+    final RegExp validPattern = allowNegative
+        ? RegExp(r'^-?\d+(\.\d{1,2})?$')
+        : RegExp(r'^\d+(\.\d{1,2})?$');
     if (!validPattern.hasMatch(normalized)) {
       return null;
     }
 
-    final List<String> parts = normalized.split('.');
+    final bool isNegative = normalized.startsWith('-');
+    final String unsigned = isNegative ? normalized.substring(1) : normalized;
+    if (unsigned.isEmpty) {
+      return null;
+    }
+
+    final List<String> parts = unsigned.split('.');
     final int pounds = int.parse(parts.first);
     final String pence = parts.length == 2 ? parts[1].padRight(2, '0') : '00';
-    return (pounds * 100) + int.parse(pence.substring(0, 2));
+    final int amountMinor = (pounds * 100) + int.parse(pence.substring(0, 2));
+    return isNegative ? -amountMinor : amountMinor;
   }
 }

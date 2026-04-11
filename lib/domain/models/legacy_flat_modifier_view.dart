@@ -15,6 +15,10 @@ class LegacyFlatModifierView {
     final List<ProductModifier> omittedSemanticModifiers = <ProductModifier>[];
 
     for (final ProductModifier modifier in modifiers) {
+      if (modifier.hasStructuredUi) {
+        omittedSemanticModifiers.add(modifier);
+        continue;
+      }
       switch (modifier.type) {
         case ModifierType.included:
           included.add(modifier);

@@ -115,8 +115,9 @@ class MealAdjustmentAdminService {
   }
 
   Future<int> duplicateProfile(int sourceProfileId) async {
-    final MealAdjustmentProfileDraft source =
-        await loadProfileDraft(sourceProfileId);
+    final MealAdjustmentProfileDraft source = await loadProfileDraft(
+      sourceProfileId,
+    );
     final MealAdjustmentProfileDraft duplicated = source.duplicate();
     return _repository.saveProfileDraft(duplicated);
   }
@@ -127,6 +128,7 @@ class MealAdjustmentAdminService {
       id: draft.id,
       name: draft.name,
       description: draft.description,
+      kind: draft.kind,
       freeSwapLimit: draft.freeSwapLimit,
       isActive: false,
       components: draft.components,
@@ -137,8 +139,8 @@ class MealAdjustmentAdminService {
   }
 
   Future<bool> deleteProfile(int profileId) async {
-    final List<MealAdjustmentProductSummary> usages =
-        await _repository.listProductsByProfile(profileId);
+    final List<MealAdjustmentProductSummary> usages = await _repository
+        .listProductsByProfile(profileId);
     if (usages.isNotEmpty) {
       throw MealAdjustmentProfileInUseException(
         profileId: profileId,

@@ -14,7 +14,17 @@ enum MealAdjustmentValidationSection {
 
 enum MealAdjustmentValidationIssueCode {
   negativeFreeSwapLimit,
+  negativeSandwichSurcharge,
+  negativeBaguetteSurcharge,
+  sandwichSauceItemMissing,
+  sandwichSauceItemInactive,
+  sandwichSauceItemMustBelongToSaucesCategory,
   activeProfileMissingComponents,
+  sandwichProfileFreeSwapLimitMustBeZero,
+  sandwichProfileComponentsNotSupported,
+  sandwichProfilePricingRulesNotSupported,
+  missingComponentKey,
+  missingComponentDisplayName,
   duplicateComponentKey,
   invalidComponentQuantity,
   defaultItemMissing,
@@ -28,6 +38,8 @@ enum MealAdjustmentValidationIssueCode {
   swapOptionMatchesDefaultItem,
   duplicateSwapOption,
   duplicateExtraOption,
+  invalidExtraPriceDelta,
+  missingRuleName,
   invalidRuleCondition,
   invalidExtraRulePriceDelta,
   invalidRemoveOnlyRulePriceDelta,
@@ -76,24 +88,54 @@ class MealAdjustmentValidationIssue {
     switch (code) {
       case MealAdjustmentValidationIssueCode.negativeFreeSwapLimit:
         return 'Free swap limit cannot be negative.';
+      case MealAdjustmentValidationIssueCode.negativeSandwichSurcharge:
+        return 'Sandwich surcharge cannot be negative.';
+      case MealAdjustmentValidationIssueCode.negativeBaguetteSurcharge:
+        return 'Baguette surcharge cannot be negative.';
+      case MealAdjustmentValidationIssueCode.sandwichSauceItemMissing:
+        return 'Sandwich sauce item ${itemProductId ?? 'unknown'} is missing.';
+      case MealAdjustmentValidationIssueCode.sandwichSauceItemInactive:
+        return 'Sandwich sauce item ${itemProductId ?? 'unknown'} is inactive.';
+      case MealAdjustmentValidationIssueCode
+          .sandwichSauceItemMustBelongToSaucesCategory:
+        return 'Sandwich sauce item ${itemProductId ?? 'unknown'} must belong to the Sauces category.';
       case MealAdjustmentValidationIssueCode.activeProfileMissingComponents:
         return 'An active profile must contain at least one component.';
+      case MealAdjustmentValidationIssueCode
+          .sandwichProfileFreeSwapLimitMustBeZero:
+        return 'Sandwich profiles do not use free swaps. Set the free swap limit to 0.';
+      case MealAdjustmentValidationIssueCode
+          .sandwichProfileComponentsNotSupported:
+        return 'Sandwich profiles use automatic bread, sauce, and toast choices. Components are not supported.';
+      case MealAdjustmentValidationIssueCode
+          .sandwichProfilePricingRulesNotSupported:
+        return 'Sandwich profiles use fixed bread surcharges. Pricing rules are not supported.';
+      case MealAdjustmentValidationIssueCode.missingComponentKey:
+        return 'Component key is required.';
+      case MealAdjustmentValidationIssueCode.missingComponentDisplayName:
+        return 'Component display name is required.';
       case MealAdjustmentValidationIssueCode.duplicateComponentKey:
         return 'Component keys must be unique. Duplicate: ${componentKey ?? 'unknown'}.';
       case MealAdjustmentValidationIssueCode.invalidComponentQuantity:
         return 'Component quantity must be greater than zero for ${componentKey ?? 'unknown'}.';
       case MealAdjustmentValidationIssueCode.defaultItemMissing:
+        if (itemProductId == null || itemProductId! <= 0) {
+          return 'Default product is required for ${componentKey ?? 'this component'}.';
+        }
         return 'Default item ${itemProductId ?? 'unknown'} is missing for ${componentKey ?? 'unknown'}.';
       case MealAdjustmentValidationIssueCode.defaultItemInactive:
-        return 'Default item ${itemProductId ?? 'unknown'} is inactive for ${componentKey ?? 'unknown'}.';
+        return 'Default product ${itemProductId ?? 'unknown'} is inactive for ${componentKey ?? 'unknown'}.';
       case MealAdjustmentValidationIssueCode.swapItemMissing:
+        if (itemProductId == null || itemProductId! <= 0) {
+          return 'Swap option product is required for ${componentKey ?? 'this component'}.';
+        }
         return 'Swap item ${itemProductId ?? 'unknown'} is missing for ${componentKey ?? 'unknown'}.';
       case MealAdjustmentValidationIssueCode.swapItemInactive:
-        return 'Swap item ${itemProductId ?? 'unknown'} is inactive for ${componentKey ?? 'unknown'}.';
+        return 'Swap product ${itemProductId ?? 'unknown'} is inactive for ${componentKey ?? 'unknown'}.';
       case MealAdjustmentValidationIssueCode.extraItemMissing:
-        return 'Extra item ${itemProductId ?? 'unknown'} is missing.';
+        return 'Add-in item ${itemProductId ?? 'unknown'} is missing.';
       case MealAdjustmentValidationIssueCode.extraItemInactive:
-        return 'Extra item ${itemProductId ?? 'unknown'} is inactive.';
+        return 'Add-in item ${itemProductId ?? 'unknown'} is inactive.';
       case MealAdjustmentValidationIssueCode.ruleItemMissing:
         return 'Pricing rule item ${itemProductId ?? 'unknown'} is missing.';
       case MealAdjustmentValidationIssueCode.ruleItemInactive:
@@ -103,11 +145,17 @@ class MealAdjustmentValidationIssue {
       case MealAdjustmentValidationIssueCode.duplicateSwapOption:
         return 'Swap options cannot contain duplicate products for ${componentKey ?? 'unknown'}.';
       case MealAdjustmentValidationIssueCode.duplicateExtraOption:
-        return 'Extra options cannot contain duplicate products.';
+        return 'Add-ins cannot contain duplicate products.';
+      case MealAdjustmentValidationIssueCode.invalidExtraPriceDelta:
+        return 'Add-ins cannot use negative prices.';
+      case MealAdjustmentValidationIssueCode.missingRuleName:
+        return 'Pricing rule name is required.';
       case MealAdjustmentValidationIssueCode.invalidRuleCondition:
-        return 'Pricing rule condition is structurally invalid.';
+        return detail == null || detail!.trim().isEmpty
+            ? 'Pricing rule condition is structurally invalid.'
+            : 'Pricing rule condition is invalid. $detail';
       case MealAdjustmentValidationIssueCode.invalidExtraRulePriceDelta:
-        return 'Extra pricing rules cannot use negative price deltas.';
+        return 'Add-in pricing rules cannot use negative price deltas.';
       case MealAdjustmentValidationIssueCode.invalidRemoveOnlyRulePriceDelta:
         return 'Remove-only pricing rules cannot use positive price deltas.';
       case MealAdjustmentValidationIssueCode.duplicateRuleMeaning:
@@ -119,7 +167,9 @@ class MealAdjustmentValidationIssue {
       case MealAdjustmentValidationIssueCode.assignedProfileMissing:
         return 'Assigned meal-adjustment profile ${detail ?? 'unknown'} was not found.';
       case MealAdjustmentValidationIssueCode.breakfastProductAssignmentBlocked:
-        return 'Breakfast semantic products cannot carry a meal-adjustment profile.';
+        return detail == null || detail!.trim().isEmpty
+            ? 'Breakfast semantic root products cannot carry a meal-adjustment profile.'
+            : detail!;
     }
   }
 }
@@ -282,15 +332,19 @@ class MealAdjustmentProfileValidationService {
       );
     }
 
-    final Set<int> breakfastIds = await _repository
-        .loadBreakfastSemanticProductIds(<int>[productId]);
-    if (breakfastIds.contains(productId)) {
+    final Set<int> breakfastRootIds = await _repository
+        .loadBreakfastSemanticRootProductIds(<int>[productId]);
+    if (breakfastRootIds.contains(productId)) {
       blockingErrors.add(
         MealAdjustmentValidationIssue(
           code: MealAdjustmentValidationIssueCode
               .breakfastProductAssignmentBlocked,
           section: MealAdjustmentValidationSection.assignments,
           productId: productId,
+          detail: _buildBreakfastAssignmentConflictMessage(
+            productName: product.name,
+            profileName: profile?.name,
+          ),
         ),
       );
     }
@@ -340,10 +394,10 @@ class MealAdjustmentProfileValidationService {
         <MealAdjustmentValidationIssue>[];
     final List<MealAdjustmentProductSummary> assignedProducts =
         await _loadAssignedProducts(draft);
-    final Set<int> breakfastAssignedProductIds =
+    final Set<int> breakfastAssignedRootProductIds =
         draft.id == null || assignedProducts.isEmpty
         ? const <int>{}
-        : await _repository.loadBreakfastSemanticProductIds(
+        : await _repository.loadBreakfastSemanticRootProductIds(
             assignedProducts.map(
               (MealAdjustmentProductSummary product) => product.id,
             ),
@@ -360,7 +414,35 @@ class MealAdjustmentProfileValidationService {
         ),
       );
     }
-    if (draft.isActive && draft.components.isEmpty) {
+    if (draft.sandwichSettings.sandwichSurchargeMinor < 0) {
+      blockingErrors.add(
+        const MealAdjustmentValidationIssue(
+          code: MealAdjustmentValidationIssueCode.negativeSandwichSurcharge,
+          section: MealAdjustmentValidationSection.profile,
+        ),
+      );
+    }
+    if (draft.sandwichSettings.baguetteSurchargeMinor < 0) {
+      blockingErrors.add(
+        const MealAdjustmentValidationIssue(
+          code: MealAdjustmentValidationIssueCode.negativeBaguetteSurcharge,
+          section: MealAdjustmentValidationSection.profile,
+        ),
+      );
+    }
+    if (draft.kind == MealAdjustmentProfileKind.sandwich &&
+        draft.freeSwapLimit != 0) {
+      blockingErrors.add(
+        const MealAdjustmentValidationIssue(
+          code: MealAdjustmentValidationIssueCode
+              .sandwichProfileFreeSwapLimitMustBeZero,
+          section: MealAdjustmentValidationSection.profile,
+        ),
+      );
+    }
+    if (draft.isActive &&
+        draft.kind == MealAdjustmentProfileKind.standard &&
+        draft.components.isEmpty) {
       blockingErrors.add(
         const MealAdjustmentValidationIssue(
           code:
@@ -369,18 +451,49 @@ class MealAdjustmentProfileValidationService {
         ),
       );
     }
+    if (draft.kind == MealAdjustmentProfileKind.sandwich &&
+        draft.components.isNotEmpty) {
+      blockingErrors.add(
+        const MealAdjustmentValidationIssue(
+          code: MealAdjustmentValidationIssueCode
+              .sandwichProfileComponentsNotSupported,
+          section: MealAdjustmentValidationSection.components,
+        ),
+      );
+    }
+    if (draft.kind == MealAdjustmentProfileKind.sandwich &&
+        draft.pricingRules.isNotEmpty) {
+      blockingErrors.add(
+        const MealAdjustmentValidationIssue(
+          code: MealAdjustmentValidationIssueCode
+              .sandwichProfilePricingRulesNotSupported,
+          section: MealAdjustmentValidationSection.rules,
+        ),
+      );
+    }
 
-    blockingErrors.addAll(_validateComponents(draft, references.productsById));
-    blockingErrors.addAll(_validateExtras(draft, references.productsById));
-    final _RuleValidationArtifacts ruleArtifacts = _validateRules(
-      draft,
-      references.productsById,
+    if (draft.kind == MealAdjustmentProfileKind.standard) {
+      blockingErrors.addAll(
+        _validateComponents(draft, references.productsById),
+      );
+    }
+    blockingErrors.addAll(
+      _validateSandwichSauces(draft, references.productsById),
     );
+    blockingErrors.addAll(_validateExtras(draft, references.productsById));
+    final _RuleValidationArtifacts ruleArtifacts =
+        draft.kind == MealAdjustmentProfileKind.standard
+        ? _validateRules(draft, references.productsById)
+        : const _RuleValidationArtifacts(
+            blockingErrors: <MealAdjustmentValidationIssue>[],
+            conflictingRules: <MealAdjustmentConflictingRule>[],
+          );
     blockingErrors.addAll(ruleArtifacts.blockingErrors);
     blockingErrors.addAll(
       _validateAssignedProducts(
         assignedProducts: assignedProducts,
-        breakfastAssignedProductIds: breakfastAssignedProductIds,
+        breakfastAssignedRootProductIds: breakfastAssignedRootProductIds,
+        profileName: draft.name,
       ),
     );
 
@@ -399,7 +512,7 @@ class MealAdjustmentProfileValidationService {
       breakfastAssignedProducts: assignedProducts
           .where(
             (MealAdjustmentProductSummary product) =>
-                breakfastAssignedProductIds.contains(product.id),
+                breakfastAssignedRootProductIds.contains(product.id),
           )
           .toList(growable: false),
     );
@@ -421,6 +534,7 @@ class MealAdjustmentProfileValidationService {
     MealAdjustmentProfileDraft draft,
   ) async {
     final Set<int> referencedProductIds = <int>{};
+    referencedProductIds.addAll(draft.sandwichSettings.sauceProductIds);
     for (final MealAdjustmentComponentDraft component in draft.components) {
       referencedProductIds.add(component.defaultItemProductId);
       for (final MealAdjustmentComponentOptionDraft option
@@ -446,6 +560,52 @@ class MealAdjustmentProfileValidationService {
     return _ReferenceResolution(productsById: productsById);
   }
 
+  List<MealAdjustmentValidationIssue> _validateSandwichSauces(
+    MealAdjustmentProfileDraft draft,
+    Map<int, MealAdjustmentProductSummary> productsById,
+  ) {
+    if (draft.kind != MealAdjustmentProfileKind.sandwich) {
+      return const <MealAdjustmentValidationIssue>[];
+    }
+
+    final List<MealAdjustmentValidationIssue> blockingErrors =
+        <MealAdjustmentValidationIssue>[];
+    for (final int sauceProductId in draft.sandwichSettings.sauceProductIds) {
+      final MealAdjustmentProductSummary? product =
+          productsById[sauceProductId];
+      if (product == null) {
+        blockingErrors.add(
+          MealAdjustmentValidationIssue(
+            code: MealAdjustmentValidationIssueCode.sandwichSauceItemMissing,
+            section: MealAdjustmentValidationSection.references,
+            itemProductId: sauceProductId,
+          ),
+        );
+        continue;
+      }
+      if (!product.isActive) {
+        blockingErrors.add(
+          MealAdjustmentValidationIssue(
+            code: MealAdjustmentValidationIssueCode.sandwichSauceItemInactive,
+            section: MealAdjustmentValidationSection.references,
+            itemProductId: sauceProductId,
+          ),
+        );
+      }
+      if (!product.isSauceProduct) {
+        blockingErrors.add(
+          MealAdjustmentValidationIssue(
+            code: MealAdjustmentValidationIssueCode
+                .sandwichSauceItemMustBelongToSaucesCategory,
+            section: MealAdjustmentValidationSection.references,
+            itemProductId: sauceProductId,
+          ),
+        );
+      }
+    }
+    return blockingErrors;
+  }
+
   List<MealAdjustmentValidationIssue> _validateComponents(
     MealAdjustmentProfileDraft draft,
     Map<int, MealAdjustmentProductSummary> productsById,
@@ -456,12 +616,29 @@ class MealAdjustmentProfileValidationService {
 
     for (final MealAdjustmentComponentDraft component in draft.components) {
       final String normalizedKey = component.componentKey.trim().toLowerCase();
-      if (!seenComponentKeys.add(normalizedKey)) {
+      if (normalizedKey.isEmpty) {
+        blockingErrors.add(
+          MealAdjustmentValidationIssue(
+            code: MealAdjustmentValidationIssueCode.missingComponentKey,
+            section: MealAdjustmentValidationSection.components,
+            detail: 'component:${component.sortOrder}',
+          ),
+        );
+      } else if (!seenComponentKeys.add(normalizedKey)) {
         blockingErrors.add(
           MealAdjustmentValidationIssue(
             code: MealAdjustmentValidationIssueCode.duplicateComponentKey,
             section: MealAdjustmentValidationSection.components,
             componentKey: component.componentKey,
+          ),
+        );
+      }
+      if (component.displayName.trim().isEmpty) {
+        blockingErrors.add(
+          MealAdjustmentValidationIssue(
+            code: MealAdjustmentValidationIssueCode.missingComponentDisplayName,
+            section: MealAdjustmentValidationSection.components,
+            detail: 'component:${component.sortOrder}',
           ),
         );
       }
@@ -558,6 +735,15 @@ class MealAdjustmentProfileValidationService {
     final Set<int> seenExtraItems = <int>{};
 
     for (final MealAdjustmentExtraOptionDraft extra in draft.extraOptions) {
+      if (extra.fixedPriceDeltaMinor < 0) {
+        blockingErrors.add(
+          MealAdjustmentValidationIssue(
+            code: MealAdjustmentValidationIssueCode.invalidExtraPriceDelta,
+            section: MealAdjustmentValidationSection.extras,
+            itemProductId: extra.itemProductId,
+          ),
+        );
+      }
       if (!seenExtraItems.add(extra.itemProductId)) {
         blockingErrors.add(
           MealAdjustmentValidationIssue(
@@ -600,10 +786,41 @@ class MealAdjustmentProfileValidationService {
         <MealAdjustmentValidationIssue>[];
     final Map<String, List<MealAdjustmentPricingRuleDraft>> rulesByMeaning =
         <String, List<MealAdjustmentPricingRuleDraft>>{};
+    final Map<String, MealAdjustmentComponentDraft> activeComponentsByKey =
+        <String, MealAdjustmentComponentDraft>{
+          for (final MealAdjustmentComponentDraft component in draft.components)
+            if (component.isActive)
+              component.componentKey.trim().toLowerCase(): component,
+        };
+    final Map<String, Set<int>> activeSwapTargetsByComponentKey =
+        <String, Set<int>>{
+          for (final MealAdjustmentComponentDraft component in draft.components)
+            if (component.isActive)
+              component.componentKey.trim().toLowerCase(): component.swapOptions
+                  .where(
+                    (MealAdjustmentComponentOptionDraft option) =>
+                        option.isActive,
+                  )
+                  .map(
+                    (MealAdjustmentComponentOptionDraft option) =>
+                        option.optionItemProductId,
+                  )
+                  .toSet(),
+        };
+    final Set<int> activeExtraItemIds = draft.extraOptions
+        .where((MealAdjustmentExtraOptionDraft extra) => extra.isActive)
+        .map((MealAdjustmentExtraOptionDraft extra) => extra.itemProductId)
+        .toSet();
 
     for (final MealAdjustmentPricingRuleDraft rule in draft.pricingRules) {
-      if (!rule.isActive) {
-        continue;
+      if (rule.name.trim().isEmpty) {
+        blockingErrors.add(
+          MealAdjustmentValidationIssue(
+            code: MealAdjustmentValidationIssueCode.missingRuleName,
+            section: MealAdjustmentValidationSection.rules,
+            ruleId: rule.id,
+          ),
+        );
       }
       if (rule.ruleType == MealAdjustmentPricingRuleType.extra &&
           rule.priceDeltaMinor < 0) {
@@ -626,9 +843,34 @@ class MealAdjustmentProfileValidationService {
           ),
         );
       }
+      if (rule.conditions.isEmpty) {
+        blockingErrors.add(
+          MealAdjustmentValidationIssue(
+            code: MealAdjustmentValidationIssueCode.invalidRuleCondition,
+            section: MealAdjustmentValidationSection.rules,
+            ruleId: rule.id,
+            detail: 'At least one condition is required.',
+          ),
+        );
+      }
+      final Set<String> seenConditionMeaningKeys = <String>{};
 
       for (final MealAdjustmentPricingRuleConditionDraft condition
           in rule.conditions) {
+        if (!seenConditionMeaningKeys.add(condition.semanticMeaningKey)) {
+          blockingErrors.add(
+            MealAdjustmentValidationIssue(
+              code: MealAdjustmentValidationIssueCode.invalidRuleCondition,
+              section: MealAdjustmentValidationSection.rules,
+              ruleId: rule.id,
+              componentKey: condition.componentKey,
+              itemProductId: condition.itemProductId,
+              detail:
+                  'Duplicate conditions with the same semantic meaning are not allowed in one rule.',
+            ),
+          );
+          continue;
+        }
         if (!condition.isStructurallyValid) {
           blockingErrors.add(
             MealAdjustmentValidationIssue(
@@ -637,8 +879,87 @@ class MealAdjustmentProfileValidationService {
               ruleId: rule.id,
               componentKey: condition.componentKey,
               itemProductId: condition.itemProductId,
+              detail:
+                  'Complete the condition fields required by this condition type.',
             ),
           );
+          continue;
+        }
+
+        final String normalizedComponentKey =
+            condition.componentKey?.trim().toLowerCase() ?? '';
+        switch (condition.conditionType) {
+          case MealAdjustmentPricingRuleConditionType.removedComponent:
+            final MealAdjustmentComponentDraft? component =
+                activeComponentsByKey[normalizedComponentKey];
+            if (component == null) {
+              blockingErrors.add(
+                MealAdjustmentValidationIssue(
+                  code: MealAdjustmentValidationIssueCode.invalidRuleCondition,
+                  section: MealAdjustmentValidationSection.rules,
+                  ruleId: rule.id,
+                  componentKey: condition.componentKey,
+                  detail:
+                      'Removed-component condition must reference an active profile component.',
+                ),
+              );
+            } else if (!component.canRemove) {
+              blockingErrors.add(
+                MealAdjustmentValidationIssue(
+                  code: MealAdjustmentValidationIssueCode.invalidRuleCondition,
+                  section: MealAdjustmentValidationSection.rules,
+                  ruleId: rule.id,
+                  componentKey: condition.componentKey,
+                  detail:
+                      'Removed-component condition must reference a removable component.',
+                ),
+              );
+            }
+            break;
+          case MealAdjustmentPricingRuleConditionType.swapToItem:
+            final MealAdjustmentComponentDraft? component =
+                activeComponentsByKey[normalizedComponentKey];
+            if (component == null) {
+              blockingErrors.add(
+                MealAdjustmentValidationIssue(
+                  code: MealAdjustmentValidationIssueCode.invalidRuleCondition,
+                  section: MealAdjustmentValidationSection.rules,
+                  ruleId: rule.id,
+                  componentKey: condition.componentKey,
+                  itemProductId: condition.itemProductId,
+                  detail:
+                      'Swap condition must reference an active profile component.',
+                ),
+              );
+            } else if (!activeSwapTargetsByComponentKey[normalizedComponentKey]!
+                .contains(condition.itemProductId)) {
+              blockingErrors.add(
+                MealAdjustmentValidationIssue(
+                  code: MealAdjustmentValidationIssueCode.invalidRuleCondition,
+                  section: MealAdjustmentValidationSection.rules,
+                  ruleId: rule.id,
+                  componentKey: condition.componentKey,
+                  itemProductId: condition.itemProductId,
+                  detail:
+                      'Swap condition target must be configured as an active swap option for the component.',
+                ),
+              );
+            }
+            break;
+          case MealAdjustmentPricingRuleConditionType.extraItem:
+            if (!activeExtraItemIds.contains(condition.itemProductId)) {
+              blockingErrors.add(
+                MealAdjustmentValidationIssue(
+                  code: MealAdjustmentValidationIssueCode.invalidRuleCondition,
+                  section: MealAdjustmentValidationSection.rules,
+                  ruleId: rule.id,
+                  itemProductId: condition.itemProductId,
+                  detail:
+                      'Extra-item condition must reference an active profile extra.',
+                ),
+              );
+            }
+            break;
         }
         final int? itemProductId = condition.itemProductId;
         if (itemProductId == null) {
@@ -717,12 +1038,13 @@ class MealAdjustmentProfileValidationService {
 
   List<MealAdjustmentValidationIssue> _validateAssignedProducts({
     required List<MealAdjustmentProductSummary> assignedProducts,
-    required Set<int> breakfastAssignedProductIds,
+    required Set<int> breakfastAssignedRootProductIds,
+    required String profileName,
   }) {
     return assignedProducts
         .where(
           (MealAdjustmentProductSummary product) =>
-              breakfastAssignedProductIds.contains(product.id),
+              breakfastAssignedRootProductIds.contains(product.id),
         )
         .map(
           (MealAdjustmentProductSummary product) =>
@@ -731,9 +1053,24 @@ class MealAdjustmentProfileValidationService {
                     .breakfastProductAssignmentBlocked,
                 section: MealAdjustmentValidationSection.assignments,
                 productId: product.id,
+                detail: _buildBreakfastAssignmentConflictMessage(
+                  productName: product.name,
+                  profileName: profileName,
+                ),
               ),
         )
         .toList(growable: false);
+  }
+
+  String _buildBreakfastAssignmentConflictMessage({
+    required String productName,
+    String? profileName,
+  }) {
+    final String normalizedProfileName =
+        profileName == null || profileName.trim().isEmpty
+        ? 'this meal-adjustment profile'
+        : '"${profileName.trim()}"';
+    return 'Product "$productName" cannot use meal-adjustment profile $normalizedProfileName because it is configured as a breakfast semantic root product.';
   }
 
   List<MealAdjustmentBrokenReference> _collectBrokenReferences(
@@ -775,6 +1112,12 @@ class MealAdjustmentProfileValidationService {
       }
     }
 
+    for (final int sauceProductId in draft.sandwichSettings.sauceProductIds) {
+      addReference(
+        section: MealAdjustmentValidationSection.profile,
+        itemProductId: sauceProductId,
+      );
+    }
     for (final MealAdjustmentComponentDraft component in draft.components) {
       addReference(
         section: MealAdjustmentValidationSection.components,

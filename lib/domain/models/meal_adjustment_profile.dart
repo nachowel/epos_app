@@ -1,6 +1,12 @@
+import 'sandwich.dart';
+
+export 'sandwich.dart';
+
 enum MealAdjustmentComponentOptionType { swap }
 
 enum MealAdjustmentPricingRuleType { removeOnly, combo, swap, extra }
+
+enum MealAdjustmentProfileKind { standard, sandwich }
 
 enum MealAdjustmentPricingRuleConditionType {
   removedComponent,
@@ -15,6 +21,8 @@ class MealAdjustmentProfile {
     required this.id,
     required this.name,
     this.description,
+    this.kind = MealAdjustmentProfileKind.standard,
+    this.sandwichSettings = const SandwichProfileSettings(),
     required this.freeSwapLimit,
     required this.isActive,
     this.createdAt,
@@ -27,6 +35,8 @@ class MealAdjustmentProfile {
   final int id;
   final String name;
   final String? description;
+  final MealAdjustmentProfileKind kind;
+  final SandwichProfileSettings sandwichSettings;
   final int freeSwapLimit;
   final bool isActive;
   final DateTime? createdAt;
@@ -39,6 +49,8 @@ class MealAdjustmentProfile {
     int? id,
     String? name,
     Object? description = _unsetNullableField,
+    MealAdjustmentProfileKind? kind,
+    SandwichProfileSettings? sandwichSettings,
     int? freeSwapLimit,
     bool? isActive,
     Object? createdAt = _unsetNullableField,
@@ -53,6 +65,8 @@ class MealAdjustmentProfile {
       description: identical(description, _unsetNullableField)
           ? this.description
           : description as String?,
+      kind: kind ?? this.kind,
+      sandwichSettings: sandwichSettings ?? this.sandwichSettings,
       freeSwapLimit: freeSwapLimit ?? this.freeSwapLimit,
       isActive: isActive ?? this.isActive,
       createdAt: identical(createdAt, _unsetNullableField)
@@ -76,6 +90,8 @@ class MealAdjustmentProfile {
         other.id == id &&
         other.name == name &&
         other.description == description &&
+        other.kind == kind &&
+        other.sandwichSettings == sandwichSettings &&
         other.freeSwapLimit == freeSwapLimit &&
         other.isActive == isActive &&
         other.createdAt == createdAt &&
@@ -90,6 +106,8 @@ class MealAdjustmentProfile {
     id,
     name,
     description,
+    kind,
+    sandwichSettings,
     freeSwapLimit,
     isActive,
     createdAt,
@@ -105,6 +123,8 @@ class MealAdjustmentProfileDraft {
     this.id,
     required this.name,
     this.description,
+    this.kind = MealAdjustmentProfileKind.standard,
+    this.sandwichSettings = const SandwichProfileSettings(),
     required this.freeSwapLimit,
     required this.isActive,
     this.components = const <MealAdjustmentComponentDraft>[],
@@ -115,6 +135,8 @@ class MealAdjustmentProfileDraft {
   final int? id;
   final String name;
   final String? description;
+  final MealAdjustmentProfileKind kind;
+  final SandwichProfileSettings sandwichSettings;
   final int freeSwapLimit;
   final bool isActive;
   final List<MealAdjustmentComponentDraft> components;
@@ -125,6 +147,8 @@ class MealAdjustmentProfileDraft {
     Object? id = _unsetNullableField,
     String? name,
     Object? description = _unsetNullableField,
+    MealAdjustmentProfileKind? kind,
+    SandwichProfileSettings? sandwichSettings,
     int? freeSwapLimit,
     bool? isActive,
     List<MealAdjustmentComponentDraft>? components,
@@ -137,6 +161,8 @@ class MealAdjustmentProfileDraft {
       description: identical(description, _unsetNullableField)
           ? this.description
           : description as String?,
+      kind: kind ?? this.kind,
+      sandwichSettings: sandwichSettings ?? this.sandwichSettings,
       freeSwapLimit: freeSwapLimit ?? this.freeSwapLimit,
       isActive: isActive ?? this.isActive,
       components: components ?? this.components,
@@ -148,10 +174,7 @@ class MealAdjustmentProfileDraft {
   /// Creates a duplicate draft with no id and a modified name.
   MealAdjustmentProfileDraft duplicate({String? nameSuffix}) {
     final String suffix = nameSuffix ?? ' (copy)';
-    return copyWith(
-      id: null,
-      name: '$name$suffix',
-    );
+    return copyWith(id: null, name: '$name$suffix');
   }
 
   MealAdjustmentProfile toRuntimeProfile({required int profileId}) {
@@ -159,6 +182,8 @@ class MealAdjustmentProfileDraft {
       id: profileId,
       name: name,
       description: description,
+      kind: kind,
+      sandwichSettings: sandwichSettings,
       freeSwapLimit: freeSwapLimit,
       isActive: isActive,
       components: components
@@ -193,6 +218,58 @@ class MealAdjustmentProfileDraft {
           .toList(growable: false),
     );
   }
+}
+
+class SandwichProfileSettings {
+  const SandwichProfileSettings({
+    this.sandwichSurchargeMinor = kDefaultSandwichSurchargeMinor,
+    this.baguetteSurchargeMinor = kDefaultBaguetteSurchargeMinor,
+    this.sauceProductIds = const <int>[],
+  });
+
+  final int sandwichSurchargeMinor;
+  final int baguetteSurchargeMinor;
+  final List<int> sauceProductIds;
+
+  SandwichProfileSettings copyWith({
+    int? sandwichSurchargeMinor,
+    int? baguetteSurchargeMinor,
+    List<int>? sauceProductIds,
+  }) {
+    return SandwichProfileSettings(
+      sandwichSurchargeMinor:
+          sandwichSurchargeMinor ?? this.sandwichSurchargeMinor,
+      baguetteSurchargeMinor:
+          baguetteSurchargeMinor ?? this.baguetteSurchargeMinor,
+      sauceProductIds: sauceProductIds ?? this.sauceProductIds,
+    );
+  }
+
+  int surchargeForBread(SandwichBreadType breadType) {
+    switch (breadType) {
+      case SandwichBreadType.roll:
+        return 0;
+      case SandwichBreadType.sandwich:
+        return sandwichSurchargeMinor;
+      case SandwichBreadType.baguette:
+        return baguetteSurchargeMinor;
+    }
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SandwichProfileSettings &&
+        other.sandwichSurchargeMinor == sandwichSurchargeMinor &&
+        other.baguetteSurchargeMinor == baguetteSurchargeMinor &&
+        _listEquals(other.sauceProductIds, sauceProductIds);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    sandwichSurchargeMinor,
+    baguetteSurchargeMinor,
+    Object.hashAll(sauceProductIds),
+  );
 }
 
 class MealAdjustmentComponent {
@@ -275,6 +352,30 @@ class MealAdjustmentComponentDraft {
   final int sortOrder;
   final bool isActive;
   final List<MealAdjustmentComponentOptionDraft> swapOptions;
+
+  MealAdjustmentComponentDraft copyWith({
+    Object? id = _unsetNullableField,
+    String? componentKey,
+    String? displayName,
+    int? defaultItemProductId,
+    int? quantity,
+    bool? canRemove,
+    int? sortOrder,
+    bool? isActive,
+    List<MealAdjustmentComponentOptionDraft>? swapOptions,
+  }) {
+    return MealAdjustmentComponentDraft(
+      id: id == _unsetNullableField ? this.id : id as int?,
+      componentKey: componentKey ?? this.componentKey,
+      displayName: displayName ?? this.displayName,
+      defaultItemProductId: defaultItemProductId ?? this.defaultItemProductId,
+      quantity: quantity ?? this.quantity,
+      canRemove: canRemove ?? this.canRemove,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isActive: isActive ?? this.isActive,
+      swapOptions: swapOptions ?? this.swapOptions,
+    );
+  }
 
   MealAdjustmentComponent toRuntimeComponent({
     required int profileId,
@@ -367,6 +468,26 @@ class MealAdjustmentComponentOptionDraft {
   final int sortOrder;
   final bool isActive;
 
+  MealAdjustmentComponentOptionDraft copyWith({
+    Object? id = _unsetNullableField,
+    int? optionItemProductId,
+    MealAdjustmentComponentOptionType? type,
+    Object? fixedPriceDeltaMinor = _unsetNullableField,
+    int? sortOrder,
+    bool? isActive,
+  }) {
+    return MealAdjustmentComponentOptionDraft(
+      id: id == _unsetNullableField ? this.id : id as int?,
+      optionItemProductId: optionItemProductId ?? this.optionItemProductId,
+      type: type ?? this.type,
+      fixedPriceDeltaMinor: fixedPriceDeltaMinor == _unsetNullableField
+          ? this.fixedPriceDeltaMinor
+          : fixedPriceDeltaMinor as int?,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isActive: isActive ?? this.isActive,
+    );
+  }
+
   MealAdjustmentComponentOption toRuntimeOption({
     required int profileComponentId,
     required int generatedOptionId,
@@ -439,6 +560,22 @@ class MealAdjustmentExtraOptionDraft {
   final int fixedPriceDeltaMinor;
   final int sortOrder;
   final bool isActive;
+
+  MealAdjustmentExtraOptionDraft copyWith({
+    Object? id = _unsetNullableField,
+    int? itemProductId,
+    int? fixedPriceDeltaMinor,
+    int? sortOrder,
+    bool? isActive,
+  }) {
+    return MealAdjustmentExtraOptionDraft(
+      id: identical(id, _unsetNullableField) ? this.id : id as int?,
+      itemProductId: itemProductId ?? this.itemProductId,
+      fixedPriceDeltaMinor: fixedPriceDeltaMinor ?? this.fixedPriceDeltaMinor,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isActive: isActive ?? this.isActive,
+    );
+  }
 
   MealAdjustmentExtraOption toRuntimeExtraOption({
     required int profileId,
@@ -523,6 +660,26 @@ class MealAdjustmentPricingRuleDraft {
   final int priority;
   final bool isActive;
   final List<MealAdjustmentPricingRuleConditionDraft> conditions;
+
+  MealAdjustmentPricingRuleDraft copyWith({
+    Object? id = _unsetNullableField,
+    String? name,
+    MealAdjustmentPricingRuleType? ruleType,
+    int? priceDeltaMinor,
+    int? priority,
+    bool? isActive,
+    List<MealAdjustmentPricingRuleConditionDraft>? conditions,
+  }) {
+    return MealAdjustmentPricingRuleDraft(
+      id: identical(id, _unsetNullableField) ? this.id : id as int?,
+      name: name ?? this.name,
+      ruleType: ruleType ?? this.ruleType,
+      priceDeltaMinor: priceDeltaMinor ?? this.priceDeltaMinor,
+      priority: priority ?? this.priority,
+      isActive: isActive ?? this.isActive,
+      conditions: conditions ?? this.conditions,
+    );
+  }
 
   String get semanticMeaningKey {
     final List<String> conditionKeys =
@@ -639,6 +796,26 @@ class MealAdjustmentPricingRuleConditionDraft {
   final String? componentKey;
   final int? itemProductId;
   final int quantity;
+
+  MealAdjustmentPricingRuleConditionDraft copyWith({
+    Object? id = _unsetNullableField,
+    MealAdjustmentPricingRuleConditionType? conditionType,
+    Object? componentKey = _unsetNullableField,
+    Object? itemProductId = _unsetNullableField,
+    int? quantity,
+  }) {
+    return MealAdjustmentPricingRuleConditionDraft(
+      id: identical(id, _unsetNullableField) ? this.id : id as int?,
+      conditionType: conditionType ?? this.conditionType,
+      componentKey: identical(componentKey, _unsetNullableField)
+          ? this.componentKey
+          : componentKey as String?,
+      itemProductId: identical(itemProductId, _unsetNullableField)
+          ? this.itemProductId
+          : itemProductId as int?,
+      quantity: quantity ?? this.quantity,
+    );
+  }
 
   String get semanticMeaningKey {
     return '${conditionType.name}|${componentKey ?? ''}|${itemProductId ?? ''}|$quantity';

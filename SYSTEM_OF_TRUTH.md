@@ -16,26 +16,47 @@ If two sources disagree, follow the hierarchy below.
 
 ## 1. Authority Hierarchy
 
-### Level 1 — Live implementation truth
-These are the highest authority for current technical reality:
+Use this authority chain in this exact order:
 
-1. `lib/data/database/app_database.dart`
-2. embedded migration functions and raw SQL defined in `lib/data/database/app_database.dart`
-3. any generated schema-compatible runtime behavior already enforced by live code
+1. `SYSTEM_OF_TRUTH.md`
+2. `lib/data/database/app_database.dart`
+3. embedded migration functions and raw SQL defined in `lib/data/database/app_database.dart`
+4. relevant feature contract docs
+5. `CLAUDE.md`
+6. `schema.md`
 
 Interpretation:
-- Current table shape
-- current enum/check constraints
-- current runtime status values
-- current persisted field availability
+- `SYSTEM_OF_TRUTH.md` defines which source governs each subject area
+- live schema and embedded migrations define current persisted table shape and constraints
+- feature contract docs define approved feature behavior where schema alone is insufficient
+- `CLAUDE.md` provides coding and architecture guardrails
+- `schema.md` is human-readable support documentation only
 
-must follow live code and migrations first.
-
-If markdown docs disagree with live code, live code wins.
+If lower-authority markdown disagrees with higher-authority sources, the lower-authority markdown must be updated.
 
 ---
 
-## 2. Domain truth for menu engine / breakfast behavior
+## 2. Feature contract truth
+
+For POS entry flow, pre-order semantics, persisted transaction status
+semantics, order lifecycle timing, category ordering, and admin category
+reorder behavior, the authoritative contract is:
+
+1. `docs/pos_category_entry_flow_contract.md`
+
+Interpretation:
+- login-to-selling navigation flow
+- post-payment return flow
+- canonical persisted transaction status model
+- persisted transaction lifecycle transitions
+- active-order terminology boundaries
+- transaction creation trigger
+- category order source of truth
+- category entry vs POS screen responsibility split
+- admin category reorder persistence contract
+
+If UI behavior, older notes, or implementation shortcuts conflict with this
+contract, the contract wins and the implementation must be updated later.
 
 For breakfast, set logic, swap logic, choice logic, persistence semantics, and edit orchestration, the authoritative contract chain is:
 
@@ -122,7 +143,7 @@ It is authoritative for:
 It is **not** the final authority for:
 - current live schema shape
 - migration truth
-- breakfast contract details when those are documented in dedicated contract files
+- feature contract details when those are documented in dedicated contract files
 
 If `CLAUDE.md` conflicts with live schema or contract docs, update `CLAUDE.md` later, but do not follow the stale section.
 
@@ -141,7 +162,7 @@ It is useful for:
 It is **not** the top authority when it conflicts with:
 - `app_database.dart`
 - migration files
-- menu-engine contract docs
+- feature contract docs
 
 If `schema.md` conflicts with live schema, live schema wins and `schema.md` must be updated afterward.
 
@@ -155,8 +176,8 @@ If live code and markdown docs conflict:
 - update markdown afterward
 
 ### Rule B
-If breakfast/menu-engine contract docs and older general docs conflict:
-- follow breakfast/menu-engine contract docs
+If feature contract docs and older general docs conflict:
+- follow the relevant feature contract docs
 - update general docs afterward
 
 ### Rule C
@@ -180,9 +201,13 @@ Business rules must come from:
 These mismatches are already known and must not be ignored:
 
 1. Markdown docs may lag behind `app_database.dart`
-2. Transaction status semantics in older docs may use `open`, while live code / newer contracts may use `draft/sent/paid/cancelled`
+2. Canonical persisted transaction status model is `draft / sent / paid / cancelled`; any older `open` wording is legacy terminology only
 3. Older flat modifier descriptions do not fully represent the newer breakfast/menu-engine direction
 4. `CLAUDE.md` and `schema.md` may contain legacy baseline sections that are useful for history but not authoritative for current breakfast behavior
+5. POS/category-entry behavior must come from `docs/pos_category_entry_flow_contract.md`, not from older direct-to-POS navigation assumptions
+6. Pre-order is a non-persisted navigation/browsing state and must not be confused with any persisted `transactions.status` value
+7. The raw SQL schema and migrations define transaction default/status truth; any stale code residue such as a Dart-side `open` default must not be treated as canonical persisted status truth
+8. `open orders` may remain as a UI/report umbrella label for active orders, but it must never be documented as a stored `transactions.status` value
 
 ---
 
@@ -198,7 +223,7 @@ Always instruct the model to follow this order:
 4. `CLAUDE.md`
 5. `schema.md`
 
-Never rely on `CLAUDE.md` or `schema.md` alone for breakfast/menu-engine work.
+Never rely on `CLAUDE.md` or `schema.md` alone for feature work where a dedicated contract exists.
 
 ---
 
@@ -211,6 +236,9 @@ Use this mental model:
 
 - **What is semantically true for breakfast/menu engine?**
   - contract docs
+
+- **What is semantically true for POS entry flow, transaction lifecycle semantics, and category ordering?**
+  - `docs/pos_category_entry_flow_contract.md`
 
 - **What is operational/coding discipline?**
   - `CLAUDE.md`

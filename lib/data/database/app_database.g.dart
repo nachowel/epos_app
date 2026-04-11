@@ -2230,6 +2230,539 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   }
 }
 
+class $SandwichSauceMigrationAuditsTable extends SandwichSauceMigrationAudits
+    with
+        TableInfo<
+          $SandwichSauceMigrationAuditsTable,
+          SandwichSauceMigrationAudit
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SandwichSauceMigrationAuditsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _profileIdMeta = const VerificationMeta(
+    'profileId',
+  );
+  @override
+  late final GeneratedColumn<int> profileId = GeneratedColumn<int>(
+    'profile_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _legacyValueMeta = const VerificationMeta(
+    'legacyValue',
+  );
+  @override
+  late final GeneratedColumn<String> legacyValue = GeneratedColumn<String>(
+    'legacy_value',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _matchedProductIdMeta = const VerificationMeta(
+    'matchedProductId',
+  );
+  @override
+  late final GeneratedColumn<int> matchedProductId = GeneratedColumn<int>(
+    'matched_product_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _matchedProductNameMeta =
+      const VerificationMeta('matchedProductName');
+  @override
+  late final GeneratedColumn<String> matchedProductName =
+      GeneratedColumn<String>(
+        'matched_product_name',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _detailMeta = const VerificationMeta('detail');
+  @override
+  late final GeneratedColumn<String> detail = GeneratedColumn<String>(
+    'detail',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    profileId,
+    legacyValue,
+    matchedProductId,
+    matchedProductName,
+    status,
+    detail,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sandwich_sauce_migration_audits';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SandwichSauceMigrationAudit> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('profile_id')) {
+      context.handle(
+        _profileIdMeta,
+        profileId.isAcceptableOrUnknown(data['profile_id']!, _profileIdMeta),
+      );
+    }
+    if (data.containsKey('legacy_value')) {
+      context.handle(
+        _legacyValueMeta,
+        legacyValue.isAcceptableOrUnknown(
+          data['legacy_value']!,
+          _legacyValueMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_legacyValueMeta);
+    }
+    if (data.containsKey('matched_product_id')) {
+      context.handle(
+        _matchedProductIdMeta,
+        matchedProductId.isAcceptableOrUnknown(
+          data['matched_product_id']!,
+          _matchedProductIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('matched_product_name')) {
+      context.handle(
+        _matchedProductNameMeta,
+        matchedProductName.isAcceptableOrUnknown(
+          data['matched_product_name']!,
+          _matchedProductNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('detail')) {
+      context.handle(
+        _detailMeta,
+        detail.isAcceptableOrUnknown(data['detail']!, _detailMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SandwichSauceMigrationAudit map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SandwichSauceMigrationAudit(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      profileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}profile_id'],
+      ),
+      legacyValue: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}legacy_value'],
+      )!,
+      matchedProductId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}matched_product_id'],
+      ),
+      matchedProductName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}matched_product_name'],
+      ),
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      detail: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}detail'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $SandwichSauceMigrationAuditsTable createAlias(String alias) {
+    return $SandwichSauceMigrationAuditsTable(attachedDatabase, alias);
+  }
+}
+
+class SandwichSauceMigrationAudit extends DataClass
+    implements Insertable<SandwichSauceMigrationAudit> {
+  final int id;
+  final int? profileId;
+  final String legacyValue;
+  final int? matchedProductId;
+  final String? matchedProductName;
+  final String status;
+  final String? detail;
+  final DateTime createdAt;
+  const SandwichSauceMigrationAudit({
+    required this.id,
+    this.profileId,
+    required this.legacyValue,
+    this.matchedProductId,
+    this.matchedProductName,
+    required this.status,
+    this.detail,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    if (!nullToAbsent || profileId != null) {
+      map['profile_id'] = Variable<int>(profileId);
+    }
+    map['legacy_value'] = Variable<String>(legacyValue);
+    if (!nullToAbsent || matchedProductId != null) {
+      map['matched_product_id'] = Variable<int>(matchedProductId);
+    }
+    if (!nullToAbsent || matchedProductName != null) {
+      map['matched_product_name'] = Variable<String>(matchedProductName);
+    }
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || detail != null) {
+      map['detail'] = Variable<String>(detail);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  SandwichSauceMigrationAuditsCompanion toCompanion(bool nullToAbsent) {
+    return SandwichSauceMigrationAuditsCompanion(
+      id: Value(id),
+      profileId: profileId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(profileId),
+      legacyValue: Value(legacyValue),
+      matchedProductId: matchedProductId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(matchedProductId),
+      matchedProductName: matchedProductName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(matchedProductName),
+      status: Value(status),
+      detail: detail == null && nullToAbsent
+          ? const Value.absent()
+          : Value(detail),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory SandwichSauceMigrationAudit.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SandwichSauceMigrationAudit(
+      id: serializer.fromJson<int>(json['id']),
+      profileId: serializer.fromJson<int?>(json['profileId']),
+      legacyValue: serializer.fromJson<String>(json['legacyValue']),
+      matchedProductId: serializer.fromJson<int?>(json['matchedProductId']),
+      matchedProductName: serializer.fromJson<String?>(
+        json['matchedProductName'],
+      ),
+      status: serializer.fromJson<String>(json['status']),
+      detail: serializer.fromJson<String?>(json['detail']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'profileId': serializer.toJson<int?>(profileId),
+      'legacyValue': serializer.toJson<String>(legacyValue),
+      'matchedProductId': serializer.toJson<int?>(matchedProductId),
+      'matchedProductName': serializer.toJson<String?>(matchedProductName),
+      'status': serializer.toJson<String>(status),
+      'detail': serializer.toJson<String?>(detail),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  SandwichSauceMigrationAudit copyWith({
+    int? id,
+    Value<int?> profileId = const Value.absent(),
+    String? legacyValue,
+    Value<int?> matchedProductId = const Value.absent(),
+    Value<String?> matchedProductName = const Value.absent(),
+    String? status,
+    Value<String?> detail = const Value.absent(),
+    DateTime? createdAt,
+  }) => SandwichSauceMigrationAudit(
+    id: id ?? this.id,
+    profileId: profileId.present ? profileId.value : this.profileId,
+    legacyValue: legacyValue ?? this.legacyValue,
+    matchedProductId: matchedProductId.present
+        ? matchedProductId.value
+        : this.matchedProductId,
+    matchedProductName: matchedProductName.present
+        ? matchedProductName.value
+        : this.matchedProductName,
+    status: status ?? this.status,
+    detail: detail.present ? detail.value : this.detail,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  SandwichSauceMigrationAudit copyWithCompanion(
+    SandwichSauceMigrationAuditsCompanion data,
+  ) {
+    return SandwichSauceMigrationAudit(
+      id: data.id.present ? data.id.value : this.id,
+      profileId: data.profileId.present ? data.profileId.value : this.profileId,
+      legacyValue: data.legacyValue.present
+          ? data.legacyValue.value
+          : this.legacyValue,
+      matchedProductId: data.matchedProductId.present
+          ? data.matchedProductId.value
+          : this.matchedProductId,
+      matchedProductName: data.matchedProductName.present
+          ? data.matchedProductName.value
+          : this.matchedProductName,
+      status: data.status.present ? data.status.value : this.status,
+      detail: data.detail.present ? data.detail.value : this.detail,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SandwichSauceMigrationAudit(')
+          ..write('id: $id, ')
+          ..write('profileId: $profileId, ')
+          ..write('legacyValue: $legacyValue, ')
+          ..write('matchedProductId: $matchedProductId, ')
+          ..write('matchedProductName: $matchedProductName, ')
+          ..write('status: $status, ')
+          ..write('detail: $detail, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    profileId,
+    legacyValue,
+    matchedProductId,
+    matchedProductName,
+    status,
+    detail,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SandwichSauceMigrationAudit &&
+          other.id == this.id &&
+          other.profileId == this.profileId &&
+          other.legacyValue == this.legacyValue &&
+          other.matchedProductId == this.matchedProductId &&
+          other.matchedProductName == this.matchedProductName &&
+          other.status == this.status &&
+          other.detail == this.detail &&
+          other.createdAt == this.createdAt);
+}
+
+class SandwichSauceMigrationAuditsCompanion
+    extends UpdateCompanion<SandwichSauceMigrationAudit> {
+  final Value<int> id;
+  final Value<int?> profileId;
+  final Value<String> legacyValue;
+  final Value<int?> matchedProductId;
+  final Value<String?> matchedProductName;
+  final Value<String> status;
+  final Value<String?> detail;
+  final Value<DateTime> createdAt;
+  const SandwichSauceMigrationAuditsCompanion({
+    this.id = const Value.absent(),
+    this.profileId = const Value.absent(),
+    this.legacyValue = const Value.absent(),
+    this.matchedProductId = const Value.absent(),
+    this.matchedProductName = const Value.absent(),
+    this.status = const Value.absent(),
+    this.detail = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  SandwichSauceMigrationAuditsCompanion.insert({
+    this.id = const Value.absent(),
+    this.profileId = const Value.absent(),
+    required String legacyValue,
+    this.matchedProductId = const Value.absent(),
+    this.matchedProductName = const Value.absent(),
+    required String status,
+    this.detail = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  }) : legacyValue = Value(legacyValue),
+       status = Value(status);
+  static Insertable<SandwichSauceMigrationAudit> custom({
+    Expression<int>? id,
+    Expression<int>? profileId,
+    Expression<String>? legacyValue,
+    Expression<int>? matchedProductId,
+    Expression<String>? matchedProductName,
+    Expression<String>? status,
+    Expression<String>? detail,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (profileId != null) 'profile_id': profileId,
+      if (legacyValue != null) 'legacy_value': legacyValue,
+      if (matchedProductId != null) 'matched_product_id': matchedProductId,
+      if (matchedProductName != null)
+        'matched_product_name': matchedProductName,
+      if (status != null) 'status': status,
+      if (detail != null) 'detail': detail,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  SandwichSauceMigrationAuditsCompanion copyWith({
+    Value<int>? id,
+    Value<int?>? profileId,
+    Value<String>? legacyValue,
+    Value<int?>? matchedProductId,
+    Value<String?>? matchedProductName,
+    Value<String>? status,
+    Value<String?>? detail,
+    Value<DateTime>? createdAt,
+  }) {
+    return SandwichSauceMigrationAuditsCompanion(
+      id: id ?? this.id,
+      profileId: profileId ?? this.profileId,
+      legacyValue: legacyValue ?? this.legacyValue,
+      matchedProductId: matchedProductId ?? this.matchedProductId,
+      matchedProductName: matchedProductName ?? this.matchedProductName,
+      status: status ?? this.status,
+      detail: detail ?? this.detail,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (profileId.present) {
+      map['profile_id'] = Variable<int>(profileId.value);
+    }
+    if (legacyValue.present) {
+      map['legacy_value'] = Variable<String>(legacyValue.value);
+    }
+    if (matchedProductId.present) {
+      map['matched_product_id'] = Variable<int>(matchedProductId.value);
+    }
+    if (matchedProductName.present) {
+      map['matched_product_name'] = Variable<String>(matchedProductName.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (detail.present) {
+      map['detail'] = Variable<String>(detail.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SandwichSauceMigrationAuditsCompanion(')
+          ..write('id: $id, ')
+          ..write('profileId: $profileId, ')
+          ..write('legacyValue: $legacyValue, ')
+          ..write('matchedProductId: $matchedProductId, ')
+          ..write('matchedProductName: $matchedProductName, ')
+          ..write('status: $status, ')
+          ..write('detail: $detail, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $MealAdjustmentProfileComponentsTable
     extends MealAdjustmentProfileComponents
     with
@@ -6563,6 +7096,28 @@ class $ProductModifiersTable extends ProductModifiers
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _priceBehaviorMeta = const VerificationMeta(
+    'priceBehavior',
+  );
+  @override
+  late final GeneratedColumn<String> priceBehavior = GeneratedColumn<String>(
+    'price_behavior',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _uiSectionMeta = const VerificationMeta(
+    'uiSection',
+  );
+  @override
+  late final GeneratedColumn<String> uiSection = GeneratedColumn<String>(
+    'ui_section',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -6587,6 +7142,8 @@ class $ProductModifiersTable extends ProductModifiers
     name,
     type,
     extraPriceMinor,
+    priceBehavior,
+    uiSection,
     isActive,
   ];
   @override
@@ -6652,6 +7209,21 @@ class $ProductModifiersTable extends ProductModifiers
         ),
       );
     }
+    if (data.containsKey('price_behavior')) {
+      context.handle(
+        _priceBehaviorMeta,
+        priceBehavior.isAcceptableOrUnknown(
+          data['price_behavior']!,
+          _priceBehaviorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ui_section')) {
+      context.handle(
+        _uiSectionMeta,
+        uiSection.isAcceptableOrUnknown(data['ui_section']!, _uiSectionMeta),
+      );
+    }
     if (data.containsKey('is_active')) {
       context.handle(
         _isActiveMeta,
@@ -6695,6 +7267,14 @@ class $ProductModifiersTable extends ProductModifiers
         DriftSqlType.int,
         data['${effectivePrefix}extra_price_minor'],
       )!,
+      priceBehavior: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}price_behavior'],
+      ),
+      uiSection: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ui_section'],
+      ),
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -6716,6 +7296,8 @@ class ProductModifier extends DataClass implements Insertable<ProductModifier> {
   final String name;
   final String type;
   final int extraPriceMinor;
+  final String? priceBehavior;
+  final String? uiSection;
   final bool isActive;
   const ProductModifier({
     required this.id,
@@ -6725,6 +7307,8 @@ class ProductModifier extends DataClass implements Insertable<ProductModifier> {
     required this.name,
     required this.type,
     required this.extraPriceMinor,
+    this.priceBehavior,
+    this.uiSection,
     required this.isActive,
   });
   @override
@@ -6741,6 +7325,12 @@ class ProductModifier extends DataClass implements Insertable<ProductModifier> {
     map['name'] = Variable<String>(name);
     map['type'] = Variable<String>(type);
     map['extra_price_minor'] = Variable<int>(extraPriceMinor);
+    if (!nullToAbsent || priceBehavior != null) {
+      map['price_behavior'] = Variable<String>(priceBehavior);
+    }
+    if (!nullToAbsent || uiSection != null) {
+      map['ui_section'] = Variable<String>(uiSection);
+    }
     map['is_active'] = Variable<bool>(isActive);
     return map;
   }
@@ -6758,6 +7348,12 @@ class ProductModifier extends DataClass implements Insertable<ProductModifier> {
       name: Value(name),
       type: Value(type),
       extraPriceMinor: Value(extraPriceMinor),
+      priceBehavior: priceBehavior == null && nullToAbsent
+          ? const Value.absent()
+          : Value(priceBehavior),
+      uiSection: uiSection == null && nullToAbsent
+          ? const Value.absent()
+          : Value(uiSection),
       isActive: Value(isActive),
     );
   }
@@ -6775,6 +7371,8 @@ class ProductModifier extends DataClass implements Insertable<ProductModifier> {
       name: serializer.fromJson<String>(json['name']),
       type: serializer.fromJson<String>(json['type']),
       extraPriceMinor: serializer.fromJson<int>(json['extraPriceMinor']),
+      priceBehavior: serializer.fromJson<String?>(json['priceBehavior']),
+      uiSection: serializer.fromJson<String?>(json['uiSection']),
       isActive: serializer.fromJson<bool>(json['isActive']),
     );
   }
@@ -6789,6 +7387,8 @@ class ProductModifier extends DataClass implements Insertable<ProductModifier> {
       'name': serializer.toJson<String>(name),
       'type': serializer.toJson<String>(type),
       'extraPriceMinor': serializer.toJson<int>(extraPriceMinor),
+      'priceBehavior': serializer.toJson<String?>(priceBehavior),
+      'uiSection': serializer.toJson<String?>(uiSection),
       'isActive': serializer.toJson<bool>(isActive),
     };
   }
@@ -6801,6 +7401,8 @@ class ProductModifier extends DataClass implements Insertable<ProductModifier> {
     String? name,
     String? type,
     int? extraPriceMinor,
+    Value<String?> priceBehavior = const Value.absent(),
+    Value<String?> uiSection = const Value.absent(),
     bool? isActive,
   }) => ProductModifier(
     id: id ?? this.id,
@@ -6812,6 +7414,10 @@ class ProductModifier extends DataClass implements Insertable<ProductModifier> {
     name: name ?? this.name,
     type: type ?? this.type,
     extraPriceMinor: extraPriceMinor ?? this.extraPriceMinor,
+    priceBehavior: priceBehavior.present
+        ? priceBehavior.value
+        : this.priceBehavior,
+    uiSection: uiSection.present ? uiSection.value : this.uiSection,
     isActive: isActive ?? this.isActive,
   );
   ProductModifier copyWithCompanion(ProductModifiersCompanion data) {
@@ -6827,6 +7433,10 @@ class ProductModifier extends DataClass implements Insertable<ProductModifier> {
       extraPriceMinor: data.extraPriceMinor.present
           ? data.extraPriceMinor.value
           : this.extraPriceMinor,
+      priceBehavior: data.priceBehavior.present
+          ? data.priceBehavior.value
+          : this.priceBehavior,
+      uiSection: data.uiSection.present ? data.uiSection.value : this.uiSection,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
     );
   }
@@ -6841,6 +7451,8 @@ class ProductModifier extends DataClass implements Insertable<ProductModifier> {
           ..write('name: $name, ')
           ..write('type: $type, ')
           ..write('extraPriceMinor: $extraPriceMinor, ')
+          ..write('priceBehavior: $priceBehavior, ')
+          ..write('uiSection: $uiSection, ')
           ..write('isActive: $isActive')
           ..write(')'))
         .toString();
@@ -6855,6 +7467,8 @@ class ProductModifier extends DataClass implements Insertable<ProductModifier> {
     name,
     type,
     extraPriceMinor,
+    priceBehavior,
+    uiSection,
     isActive,
   );
   @override
@@ -6868,6 +7482,8 @@ class ProductModifier extends DataClass implements Insertable<ProductModifier> {
           other.name == this.name &&
           other.type == this.type &&
           other.extraPriceMinor == this.extraPriceMinor &&
+          other.priceBehavior == this.priceBehavior &&
+          other.uiSection == this.uiSection &&
           other.isActive == this.isActive);
 }
 
@@ -6879,6 +7495,8 @@ class ProductModifiersCompanion extends UpdateCompanion<ProductModifier> {
   final Value<String> name;
   final Value<String> type;
   final Value<int> extraPriceMinor;
+  final Value<String?> priceBehavior;
+  final Value<String?> uiSection;
   final Value<bool> isActive;
   const ProductModifiersCompanion({
     this.id = const Value.absent(),
@@ -6888,6 +7506,8 @@ class ProductModifiersCompanion extends UpdateCompanion<ProductModifier> {
     this.name = const Value.absent(),
     this.type = const Value.absent(),
     this.extraPriceMinor = const Value.absent(),
+    this.priceBehavior = const Value.absent(),
+    this.uiSection = const Value.absent(),
     this.isActive = const Value.absent(),
   });
   ProductModifiersCompanion.insert({
@@ -6898,6 +7518,8 @@ class ProductModifiersCompanion extends UpdateCompanion<ProductModifier> {
     required String name,
     required String type,
     this.extraPriceMinor = const Value.absent(),
+    this.priceBehavior = const Value.absent(),
+    this.uiSection = const Value.absent(),
     this.isActive = const Value.absent(),
   }) : productId = Value(productId),
        name = Value(name),
@@ -6910,6 +7532,8 @@ class ProductModifiersCompanion extends UpdateCompanion<ProductModifier> {
     Expression<String>? name,
     Expression<String>? type,
     Expression<int>? extraPriceMinor,
+    Expression<String>? priceBehavior,
+    Expression<String>? uiSection,
     Expression<bool>? isActive,
   }) {
     return RawValuesInsertable({
@@ -6920,6 +7544,8 @@ class ProductModifiersCompanion extends UpdateCompanion<ProductModifier> {
       if (name != null) 'name': name,
       if (type != null) 'type': type,
       if (extraPriceMinor != null) 'extra_price_minor': extraPriceMinor,
+      if (priceBehavior != null) 'price_behavior': priceBehavior,
+      if (uiSection != null) 'ui_section': uiSection,
       if (isActive != null) 'is_active': isActive,
     });
   }
@@ -6932,6 +7558,8 @@ class ProductModifiersCompanion extends UpdateCompanion<ProductModifier> {
     Value<String>? name,
     Value<String>? type,
     Value<int>? extraPriceMinor,
+    Value<String?>? priceBehavior,
+    Value<String?>? uiSection,
     Value<bool>? isActive,
   }) {
     return ProductModifiersCompanion(
@@ -6942,6 +7570,8 @@ class ProductModifiersCompanion extends UpdateCompanion<ProductModifier> {
       name: name ?? this.name,
       type: type ?? this.type,
       extraPriceMinor: extraPriceMinor ?? this.extraPriceMinor,
+      priceBehavior: priceBehavior ?? this.priceBehavior,
+      uiSection: uiSection ?? this.uiSection,
       isActive: isActive ?? this.isActive,
     );
   }
@@ -6970,6 +7600,12 @@ class ProductModifiersCompanion extends UpdateCompanion<ProductModifier> {
     if (extraPriceMinor.present) {
       map['extra_price_minor'] = Variable<int>(extraPriceMinor.value);
     }
+    if (priceBehavior.present) {
+      map['price_behavior'] = Variable<String>(priceBehavior.value);
+    }
+    if (uiSection.present) {
+      map['ui_section'] = Variable<String>(uiSection.value);
+    }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
@@ -6986,6 +7622,8 @@ class ProductModifiersCompanion extends UpdateCompanion<ProductModifier> {
           ..write('name: $name, ')
           ..write('type: $type, ')
           ..write('extraPriceMinor: $extraPriceMinor, ')
+          ..write('priceBehavior: $priceBehavior, ')
+          ..write('uiSection: $uiSection, ')
           ..write('isActive: $isActive')
           ..write(')'))
         .toString();
@@ -7583,7 +8221,7 @@ class $TransactionsTable extends Transactions
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant('open'),
+    defaultValue: const Constant('draft'),
   );
   static const VerificationMeta _subtotalMinorMeta = const VerificationMeta(
     'subtotalMinor',
@@ -9275,6 +9913,28 @@ class $OrderModifiersTable extends OrderModifiers
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _priceBehaviorMeta = const VerificationMeta(
+    'priceBehavior',
+  );
+  @override
+  late final GeneratedColumn<String> priceBehavior = GeneratedColumn<String>(
+    'price_behavior',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _uiSectionMeta = const VerificationMeta(
+    'uiSection',
+  );
+  @override
+  late final GeneratedColumn<String> uiSection = GeneratedColumn<String>(
+    'ui_section',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -9290,6 +9950,8 @@ class $OrderModifiersTable extends OrderModifiers
     unitPriceMinor,
     priceEffectMinor,
     sortKey,
+    priceBehavior,
+    uiSection,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -9407,6 +10069,21 @@ class $OrderModifiersTable extends OrderModifiers
         sortKey.isAcceptableOrUnknown(data['sort_key']!, _sortKeyMeta),
       );
     }
+    if (data.containsKey('price_behavior')) {
+      context.handle(
+        _priceBehaviorMeta,
+        priceBehavior.isAcceptableOrUnknown(
+          data['price_behavior']!,
+          _priceBehaviorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ui_section')) {
+      context.handle(
+        _uiSectionMeta,
+        uiSection.isAcceptableOrUnknown(data['ui_section']!, _uiSectionMeta),
+      );
+    }
     return context;
   }
 
@@ -9468,6 +10145,14 @@ class $OrderModifiersTable extends OrderModifiers
         DriftSqlType.int,
         data['${effectivePrefix}sort_key'],
       )!,
+      priceBehavior: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}price_behavior'],
+      ),
+      uiSection: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ui_section'],
+      ),
     );
   }
 
@@ -9491,6 +10176,8 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
   final int unitPriceMinor;
   final int priceEffectMinor;
   final int sortKey;
+  final String? priceBehavior;
+  final String? uiSection;
   const OrderModifier({
     required this.id,
     required this.uuid,
@@ -9505,6 +10192,8 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
     required this.unitPriceMinor,
     required this.priceEffectMinor,
     required this.sortKey,
+    this.priceBehavior,
+    this.uiSection,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -9528,6 +10217,12 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
     map['unit_price_minor'] = Variable<int>(unitPriceMinor);
     map['price_effect_minor'] = Variable<int>(priceEffectMinor);
     map['sort_key'] = Variable<int>(sortKey);
+    if (!nullToAbsent || priceBehavior != null) {
+      map['price_behavior'] = Variable<String>(priceBehavior);
+    }
+    if (!nullToAbsent || uiSection != null) {
+      map['ui_section'] = Variable<String>(uiSection);
+    }
     return map;
   }
 
@@ -9552,6 +10247,12 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
       unitPriceMinor: Value(unitPriceMinor),
       priceEffectMinor: Value(priceEffectMinor),
       sortKey: Value(sortKey),
+      priceBehavior: priceBehavior == null && nullToAbsent
+          ? const Value.absent()
+          : Value(priceBehavior),
+      uiSection: uiSection == null && nullToAbsent
+          ? const Value.absent()
+          : Value(uiSection),
     );
   }
 
@@ -9574,6 +10275,8 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
       unitPriceMinor: serializer.fromJson<int>(json['unitPriceMinor']),
       priceEffectMinor: serializer.fromJson<int>(json['priceEffectMinor']),
       sortKey: serializer.fromJson<int>(json['sortKey']),
+      priceBehavior: serializer.fromJson<String?>(json['priceBehavior']),
+      uiSection: serializer.fromJson<String?>(json['uiSection']),
     );
   }
   @override
@@ -9593,6 +10296,8 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
       'unitPriceMinor': serializer.toJson<int>(unitPriceMinor),
       'priceEffectMinor': serializer.toJson<int>(priceEffectMinor),
       'sortKey': serializer.toJson<int>(sortKey),
+      'priceBehavior': serializer.toJson<String?>(priceBehavior),
+      'uiSection': serializer.toJson<String?>(uiSection),
     };
   }
 
@@ -9610,6 +10315,8 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
     int? unitPriceMinor,
     int? priceEffectMinor,
     int? sortKey,
+    Value<String?> priceBehavior = const Value.absent(),
+    Value<String?> uiSection = const Value.absent(),
   }) => OrderModifier(
     id: id ?? this.id,
     uuid: uuid ?? this.uuid,
@@ -9628,6 +10335,10 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
     unitPriceMinor: unitPriceMinor ?? this.unitPriceMinor,
     priceEffectMinor: priceEffectMinor ?? this.priceEffectMinor,
     sortKey: sortKey ?? this.sortKey,
+    priceBehavior: priceBehavior.present
+        ? priceBehavior.value
+        : this.priceBehavior,
+    uiSection: uiSection.present ? uiSection.value : this.uiSection,
   );
   OrderModifier copyWithCompanion(OrderModifiersCompanion data) {
     return OrderModifier(
@@ -9658,6 +10369,10 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
           ? data.priceEffectMinor.value
           : this.priceEffectMinor,
       sortKey: data.sortKey.present ? data.sortKey.value : this.sortKey,
+      priceBehavior: data.priceBehavior.present
+          ? data.priceBehavior.value
+          : this.priceBehavior,
+      uiSection: data.uiSection.present ? data.uiSection.value : this.uiSection,
     );
   }
 
@@ -9676,7 +10391,9 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
           ..write('chargeReason: $chargeReason, ')
           ..write('unitPriceMinor: $unitPriceMinor, ')
           ..write('priceEffectMinor: $priceEffectMinor, ')
-          ..write('sortKey: $sortKey')
+          ..write('sortKey: $sortKey, ')
+          ..write('priceBehavior: $priceBehavior, ')
+          ..write('uiSection: $uiSection')
           ..write(')'))
         .toString();
   }
@@ -9696,6 +10413,8 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
     unitPriceMinor,
     priceEffectMinor,
     sortKey,
+    priceBehavior,
+    uiSection,
   );
   @override
   bool operator ==(Object other) =>
@@ -9713,7 +10432,9 @@ class OrderModifier extends DataClass implements Insertable<OrderModifier> {
           other.chargeReason == this.chargeReason &&
           other.unitPriceMinor == this.unitPriceMinor &&
           other.priceEffectMinor == this.priceEffectMinor &&
-          other.sortKey == this.sortKey);
+          other.sortKey == this.sortKey &&
+          other.priceBehavior == this.priceBehavior &&
+          other.uiSection == this.uiSection);
 }
 
 class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
@@ -9730,6 +10451,8 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
   final Value<int> unitPriceMinor;
   final Value<int> priceEffectMinor;
   final Value<int> sortKey;
+  final Value<String?> priceBehavior;
+  final Value<String?> uiSection;
   const OrderModifiersCompanion({
     this.id = const Value.absent(),
     this.uuid = const Value.absent(),
@@ -9744,6 +10467,8 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
     this.unitPriceMinor = const Value.absent(),
     this.priceEffectMinor = const Value.absent(),
     this.sortKey = const Value.absent(),
+    this.priceBehavior = const Value.absent(),
+    this.uiSection = const Value.absent(),
   });
   OrderModifiersCompanion.insert({
     this.id = const Value.absent(),
@@ -9759,6 +10484,8 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
     this.unitPriceMinor = const Value.absent(),
     this.priceEffectMinor = const Value.absent(),
     this.sortKey = const Value.absent(),
+    this.priceBehavior = const Value.absent(),
+    this.uiSection = const Value.absent(),
   }) : uuid = Value(uuid),
        transactionLineId = Value(transactionLineId),
        action = Value(action),
@@ -9777,6 +10504,8 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
     Expression<int>? unitPriceMinor,
     Expression<int>? priceEffectMinor,
     Expression<int>? sortKey,
+    Expression<String>? priceBehavior,
+    Expression<String>? uiSection,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -9792,6 +10521,8 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
       if (unitPriceMinor != null) 'unit_price_minor': unitPriceMinor,
       if (priceEffectMinor != null) 'price_effect_minor': priceEffectMinor,
       if (sortKey != null) 'sort_key': sortKey,
+      if (priceBehavior != null) 'price_behavior': priceBehavior,
+      if (uiSection != null) 'ui_section': uiSection,
     });
   }
 
@@ -9809,6 +10540,8 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
     Value<int>? unitPriceMinor,
     Value<int>? priceEffectMinor,
     Value<int>? sortKey,
+    Value<String?>? priceBehavior,
+    Value<String?>? uiSection,
   }) {
     return OrderModifiersCompanion(
       id: id ?? this.id,
@@ -9824,6 +10557,8 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
       unitPriceMinor: unitPriceMinor ?? this.unitPriceMinor,
       priceEffectMinor: priceEffectMinor ?? this.priceEffectMinor,
       sortKey: sortKey ?? this.sortKey,
+      priceBehavior: priceBehavior ?? this.priceBehavior,
+      uiSection: uiSection ?? this.uiSection,
     );
   }
 
@@ -9869,6 +10604,12 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
     if (sortKey.present) {
       map['sort_key'] = Variable<int>(sortKey.value);
     }
+    if (priceBehavior.present) {
+      map['price_behavior'] = Variable<String>(priceBehavior.value);
+    }
+    if (uiSection.present) {
+      map['ui_section'] = Variable<String>(uiSection.value);
+    }
     return map;
   }
 
@@ -9887,7 +10628,9 @@ class OrderModifiersCompanion extends UpdateCompanion<OrderModifier> {
           ..write('chargeReason: $chargeReason, ')
           ..write('unitPriceMinor: $unitPriceMinor, ')
           ..write('priceEffectMinor: $priceEffectMinor, ')
-          ..write('sortKey: $sortKey')
+          ..write('sortKey: $sortKey, ')
+          ..write('priceBehavior: $priceBehavior, ')
+          ..write('uiSection: $uiSection')
           ..write(')'))
         .toString();
   }
@@ -15249,6 +15992,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MealAdjustmentProfilesTable mealAdjustmentProfiles =
       $MealAdjustmentProfilesTable(this);
   late final $ProductsTable products = $ProductsTable(this);
+  late final $SandwichSauceMigrationAuditsTable sandwichSauceMigrationAudits =
+      $SandwichSauceMigrationAuditsTable(this);
   late final $MealAdjustmentProfileComponentsTable
   mealAdjustmentProfileComponents = $MealAdjustmentProfileComponentsTable(this);
   late final $MealAdjustmentComponentOptionsTable
@@ -15300,6 +16045,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     categories,
     mealAdjustmentProfiles,
     products,
+    sandwichSauceMigrationAudits,
     mealAdjustmentProfileComponents,
     mealAdjustmentComponentOptions,
     mealAdjustmentProfileExtras,
@@ -19626,6 +20372,282 @@ typedef $$ProductsTableProcessedTableManager =
         bool orderModifiersRefs,
         bool breakfastCookingInstructionsRefs,
       })
+    >;
+typedef $$SandwichSauceMigrationAuditsTableCreateCompanionBuilder =
+    SandwichSauceMigrationAuditsCompanion Function({
+      Value<int> id,
+      Value<int?> profileId,
+      required String legacyValue,
+      Value<int?> matchedProductId,
+      Value<String?> matchedProductName,
+      required String status,
+      Value<String?> detail,
+      Value<DateTime> createdAt,
+    });
+typedef $$SandwichSauceMigrationAuditsTableUpdateCompanionBuilder =
+    SandwichSauceMigrationAuditsCompanion Function({
+      Value<int> id,
+      Value<int?> profileId,
+      Value<String> legacyValue,
+      Value<int?> matchedProductId,
+      Value<String?> matchedProductName,
+      Value<String> status,
+      Value<String?> detail,
+      Value<DateTime> createdAt,
+    });
+
+class $$SandwichSauceMigrationAuditsTableFilterComposer
+    extends Composer<_$AppDatabase, $SandwichSauceMigrationAuditsTable> {
+  $$SandwichSauceMigrationAuditsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get profileId => $composableBuilder(
+    column: $table.profileId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get legacyValue => $composableBuilder(
+    column: $table.legacyValue,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get matchedProductId => $composableBuilder(
+    column: $table.matchedProductId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get matchedProductName => $composableBuilder(
+    column: $table.matchedProductName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get detail => $composableBuilder(
+    column: $table.detail,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SandwichSauceMigrationAuditsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SandwichSauceMigrationAuditsTable> {
+  $$SandwichSauceMigrationAuditsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get profileId => $composableBuilder(
+    column: $table.profileId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get legacyValue => $composableBuilder(
+    column: $table.legacyValue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get matchedProductId => $composableBuilder(
+    column: $table.matchedProductId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get matchedProductName => $composableBuilder(
+    column: $table.matchedProductName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get detail => $composableBuilder(
+    column: $table.detail,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SandwichSauceMigrationAuditsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SandwichSauceMigrationAuditsTable> {
+  $$SandwichSauceMigrationAuditsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get profileId =>
+      $composableBuilder(column: $table.profileId, builder: (column) => column);
+
+  GeneratedColumn<String> get legacyValue => $composableBuilder(
+    column: $table.legacyValue,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get matchedProductId => $composableBuilder(
+    column: $table.matchedProductId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get matchedProductName => $composableBuilder(
+    column: $table.matchedProductName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get detail =>
+      $composableBuilder(column: $table.detail, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$SandwichSauceMigrationAuditsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SandwichSauceMigrationAuditsTable,
+          SandwichSauceMigrationAudit,
+          $$SandwichSauceMigrationAuditsTableFilterComposer,
+          $$SandwichSauceMigrationAuditsTableOrderingComposer,
+          $$SandwichSauceMigrationAuditsTableAnnotationComposer,
+          $$SandwichSauceMigrationAuditsTableCreateCompanionBuilder,
+          $$SandwichSauceMigrationAuditsTableUpdateCompanionBuilder,
+          (
+            SandwichSauceMigrationAudit,
+            BaseReferences<
+              _$AppDatabase,
+              $SandwichSauceMigrationAuditsTable,
+              SandwichSauceMigrationAudit
+            >,
+          ),
+          SandwichSauceMigrationAudit,
+          PrefetchHooks Function()
+        > {
+  $$SandwichSauceMigrationAuditsTableTableManager(
+    _$AppDatabase db,
+    $SandwichSauceMigrationAuditsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SandwichSauceMigrationAuditsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$SandwichSauceMigrationAuditsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$SandwichSauceMigrationAuditsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int?> profileId = const Value.absent(),
+                Value<String> legacyValue = const Value.absent(),
+                Value<int?> matchedProductId = const Value.absent(),
+                Value<String?> matchedProductName = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> detail = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => SandwichSauceMigrationAuditsCompanion(
+                id: id,
+                profileId: profileId,
+                legacyValue: legacyValue,
+                matchedProductId: matchedProductId,
+                matchedProductName: matchedProductName,
+                status: status,
+                detail: detail,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int?> profileId = const Value.absent(),
+                required String legacyValue,
+                Value<int?> matchedProductId = const Value.absent(),
+                Value<String?> matchedProductName = const Value.absent(),
+                required String status,
+                Value<String?> detail = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => SandwichSauceMigrationAuditsCompanion.insert(
+                id: id,
+                profileId: profileId,
+                legacyValue: legacyValue,
+                matchedProductId: matchedProductId,
+                matchedProductName: matchedProductName,
+                status: status,
+                detail: detail,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SandwichSauceMigrationAuditsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SandwichSauceMigrationAuditsTable,
+      SandwichSauceMigrationAudit,
+      $$SandwichSauceMigrationAuditsTableFilterComposer,
+      $$SandwichSauceMigrationAuditsTableOrderingComposer,
+      $$SandwichSauceMigrationAuditsTableAnnotationComposer,
+      $$SandwichSauceMigrationAuditsTableCreateCompanionBuilder,
+      $$SandwichSauceMigrationAuditsTableUpdateCompanionBuilder,
+      (
+        SandwichSauceMigrationAudit,
+        BaseReferences<
+          _$AppDatabase,
+          $SandwichSauceMigrationAuditsTable,
+          SandwichSauceMigrationAudit
+        >,
+      ),
+      SandwichSauceMigrationAudit,
+      PrefetchHooks Function()
     >;
 typedef $$MealAdjustmentProfileComponentsTableCreateCompanionBuilder =
     MealAdjustmentProfileComponentsCompanion Function({
@@ -24248,6 +25270,8 @@ typedef $$ProductModifiersTableCreateCompanionBuilder =
       required String name,
       required String type,
       Value<int> extraPriceMinor,
+      Value<String?> priceBehavior,
+      Value<String?> uiSection,
       Value<bool> isActive,
     });
 typedef $$ProductModifiersTableUpdateCompanionBuilder =
@@ -24259,6 +25283,8 @@ typedef $$ProductModifiersTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String> type,
       Value<int> extraPriceMinor,
+      Value<String?> priceBehavior,
+      Value<String?> uiSection,
       Value<bool> isActive,
     });
 
@@ -24355,6 +25381,16 @@ class $$ProductModifiersTableFilterComposer
 
   ColumnFilters<int> get extraPriceMinor => $composableBuilder(
     column: $table.extraPriceMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get priceBehavior => $composableBuilder(
+    column: $table.priceBehavior,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get uiSection => $composableBuilder(
+    column: $table.uiSection,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -24462,6 +25498,16 @@ class $$ProductModifiersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get priceBehavior => $composableBuilder(
+    column: $table.priceBehavior,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get uiSection => $composableBuilder(
+    column: $table.uiSection,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -24559,6 +25605,14 @@ class $$ProductModifiersTableAnnotationComposer
     column: $table.extraPriceMinor,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get priceBehavior => $composableBuilder(
+    column: $table.priceBehavior,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get uiSection =>
+      $composableBuilder(column: $table.uiSection, builder: (column) => column);
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -24674,6 +25728,8 @@ class $$ProductModifiersTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<int> extraPriceMinor = const Value.absent(),
+                Value<String?> priceBehavior = const Value.absent(),
+                Value<String?> uiSection = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
               }) => ProductModifiersCompanion(
                 id: id,
@@ -24683,6 +25739,8 @@ class $$ProductModifiersTableTableManager
                 name: name,
                 type: type,
                 extraPriceMinor: extraPriceMinor,
+                priceBehavior: priceBehavior,
+                uiSection: uiSection,
                 isActive: isActive,
               ),
           createCompanionCallback:
@@ -24694,6 +25752,8 @@ class $$ProductModifiersTableTableManager
                 required String name,
                 required String type,
                 Value<int> extraPriceMinor = const Value.absent(),
+                Value<String?> priceBehavior = const Value.absent(),
+                Value<String?> uiSection = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
               }) => ProductModifiersCompanion.insert(
                 id: id,
@@ -24703,6 +25763,8 @@ class $$ProductModifiersTableTableManager
                 name: name,
                 type: type,
                 extraPriceMinor: extraPriceMinor,
+                priceBehavior: priceBehavior,
+                uiSection: uiSection,
                 isActive: isActive,
               ),
           withReferenceMapper: (p0) => p0
@@ -27552,6 +28614,8 @@ typedef $$OrderModifiersTableCreateCompanionBuilder =
       Value<int> unitPriceMinor,
       Value<int> priceEffectMinor,
       Value<int> sortKey,
+      Value<String?> priceBehavior,
+      Value<String?> uiSection,
     });
 typedef $$OrderModifiersTableUpdateCompanionBuilder =
     OrderModifiersCompanion Function({
@@ -27568,6 +28632,8 @@ typedef $$OrderModifiersTableUpdateCompanionBuilder =
       Value<int> unitPriceMinor,
       Value<int> priceEffectMinor,
       Value<int> sortKey,
+      Value<String?> priceBehavior,
+      Value<String?> uiSection,
     });
 
 final class $$OrderModifiersTableReferences
@@ -27701,6 +28767,16 @@ class $$OrderModifiersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get priceBehavior => $composableBuilder(
+    column: $table.priceBehavior,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get uiSection => $composableBuilder(
+    column: $table.uiSection,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$TransactionLinesTableFilterComposer get transactionLineId {
     final $$TransactionLinesTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -27830,6 +28906,16 @@ class $$OrderModifiersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get priceBehavior => $composableBuilder(
+    column: $table.priceBehavior,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get uiSection => $composableBuilder(
+    column: $table.uiSection,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$TransactionLinesTableOrderingComposer get transactionLineId {
     final $$TransactionLinesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -27946,6 +29032,14 @@ class $$OrderModifiersTableAnnotationComposer
 
   GeneratedColumn<int> get sortKey =>
       $composableBuilder(column: $table.sortKey, builder: (column) => column);
+
+  GeneratedColumn<String> get priceBehavior => $composableBuilder(
+    column: $table.priceBehavior,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get uiSection =>
+      $composableBuilder(column: $table.uiSection, builder: (column) => column);
 
   $$TransactionLinesTableAnnotationComposer get transactionLineId {
     final $$TransactionLinesTableAnnotationComposer composer = $composerBuilder(
@@ -28064,6 +29158,8 @@ class $$OrderModifiersTableTableManager
                 Value<int> unitPriceMinor = const Value.absent(),
                 Value<int> priceEffectMinor = const Value.absent(),
                 Value<int> sortKey = const Value.absent(),
+                Value<String?> priceBehavior = const Value.absent(),
+                Value<String?> uiSection = const Value.absent(),
               }) => OrderModifiersCompanion(
                 id: id,
                 uuid: uuid,
@@ -28078,6 +29174,8 @@ class $$OrderModifiersTableTableManager
                 unitPriceMinor: unitPriceMinor,
                 priceEffectMinor: priceEffectMinor,
                 sortKey: sortKey,
+                priceBehavior: priceBehavior,
+                uiSection: uiSection,
               ),
           createCompanionCallback:
               ({
@@ -28094,6 +29192,8 @@ class $$OrderModifiersTableTableManager
                 Value<int> unitPriceMinor = const Value.absent(),
                 Value<int> priceEffectMinor = const Value.absent(),
                 Value<int> sortKey = const Value.absent(),
+                Value<String?> priceBehavior = const Value.absent(),
+                Value<String?> uiSection = const Value.absent(),
               }) => OrderModifiersCompanion.insert(
                 id: id,
                 uuid: uuid,
@@ -28108,6 +29208,8 @@ class $$OrderModifiersTableTableManager
                 unitPriceMinor: unitPriceMinor,
                 priceEffectMinor: priceEffectMinor,
                 sortKey: sortKey,
+                priceBehavior: priceBehavior,
+                uiSection: uiSection,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -32470,6 +33572,12 @@ class $AppDatabaseManager {
       );
   $$ProductsTableTableManager get products =>
       $$ProductsTableTableManager(_db, _db.products);
+  $$SandwichSauceMigrationAuditsTableTableManager
+  get sandwichSauceMigrationAudits =>
+      $$SandwichSauceMigrationAuditsTableTableManager(
+        _db,
+        _db.sandwichSauceMigrationAudits,
+      );
   $$MealAdjustmentProfileComponentsTableTableManager
   get mealAdjustmentProfileComponents =>
       $$MealAdjustmentProfileComponentsTableTableManager(

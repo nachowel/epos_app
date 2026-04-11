@@ -3,6 +3,10 @@ import '../models/meal_customization.dart';
 
 enum MealCustomizationRequestIssueCode {
   profileMismatch,
+  unexpectedSandwichSelectionForStandardProfile,
+  missingSandwichBreadChoice,
+  unavailableSandwichSauce,
+  sandwichToastRequiresSandwichBread,
   unknownRemovedComponent,
   duplicateRemovedComponent,
   removedComponentNotRemovable,
@@ -33,6 +37,15 @@ class MealCustomizationRequestIssue {
     switch (code) {
       case MealCustomizationRequestIssueCode.profileMismatch:
         return 'Request profile does not match the evaluated profile.';
+      case MealCustomizationRequestIssueCode
+          .unexpectedSandwichSelectionForStandardProfile:
+        return 'Sandwich bread, sauce, and toast selections are only allowed for sandwich profiles.';
+      case MealCustomizationRequestIssueCode.missingSandwichBreadChoice:
+        return 'Bread type is required for sandwich products.';
+      case MealCustomizationRequestIssueCode.unavailableSandwichSauce:
+        return 'Selected sauce ${detail ?? 'unknown'} is not enabled on this sandwich profile.';
+      case MealCustomizationRequestIssueCode.sandwichToastRequiresSandwichBread:
+        return 'Toast is only available when Sandwich bread is selected.';
       case MealCustomizationRequestIssueCode.unknownRemovedComponent:
         return 'Removed component ${componentKey ?? 'unknown'} is not configured on the profile.';
       case MealCustomizationRequestIssueCode.duplicateRemovedComponent:
@@ -83,6 +96,13 @@ class MealCustomizationEngine {
       profile: profile,
       request: request,
     );
+    if (profile.kind == MealAdjustmentProfileKind.sandwich) {
+      return _evaluateSandwich(
+        profile: profile,
+        request: request,
+        prepared: prepared,
+      );
+    }
     final List<_IndexedRule> activeRules = profile.pricingRules
         .asMap()
         .entries
@@ -127,95 +147,49 @@ class MealCustomizationEngine {
           ),
         )
         .toList(growable: false);
+    final List<_PreparedSwapClassification> classifiedSwaps =
+        <_PreparedSwapClassification>[];
     final List<String> swapConditionKeys = <String>[];
-    final List<String> extraConditionKeys = <String>[];
-
     for (int index = 0; index < prepared.swapSelections.length; index += 1) {
       final _PreparedSwapSelection swapSelection =
           prepared.swapSelections[index];
-      swapConditionKeys.add(
-        _conditionKey(
-          MealAdjustmentPricingRuleConditionType.swapToItem,
-          componentKey: swapSelection.component.componentKey,
-          itemProductId: swapSelection.selection.targetItemProductId,
-          quantity: swapSelection.selection.quantity,
+      final bool isFreeSwap = index < profile.freeSwapLimit;
+      final String conditionKey = _conditionKey(
+        MealAdjustmentPricingRuleConditionType.swapToItem,
+        componentKey: swapSelection.component.componentKey,
+        itemProductId: swapSelection.selection.targetItemProductId,
+        quantity: swapSelection.selection.quantity,
+      );
+      swapConditionKeys.add(conditionKey);
+      classifiedSwaps.add(
+        _PreparedSwapClassification(
+          selection: swapSelection,
+          isFreeSwap: isFreeSwap,
+          conditionKey: conditionKey,
         ),
       );
-      final bool isFreeSwap = index < profile.freeSwapLimit;
       if (isFreeSwap) {
         freeSwapCountUsed += 1;
       } else {
         paidSwapCountUsed += 1;
       }
-
-      final _IndexedRule? exactSwapRule = isFreeSwap
-          ? null
-          : _selectBestExactRule(
-              rules: activeRules,
-              ruleType: MealAdjustmentPricingRuleType.swap,
-              exactConditionKeys: <String>[swapConditionKeys.last],
-            );
-      final int swapPriceDeltaMinor = isFreeSwap
-          ? 0
-          : exactSwapRule?.rule.priceDeltaMinor ??
-                swapSelection.option.fixedPriceDeltaMinor ??
-                0;
-      if (exactSwapRule != null) {
-        appliedRulesById[exactSwapRule.rule.id] = _toAppliedRule(exactSwapRule);
-      }
-
-      componentActions.add(
-        MealCustomizationSemanticAction(
-          action: MealCustomizationAction.swap,
-          chargeReason: isFreeSwap
-              ? MealCustomizationChargeReason.freeSwap
-              : MealCustomizationChargeReason.paidSwap,
-          componentKey: swapSelection.component.componentKey,
-          itemProductId: swapSelection.selection.targetItemProductId,
-          sourceItemProductId: swapSelection.component.defaultItemProductId,
-          quantity: swapSelection.selection.quantity,
-          priceDeltaMinor: swapPriceDeltaMinor,
-          appliedRuleIds: exactSwapRule == null
-              ? const <int>[]
-              : <int>[exactSwapRule.rule.id],
-        ),
-      );
     }
 
+    final List<_PreparedExtraClassification> classifiedExtras =
+        <_PreparedExtraClassification>[];
+    final List<String> extraConditionKeys = <String>[];
     for (final _PreparedExtraSelection extraSelection
         in prepared.extraSelections) {
-      extraConditionKeys.add(
-        _conditionKey(
-          MealAdjustmentPricingRuleConditionType.extraItem,
-          itemProductId: extraSelection.selection.itemProductId,
-          quantity: extraSelection.selection.quantity,
-        ),
+      final String conditionKey = _conditionKey(
+        MealAdjustmentPricingRuleConditionType.extraItem,
+        itemProductId: extraSelection.selection.itemProductId,
+        quantity: extraSelection.selection.quantity,
       );
-      final _IndexedRule? exactExtraRule = _selectBestExactRule(
-        rules: activeRules,
-        ruleType: MealAdjustmentPricingRuleType.extra,
-        exactConditionKeys: <String>[extraConditionKeys.last],
-      );
-      final int extraPriceDeltaMinor =
-          exactExtraRule?.rule.priceDeltaMinor ??
-          (extraSelection.option.fixedPriceDeltaMinor *
-              extraSelection.selection.quantity);
-      if (exactExtraRule != null) {
-        appliedRulesById[exactExtraRule.rule.id] = _toAppliedRule(
-          exactExtraRule,
-        );
-      }
-
-      extraActions.add(
-        MealCustomizationSemanticAction(
-          action: MealCustomizationAction.extra,
-          chargeReason: MealCustomizationChargeReason.extraAdd,
-          itemProductId: extraSelection.selection.itemProductId,
-          quantity: extraSelection.selection.quantity,
-          priceDeltaMinor: extraPriceDeltaMinor,
-          appliedRuleIds: exactExtraRule == null
-              ? const <int>[]
-              : <int>[exactExtraRule.rule.id],
+      extraConditionKeys.add(conditionKey);
+      classifiedExtras.add(
+        _PreparedExtraClassification(
+          selection: extraSelection,
+          conditionKey: conditionKey,
         ),
       );
     }
@@ -241,7 +215,74 @@ class MealCustomizationEngine {
           appliedRuleIds: <int>[exactComboRule.rule.id],
         ),
       );
-    } else {
+    }
+
+    for (final _PreparedSwapClassification swap in classifiedSwaps) {
+      final _IndexedRule? exactSwapRule = swap.isFreeSwap
+          ? null
+          : _selectBestExactRule(
+              rules: activeRules,
+              ruleType: MealAdjustmentPricingRuleType.swap,
+              exactConditionKeys: <String>[swap.conditionKey],
+            );
+      final int swapPriceDeltaMinor = swap.isFreeSwap
+          ? 0
+          : exactSwapRule?.rule.priceDeltaMinor ??
+                swap.selection.option.fixedPriceDeltaMinor ??
+                0;
+      if (exactSwapRule != null) {
+        appliedRulesById[exactSwapRule.rule.id] = _toAppliedRule(exactSwapRule);
+      }
+
+      componentActions.add(
+        MealCustomizationSemanticAction(
+          action: MealCustomizationAction.swap,
+          chargeReason: swap.isFreeSwap
+              ? MealCustomizationChargeReason.freeSwap
+              : MealCustomizationChargeReason.paidSwap,
+          componentKey: swap.selection.component.componentKey,
+          itemProductId: swap.selection.selection.targetItemProductId,
+          sourceItemProductId: swap.selection.component.defaultItemProductId,
+          quantity: swap.selection.selection.quantity,
+          priceDeltaMinor: swapPriceDeltaMinor,
+          appliedRuleIds: exactSwapRule == null
+              ? const <int>[]
+              : <int>[exactSwapRule.rule.id],
+        ),
+      );
+    }
+
+    for (final _PreparedExtraClassification extra in classifiedExtras) {
+      final _IndexedRule? exactExtraRule = _selectBestExactRule(
+        rules: activeRules,
+        ruleType: MealAdjustmentPricingRuleType.extra,
+        exactConditionKeys: <String>[extra.conditionKey],
+      );
+      final int extraPriceDeltaMinor =
+          exactExtraRule?.rule.priceDeltaMinor ??
+          (extra.selection.option.fixedPriceDeltaMinor *
+              extra.selection.selection.quantity);
+      if (exactExtraRule != null) {
+        appliedRulesById[exactExtraRule.rule.id] = _toAppliedRule(
+          exactExtraRule,
+        );
+      }
+
+      extraActions.add(
+        MealCustomizationSemanticAction(
+          action: MealCustomizationAction.extra,
+          chargeReason: MealCustomizationChargeReason.extraAdd,
+          itemProductId: extra.selection.selection.itemProductId,
+          quantity: extra.selection.selection.quantity,
+          priceDeltaMinor: extraPriceDeltaMinor,
+          appliedRuleIds: exactExtraRule == null
+              ? const <int>[]
+              : <int>[exactExtraRule.rule.id],
+        ),
+      );
+    }
+
+    if (exactComboRule == null) {
       final List<_IndexedRule> removeOnlyRules = _selectMatchingRemoveOnlyRules(
         rules: activeRules,
         removedConditionKeys: removedConditionKeys,
@@ -279,6 +320,7 @@ class MealCustomizationEngine {
     return MealCustomizationResolvedSnapshot(
       productId: request.productId,
       profileId: profile.id,
+      sandwichSelection: prepared.sandwichSelection,
       resolvedComponentActions:
           List<MealCustomizationSemanticAction>.unmodifiable(componentActions),
       resolvedExtraActions: List<MealCustomizationSemanticAction>.unmodifiable(
@@ -309,6 +351,12 @@ class MealCustomizationEngine {
         ),
       );
     }
+    final SandwichCustomizationSelection? resolvedSandwichSelection =
+        _prepareSandwichSelection(
+          profile: profile,
+          request: request,
+          issues: issues,
+        );
 
     final List<MealAdjustmentComponent> activeComponents =
         profile.components
@@ -510,9 +558,124 @@ class MealCustomizationEngine {
     swapSelections.sort(_comparePreparedSwaps);
     extraSelections.sort(_comparePreparedExtras);
     return _PreparedRequest(
+      sandwichSelection: resolvedSandwichSelection,
       removedComponents: removedComponents,
       swapSelections: swapSelections,
       extraSelections: extraSelections,
+    );
+  }
+
+  SandwichCustomizationSelection? _prepareSandwichSelection({
+    required MealAdjustmentProfile profile,
+    required MealCustomizationRequest request,
+    required List<MealCustomizationRequestIssue> issues,
+  }) {
+    final SandwichCustomizationSelection selection = request.sandwichSelection;
+    if (profile.kind != MealAdjustmentProfileKind.sandwich) {
+      if (_hasExplicitSandwichSelection(selection)) {
+        issues.add(
+          const MealCustomizationRequestIssue(
+            code: MealCustomizationRequestIssueCode
+                .unexpectedSandwichSelectionForStandardProfile,
+          ),
+        );
+      }
+      return null;
+    }
+
+    final SandwichBreadType? breadType = selection.breadType;
+    final List<int> normalizedSauceProductIds =
+        normalizeSandwichSauceProductIds(selection.sauceProductIds);
+    if (breadType == null) {
+      issues.add(
+        const MealCustomizationRequestIssue(
+          code: MealCustomizationRequestIssueCode.missingSandwichBreadChoice,
+        ),
+      );
+      return null;
+    }
+    final Set<int> enabledSauceProductIds = profile
+        .sandwichSettings
+        .sauceProductIds
+        .toSet();
+    for (final int sauceProductId in normalizedSauceProductIds) {
+      if (!enabledSauceProductIds.contains(sauceProductId)) {
+        issues.add(
+          MealCustomizationRequestIssue(
+            code: MealCustomizationRequestIssueCode.unavailableSandwichSauce,
+            itemProductId: sauceProductId,
+            detail: 'product $sauceProductId',
+          ),
+        );
+      }
+    }
+    if (selection.toastOption != null &&
+        breadType != SandwichBreadType.sandwich) {
+      issues.add(
+        const MealCustomizationRequestIssue(
+          code: MealCustomizationRequestIssueCode
+              .sandwichToastRequiresSandwichBread,
+        ),
+      );
+      return null;
+    }
+
+    return SandwichCustomizationSelection(
+      breadType: breadType,
+      sauceProductIds: normalizedSauceProductIds,
+      toastOption: breadType == SandwichBreadType.sandwich
+          ? (selection.toastOption ?? SandwichToastOption.normal)
+          : null,
+    );
+  }
+
+  bool _hasExplicitSandwichSelection(SandwichCustomizationSelection selection) {
+    return selection.breadType != null ||
+        selection.sauceProductIds.isNotEmpty ||
+        selection.toastOption != null;
+  }
+
+  MealCustomizationResolvedSnapshot _evaluateSandwich({
+    required MealAdjustmentProfile profile,
+    required MealCustomizationRequest request,
+    required _PreparedRequest prepared,
+  }) {
+    final SandwichCustomizationSelection sandwichSelection =
+        prepared.sandwichSelection ??
+        (throw MealCustomizationRequestRejectedException(const <
+          MealCustomizationRequestIssue
+        >[
+          MealCustomizationRequestIssue(
+            code: MealCustomizationRequestIssueCode.missingSandwichBreadChoice,
+          ),
+        ]));
+    final List<MealCustomizationSemanticAction> extraActions =
+        <MealCustomizationSemanticAction>[];
+    int totalAdjustmentMinor = profile.sandwichSettings.surchargeForBread(
+      sandwichSelection.breadType!,
+    );
+    for (final _PreparedExtraSelection extra in prepared.extraSelections) {
+      final int priceDeltaMinor =
+          extra.option.fixedPriceDeltaMinor * extra.selection.quantity;
+      extraActions.add(
+        MealCustomizationSemanticAction(
+          action: MealCustomizationAction.extra,
+          chargeReason: MealCustomizationChargeReason.extraAdd,
+          itemProductId: extra.selection.itemProductId,
+          quantity: extra.selection.quantity,
+          priceDeltaMinor: priceDeltaMinor,
+        ),
+      );
+      totalAdjustmentMinor += priceDeltaMinor;
+    }
+    return MealCustomizationResolvedSnapshot(
+      productId: request.productId,
+      profileId: profile.id,
+      sandwichSelection: sandwichSelection,
+      resolvedExtraActions: List<MealCustomizationSemanticAction>.unmodifiable(
+        extraActions,
+      ),
+      totalAdjustmentMinor: totalAdjustmentMinor,
     );
   }
 
@@ -697,11 +860,13 @@ class MealCustomizationEngine {
 
 class _PreparedRequest {
   const _PreparedRequest({
+    required this.sandwichSelection,
     required this.removedComponents,
     required this.swapSelections,
     required this.extraSelections,
   });
 
+  final SandwichCustomizationSelection? sandwichSelection;
   final List<MealAdjustmentComponent> removedComponents;
   final List<_PreparedSwapSelection> swapSelections;
   final List<_PreparedExtraSelection> extraSelections;
@@ -719,6 +884,18 @@ class _PreparedSwapSelection {
   final MealAdjustmentComponentOption option;
 }
 
+class _PreparedSwapClassification {
+  const _PreparedSwapClassification({
+    required this.selection,
+    required this.isFreeSwap,
+    required this.conditionKey,
+  });
+
+  final _PreparedSwapSelection selection;
+  final bool isFreeSwap;
+  final String conditionKey;
+}
+
 class _PreparedExtraSelection {
   const _PreparedExtraSelection({
     required this.selection,
@@ -727,6 +904,16 @@ class _PreparedExtraSelection {
 
   final MealCustomizationExtraSelection selection;
   final MealAdjustmentExtraOption option;
+}
+
+class _PreparedExtraClassification {
+  const _PreparedExtraClassification({
+    required this.selection,
+    required this.conditionKey,
+  });
+
+  final _PreparedExtraSelection selection;
+  final String conditionKey;
 }
 
 class _IndexedRule {

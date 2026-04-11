@@ -24,7 +24,7 @@ abstract class MealAdjustmentProfileRepository {
     Iterable<int> productIds,
   );
 
-  Future<Set<int>> loadBreakfastSemanticProductIds(
+  Future<Set<int>> loadBreakfastSemanticRootProductIds(
     Iterable<int> productIds,
   );
 }
@@ -48,4 +48,7 @@ class MealAdjustmentProductSummary {
 
   bool get isBreakfastProduct =>
       categoryName.trim().toLowerCase() == 'set breakfast';
+
+  bool get isSauceProduct =>
+      categoryName.trim().toLowerCase() == kSaucesCategoryName.toLowerCase();
 }

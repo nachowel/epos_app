@@ -140,7 +140,7 @@ class _CashierDashboardScreenState
                   canStartNewOrder: canStartNewOrder,
                   canOpenOrders: canOpenOrders,
                   canPreview: canPreview,
-                  onPos: () => context.go('/pos'),
+                  onPos: () => context.go('/pos/categories'),
                   onOrders: () => context.go('/orders'),
                   onPreview: () => context.go('/reports'),
                 ),

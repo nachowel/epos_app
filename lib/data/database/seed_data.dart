@@ -283,41 +283,68 @@ class SeedData {
       await _insertModifier(
         db,
         productId: burgerId,
-        name: 'Lettuce',
-        type: 'included',
-      );
-      await _insertModifier(
-        db,
-        productId: burgerId,
-        name: 'Tomato',
-        type: 'included',
-      );
-      await _insertModifier(
-        db,
-        productId: burgerId,
-        name: 'Onion',
-        type: 'included',
-      );
-      await _insertModifier(
-        db,
-        productId: burgerId,
-        name: 'Cheese',
+        name: 'Fried onion',
         type: 'extra',
-        extraPriceMinor: 100,
+        priceBehavior: 'free',
+        uiSection: 'toppings',
       );
       await _insertModifier(
         db,
         productId: burgerId,
-        name: 'Bacon',
+        name: 'Salad',
         type: 'extra',
-        extraPriceMinor: 150,
+        priceBehavior: 'free',
+        uiSection: 'toppings',
       );
       await _insertModifier(
         db,
         productId: burgerId,
-        name: 'Extra Patty',
+        name: 'Ketchup',
         type: 'extra',
-        extraPriceMinor: 300,
+        priceBehavior: 'free',
+        uiSection: 'sauces',
+      );
+      await _insertModifier(
+        db,
+        productId: burgerId,
+        name: 'Brown sauce',
+        type: 'extra',
+        priceBehavior: 'free',
+        uiSection: 'sauces',
+      );
+      await _insertModifier(
+        db,
+        productId: burgerId,
+        name: 'Burger sauce',
+        type: 'extra',
+        priceBehavior: 'free',
+        uiSection: 'sauces',
+      );
+      await _insertModifier(
+        db,
+        productId: burgerId,
+        name: 'Mayonnaise',
+        type: 'extra',
+        priceBehavior: 'free',
+        uiSection: 'sauces',
+      );
+      await _insertModifier(
+        db,
+        productId: burgerId,
+        name: 'Chips',
+        type: 'extra',
+        extraPriceMinor: 110,
+        priceBehavior: 'paid',
+        uiSection: 'add_ins',
+      );
+      await _insertModifier(
+        db,
+        productId: burgerId,
+        name: 'Beans',
+        type: 'extra',
+        extraPriceMinor: 80,
+        priceBehavior: 'paid',
+        uiSection: 'add_ins',
       );
 
       await _insertModifier(
@@ -650,6 +677,8 @@ class SeedData {
     required String name,
     required String type,
     int extraPriceMinor = 0,
+    String? priceBehavior,
+    String? uiSection,
   }) {
     return db
         .into(db.productModifiers)
@@ -659,6 +688,8 @@ class SeedData {
             name: name,
             type: type,
             extraPriceMinor: Value<int>(extraPriceMinor),
+            priceBehavior: Value<String?>(priceBehavior),
+            uiSection: Value<String?>(uiSection),
           ),
         );
   }

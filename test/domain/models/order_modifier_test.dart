@@ -1,4 +1,5 @@
 import 'package:epos_app/domain/models/order_modifier.dart';
+import 'package:epos_app/domain/models/product_modifier.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -18,12 +19,16 @@ void main() {
         unitPriceMinor: 100,
         priceEffectMinor: 200,
         sortKey: 5,
+        priceBehavior: ModifierPriceBehavior.paid,
+        uiSection: ModifierUiSection.addIns,
       );
 
       final OrderModifier cleared = modifier.copyWith(
         chargeReason: null,
         itemProductId: null,
         sourceGroupId: null,
+        priceBehavior: null,
+        uiSection: null,
       );
 
       expect(cleared.chargeReason, isNull);
@@ -33,6 +38,8 @@ void main() {
       expect(cleared.unitPriceMinor, 100);
       expect(cleared.priceEffectMinor, 200);
       expect(cleared.sortKey, 5);
+      expect(cleared.priceBehavior, isNull);
+      expect(cleared.uiSection, isNull);
     });
   });
 }

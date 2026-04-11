@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_colors.dart';
@@ -10,6 +8,8 @@ import 'product_card.dart';
 
 class ProductGrid extends StatelessWidget {
   const ProductGrid({
+    required this.title,
+    required this.productCount,
     required this.products,
     required this.isLoading,
     required this.onTapProduct,
@@ -17,12 +17,12 @@ class ProductGrid extends StatelessWidget {
     super.key,
   });
 
-  static const double _targetMaxExtent = 170;
-  static const double _mainAxisSpacing = 8;
-  static const double _crossAxisSpacing = 8;
-  static const double _childAspectRatio = 0.78;
-  static const double _minimumItemWidthForSixColumns = _targetMaxExtent - 30;
+  static const double _mainAxisSpacing = 10;
+  static const double _crossAxisSpacing = 10;
+  static const double _childAspectRatio = 1.02;
 
+  final String title;
+  final int productCount;
   final List<Product> products;
   final bool isLoading;
   final ValueChanged<Product>? onTapProduct;
@@ -30,16 +30,97 @@ class ProductGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.82)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.038),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        AppStrings.products,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                          height: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '$productCount',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppColors.border.withValues(alpha: 0.84)),
+          Expanded(child: _buildBody()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody() {
     if (isLoading && products.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
     if (products.isEmpty) {
       return Center(
-        child: Text(
-          AppStrings.noProductsInCategory,
-          style: const TextStyle(
-            fontSize: AppSizes.fontSm,
-            color: AppColors.textSecondary,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSizes.spacingLg),
+          child: Text(
+            AppStrings.noProductsInCategory,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: AppSizes.fontSm,
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
       );
@@ -53,7 +134,7 @@ class ProductGrid extends StatelessWidget {
         );
 
         return GridView.builder(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           itemCount: products.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 5,
@@ -78,27 +159,16 @@ class ProductGrid extends StatelessWidget {
     required double productAreaWidth,
     required double viewportWidth,
   }) {
-    if (viewportWidth < 1000) {
+    if (productAreaWidth < 460 || viewportWidth < 900) {
+      return 2;
+    }
+    if (productAreaWidth < 760) {
+      return 3;
+    }
+    if (productAreaWidth < 1080) {
       return 4;
     }
-
-    if (viewportWidth <= 1300) {
-      return 5;
-    }
-
-    final double sixColumnWidth = _itemWidthFor(
-      width: productAreaWidth,
-      columns: 6,
-    );
-    if (sixColumnWidth >= _minimumItemWidthForSixColumns) {
-      return 6;
-    }
     return 5;
-  }
-
-  double _itemWidthFor({required double width, required int columns}) {
-    final double availableWidth = math.max(0, width - 16);
-    return (availableWidth - ((columns - 1) * _crossAxisSpacing)) / columns;
   }
 }
 

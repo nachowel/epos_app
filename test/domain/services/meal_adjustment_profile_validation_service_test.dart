@@ -26,7 +26,7 @@ void main() {
                     isActive: true,
                   ),
                 },
-                breakfastSemanticProductIds: const <int>{77},
+                breakfastSemanticRootProductIds: const <int>{77},
               ),
             );
 
@@ -38,6 +38,43 @@ void main() {
           result.blockingErrors.single.code,
           MealAdjustmentValidationIssueCode.breakfastProductAssignmentBlocked,
         );
+        expect(
+          result.blockingErrors.single.message,
+          'Product "Set 4" cannot use meal-adjustment profile "Lunch profile" because it is configured as a breakfast semantic root product.',
+        );
+      },
+    );
+
+    test(
+      'allows standard product assignments when product is not breakfast semantic',
+      () async {
+        final MealAdjustmentProfileValidationService service =
+            MealAdjustmentProfileValidationService(
+              repository: _FakeMealAdjustmentProfileRepository(
+                profile: const MealAdjustmentProfile(
+                  id: 5,
+                  name: 'Sandwich profile',
+                  kind: MealAdjustmentProfileKind.sandwich,
+                  freeSwapLimit: 0,
+                  isActive: true,
+                ),
+                productsById: <int, MealAdjustmentProductSummary>{
+                  127: const MealAdjustmentProductSummary(
+                    id: 127,
+                    categoryId: 20,
+                    categoryName: 'Sandwiches',
+                    name: 'Cheese',
+                    isActive: true,
+                  ),
+                },
+              ),
+            );
+
+        final MealAdjustmentValidationResult result = await service
+            .validateProductAssignment(productId: 127, profileId: 5);
+
+        expect(result.canSave, isTrue);
+        expect(result.blockingErrors, isEmpty);
       },
     );
 
@@ -99,6 +136,66 @@ void main() {
           MealAdjustmentValidationIssueCode.defaultItemInactive,
           MealAdjustmentValidationIssueCode.swapItemMissing,
           MealAdjustmentValidationIssueCode.extraItemMissing,
+        ]),
+      );
+    });
+
+    test('blocks duplicate and negative profile extras', () async {
+      final MealAdjustmentProfileValidationService service =
+          MealAdjustmentProfileValidationService(
+            repository: _FakeMealAdjustmentProfileRepository(
+              productsById: <int, MealAdjustmentProductSummary>{
+                100: const MealAdjustmentProductSummary(
+                  id: 100,
+                  categoryId: 1,
+                  categoryName: 'Veg',
+                  name: 'Egg',
+                  isActive: true,
+                ),
+              },
+            ),
+          );
+
+      final MealAdjustmentValidationResult result = await service.validateDraft(
+        const MealAdjustmentProfileDraft(
+          name: 'Extras profile',
+          freeSwapLimit: 0,
+          isActive: true,
+          components: <MealAdjustmentComponentDraft>[
+            MealAdjustmentComponentDraft(
+              componentKey: 'main',
+              displayName: 'Main',
+              defaultItemProductId: 100,
+              quantity: 1,
+              canRemove: true,
+              sortOrder: 0,
+              isActive: true,
+            ),
+          ],
+          extraOptions: <MealAdjustmentExtraOptionDraft>[
+            MealAdjustmentExtraOptionDraft(
+              itemProductId: 100,
+              fixedPriceDeltaMinor: -150,
+              sortOrder: 0,
+              isActive: true,
+            ),
+            MealAdjustmentExtraOptionDraft(
+              itemProductId: 100,
+              fixedPriceDeltaMinor: 150,
+              sortOrder: 1,
+              isActive: true,
+            ),
+          ],
+        ),
+      );
+
+      expect(
+        result.blockingErrors.map((MealAdjustmentValidationIssue issue) {
+          return issue.code;
+        }),
+        containsAll(<MealAdjustmentValidationIssueCode>[
+          MealAdjustmentValidationIssueCode.invalidExtraPriceDelta,
+          MealAdjustmentValidationIssueCode.duplicateExtraOption,
         ]),
       );
     });
@@ -180,6 +277,111 @@ void main() {
         ]),
       );
     });
+
+    test(
+      'blocks incomplete rule names empty conditions and duplicates',
+      () async {
+        final MealAdjustmentProfileValidationService service =
+            MealAdjustmentProfileValidationService(
+              repository: _FakeMealAdjustmentProfileRepository(
+                productsById: <int, MealAdjustmentProductSummary>{
+                  100: const MealAdjustmentProductSummary(
+                    id: 100,
+                    categoryId: 1,
+                    categoryName: 'Mains',
+                    name: 'Chicken',
+                    isActive: true,
+                  ),
+                  101: const MealAdjustmentProductSummary(
+                    id: 101,
+                    categoryId: 1,
+                    categoryName: 'Veg',
+                    name: 'Peas',
+                    isActive: true,
+                  ),
+                },
+              ),
+            );
+
+        final MealAdjustmentValidationResult
+        result = await service.validateDraft(
+          const MealAdjustmentProfileDraft(
+            name: 'Rule profile',
+            freeSwapLimit: 0,
+            isActive: true,
+            components: <MealAdjustmentComponentDraft>[
+              MealAdjustmentComponentDraft(
+                componentKey: 'main',
+                displayName: 'Main',
+                defaultItemProductId: 100,
+                quantity: 1,
+                canRemove: true,
+                sortOrder: 0,
+                isActive: true,
+                swapOptions: <MealAdjustmentComponentOptionDraft>[
+                  MealAdjustmentComponentOptionDraft(
+                    optionItemProductId: 101,
+                    sortOrder: 0,
+                    isActive: true,
+                  ),
+                ],
+              ),
+            ],
+            pricingRules: <MealAdjustmentPricingRuleDraft>[
+              MealAdjustmentPricingRuleDraft(
+                id: 1,
+                name: '',
+                ruleType: MealAdjustmentPricingRuleType.removeOnly,
+                priceDeltaMinor: 0,
+                priority: 0,
+                isActive: true,
+              ),
+              MealAdjustmentPricingRuleDraft(
+                id: 2,
+                name: 'Duplicate conditions',
+                ruleType: MealAdjustmentPricingRuleType.combo,
+                priceDeltaMinor: 0,
+                priority: 1,
+                isActive: true,
+                conditions: <MealAdjustmentPricingRuleConditionDraft>[
+                  MealAdjustmentPricingRuleConditionDraft(
+                    conditionType:
+                        MealAdjustmentPricingRuleConditionType.removedComponent,
+                    componentKey: 'main',
+                    quantity: 1,
+                  ),
+                  MealAdjustmentPricingRuleConditionDraft(
+                    conditionType:
+                        MealAdjustmentPricingRuleConditionType.removedComponent,
+                    componentKey: 'main',
+                    quantity: 1,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+
+        expect(
+          result.blockingErrors.map((MealAdjustmentValidationIssue issue) {
+            return issue.code;
+          }),
+          containsAll(<MealAdjustmentValidationIssueCode>[
+            MealAdjustmentValidationIssueCode.missingRuleName,
+            MealAdjustmentValidationIssueCode.invalidRuleCondition,
+          ]),
+        );
+        expect(
+          result.blockingErrors.map(
+            (MealAdjustmentValidationIssue issue) => issue.detail,
+          ),
+          containsAll(<String>[
+            'At least one condition is required.',
+            'Duplicate conditions with the same semantic meaning are not allowed in one rule.',
+          ]),
+        );
+      },
+    );
 
     test('blocks duplicate and conflicting rule meaning', () async {
       final MealAdjustmentProfileValidationService service =
@@ -315,6 +517,139 @@ void main() {
       expect(summary.inactiveItems, <int>[100]);
       expect(summary.affectedProducts.single.id, 501);
     });
+
+    test(
+      'blocks rule conditions that do not match the configured meal semantics',
+      () async {
+        final MealAdjustmentProfileValidationService service =
+            MealAdjustmentProfileValidationService(
+              repository: _FakeMealAdjustmentProfileRepository(
+                productsById: <int, MealAdjustmentProductSummary>{
+                  100: const MealAdjustmentProductSummary(
+                    id: 100,
+                    categoryId: 1,
+                    categoryName: 'Mains',
+                    name: 'Chicken',
+                    isActive: true,
+                  ),
+                  101: const MealAdjustmentProductSummary(
+                    id: 101,
+                    categoryId: 1,
+                    categoryName: 'Mains',
+                    name: 'Beef',
+                    isActive: true,
+                  ),
+                  102: const MealAdjustmentProductSummary(
+                    id: 102,
+                    categoryId: 1,
+                    categoryName: 'Sides',
+                    name: 'Cheese',
+                    isActive: true,
+                  ),
+                },
+              ),
+            );
+
+        final MealAdjustmentValidationResult result = await service
+            .validateDraft(
+              const MealAdjustmentProfileDraft(
+                name: 'Invalid semantic rules',
+                freeSwapLimit: 0,
+                isActive: true,
+                components: <MealAdjustmentComponentDraft>[
+                  MealAdjustmentComponentDraft(
+                    componentKey: 'main',
+                    displayName: 'Main',
+                    defaultItemProductId: 100,
+                    quantity: 1,
+                    canRemove: false,
+                    sortOrder: 0,
+                    isActive: true,
+                    swapOptions: <MealAdjustmentComponentOptionDraft>[
+                      MealAdjustmentComponentOptionDraft(
+                        optionItemProductId: 101,
+                        sortOrder: 0,
+                        isActive: true,
+                      ),
+                    ],
+                  ),
+                ],
+                pricingRules: <MealAdjustmentPricingRuleDraft>[
+                  MealAdjustmentPricingRuleDraft(
+                    id: 1,
+                    name: 'Invalid remove rule',
+                    ruleType: MealAdjustmentPricingRuleType.removeOnly,
+                    priceDeltaMinor: -10,
+                    priority: 0,
+                    isActive: true,
+                    conditions: <MealAdjustmentPricingRuleConditionDraft>[
+                      MealAdjustmentPricingRuleConditionDraft(
+                        conditionType: MealAdjustmentPricingRuleConditionType
+                            .removedComponent,
+                        componentKey: 'main',
+                        quantity: 1,
+                      ),
+                    ],
+                  ),
+                  MealAdjustmentPricingRuleDraft(
+                    id: 2,
+                    name: 'Invalid swap rule',
+                    ruleType: MealAdjustmentPricingRuleType.swap,
+                    priceDeltaMinor: 10,
+                    priority: 0,
+                    isActive: true,
+                    conditions: <MealAdjustmentPricingRuleConditionDraft>[
+                      MealAdjustmentPricingRuleConditionDraft(
+                        conditionType:
+                            MealAdjustmentPricingRuleConditionType.swapToItem,
+                        componentKey: 'main',
+                        itemProductId: 999,
+                        quantity: 1,
+                      ),
+                    ],
+                  ),
+                  MealAdjustmentPricingRuleDraft(
+                    id: 3,
+                    name: 'Invalid extra rule',
+                    ruleType: MealAdjustmentPricingRuleType.combo,
+                    priceDeltaMinor: -10,
+                    priority: 0,
+                    isActive: true,
+                    conditions: <MealAdjustmentPricingRuleConditionDraft>[
+                      MealAdjustmentPricingRuleConditionDraft(
+                        conditionType:
+                            MealAdjustmentPricingRuleConditionType.extraItem,
+                        itemProductId: 102,
+                        quantity: 1,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+
+        final List<MealAdjustmentValidationIssue> invalidRuleIssues = result
+            .blockingErrors
+            .where(
+              (MealAdjustmentValidationIssue issue) =>
+                  issue.code ==
+                  MealAdjustmentValidationIssueCode.invalidRuleCondition,
+            )
+            .toList(growable: false);
+
+        expect(invalidRuleIssues, hasLength(3));
+        expect(
+          invalidRuleIssues.map(
+            (MealAdjustmentValidationIssue issue) => issue.detail,
+          ),
+          containsAll(<String>[
+            'Removed-component condition must reference a removable component.',
+            'Swap condition target must be configured as an active swap option for the component.',
+            'Extra-item condition must reference an active profile extra.',
+          ]),
+        );
+      },
+    );
   });
 }
 
@@ -324,13 +659,13 @@ class _FakeMealAdjustmentProfileRepository
     this.profile,
     this.productsById = const <int, MealAdjustmentProductSummary>{},
     this.assignedProducts = const <MealAdjustmentProductSummary>[],
-    this.breakfastSemanticProductIds = const <int>{},
+    this.breakfastSemanticRootProductIds = const <int>{},
   });
 
   final MealAdjustmentProfile? profile;
   final Map<int, MealAdjustmentProductSummary> productsById;
   final List<MealAdjustmentProductSummary> assignedProducts;
-  final Set<int> breakfastSemanticProductIds;
+  final Set<int> breakfastSemanticRootProductIds;
 
   @override
   Future<bool> assignProfileToProduct({
@@ -405,6 +740,11 @@ class _FakeMealAdjustmentProfileRepository
   }
 
   @override
+  Future<bool> deleteProfile(int profileId) async {
+    return true;
+  }
+
+  @override
   Future<List<MealAdjustmentProductSummary>> listProductsByProfile(
     int profileId, {
     bool activeOnly = false,
@@ -432,12 +772,13 @@ class _FakeMealAdjustmentProfileRepository
   }
 
   @override
-  Future<Set<int>> loadBreakfastSemanticProductIds(
+  Future<Set<int>> loadBreakfastSemanticRootProductIds(
     Iterable<int> productIds,
   ) async {
     return productIds
         .where(
-          (int productId) => breakfastSemanticProductIds.contains(productId),
+          (int productId) =>
+              breakfastSemanticRootProductIds.contains(productId),
         )
         .toSet();
   }

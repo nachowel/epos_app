@@ -10,8 +10,8 @@ void main() {
         MealCustomizationPersistenceMapper();
 
     test('maps semantic snapshot to deterministic order modifier rows', () {
-      final MealCustomizationPersistenceProjection projection =
-          mapper.mapSnapshot(
+      final MealCustomizationPersistenceProjection projection = mapper
+          .mapSnapshot(
             transactionLineId: 77,
             snapshot: const MealCustomizationResolvedSnapshot(
               productId: 500,
@@ -119,6 +119,61 @@ void main() {
         <int>[10, 20, 30, 40, 50],
       );
     });
+
+    test(
+      'maps sandwich bread surcharge and multiple sauces into choice modifiers',
+      () {
+        final MealCustomizationPersistenceProjection projection = mapper
+            .mapSnapshot(
+              transactionLineId: 88,
+              snapshot: const MealCustomizationResolvedSnapshot(
+                productId: 700,
+                profileId: 30,
+                sandwichSelection: SandwichCustomizationSelection(
+                  breadType: SandwichBreadType.sandwich,
+                  sauceProductIds: <int>[501, 502],
+                  toastOption: SandwichToastOption.toasted,
+                ),
+                resolvedExtraActions: <MealCustomizationSemanticAction>[
+                  MealCustomizationSemanticAction(
+                    action: MealCustomizationAction.extra,
+                    chargeReason: MealCustomizationChargeReason.extraAdd,
+                    itemProductId: 401,
+                    quantity: 1,
+                    priceDeltaMinor: 100,
+                  ),
+                ],
+                totalAdjustmentMinor: 200,
+              ),
+              productNamesById: const <int, String>{
+                401: 'Cheese',
+                501: 'Mayonnaise',
+                502: 'Chilli Sauce',
+              },
+              createUuid: _UuidSequence().next,
+            );
+
+        expect(projection.modifierTotalMinor, 200);
+        expect(
+          projection.modifiers.map((OrderModifier row) => row.itemName),
+          <String>[
+            'Sandwich',
+            'Mayonnaise',
+            'Chilli Sauce',
+            'Toasted',
+            'Cheese',
+          ],
+        );
+        expect(
+          projection.modifiers.map((OrderModifier row) => row.priceEffectMinor),
+          <int>[100, 0, 0, 0, 100],
+        );
+        expect(
+          projection.modifiers.map((OrderModifier row) => row.itemProductId),
+          <int?>[null, 501, 502, null, 401],
+        );
+      },
+    );
   });
 }
 

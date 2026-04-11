@@ -55,21 +55,21 @@ These stay local-only in this phase and are not part of the Supabase remote sche
 
 These are intentionally left local-only in phase 1.
 
-### 2. Transaction status semantics differ between code and markdown
+### 2. Transaction status semantics are canonicalized to the live schema
 
 `app_database.dart`:
 
 - `transactions.status` check is `('draft','sent','paid','cancelled')`
 
-`schema.md` and `CLAUDE.md` still describe older status sets such as:
+Migration compatibility also remaps legacy persisted `open` rows into the
+canonical current model.
 
-- `('open','paid','cancelled')`
+Canonical phase-one decision:
 
-Important phase-one decision:
-
-- Follow `app_database.dart`
-- The existing sync worker still syncs terminal transactions only (`paid`, `cancelled`)
-- No status behavior is changed in this phase
+- persisted transaction statuses are `draft`, `sent`, `paid`, `cancelled`
+- `open` is deprecated legacy terminology only, not a stored canonical status
+- the sync worker still syncs terminal transactions only (`paid`, `cancelled`)
+- `draft` and `sent` remain local operational states
 
 ### 3. Shift default in code does not match docs
 

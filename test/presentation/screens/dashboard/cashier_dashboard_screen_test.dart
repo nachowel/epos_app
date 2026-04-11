@@ -640,7 +640,7 @@ Widget _routerApp(ProviderContainer container) {
         builder: (_, __) => const CashierDashboardScreen(),
       ),
       GoRoute(
-        path: '/pos',
+        path: '/pos/categories',
         builder: (_, __) =>
             const Scaffold(body: Center(child: Text('POS TARGET'))),
       ),

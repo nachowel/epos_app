@@ -610,11 +610,17 @@ void main() {
         );
 
         await tester.tap(
-          find.byKey(const ValueKey<String>('meal-sandwich-sauce-mayo')),
+          find.byKey(
+            ValueKey<String>('meal-sandwich-sauce-${fixture.mayoSauceId}'),
+          ),
         );
         await tester.pumpAndSettle();
         await tester.tap(
-          find.byKey(const ValueKey<String>('meal-sandwich-sauce-brownSauce')),
+          find.byKey(
+            ValueKey<String>(
+              'meal-sandwich-sauce-${fixture.brownSauceProductId}',
+            ),
+          ),
         );
         await tester.pumpAndSettle();
         await tester.tap(
@@ -629,7 +635,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Mayo'), findsWidgets);
+        expect(find.text('Mayonnaise'), findsWidgets);
         expect(find.text('Brown Sauce'), findsWidgets);
         expect(find.text('Toasted'), findsWidgets);
         expect(find.text('Extra Cheese +£1.00'), findsWidgets);
@@ -666,11 +672,17 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.byKey(const ValueKey<String>('meal-sandwich-sauce-mayo')),
+          find.byKey(
+            ValueKey<String>('meal-sandwich-sauce-${fixture.mayoSauceId}'),
+          ),
           findsOneWidget,
         );
         expect(
-          find.byKey(const ValueKey<String>('meal-sandwich-sauce-brownSauce')),
+          find.byKey(
+            ValueKey<String>(
+              'meal-sandwich-sauce-${fixture.brownSauceProductId}',
+            ),
+          ),
           findsOneWidget,
         );
 
@@ -820,6 +832,19 @@ Future<_DialogFixture> _seedDialogFixture(
     name: 'Tomato',
     priceMinor: 0,
   );
+  final int saucesCategoryId = await insertCategory(db, name: 'Sauces');
+  final int mayoSauceId = await insertProduct(
+    db,
+    categoryId: saucesCategoryId,
+    name: 'Mayonnaise',
+    priceMinor: 0,
+  );
+  final int brownSauceProductId = await insertProduct(
+    db,
+    categoryId: saucesCategoryId,
+    name: 'Brown Sauce',
+    priceMinor: 0,
+  );
 
   final DriftMealAdjustmentProfileRepository repository =
       DriftMealAdjustmentProfileRepository(db);
@@ -828,13 +853,10 @@ Future<_DialogFixture> _seedDialogFixture(
       name: 'Dialog profile',
       kind: kind,
       sandwichSettings: kind == MealAdjustmentProfileKind.sandwich
-          ? const SandwichProfileSettings(
+          ? SandwichProfileSettings(
               sandwichSurchargeMinor: 100,
               baguetteSurchargeMinor: 180,
-              sauceOptions: <SandwichSauceType>[
-                SandwichSauceType.mayo,
-                SandwichSauceType.brownSauce,
-              ],
+              sauceProductIds: <int>[mayoSauceId, brownSauceProductId],
             )
           : const SandwichProfileSettings(),
       freeSwapLimit: 0,
@@ -925,6 +947,8 @@ Future<_DialogFixture> _seedDialogFixture(
     swapItemId: swapItemId,
     extraItemId: extraItemId,
     secondExtraItemId: secondExtraItemId,
+    mayoSauceId: mayoSauceId,
+    brownSauceProductId: brownSauceProductId,
   );
 }
 
@@ -935,6 +959,8 @@ class _DialogFixture {
     required this.swapItemId,
     required this.extraItemId,
     required this.secondExtraItemId,
+    required this.mayoSauceId,
+    required this.brownSauceProductId,
   });
 
   final MealCustomizationPosService service;
@@ -942,6 +968,8 @@ class _DialogFixture {
   final int swapItemId;
   final int extraItemId;
   final int secondExtraItemId;
+  final int mayoSauceId;
+  final int brownSauceProductId;
 }
 
 Future<void> _expandAddIns(WidgetTester tester) async {

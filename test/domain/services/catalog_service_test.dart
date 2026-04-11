@@ -125,6 +125,37 @@ void main() {
         );
       },
     );
+
+    test(
+      'structured flat modifier rows are omitted from the legacy flat projection',
+      () async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final _CatalogModifierFixture fixture = await _seedCatalogFixture(db);
+        final CatalogService service = _createCatalogService(db);
+
+        final int structuredId = await db
+            .into(db.productModifiers)
+            .insert(
+              app_db.ProductModifiersCompanion.insert(
+                productId: fixture.rootProductId,
+                name: 'Ketchup',
+                type: 'extra',
+                extraPriceMinor: const Value<int>(0),
+                priceBehavior: const Value<String?>('free'),
+                uiSection: const Value<String?>('sauces'),
+              ),
+            );
+
+        final LegacyFlatModifierView flatView = await service
+            .getLegacyFlatModifierView(fixture.rootProductId);
+
+        expect(flatView.included, isEmpty);
+        expect(flatView.extras, isEmpty);
+        expect(flatView.omittedSemanticModifiers, hasLength(1));
+        expect(flatView.omittedSemanticModifiers.single.id, structuredId);
+      },
+    );
   });
 }
 

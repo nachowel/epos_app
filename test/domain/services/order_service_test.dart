@@ -1,3 +1,4 @@
+import 'package:epos_app/data/database/app_database.dart' as app_db;
 import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/core/logging/app_logger.dart';
 import 'package:epos_app/data/repositories/audit_log_repository.dart';
@@ -7,7 +8,9 @@ import 'package:epos_app/data/repositories/transaction_repository.dart';
 import 'package:epos_app/data/repositories/transaction_state_repository.dart';
 import 'package:epos_app/domain/models/order_modifier.dart';
 import 'package:epos_app/domain/models/payment.dart';
+import 'package:epos_app/domain/models/product_modifier.dart';
 import 'package:epos_app/domain/models/transaction.dart';
+import 'package:epos_app/domain/models/transaction_line.dart';
 import 'package:epos_app/domain/models/user.dart';
 import 'package:epos_app/domain/services/audit_log_service.dart';
 import 'package:epos_app/domain/services/order_service.dart';
@@ -278,6 +281,225 @@ void main() {
       expect(refreshed.totalAmountMinor, 1300);
       expect(lines.single.lineTotalMinor, 1300);
     });
+
+    test(
+      'plain burger plus fried onion keeps totals flat and persists a free add snapshot row',
+      () async {
+        final _BurgerOrderFixture fixture = await _createBurgerOrderFixture();
+        addTearDown(fixture.db.close);
+
+        final Transaction order = await fixture.service.createOrder(
+          currentUser: fixture.user,
+        );
+        final TransactionLine line = await fixture.service.addProductToOrder(
+          transactionId: order.id,
+          productId: fixture.productId,
+        );
+
+        await fixture.service.addModifierToLine(
+          transactionLineId: line.id,
+          action: ModifierAction.add,
+          itemName: 'Fried onion',
+          extraPriceMinor: 0,
+          priceBehavior: ModifierPriceBehavior.free,
+          uiSection: ModifierUiSection.toppings,
+        );
+
+        final Transaction refreshed = (await fixture.service.getOrderById(
+          order.id,
+        ))!;
+        final List<OrderModifier> modifiers = await fixture.service
+            .getLineModifiers(line.id);
+
+        expect(refreshed.subtotalMinor, 900);
+        expect(refreshed.modifierTotalMinor, 0);
+        expect(refreshed.totalAmountMinor, 900);
+        expect(modifiers, hasLength(1));
+        expect(modifiers.single.action, ModifierAction.add);
+        expect(modifiers.single.itemName, 'Fried onion');
+        expect(modifiers.single.extraPriceMinor, 0);
+        expect(modifiers.single.priceEffectMinor, 0);
+        expect(modifiers.single.priceBehavior, ModifierPriceBehavior.free);
+        expect(modifiers.single.uiSection, ModifierUiSection.toppings);
+      },
+    );
+
+    test(
+      'plain burger plus ketchup and mayo keeps totals flat and persists both sauce rows',
+      () async {
+        final _BurgerOrderFixture fixture = await _createBurgerOrderFixture();
+        addTearDown(fixture.db.close);
+
+        final Transaction order = await fixture.service.createOrder(
+          currentUser: fixture.user,
+        );
+        final TransactionLine line = await fixture.service.addProductToOrder(
+          transactionId: order.id,
+          productId: fixture.productId,
+        );
+
+        for (final String sauce in <String>['Ketchup', 'Mayonnaise']) {
+          await fixture.service.addModifierToLine(
+            transactionLineId: line.id,
+            action: ModifierAction.add,
+            itemName: sauce,
+            extraPriceMinor: 0,
+            priceBehavior: ModifierPriceBehavior.free,
+            uiSection: ModifierUiSection.sauces,
+          );
+        }
+
+        final Transaction refreshed = (await fixture.service.getOrderById(
+          order.id,
+        ))!;
+        final List<OrderModifier> modifiers = await fixture.service
+            .getLineModifiers(line.id);
+
+        expect(refreshed.modifierTotalMinor, 0);
+        expect(refreshed.totalAmountMinor, 900);
+        expect(modifiers, hasLength(2));
+        expect(
+          modifiers.map((OrderModifier modifier) => modifier.itemName),
+          containsAll(<String>['Ketchup', 'Mayonnaise']),
+        );
+        expect(
+          modifiers.every(
+            (OrderModifier modifier) =>
+                modifier.priceBehavior == ModifierPriceBehavior.free &&
+                modifier.uiSection == ModifierUiSection.sauces &&
+                modifier.priceEffectMinor == 0,
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'plain burger plus chips increases totals by the paid add-in price',
+      () async {
+        final _BurgerOrderFixture fixture = await _createBurgerOrderFixture();
+        addTearDown(fixture.db.close);
+
+        final Transaction order = await fixture.service.createOrder(
+          currentUser: fixture.user,
+        );
+        final TransactionLine line = await fixture.service.addProductToOrder(
+          transactionId: order.id,
+          productId: fixture.productId,
+        );
+
+        await fixture.service.addModifierToLine(
+          transactionLineId: line.id,
+          action: ModifierAction.add,
+          itemName: 'Chips',
+          extraPriceMinor: 110,
+          priceBehavior: ModifierPriceBehavior.paid,
+          uiSection: ModifierUiSection.addIns,
+        );
+
+        final Transaction refreshed = (await fixture.service.getOrderById(
+          order.id,
+        ))!;
+        final TransactionLine refreshedLine =
+            (await fixture.service.getOrderLines(order.id)).single;
+        final OrderModifier modifier = (await fixture.service.getLineModifiers(
+          line.id,
+        )).single;
+
+        expect(refreshed.modifierTotalMinor, 110);
+        expect(refreshed.totalAmountMinor, 1010);
+        expect(refreshedLine.lineTotalMinor, 1010);
+        expect(modifier.priceBehavior, ModifierPriceBehavior.paid);
+        expect(modifier.uiSection, ModifierUiSection.addIns);
+        expect(modifier.priceEffectMinor, 110);
+      },
+    );
+
+    test(
+      'plain burger plus beans and ketchup charges only the paid add-in',
+      () async {
+        final _BurgerOrderFixture fixture = await _createBurgerOrderFixture();
+        addTearDown(fixture.db.close);
+
+        final Transaction order = await fixture.service.createOrder(
+          currentUser: fixture.user,
+        );
+        final TransactionLine line = await fixture.service.addProductToOrder(
+          transactionId: order.id,
+          productId: fixture.productId,
+        );
+
+        await fixture.service.addModifierToLine(
+          transactionLineId: line.id,
+          action: ModifierAction.add,
+          itemName: 'Beans',
+          extraPriceMinor: 80,
+          priceBehavior: ModifierPriceBehavior.paid,
+          uiSection: ModifierUiSection.addIns,
+        );
+        await fixture.service.addModifierToLine(
+          transactionLineId: line.id,
+          action: ModifierAction.add,
+          itemName: 'Ketchup',
+          extraPriceMinor: 0,
+          priceBehavior: ModifierPriceBehavior.free,
+          uiSection: ModifierUiSection.sauces,
+        );
+
+        final Transaction refreshed = (await fixture.service.getOrderById(
+          order.id,
+        ))!;
+        final List<OrderModifier> modifiers = await fixture.service
+            .getLineModifiers(line.id);
+
+        expect(refreshed.modifierTotalMinor, 80);
+        expect(refreshed.totalAmountMinor, 980);
+        expect(modifiers, hasLength(2));
+        expect(
+          modifiers
+              .singleWhere(
+                (OrderModifier modifier) => modifier.itemName == 'Beans',
+              )
+              .priceEffectMinor,
+          80,
+        );
+        expect(
+          modifiers
+              .singleWhere(
+                (OrderModifier modifier) => modifier.itemName == 'Ketchup',
+              )
+              .priceEffectMinor,
+          0,
+        );
+      },
+    );
+
+    test(
+      'plain burger with no selections keeps the snapshot empty and total at base price',
+      () async {
+        final _BurgerOrderFixture fixture = await _createBurgerOrderFixture();
+        addTearDown(fixture.db.close);
+
+        final Transaction order = await fixture.service.createOrder(
+          currentUser: fixture.user,
+        );
+        final TransactionLine line = await fixture.service.addProductToOrder(
+          transactionId: order.id,
+          productId: fixture.productId,
+        );
+
+        final Transaction refreshed = (await fixture.service.getOrderById(
+          order.id,
+        ))!;
+        final List<OrderModifier> modifiers = await fixture.service
+            .getLineModifiers(line.id);
+
+        expect(modifiers, isEmpty);
+        expect(refreshed.subtotalMinor, 900);
+        expect(refreshed.modifierTotalMinor, 0);
+        expect(refreshed.totalAmountMinor, 900);
+      },
+    );
 
     test('Hidden product cannot be added to new order', () async {
       final db = createTestDatabase();
@@ -628,4 +850,53 @@ void main() {
       );
     });
   });
+}
+
+Future<_BurgerOrderFixture> _createBurgerOrderFixture() async {
+  final db = createTestDatabase();
+  final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
+  await insertShift(db, openedBy: cashierId);
+  final int categoryId = await insertCategory(db, name: 'Mains');
+  final int productId = await insertProduct(
+    db,
+    categoryId: categoryId,
+    name: 'Burger',
+    priceMinor: 900,
+    hasModifiers: true,
+  );
+  final User user = User(
+    id: cashierId,
+    name: 'Cashier',
+    pin: null,
+    password: null,
+    role: UserRole.cashier,
+    isActive: true,
+    createdAt: DateTime.now(),
+  );
+  final OrderService service = OrderService(
+    shiftSessionService: ShiftSessionService(ShiftRepository(db)),
+    transactionRepository: TransactionRepository(db),
+    transactionStateRepository: TransactionStateRepository(db),
+    paymentRepository: PaymentRepository(db),
+  );
+  return _BurgerOrderFixture(
+    db: db,
+    service: service,
+    user: user,
+    productId: productId,
+  );
+}
+
+class _BurgerOrderFixture {
+  const _BurgerOrderFixture({
+    required this.db,
+    required this.service,
+    required this.user,
+    required this.productId,
+  });
+
+  final app_db.AppDatabase db;
+  final OrderService service;
+  final User user;
+  final int productId;
 }

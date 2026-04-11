@@ -175,6 +175,7 @@ class AdminService {
     required User user,
     required String name,
     required int sortOrder,
+    String? imageUrl,
     bool isActive = true,
   }) async {
     _ensureAdmin(user);
@@ -184,6 +185,7 @@ class AdminService {
 
     return _categoryRepository.insert(
       name: name.trim(),
+      imageUrl: _normalizeOptionalImageUrl(imageUrl),
       sortOrder: sortOrder,
       isActive: isActive,
     );
@@ -195,6 +197,7 @@ class AdminService {
     required String name,
     required int sortOrder,
     required bool isActive,
+    String? imageUrl,
   }) async {
     _ensureAdmin(user);
     _validateRequiredName(name, fieldName: 'Category name');
@@ -204,12 +207,21 @@ class AdminService {
     final bool updated = await _categoryRepository.updateCategory(
       id: id,
       name: name.trim(),
+      imageUrl: _normalizeOptionalImageUrl(imageUrl),
       sortOrder: sortOrder,
       isActive: isActive,
     );
     if (!updated) {
       throw NotFoundException('Category not found: $id');
     }
+  }
+
+  String? _normalizeOptionalImageUrl(String? value) {
+    final String? trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed;
   }
 
   Future<bool> categoryHasActiveProducts({
@@ -259,6 +271,42 @@ class AdminService {
     if (!updated) {
       throw NotFoundException('Category not found: $id');
     }
+  }
+
+  Future<void> reorderCategories({
+    required User user,
+    required List<int> orderedIds,
+  }) async {
+    _ensureAdmin(user);
+    final List<Category> categories = await _categoryRepository.getAll(
+      activeOnly: false,
+    );
+    if (categories.length != orderedIds.length) {
+      throw ValidationException(
+        'Category reorder payload must include every category exactly once.',
+      );
+    }
+
+    final Set<int> expectedIds = categories
+        .map((Category category) => category.id)
+        .toSet();
+    final Set<int> actualIds = orderedIds.toSet();
+    if (expectedIds.length != actualIds.length ||
+        !expectedIds.containsAll(actualIds) ||
+        !actualIds.containsAll(expectedIds)) {
+      throw ValidationException(
+        'Category reorder payload must include every category exactly once.',
+      );
+    }
+
+    await _categoryRepository.reorder(orderedIds);
+    await _auditLogService.logActionSafely(
+      actorUserId: user.id,
+      action: 'category_reordered',
+      entityType: 'category',
+      entityId: 'all',
+      metadata: <String, Object?>{'ordered_ids': orderedIds},
+    );
   }
 
   Future<List<Product>> getProducts({int? categoryId}) {

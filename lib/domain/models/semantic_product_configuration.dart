@@ -21,11 +21,9 @@ class ProductMenuConfigurationProfile {
   final int extraPoolCount;
 
   bool get hasLegacyFlatConfig => flatModifierCount > 0;
-  bool get hasSemanticSetConfig =>
-      setItemCount > 0 ||
-      choiceGroupCount > 0 ||
-      choiceMemberCount > 0 ||
-      extraPoolCount > 0;
+  bool get hasSemanticRootConfig =>
+      setItemCount > 0 || choiceGroupCount > 0 || choiceMemberCount > 0;
+  bool get hasSemanticSetConfig => hasSemanticRootConfig;
 
   ProductMenuConfigType get type {
     if (hasLegacyFlatConfig && hasSemanticSetConfig) {

@@ -1,12 +1,13 @@
 import '../../core/errors/exceptions.dart';
-import '../../core/utils/currency_formatter.dart';
 import '../../data/repositories/product_repository.dart';
 import '../models/meal_adjustment_profile.dart';
 import '../models/meal_customization.dart';
+import '../models/meal_pricing_explanation.dart';
 import '../models/product.dart';
 import '../repositories/meal_adjustment_profile_repository.dart';
 import 'meal_adjustment_profile_validation_service.dart';
 import 'meal_customization_engine.dart';
+import 'meal_pricing_explanation_builder.dart';
 
 class MealCustomizationPosEditorData {
   const MealCustomizationPosEditorData({
@@ -29,6 +30,7 @@ class MealCustomizationPosPreview {
     required this.validationMessages,
     required this.summaryLines,
     required this.compactSummary,
+    required this.displayName,
     this.snapshot,
     this.stableIdentityKey,
     this.adjustmentMinor = 0,
@@ -41,6 +43,7 @@ class MealCustomizationPosPreview {
   final List<String> validationMessages;
   final List<String> summaryLines;
   final String compactSummary;
+  final String displayName;
   final String? stableIdentityKey;
   final int adjustmentMinor;
   final int finalLineTotalMinor;
@@ -48,14 +51,16 @@ class MealCustomizationPosPreview {
   bool get canConfirm => validationMessages.isEmpty && snapshot != null;
 
   MealCustomizationCartSelection toCartSelection() {
-    final MealCustomizationResolvedSnapshot resolvedSnapshot = snapshot ??
-        (throw ValidationException(validationMessages.join('\n')));
+    final MealCustomizationResolvedSnapshot resolvedSnapshot =
+        snapshot ?? (throw ValidationException(validationMessages.join('\n')));
     return MealCustomizationCartSelection(
       request: request,
       snapshot: resolvedSnapshot,
-      stableIdentityKey: stableIdentityKey ?? resolvedSnapshot.stableIdentityKey,
+      stableIdentityKey:
+          stableIdentityKey ?? resolvedSnapshot.stableIdentityKey,
       summaryLines: summaryLines,
       compactSummary: compactSummary,
+      displayName: displayName,
       perUnitAdjustmentMinor: adjustmentMinor,
       perUnitLineTotalMinor: finalLineTotalMinor,
     );
@@ -68,15 +73,19 @@ class MealCustomizationPosService {
     required MealAdjustmentProfileValidationService validationService,
     required ProductRepository productRepository,
     MealCustomizationEngine engine = const MealCustomizationEngine(),
+    MealPricingExplanationBuilder pricingExplanationBuilder =
+        const MealPricingExplanationBuilder(),
   }) : _mealAdjustmentProfileRepository = mealAdjustmentProfileRepository,
        _validationService = validationService,
        _productRepository = productRepository,
-       _engine = engine;
+       _engine = engine,
+       _pricingExplanationBuilder = pricingExplanationBuilder;
 
   final MealAdjustmentProfileRepository _mealAdjustmentProfileRepository;
   final MealAdjustmentProfileValidationService _validationService;
   final ProductRepository _productRepository;
   final MealCustomizationEngine _engine;
+  final MealPricingExplanationBuilder _pricingExplanationBuilder;
 
   Future<MealCustomizationPosEditorData> loadEditorData({
     required Product product,
@@ -127,8 +136,12 @@ class MealCustomizationPosService {
         ),
       for (final MealAdjustmentExtraOption option in profile.extraOptions)
         option.itemProductId,
+      ...profile.sandwichSettings.sauceProductIds,
+      ...initialState.sandwichSelection.sauceProductIds,
     };
-    final Map<int, String> productNamesById = await _loadProductNames(productIds);
+    final Map<int, String> productNamesById = await _loadProductNames(
+      productIds,
+    );
     final MealCustomizationPosPreview preview = previewSelection(
       product: product,
       profile: profile,
@@ -149,7 +162,13 @@ class MealCustomizationPosService {
     required MealCustomizationEditorState editorState,
     required Map<int, String> productNamesById,
   }) {
-    final MealCustomizationRequest request = editorState.toRequest(
+    final MealCustomizationEditorState normalizedEditorState =
+        _normalizeEditorState(
+          profile: profile,
+          editorState: editorState,
+          productNamesById: productNamesById,
+        );
+    final MealCustomizationRequest request = normalizedEditorState.toRequest(
       productId: product.id,
       profileId: profile.id,
     );
@@ -163,25 +182,27 @@ class MealCustomizationPosService {
         productNamesById: productNamesById,
       );
       return MealCustomizationPosPreview(
-        editorState: editorState,
+        editorState: normalizedEditorState,
         request: request,
         snapshot: snapshot,
         validationMessages: const <String>[],
         summaryLines: summaryLines,
         compactSummary: _buildCompactSummary(summaryLines),
+        displayName: _buildDisplayName(product: product, snapshot: snapshot),
         stableIdentityKey: snapshot.stableIdentityKey,
         adjustmentMinor: snapshot.totalAdjustmentMinor,
         finalLineTotalMinor: product.priceMinor + snapshot.totalAdjustmentMinor,
       );
     } on MealCustomizationRequestRejectedException catch (error) {
       return MealCustomizationPosPreview(
-        editorState: editorState,
+        editorState: normalizedEditorState,
         request: request,
         validationMessages: error.issues
             .map((MealCustomizationRequestIssue issue) => issue.message)
             .toList(growable: false),
         summaryLines: const <String>[],
         compactSummary: '',
+        displayName: product.name,
         finalLineTotalMinor: product.priceMinor,
       );
     }
@@ -205,7 +226,8 @@ class MealCustomizationPosService {
     bool enforceCurrentProductBinding = true,
     bool enforceBreakfastCompatibility = true,
   }) async {
-    final int profileId = overrideProfileId ??
+    final int profileId =
+        overrideProfileId ??
         product.mealAdjustmentProfileId ??
         (throw ValidationException(
           'Meal customization requires an assigned profile.',
@@ -244,20 +266,28 @@ class MealCustomizationPosService {
       );
     }
     if (enforceBreakfastCompatibility) {
-      final Set<int> breakfastProductIds =
-          await _mealAdjustmentProfileRepository.loadBreakfastSemanticProductIds(
-            <int>[product.id],
-          );
-      if (breakfastProductIds.contains(product.id)) {
+      final Set<int> breakfastRootProductIds =
+          await _mealAdjustmentProfileRepository
+              .loadBreakfastSemanticRootProductIds(<int>[product.id]);
+      if (breakfastRootProductIds.contains(product.id)) {
         throw MealCustomizationRuntimeConfigurationException(
           productId: product.id,
           profileId: profileId,
-          detail:
-              'Breakfast semantic products cannot carry a meal-adjustment profile.',
+          detail: _buildBreakfastCompatibilityMessage(
+            productName: product.name,
+            profileName: draft.name,
+          ),
         );
       }
     }
     return draft.toRuntimeProfile(profileId: profileId);
+  }
+
+  String _buildBreakfastCompatibilityMessage({
+    required String productName,
+    required String profileName,
+  }) {
+    return 'Product "$productName" cannot use meal-adjustment profile "$profileName" because it is configured as a breakfast semantic root product.';
   }
 
   Future<Map<int, String>> _loadProductNames(Set<int> productIds) async {
@@ -271,56 +301,70 @@ class MealCustomizationPosService {
     return names;
   }
 
+  MealCustomizationEditorState _normalizeEditorState({
+    required MealAdjustmentProfile profile,
+    required MealCustomizationEditorState editorState,
+    required Map<int, String> productNamesById,
+  }) {
+    if (profile.kind != MealAdjustmentProfileKind.sandwich) {
+      return editorState;
+    }
+    final SandwichCustomizationSelection normalizedSandwichSelection =
+        _normalizeSandwichSelection(
+          selection: editorState.sandwichSelection,
+          enabledSauceProductIds: profile.sandwichSettings.sauceProductIds,
+          productNamesById: productNamesById,
+        );
+    if (normalizedSandwichSelection == editorState.sandwichSelection) {
+      return editorState;
+    }
+    return editorState.copyWith(sandwichSelection: normalizedSandwichSelection);
+  }
+
+  SandwichCustomizationSelection _normalizeSandwichSelection({
+    required SandwichCustomizationSelection selection,
+    required List<int> enabledSauceProductIds,
+    required Map<int, String> productNamesById,
+  }) {
+    final Map<String, int> enabledSauceIdsByLookupToken = <String, int>{};
+    for (final int productId in enabledSauceProductIds) {
+      final String? productName = productNamesById[productId];
+      if (productName == null || productName.trim().isEmpty) {
+        continue;
+      }
+      for (final String token in sandwichSauceLookupTokensForName(
+        productName,
+      )) {
+        enabledSauceIdsByLookupToken[token] = productId;
+      }
+    }
+
+    final List<int> mergedSauceIds = <int>[
+      ...selection.sauceProductIds,
+      ...selection.legacySauceLookupKeys
+          .map(canonicalLegacySandwichSauceLookupKey)
+          .whereType<String>()
+          .map((String key) => enabledSauceIdsByLookupToken[key])
+          .whereType<int>(),
+    ];
+    return selection.copyWith(
+      sauceProductIds: normalizeSandwichSauceProductIds(mergedSauceIds),
+      legacySauceLookupKeys: const <String>[],
+    );
+  }
+
   List<String> _buildSummaryLines({
     required MealCustomizationResolvedSnapshot snapshot,
     required Map<int, String> productNamesById,
   }) {
-    final List<String> lines = <String>[];
-    for (final MealCustomizationSemanticAction action
-        in snapshot.resolvedComponentActions) {
-      switch (action.action) {
-        case MealCustomizationAction.remove:
-          final String itemName = _resolveProductName(
-            action.itemProductId,
-            productNamesById,
-          );
-          lines.add('No $itemName');
-          break;
-        case MealCustomizationAction.swap:
-          final String sourceName = _resolveProductName(
-            action.sourceItemProductId,
-            productNamesById,
-          );
-          final String targetName = _resolveProductName(
-            action.itemProductId,
-            productNamesById,
-          );
-          final String priceSuffix = action.priceDeltaMinor == 0
-              ? ''
-              : ' ${_signedMoney(action.priceDeltaMinor)}';
-          lines.add('$sourceName → $targetName$priceSuffix');
-          break;
-        case MealCustomizationAction.extra:
-        case MealCustomizationAction.discount:
-          break;
-      }
-    }
-    for (final MealCustomizationSemanticAction action
-        in snapshot.resolvedExtraActions) {
-      final String itemName = _resolveProductName(
-        action.itemProductId,
-        productNamesById,
-      );
-      final String quantityPrefix = action.quantity > 1 ? '${action.quantity}x ' : '';
-      lines.add(
-        'Extra $quantityPrefix$itemName ${_signedMoney(action.priceDeltaMinor)}',
-      );
-    }
-    for (final MealCustomizationSemanticAction action
-        in snapshot.triggeredDiscounts) {
-      lines.add('${_discountLabel(action)} ${_signedMoney(action.priceDeltaMinor)}');
-    }
-    return lines;
+    final List<PricingExplanationLine> lines = _pricingExplanationBuilder
+        .buildCartSummary(
+          snapshot: snapshot,
+          productNamesById: productNamesById,
+        );
+    return lines
+        .map((PricingExplanationLine line) => line.label)
+        .toList(growable: false);
   }
 
   String _buildCompactSummary(List<String> summaryLines) {
@@ -331,35 +375,14 @@ class MealCustomizationPosService {
     return trimmed.join(' · ');
   }
 
-  String _resolveProductName(int? productId, Map<int, String> productNamesById) {
-    if (productId == null) {
-      return 'Unknown';
+  String _buildDisplayName({
+    required Product product,
+    required MealCustomizationResolvedSnapshot snapshot,
+  }) {
+    final SandwichBreadType? breadType = snapshot.sandwichSelection?.breadType;
+    if (breadType == null) {
+      return product.name;
     }
-    return productNamesById[productId] ?? 'Product $productId';
-  }
-
-  String _signedMoney(int amountMinor) {
-    final String absolute = CurrencyFormatter.fromMinor(amountMinor.abs());
-    if (amountMinor > 0) {
-      return '+$absolute';
-    }
-    if (amountMinor < 0) {
-      return '-$absolute';
-    }
-    return absolute;
-  }
-
-  String _discountLabel(MealCustomizationSemanticAction action) {
-    switch (action.chargeReason) {
-      case MealCustomizationChargeReason.comboDiscount:
-        return 'Combo discount';
-      case MealCustomizationChargeReason.removalDiscount:
-        return 'Removal discount';
-      case MealCustomizationChargeReason.freeSwap:
-      case MealCustomizationChargeReason.paidSwap:
-      case MealCustomizationChargeReason.extraAdd:
-      case null:
-        return 'Discount';
-    }
+    return '${product.name} ${sandwichBreadLabel(breadType)}';
   }
 }

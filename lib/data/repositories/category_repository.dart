@@ -113,7 +113,7 @@ class CategoryRepository {
   Future<bool> updateCategory({
     required int id,
     String? name,
-    String? imageUrl,
+    Object? imageUrl = _unset,
     int? sortOrder,
     bool? isActive,
   }) async {
@@ -125,9 +125,9 @@ class CategoryRepository {
             name: name == null
                 ? const Value<String>.absent()
                 : Value<String>(name),
-            imageUrl: imageUrl == null
+            imageUrl: imageUrl == _unset
                 ? const Value<String?>.absent()
-                : Value<String?>(imageUrl),
+                : Value<String?>(imageUrl as String?),
             sortOrder: sortOrder == null
                 ? const Value<int>.absent()
                 : Value<int>(sortOrder),
@@ -204,3 +204,5 @@ class CategoryRepository {
     );
   }
 }
+
+const Object _unset = Object();

@@ -2,8 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/errors/error_mapper.dart';
 import '../../core/providers/app_providers.dart';
+import '../../data/repositories/product_repository.dart';
+import '../../domain/models/category.dart';
 import '../../domain/models/meal_adjustment_profile.dart';
 import '../../domain/models/meal_customization.dart';
+import '../../domain/models/product.dart';
 import '../../domain/repositories/meal_adjustment_profile_repository.dart';
 import '../../domain/services/meal_adjustment_profile_validation_service.dart';
 
@@ -55,8 +58,9 @@ class AdminMealProfilesState {
       healthByProfileId: healthByProfileId ?? this.healthByProfileId,
       isLoading: isLoading ?? this.isLoading,
       isSaving: isSaving ?? this.isSaving,
-      errorMessage:
-          errorMessage == _unset ? this.errorMessage : errorMessage as String?,
+      errorMessage: errorMessage == _unset
+          ? this.errorMessage
+          : errorMessage as String?,
       successMessage: successMessage == _unset
           ? this.successMessage
           : successMessage as String?,
@@ -68,8 +72,7 @@ class AdminMealProfilesState {
 // Notifier
 // ─────────────────────────────────────────────────────────────────────────────
 
-class AdminMealProfilesNotifier
-    extends StateNotifier<AdminMealProfilesState> {
+class AdminMealProfilesNotifier extends StateNotifier<AdminMealProfilesState> {
   AdminMealProfilesNotifier(this._ref)
     : super(const AdminMealProfilesState.initial());
 
@@ -132,6 +135,7 @@ class AdminMealProfilesNotifier
   Future<int?> createProfile({
     required String name,
     String? description,
+    MealAdjustmentProfileKind kind = MealAdjustmentProfileKind.standard,
     int freeSwapLimit = 0,
   }) async {
     state = state.copyWith(isSaving: true, errorMessage: null);
@@ -139,7 +143,20 @@ class AdminMealProfilesNotifier
       final MealAdjustmentProfileDraft draft = MealAdjustmentProfileDraft(
         name: name,
         description: description,
-        freeSwapLimit: freeSwapLimit,
+        kind: kind,
+        sandwichSettings: kind == MealAdjustmentProfileKind.sandwich
+            ? SandwichProfileSettings(
+                sauceProductIds: normalizeSandwichSauceProductIds(
+                  (await _ref
+                          .read(productRepositoryProvider)
+                          .getSandwichSauceProducts())
+                      .map((Product product) => product.id),
+                ),
+              )
+            : const SandwichProfileSettings(),
+        freeSwapLimit: kind == MealAdjustmentProfileKind.sandwich
+            ? 0
+            : freeSwapLimit,
         isActive: false,
       );
       final int profileId = await _ref
@@ -333,13 +350,71 @@ class AdminMealProfileEditorState {
       isLoading: isLoading ?? this.isLoading,
       isSaving: isSaving ?? this.isSaving,
       isDirty: isDirty ?? this.isDirty,
-      errorMessage:
-          errorMessage == _unset ? this.errorMessage : errorMessage as String?,
+      errorMessage: errorMessage == _unset
+          ? this.errorMessage
+          : errorMessage as String?,
       successMessage: successMessage == _unset
           ? this.successMessage
           : successMessage as String?,
     );
   }
+}
+
+class AdminMealProfileProductOption {
+  const AdminMealProfileProductOption({
+    required this.id,
+    required this.name,
+    required this.categoryName,
+    required this.isActive,
+    this.hasMealAdjustmentProfile = false,
+    this.hasOwnedSemanticConfiguration = false,
+  });
+
+  final int id;
+  final String name;
+  final String categoryName;
+  final bool isActive;
+  final bool hasMealAdjustmentProfile;
+  final bool hasOwnedSemanticConfiguration;
+
+  String get searchLabel => '$name $categoryName'.toLowerCase();
+
+  String get displayLabel => '$name · $categoryName';
+
+  bool get isValidAddInCandidate =>
+      isActive && !hasMealAdjustmentProfile && !hasOwnedSemanticConfiguration;
+
+  bool get isSauceCategory =>
+      categoryName.trim().toLowerCase() == kSaucesCategoryName.toLowerCase();
+}
+
+class AdminMealProfileProductCatalog {
+  const AdminMealProfileProductCatalog({required this.products});
+
+  final List<AdminMealProfileProductOption> products;
+
+  List<AdminMealProfileProductOption> get activeProducts => products
+      .where((AdminMealProfileProductOption product) => product.isActive)
+      .toList(growable: false);
+
+  List<AdminMealProfileProductOption> get activeAddInProducts => products
+      .where(
+        (AdminMealProfileProductOption product) =>
+            product.isValidAddInCandidate,
+      )
+      .toList(growable: false);
+
+  List<AdminMealProfileProductOption> get activeSauceProducts => products
+      .where((AdminMealProfileProductOption product) {
+        return product.isActive && product.isSauceCategory;
+      })
+      .toList(growable: false);
+
+  Map<int, AdminMealProfileProductOption> get byId =>
+      <int, AdminMealProfileProductOption>{
+        for (final AdminMealProfileProductOption product in products)
+          product.id: product,
+      };
 }
 
 class AdminMealProfileEditorNotifier
@@ -355,11 +430,7 @@ class AdminMealProfileEditorNotifier
       final MealAdjustmentProfileDraft draft = await _ref
           .read(mealAdjustmentAdminServiceProvider)
           .loadProfileDraft(profileId);
-      state = state.copyWith(
-        draft: draft,
-        isLoading: false,
-        isDirty: false,
-      );
+      state = state.copyWith(draft: draft, isLoading: false, isDirty: false);
       await _revalidate();
     } catch (error, stackTrace) {
       state = state.copyWith(
@@ -374,10 +445,14 @@ class AdminMealProfileEditorNotifier
     }
   }
 
-  void initNewProfile({String name = 'New Profile'}) {
+  void initNewProfile({
+    String name = 'New Profile',
+    MealAdjustmentProfileKind kind = MealAdjustmentProfileKind.standard,
+  }) {
     state = state.copyWith(
       draft: MealAdjustmentProfileDraft(
         name: name,
+        kind: kind,
         freeSwapLimit: 0,
         isActive: false,
       ),
@@ -396,19 +471,30 @@ class AdminMealProfileEditorNotifier
   void updateBasicInfo({
     String? name,
     Object? description = _unset,
+    MealAdjustmentProfileKind? kind,
     int? freeSwapLimit,
     bool? isActive,
   }) {
     final MealAdjustmentProfileDraft? current = state.draft;
     if (current == null) return;
+    final MealAdjustmentProfileKind nextKind = kind ?? current.kind;
     state = state.copyWith(
       draft: current.copyWith(
         name: name,
         description: identical(description, _unset)
             ? current.description
             : description as String?,
-        freeSwapLimit: freeSwapLimit,
+        kind: nextKind,
+        freeSwapLimit: nextKind == MealAdjustmentProfileKind.sandwich
+            ? 0
+            : freeSwapLimit,
         isActive: isActive,
+        components: nextKind == MealAdjustmentProfileKind.sandwich
+            ? const <MealAdjustmentComponentDraft>[]
+            : current.components,
+        pricingRules: nextKind == MealAdjustmentProfileKind.sandwich
+            ? const <MealAdjustmentPricingRuleDraft>[]
+            : current.pricingRules,
       ),
       isDirty: true,
     );
@@ -418,11 +504,70 @@ class AdminMealProfileEditorNotifier
   void updateComponents(List<MealAdjustmentComponentDraft> components) {
     final MealAdjustmentProfileDraft? current = state.draft;
     if (current == null) return;
+    final List<MealAdjustmentComponentDraft> normalized = components
+        .asMap()
+        .entries
+        .map((MapEntry<int, MealAdjustmentComponentDraft> entry) {
+          final List<MealAdjustmentComponentOptionDraft> swapOptions = entry
+              .value
+              .swapOptions
+              .asMap()
+              .entries
+              .map((MapEntry<int, MealAdjustmentComponentOptionDraft> option) {
+                return option.value.copyWith(sortOrder: option.key);
+              })
+              .toList(growable: false);
+          return entry.value.copyWith(
+            sortOrder: entry.key,
+            swapOptions: swapOptions,
+          );
+        })
+        .toList(growable: false);
     state = state.copyWith(
-      draft: current.copyWith(components: components),
+      draft: current.copyWith(components: normalized),
       isDirty: true,
     );
     _revalidate();
+  }
+
+  void addComponent() {
+    final MealAdjustmentProfileDraft? current = state.draft;
+    if (current == null) return;
+    final List<MealAdjustmentComponentDraft> updated =
+        List<MealAdjustmentComponentDraft>.from(current.components)..add(
+          MealAdjustmentComponentDraft(
+            componentKey: 'component_${current.components.length + 1}',
+            displayName: '',
+            defaultItemProductId: 0,
+            quantity: 1,
+            canRemove: true,
+            sortOrder: current.components.length,
+            isActive: true,
+          ),
+        );
+    updateComponents(updated);
+  }
+
+  void updateComponentAt(int index, MealAdjustmentComponentDraft component) {
+    final MealAdjustmentProfileDraft? current = state.draft;
+    if (current == null || index < 0 || index >= current.components.length) {
+      return;
+    }
+    final List<MealAdjustmentComponentDraft> updated =
+        List<MealAdjustmentComponentDraft>.from(current.components);
+    updated[index] = component;
+    updateComponents(updated);
+  }
+
+  void removeComponentAt(int index) {
+    final MealAdjustmentProfileDraft? current = state.draft;
+    if (current == null || index < 0 || index >= current.components.length) {
+      return;
+    }
+    final List<MealAdjustmentComponentDraft> updated =
+        List<MealAdjustmentComponentDraft>.from(current.components)
+          ..removeAt(index);
+    updateComponents(updated);
   }
 
   void updateExtras(List<MealAdjustmentExtraOptionDraft> extras) {
@@ -430,6 +575,16 @@ class AdminMealProfileEditorNotifier
     if (current == null) return;
     state = state.copyWith(
       draft: current.copyWith(extraOptions: extras),
+      isDirty: true,
+    );
+    _revalidate();
+  }
+
+  void updateSandwichSettings(SandwichProfileSettings sandwichSettings) {
+    final MealAdjustmentProfileDraft? current = state.draft;
+    if (current == null) return;
+    state = state.copyWith(
+      draft: current.copyWith(sandwichSettings: sandwichSettings),
       isDirty: true,
     );
     _revalidate();
@@ -507,14 +662,42 @@ class AdminMealProfileEditorNotifier
   ) {
     final Map<MealAdjustmentValidationSection, int> counts =
         <MealAdjustmentValidationSection, int>{};
-    for (final MealAdjustmentValidationIssue issue
-        in result.blockingErrors) {
-      counts[issue.section] = (counts[issue.section] ?? 0) + 1;
+    for (final MealAdjustmentValidationIssue issue in result.blockingErrors) {
+      final MealAdjustmentValidationSection targetSection =
+          _resolveEditorSection(issue);
+      counts[targetSection] = (counts[targetSection] ?? 0) + 1;
     }
     for (final MealAdjustmentValidationIssue issue in result.warnings) {
-      counts[issue.section] = (counts[issue.section] ?? 0) + 1;
+      final MealAdjustmentValidationSection targetSection =
+          _resolveEditorSection(issue);
+      counts[targetSection] = (counts[targetSection] ?? 0) + 1;
     }
     return counts;
+  }
+
+  MealAdjustmentValidationSection _resolveEditorSection(
+    MealAdjustmentValidationIssue issue,
+  ) {
+    switch (issue.section) {
+      case MealAdjustmentValidationSection.swaps:
+        return MealAdjustmentValidationSection.components;
+      case MealAdjustmentValidationSection.references:
+        if (issue.componentKey != null) {
+          return MealAdjustmentValidationSection.components;
+        }
+        if (issue.ruleId != null) {
+          return MealAdjustmentValidationSection.rules;
+        }
+        return MealAdjustmentValidationSection.extras;
+      case MealAdjustmentValidationSection.assignments:
+      case MealAdjustmentValidationSection.products:
+        return MealAdjustmentValidationSection.profile;
+      case MealAdjustmentValidationSection.profile:
+      case MealAdjustmentValidationSection.components:
+      case MealAdjustmentValidationSection.extras:
+      case MealAdjustmentValidationSection.rules:
+        return issue.section;
+    }
   }
 
   Map<int, String> _buildRuleExplanations(MealAdjustmentProfileDraft draft) {
@@ -554,11 +737,73 @@ adminMealProfilesNotifierProvider =
       (Ref ref) => AdminMealProfilesNotifier(ref),
     );
 
-final StateNotifierProvider<AdminMealProfileEditorNotifier,
-    AdminMealProfileEditorState>
-adminMealProfileEditorNotifierProvider = StateNotifierProvider<
+final StateNotifierProvider<
   AdminMealProfileEditorNotifier,
   AdminMealProfileEditorState
->((Ref ref) => AdminMealProfileEditorNotifier(ref));
+>
+adminMealProfileEditorNotifierProvider =
+    StateNotifierProvider<
+      AdminMealProfileEditorNotifier,
+      AdminMealProfileEditorState
+    >((Ref ref) => AdminMealProfileEditorNotifier(ref));
+
+final FutureProvider<AdminMealProfileProductCatalog>
+adminMealProfileProductCatalogProvider =
+    FutureProvider<AdminMealProfileProductCatalog>((Ref ref) async {
+      final List<Category> categories = await ref
+          .read(categoryRepositoryProvider)
+          .getAll(activeOnly: false);
+      final Map<int, String> categoryNames = <int, String>{
+        for (final Category category in categories) category.id: category.name,
+      };
+      final List<Product> products = await ref
+          .read(productRepositoryProvider)
+          .getAll(activeOnly: false);
+      final ProductRepository productRepository = ref.read(
+        productRepositoryProvider,
+      );
+      final Set<int> semanticRootProductIds = (await Future.wait(
+        products.map((Product product) async {
+          final bool hasOwnedSemanticConfiguration = await productRepository
+              .hasOwnedSemanticConfiguration(product.id);
+          return hasOwnedSemanticConfiguration ? product.id : null;
+        }),
+      )).whereType<int>().toSet();
+      final List<AdminMealProfileProductOption> options =
+          products
+              .map((Product product) {
+                return AdminMealProfileProductOption(
+                  id: product.id,
+                  name: product.name,
+                  categoryName:
+                      categoryNames[product.categoryId] ?? 'Unknown Category',
+                  isActive: product.isActive,
+                  hasMealAdjustmentProfile:
+                      product.mealAdjustmentProfileId != null,
+                  hasOwnedSemanticConfiguration: semanticRootProductIds
+                      .contains(product.id),
+                );
+              })
+              .toList(growable: false)
+            ..sort((
+              AdminMealProfileProductOption a,
+              AdminMealProfileProductOption b,
+            ) {
+              final int nameCompare = a.name.toLowerCase().compareTo(
+                b.name.toLowerCase(),
+              );
+              if (nameCompare != 0) {
+                return nameCompare;
+              }
+              final int categoryCompare = a.categoryName
+                  .toLowerCase()
+                  .compareTo(b.categoryName.toLowerCase());
+              if (categoryCompare != 0) {
+                return categoryCompare;
+              }
+              return a.id.compareTo(b.id);
+            });
+      return AdminMealProfileProductCatalog(products: options);
+    });
 
 const Object _unset = Object();
