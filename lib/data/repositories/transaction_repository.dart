@@ -112,6 +112,49 @@ class TransactionRepository {
     return rows.map(_mapTransaction).toList(growable: false);
   }
 
+  Future<List<Transaction>> listOrders({
+    List<TransactionStatus>? statuses,
+    DateTime? startCreatedAtInclusive,
+    DateTime? endCreatedAtExclusive,
+    int? transactionId,
+    int? limit,
+    int offset = 0,
+  }) async {
+    final List<String>? dbStatuses = statuses
+        ?.map(_statusToDb)
+        .toList(growable: false);
+    final query = _database.select(_database.transactions)
+      ..orderBy(<OrderingTerm Function(db.$TransactionsTable)>[
+        (db.$TransactionsTable t) => OrderingTerm.desc(t.createdAt),
+        (db.$TransactionsTable t) => OrderingTerm.desc(t.id),
+      ]);
+
+    if (transactionId != null) {
+      query.where((db.$TransactionsTable t) => t.id.equals(transactionId));
+    }
+    if (dbStatuses != null && dbStatuses.isNotEmpty) {
+      query.where((db.$TransactionsTable t) => t.status.isIn(dbStatuses));
+    }
+    if (startCreatedAtInclusive != null) {
+      query.where(
+        (db.$TransactionsTable t) =>
+            t.createdAt.isBiggerOrEqualValue(startCreatedAtInclusive),
+      );
+    }
+    if (endCreatedAtExclusive != null) {
+      query.where(
+        (db.$TransactionsTable t) =>
+            t.createdAt.isSmallerThanValue(endCreatedAtExclusive),
+      );
+    }
+    if (limit != null) {
+      query.limit(limit, offset: offset);
+    }
+
+    final List<db.Transaction> rows = await query.get();
+    return rows.map(_mapTransaction).toList(growable: false);
+  }
+
   Future<List<Transaction>> getActiveOrders({int? shiftId}) async {
     final query = _database.select(_database.transactions)
       ..where((db.$TransactionsTable t) {
@@ -355,6 +398,36 @@ class TransactionRepository {
             ))
             .getSingleOrNull();
     return row == null ? null : _mapLine(row);
+  }
+
+  Future<Map<int, List<TransactionLine>>> getLinesByTransactionIds(
+    Iterable<int> transactionIds,
+  ) async {
+    final List<int> ids = transactionIds.toSet().toList(growable: false);
+    if (ids.isEmpty) {
+      return const <int, List<TransactionLine>>{};
+    }
+
+    final List<db.TransactionLine> rows =
+        await (_database.select(_database.transactionLines)
+              ..where((db.$TransactionLinesTable t) {
+                return t.transactionId.isIn(ids);
+              })
+              ..orderBy(<OrderingTerm Function(db.$TransactionLinesTable)>[
+                (db.$TransactionLinesTable t) =>
+                    OrderingTerm.asc(t.transactionId),
+                (db.$TransactionLinesTable t) => OrderingTerm.asc(t.id),
+              ]))
+            .get();
+
+    final Map<int, List<TransactionLine>> linesByTransactionId =
+        <int, List<TransactionLine>>{};
+    for (final db.TransactionLine row in rows) {
+      linesByTransactionId
+          .putIfAbsent(row.transactionId, () => <TransactionLine>[])
+          .add(_mapLine(row));
+    }
+    return linesByTransactionId;
   }
 
   Future<

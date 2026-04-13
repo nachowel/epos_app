@@ -283,7 +283,11 @@ void main() {
         );
         expect(receiptJobBeforeRetry.status, PrintJobStatus.failed);
 
-        await printerService.printReceipt(transaction.id, allowReprint: true);
+        await printerService.printReceipt(
+          transaction.id,
+          allowReprint: true,
+          actorUserId: fixture.cashier.id,
+        );
 
         final Payment? paymentAfterRetry = await fixture.paymentRepository
             .getByTransactionId(transaction.id);
@@ -449,7 +453,11 @@ void main() {
           immediatePaymentMethod: PaymentMethod.card,
         );
 
-        await printerService.printReceipt(paidOrder.id, allowReprint: true);
+        await printerService.printReceipt(
+          paidOrder.id,
+          allowReprint: true,
+          actorUserId: fixture.cashier.id,
+        );
 
         final Transaction secondOrder = await fixture.orderService.createOrder(
           currentUser: fixture.cashier,
@@ -552,6 +560,7 @@ class _DeterministicPrinterService extends PrinterService {
   Future<PrintJob> printKitchenTicket(
     int transactionId, {
     bool allowReprint = false,
+    int? actorUserId,
   }) async {
     return _process(
       transactionId: transactionId,

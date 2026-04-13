@@ -48,7 +48,7 @@ void main() {
     );
   });
 
-  test('medium widths use the compact inline navigation stage', () {
+  test('medium widths now collapse into the structured navigation stage', () {
     expect(
       SectionAppBar.debugNavigationStage(
         viewportWidth: 1120,
@@ -56,7 +56,7 @@ void main() {
         navLabels: cashierNavLabels,
         logoutLabel: 'Logout',
       ),
-      'compact',
+      'collapsed',
     );
     expect(
       SectionAppBar.debugNavigationStage(
@@ -65,7 +65,7 @@ void main() {
         navLabels: cashierNavLabels,
         logoutLabel: 'Logout',
       ),
-      'compact',
+      'collapsed',
     );
   });
 

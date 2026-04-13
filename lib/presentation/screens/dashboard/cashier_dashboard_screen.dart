@@ -62,7 +62,7 @@ class _CashierDashboardScreenState
         snapshot?.shiftSession.cashierPreviewActive ?? false;
     final bool salesLocked = snapshot?.shiftSession.salesLocked ?? false;
     final bool canStartNewOrder = hasOpenShift && !salesLocked;
-    final bool canOpenOrders = hasOpenShift;
+    final bool canOpenOrders = authState.currentUser != null;
     final bool canPreview = hasOpenShift && !previewActive;
 
     return Scaffold(

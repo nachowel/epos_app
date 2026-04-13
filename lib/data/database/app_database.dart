@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../core/errors/exceptions.dart';
 import '../../domain/models/migration_log_entry.dart';
+import '../../domain/models/printer_settings.dart';
 import '../../domain/models/sandwich.dart';
 
 part 'app_database.g.dart';
@@ -856,7 +857,23 @@ class PrinterSettings extends Table {
 
   TextColumn get deviceName => text()();
 
+  // From schema v32 onward this column is not bluetooth-only:
+  // - bluetooth rows keep the bluetooth address / MAC
+  // - ethernet rows store the normalized host for compatibility with
+  //   existing call sites that still read deviceAddress
   TextColumn get deviceAddress => text()();
+
+  TextColumn get connectionType => text().nullable().check(
+    connectionType.isNull() |
+        connectionType.isIn(const <String>['bluetooth', 'ethernet']),
+  )();
+
+  TextColumn get ipAddress => text().nullable()();
+
+  IntColumn get port => integer().nullable().check(
+    port.isNull() |
+        port.isBiggerOrEqualValue(1) & port.isSmallerOrEqualValue(65535),
+  )();
 
   IntColumn get paperWidth => integer().withDefault(const Constant(80))();
 
@@ -939,7 +956,7 @@ class AppDatabase extends _$AppDatabase {
     return AppDatabase(NativeDatabase(file));
   }
 
-  static const int currentSchemaVersion = 31;
+  static const int currentSchemaVersion = 32;
   final List<MigrationLogEntry> _migrationHistory = <MigrationLogEntry>[];
   MigrationLogEntry? _lastMigrationFailure;
 
@@ -969,11 +986,13 @@ class AppDatabase extends _$AppDatabase {
             await _createBaseTables();
             await _createFreshPathFkEmulation();
           }
+          await _createSyncRootSnapshotTable();
           await _seedDefaultMenuSettings();
           await _createMealCustomizationSnapshotSchema();
           await _createIndexes();
           await _createMealCustomizationSnapshotIndexes();
           await _createMealCustomizationSnapshotFkEmulation();
+          await _migrateToV32();
         },
       );
     },
@@ -1216,6 +1235,14 @@ class AppDatabase extends _$AppDatabase {
           fromVersion: from < 30 ? 30 : from,
           toVersion: 31,
           action: _migrateToV31,
+        );
+      }
+      if (from < 32) {
+        await _runMigrationStep(
+          step: 'migrate_v32',
+          fromVersion: from < 31 ? 31 : from,
+          toVersion: 32,
+          action: _migrateToV32,
         );
       }
     },
@@ -1622,7 +1649,10 @@ class AppDatabase extends _$AppDatabase {
         device_name TEXT NOT NULL,
         device_address TEXT NOT NULL,
         paper_width INTEGER NOT NULL DEFAULT 80 CHECK (paper_width IN (58,80)),
-        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        connection_type TEXT NULL CHECK (connection_type IS NULL OR connection_type IN ('bluetooth','ethernet')),
+        ip_address TEXT NULL,
+        port INTEGER NULL CHECK (port IS NULL OR (port >= 1 AND port <= 65535))
       );
     ''');
     await customStatement('''
@@ -3827,6 +3857,91 @@ class AppDatabase extends _$AppDatabase {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _migrateToV32() async {
+    final bool hasPrinterSettingsTable = await _tableExists('printer_settings');
+    if (!hasPrinterSettingsTable) {
+      await customStatement('''
+        CREATE TABLE printer_settings (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          device_name TEXT NOT NULL,
+          device_address TEXT NOT NULL,
+          paper_width INTEGER NOT NULL DEFAULT 80 CHECK (paper_width IN (58,80)),
+          is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+          connection_type TEXT NULL CHECK (connection_type IS NULL OR connection_type IN ('bluetooth','ethernet')),
+          ip_address TEXT NULL,
+          port INTEGER NULL CHECK (port IS NULL OR (port >= 1 AND port <= 65535))
+        );
+      ''');
+    }
+
+    final bool hasConnectionType = await _tableHasColumn(
+      tableName: 'printer_settings',
+      columnName: 'connection_type',
+    );
+    if (!hasConnectionType) {
+      await customStatement(
+        "ALTER TABLE printer_settings ADD COLUMN connection_type TEXT NULL CHECK (connection_type IS NULL OR connection_type IN ('bluetooth','ethernet'));",
+      );
+    }
+
+    final bool hasIpAddress = await _tableHasColumn(
+      tableName: 'printer_settings',
+      columnName: 'ip_address',
+    );
+    if (!hasIpAddress) {
+      await customStatement(
+        'ALTER TABLE printer_settings ADD COLUMN ip_address TEXT NULL;',
+      );
+    }
+
+    final bool hasPort = await _tableHasColumn(
+      tableName: 'printer_settings',
+      columnName: 'port',
+    );
+    if (!hasPort) {
+      await customStatement(
+        'ALTER TABLE printer_settings ADD COLUMN port INTEGER NULL CHECK (port IS NULL OR (port >= 1 AND port <= 65535));',
+      );
+    }
+
+    final List<QueryRow> printerRows = await customSelect('''
+      SELECT id, device_name, device_address, paper_width, is_active
+      FROM printer_settings
+      ORDER BY id ASC
+    ''').get();
+    for (final QueryRow row in printerRows) {
+      final PrinterSettingsModel parsed = PrinterSettingsModel.fromStorage(
+        id: row.read<int>('id'),
+        deviceName: row.read<String>('device_name'),
+        deviceAddress: row.read<String>('device_address'),
+        paperWidth: row.read<int>('paper_width'),
+        isActive: row.read<int>('is_active') == 1,
+      );
+      await customStatement(
+        '''
+        UPDATE printer_settings
+        SET
+          device_name = ?,
+          -- device_address is rewritten to the normalized runtime address:
+          -- bluetooth => MAC/address, ethernet => host
+          device_address = ?,
+          connection_type = ?,
+          ip_address = ?,
+          port = ?
+        WHERE id = ?
+        ''',
+        <Object?>[
+          PrinterSettingsModel.normalizeEditableDeviceName(parsed.deviceName),
+          parsed.deviceAddress.trim(),
+          parsed.connectionType.name,
+          parsed.ipAddress?.trim(),
+          parsed.port,
+          parsed.id,
+        ],
+      );
     }
   }
 

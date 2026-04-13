@@ -1,8 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../domain/models/analytics/analytics_date_range.dart';
+import '../../domain/models/analytics/analytics_revenue_preset.dart';
 import '../../domain/models/user.dart';
-import '../../domain/models/analytics/analytics_period.dart';
 import '../../presentation/providers/auth_provider.dart';
 import '../../presentation/screens/admin/admin_categories_screen.dart';
 import '../../presentation/screens/admin/admin_cash_movements_screen.dart';
@@ -12,7 +13,6 @@ import '../../presentation/screens/admin/admin_meal_profiles_screen.dart';
 import '../../presentation/screens/admin/admin_meal_profile_editor_screen.dart';
 import '../../presentation/screens/admin/admin_meal_optimization_screen.dart';
 import '../../presentation/screens/admin/admin_dashboard_screen.dart';
-import '../../presentation/screens/admin/admin_revenue_analytics_screen.dart';
 import '../../presentation/screens/admin/admin_audit_logs_screen.dart';
 import '../../presentation/screens/admin/admin_modifiers_screen.dart';
 import '../../presentation/screens/admin/admin_printer_settings_screen.dart';
@@ -21,10 +21,15 @@ import '../../presentation/screens/admin/admin_report_settings_screen.dart';
 import '../../presentation/screens/admin/admin_shifts_screen.dart';
 import '../../presentation/screens/admin/admin_sync_screen.dart';
 import '../../presentation/screens/admin/admin_system_screen.dart';
+import '../../presentation/screens/admin/analytics/analytics_overview_screen.dart';
+import '../../presentation/screens/admin/analytics/analytics_payments_screen.dart';
+import '../../presentation/screens/admin/analytics/analytics_products_screen.dart';
+import '../../presentation/screens/admin/analytics/analytics_revenue_screen.dart';
+import '../../presentation/providers/analytics/analytics_overview_provider.dart';
 import '../../presentation/screens/auth/pin_screen.dart';
 import '../../presentation/screens/dashboard/cashier_dashboard_screen.dart';
 import '../../presentation/screens/orders/order_detail_screen.dart';
-import '../../presentation/screens/orders/open_orders_screen.dart';
+import '../../presentation/screens/orders/orders_screen.dart';
 import '../../presentation/screens/pos/category_entry_screen.dart';
 import '../../presentation/screens/pos/pos_screen.dart';
 import '../../presentation/screens/reports/z_report_screen.dart';
@@ -58,7 +63,8 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
           ),
         ),
       ),
-      GoRoute(path: '/orders', builder: (_, __) => const OpenOrdersScreen()),
+      GoRoute(path: '/orders', builder: (_, __) => const OrdersScreen()),
+      GoRoute(path: '/admin/orders', redirect: (_, __) => '/orders'),
       GoRoute(
         path: '/shifts',
         builder: (_, __) => const ShiftManagementScreen(),
@@ -74,19 +80,48 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardScreen()),
       GoRoute(
         path: '/admin/analytics',
-        builder: (_, GoRouterState state) => AdminRevenueAnalyticsScreen(
-          initialPeriodSelection: AnalyticsPeriodSelection.fromQueryParameters(
-            state.uri.queryParameters,
+        builder: (_, GoRouterState state) => AnalyticsOverviewScreen(
+          initialPreset: analyticsOverviewPresetFromQuery(
+            state.uri.queryParameters['range'],
           ),
-          initialComparisonMode: analyticsComparisonModeFromQuery(
-            state.uri.queryParameters['mode'],
+        ),
+      ),
+      GoRoute(
+        path: '/admin/analytics/revenue',
+        builder: (_, GoRouterState state) => AnalyticsRevenueScreen(
+          initialPreset: analyticsRevenuePresetFromQuery(
+            state.uri.queryParameters['preset'] ??
+                state.uri.queryParameters['p'],
           ),
-          initialInsightCode: state.uri.queryParameters['insight'],
-          initialTrendDate: DateTime.tryParse(
-            state.uri.queryParameters['trend'] ?? '',
+          entryPoint: analyticsRevenueDetailEntryPointFromQuery(
+            state.uri.queryParameters['entry'],
           ),
-          initialDaypart: state.uri.queryParameters['daypart'],
-          initialMoverId: state.uri.queryParameters['mover'],
+        ),
+      ),
+      GoRoute(
+        path: '/admin/analytics/orders',
+        builder: (_, GoRouterState state) => AnalyticsRevenueScreen(
+          initialPreset: analyticsRevenuePresetFromQuery(
+            state.uri.queryParameters['preset'] ??
+                state.uri.queryParameters['p'],
+          ),
+          entryPoint: AnalyticsRevenueDetailEntryPoint.orders,
+        ),
+      ),
+      GoRoute(
+        path: '/admin/analytics/products',
+        builder: (_, GoRouterState state) => AnalyticsProductsScreen(
+          initialPreset: analyticsDetailPresetFromQuery(
+            state.uri.queryParameters['range'],
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/admin/analytics/payments',
+        builder: (_, GoRouterState state) => AnalyticsPaymentsScreen(
+          initialPreset: analyticsDetailPresetFromQuery(
+            state.uri.queryParameters['range'],
+          ),
         ),
       ),
       GoRoute(

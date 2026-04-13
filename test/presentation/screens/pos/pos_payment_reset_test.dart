@@ -516,7 +516,7 @@ class _SuccessfulPayNowOrdersNotifier extends OrdersNotifier {
   @override
   Future<void> refreshOpenOrders() async {
     state = state.copyWith(
-      openOrders: const <Transaction>[],
+      orderSummaries: const [],
       lineCountByOrderId: const <int, int>{},
       selectedOrderId: null,
       isRefreshing: false,

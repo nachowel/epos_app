@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -28,10 +29,15 @@ import 'auth_provider.dart';
 import 'cart_models.dart';
 import 'cart_provider.dart';
 
+enum OrdersFilter { all, openSent, paid, cancelled }
+
+enum OrdersDateFilter { today, thisWeek, allTime }
+
 class OrderDetailLine {
   const OrderDetailLine({
     required this.line,
     required this.modifiers,
+    required this.cookingInstructions,
     this.isBreakfastConfigurable = false,
     this.isMealCustomizationConfigurable = false,
     this.isLegacyMealCustomizationLine = false,
@@ -40,6 +46,7 @@ class OrderDetailLine {
 
   final TransactionLine line;
   final List<OrderModifier> modifiers;
+  final List<BreakfastCookingInstructionRecord> cookingInstructions;
   final bool isBreakfastConfigurable;
   final bool isMealCustomizationConfigurable;
   final bool isLegacyMealCustomizationLine;
@@ -49,6 +56,7 @@ class OrderDetailLine {
 class OrderDetails {
   const OrderDetails({
     required this.transaction,
+    required this.user,
     required this.payment,
     required this.paymentAdjustment,
     required this.lines,
@@ -57,6 +65,7 @@ class OrderDetails {
   });
 
   final Transaction transaction;
+  final User? user;
   final Payment? payment;
   final PaymentAdjustment? paymentAdjustment;
   final List<OrderDetailLine> lines;
@@ -118,11 +127,15 @@ class MealCustomizationOrderEditorData {
 
 class OrdersState {
   const OrdersState({
-    required this.openOrders,
-    required this.openOrderSummaries,
+    required this.orderSummaries,
     required this.lineCountByOrderId,
     required this.selectedOrderId,
+    required this.selectedFilter,
+    required this.selectedDateFilter,
+    required this.searchQuery,
+    required this.hasMore,
     required this.isRefreshing,
+    required this.isLoadingMore,
     required this.isCheckoutLoading,
     required this.isPaymentLoading,
     required this.isCancelLoading,
@@ -132,11 +145,15 @@ class OrdersState {
   });
 
   const OrdersState.initial()
-    : openOrders = const <Transaction>[],
-      openOrderSummaries = const <OpenOrderSummary>[],
+    : orderSummaries = const <OpenOrderSummary>[],
       lineCountByOrderId = const <int, int>{},
       selectedOrderId = null,
+      selectedFilter = OrdersFilter.all,
+      selectedDateFilter = OrdersDateFilter.today,
+      searchQuery = '',
+      hasMore = false,
       isRefreshing = false,
+      isLoadingMore = false,
       isCheckoutLoading = false,
       isPaymentLoading = false,
       isCancelLoading = false,
@@ -144,11 +161,15 @@ class OrdersState {
       isTableUpdateLoading = false,
       errorMessage = null;
 
-  final List<Transaction> openOrders;
-  final List<OpenOrderSummary> openOrderSummaries;
+  final List<OpenOrderSummary> orderSummaries;
   final Map<int, int> lineCountByOrderId;
   final int? selectedOrderId;
+  final OrdersFilter selectedFilter;
+  final OrdersDateFilter selectedDateFilter;
+  final String searchQuery;
+  final bool hasMore;
   final bool isRefreshing;
+  final bool isLoadingMore;
   final bool isCheckoutLoading;
   final bool isPaymentLoading;
   final bool isCancelLoading;
@@ -158,6 +179,7 @@ class OrdersState {
 
   bool get isBusy =>
       isRefreshing ||
+      isLoadingMore ||
       isCheckoutLoading ||
       isPaymentLoading ||
       isCancelLoading ||
@@ -165,11 +187,15 @@ class OrdersState {
       isTableUpdateLoading;
 
   OrdersState copyWith({
-    List<Transaction>? openOrders,
-    List<OpenOrderSummary>? openOrderSummaries,
+    List<OpenOrderSummary>? orderSummaries,
     Map<int, int>? lineCountByOrderId,
     Object? selectedOrderId = _unset,
+    OrdersFilter? selectedFilter,
+    OrdersDateFilter? selectedDateFilter,
+    String? searchQuery,
+    bool? hasMore,
     bool? isRefreshing,
+    bool? isLoadingMore,
     bool? isCheckoutLoading,
     bool? isPaymentLoading,
     bool? isCancelLoading,
@@ -178,13 +204,17 @@ class OrdersState {
     Object? errorMessage = _unset,
   }) {
     return OrdersState(
-      openOrders: openOrders ?? this.openOrders,
-      openOrderSummaries: openOrderSummaries ?? this.openOrderSummaries,
+      orderSummaries: orderSummaries ?? this.orderSummaries,
       lineCountByOrderId: lineCountByOrderId ?? this.lineCountByOrderId,
       selectedOrderId: selectedOrderId == _unset
           ? this.selectedOrderId
           : selectedOrderId as int?,
+      selectedFilter: selectedFilter ?? this.selectedFilter,
+      selectedDateFilter: selectedDateFilter ?? this.selectedDateFilter,
+      searchQuery: searchQuery ?? this.searchQuery,
+      hasMore: hasMore ?? this.hasMore,
       isRefreshing: isRefreshing ?? this.isRefreshing,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       isCheckoutLoading: isCheckoutLoading ?? this.isCheckoutLoading,
       isPaymentLoading: isPaymentLoading ?? this.isPaymentLoading,
       isCancelLoading: isCancelLoading ?? this.isCancelLoading,
@@ -198,61 +228,60 @@ class OrdersState {
 }
 
 class OrdersNotifier extends StateNotifier<OrdersState> {
+  static const int _pageSize = 50;
+
   OrdersNotifier(this._ref, {Uuid? uuidGenerator})
     : _uuidGenerator = uuidGenerator ?? const Uuid(),
       super(const OrdersState.initial()) {
-    refreshOpenOrders();
+    refreshOrders();
   }
 
   final Ref _ref;
   final Uuid _uuidGenerator;
   String? _pendingIdempotencyKey;
 
-  Future<void> refreshOpenOrders() async {
+  Future<void> refreshOrders() async {
+    if (!mounted) {
+      return;
+    }
     state = state.copyWith(isRefreshing: true, errorMessage: null);
     try {
-      final activeShift = await _ref
-          .read(shiftSessionServiceProvider)
-          .getBackendOpenShift();
-      if (activeShift == null) {
-        state = state.copyWith(
-          openOrders: const <Transaction>[],
-          openOrderSummaries: const <OpenOrderSummary>[],
-          lineCountByOrderId: const <int, int>{},
-          selectedOrderId: null,
-          isRefreshing: false,
-          errorMessage: null,
-        );
+      final OrderSummariesPage page = await _loadOrderPage();
+      if (!mounted) {
         return;
       }
-
-      final List<OpenOrderSummary> openOrderSummaries = await _ref
-          .read(orderServiceProvider)
-          .getOrderSummariesByShift(activeShift.id);
-      final List<Transaction> openOrders = openOrderSummaries
-          .map((OpenOrderSummary summary) => summary.transaction)
-          .toList(growable: false);
+      final List<OpenOrderSummary> orderSummaries = page.orderSummaries;
       final Map<int, int> lineCountByOrderId = <int, int>{
-        for (final OpenOrderSummary summary in openOrderSummaries)
+        for (final OpenOrderSummary summary in orderSummaries)
           summary.transaction.id: summary.itemCount,
       };
 
       final int? selected = state.selectedOrderId;
       state = state.copyWith(
-        openOrders: openOrders,
-        openOrderSummaries: openOrderSummaries,
+        orderSummaries: orderSummaries,
         lineCountByOrderId: lineCountByOrderId,
+        hasMore: page.hasMore,
         selectedOrderId:
             selected == null ||
-                !openOrders.any((Transaction t) => t.id == selected)
-            ? (openOrders.isEmpty ? null : openOrders.first.id)
+                !orderSummaries.any(
+                  (OpenOrderSummary summary) =>
+                      summary.transaction.id == selected,
+                )
+            ? (orderSummaries.isEmpty
+                  ? null
+                  : orderSummaries.first.transaction.id)
             : selected,
         isRefreshing: false,
+        isLoadingMore: false,
         errorMessage: null,
       );
     } catch (error, stackTrace) {
+      if (!mounted) {
+        return;
+      }
       state = state.copyWith(
         isRefreshing: false,
+        isLoadingMore: false,
         errorMessage: ErrorMapper.toUserMessageAndLog(
           error,
           logger: _ref.read(appLoggerProvider),
@@ -263,8 +292,81 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     }
   }
 
+  Future<void> refreshOpenOrders() {
+    return refreshOrders();
+  }
+
   void selectOrder(int? transactionId) {
     state = state.copyWith(selectedOrderId: transactionId);
+  }
+
+  Future<void> setFilter(OrdersFilter filter) async {
+    if (state.selectedFilter == filter) {
+      return;
+    }
+    state = state.copyWith(selectedFilter: filter);
+    await refreshOrders();
+  }
+
+  Future<void> setDateFilter(OrdersDateFilter filter) async {
+    if (state.selectedDateFilter == filter) {
+      return;
+    }
+    state = state.copyWith(selectedDateFilter: filter);
+    await refreshOrders();
+  }
+
+  Future<void> setSearchQuery(String value) async {
+    final String normalized = _normalizeSearchQuery(value);
+    if (state.searchQuery == normalized) {
+      return;
+    }
+    state = state.copyWith(searchQuery: normalized);
+    await refreshOrders();
+  }
+
+  Future<void> loadMoreOrders() async {
+    if (state.isRefreshing || state.isLoadingMore || !state.hasMore) {
+      return;
+    }
+    state = state.copyWith(isLoadingMore: true, errorMessage: null);
+    try {
+      final OrderSummariesPage page = await _loadOrderPage(
+        offset: state.orderSummaries.length,
+      );
+      if (!mounted) {
+        return;
+      }
+      final List<OpenOrderSummary> combined = <OpenOrderSummary>[
+        ...state.orderSummaries,
+        ...page.orderSummaries,
+      ];
+      final Map<int, int> combinedLineCounts = <int, int>{
+        ...state.lineCountByOrderId,
+        for (final OpenOrderSummary summary in page.orderSummaries)
+          summary.transaction.id: summary.itemCount,
+      };
+      state = state.copyWith(
+        orderSummaries: combined,
+        lineCountByOrderId: combinedLineCounts,
+        hasMore: page.hasMore,
+        isLoadingMore: false,
+        errorMessage: null,
+      );
+    } catch (error, stackTrace) {
+      if (!mounted) {
+        return;
+      }
+      state = state.copyWith(
+        isLoadingMore: false,
+        errorMessage: ErrorMapper.toUserMessageAndLog(
+          error,
+          logger: _ref.read(appLoggerProvider),
+          eventType: 'orders_load_more_failed',
+          stackTrace: stackTrace,
+        ),
+      );
+    }
   }
 
   Future<Transaction?> createOrderFromCart({
@@ -286,6 +388,11 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
     state = state.copyWith(isCheckoutLoading: true, errorMessage: null);
     _pendingIdempotencyKey ??= _uuidGenerator.v4();
+    final String flow = immediatePaymentMethod != null ? 'PAY_NOW' : 'THEN_PAY';
+    debugPrint(
+      '[KITCHEN_PRINT][$flow] checkout started'
+      ' items=${cartItems.length}',
+    );
     try {
       final Transaction transaction = await _ref
           .read(checkoutServiceProvider)
@@ -297,19 +404,27 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             immediatePaymentMethod: immediatePaymentMethod,
           );
 
+      debugPrint(
+        '[KITCHEN_PRINT][$flow] checkout completed'
+        ' tx=${transaction.id} status=${transaction.status.name}',
+      );
       _pendingIdempotencyKey = null;
       _ref.read(cartNotifierProvider.notifier).clearCart();
       _ref.read(mealInsightsServiceProvider).invalidateSuggestionCache();
       await refreshOpenOrders();
+      final String? printWarning = await _buildKitchenAutoPrintMessage(
+        transaction.id,
+      );
       state = state.copyWith(
         selectedOrderId: transaction.status == TransactionStatus.paid
             ? null
             : transaction.id,
         isCheckoutLoading: false,
-        errorMessage: null,
+        errorMessage: printWarning,
       );
       return transaction;
     } catch (error, stackTrace) {
+      debugPrint('[KITCHEN_PRINT][$flow] checkout FAILED: $error');
       state = state.copyWith(
         isCheckoutLoading: false,
         errorMessage: ErrorMapper.toUserMessageAndLog(
@@ -364,15 +479,57 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     if (state.isCheckoutLoading) {
       return false;
     }
+    debugPrint('[KITCHEN_PRINT][SEND_ORDER] started tx=$transactionId');
     state = state.copyWith(isCheckoutLoading: true, errorMessage: null);
     try {
       await _ref
           .read(orderServiceProvider)
           .sendOrder(transactionId: transactionId, currentUser: currentUser);
+      debugPrint('[KITCHEN_PRINT][SEND_ORDER] order sent ok tx=$transactionId');
+      String? printWarning;
+
+      // Execute the queued kitchen print job. Failure must not block the
+      // send-order success path — the print job stays queued for manual
+      // reprint and the user sees the snackbar for the send itself.
+      try {
+        debugPrint(
+          '[KITCHEN_PRINT][SEND_ORDER] calling printKitchenTicket'
+          ' tx=$transactionId',
+        );
+        await _ref
+            .read(printerServiceProvider)
+            .printKitchenTicket(transactionId);
+        debugPrint(
+          '[KITCHEN_PRINT][SEND_ORDER] printKitchenTicket returned ok'
+          ' tx=$transactionId',
+        );
+      } catch (error, stackTrace) {
+        debugPrint(
+          '[KITCHEN_PRINT][SEND_ORDER] printKitchenTicket FAILED'
+          ' tx=$transactionId error=$error',
+        );
+        _ref
+            .read(appLoggerProvider)
+            .warn(
+              eventType: 'send_order_kitchen_print_failed',
+              entityId: '$transactionId',
+              message: 'Kitchen print after send-order failed.',
+              error: error,
+              stackTrace: stackTrace,
+            );
+        printWarning = AppStrings.kitchenPrintRetryRequired;
+      }
+
       await refreshOpenOrders();
+      printWarning ??= await _buildKitchenAutoPrintMessage(transactionId);
       state = state.copyWith(isCheckoutLoading: false, errorMessage: null);
+      state = state.copyWith(errorMessage: printWarning);
       return true;
     } catch (error, stackTrace) {
+      debugPrint(
+        '[KITCHEN_PRINT][SEND_ORDER] FAILED tx=$transactionId'
+        ' error=$error',
+      );
       state = state.copyWith(
         isCheckoutLoading: false,
         errorMessage: ErrorMapper.toUserMessageAndLog(
@@ -448,15 +605,36 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     if (state.isPrintLoading) {
       return false;
     }
+    final User? currentUser = _ref.read(authNotifierProvider).currentUser;
+    if (currentUser == null) {
+      state = state.copyWith(errorMessage: AppStrings.accessDenied);
+      return false;
+    }
+    debugPrint(
+      '[KITCHEN_PRINT][REPRINT_KITCHEN] requested'
+      ' tx=$transactionId',
+    );
     state = state.copyWith(isPrintLoading: true, errorMessage: null);
     try {
       await _ref
           .read(printerServiceProvider)
-          .printKitchenTicket(transactionId, allowReprint: true);
+          .printKitchenTicket(
+            transactionId,
+            allowReprint: true,
+            actorUserId: currentUser.id,
+          );
+      debugPrint(
+        '[KITCHEN_PRINT][REPRINT_KITCHEN] success'
+        ' tx=$transactionId',
+      );
       await refreshOpenOrders();
       state = state.copyWith(isPrintLoading: false, errorMessage: null);
       return true;
     } catch (error, stackTrace) {
+      debugPrint(
+        '[KITCHEN_PRINT][REPRINT_KITCHEN] FAILED'
+        ' tx=$transactionId error=$error',
+      );
       state = state.copyWith(
         isPrintLoading: false,
         errorMessage: ErrorMapper.toUserMessageAndLog(
@@ -481,6 +659,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     }
     state = state.copyWith(isPrintLoading: true, errorMessage: null);
     try {
+      await _ref
+          .read(orderServiceProvider)
+          .queueReceiptPrintJob(transactionId: transactionId);
       await _ref
           .read(printerServiceProvider)
           .printReceipt(
@@ -525,11 +706,18 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
           .read(orderServiceProvider)
           .getOrderLines(transactionId);
       final transactionRepository = _ref.read(transactionRepositoryProvider);
+      final User? operatorUser = await _ref
+          .read(userRepositoryProvider)
+          .getById(transaction.userId);
       final List<OrderDetailLine> detailLines = await Future.wait(
         lines.map((TransactionLine line) async {
           final List<OrderModifier> modifiers = await _ref
               .read(orderServiceProvider)
               .getLineModifiers(line.id);
+          final List<BreakfastCookingInstructionRecord> cookingInstructions =
+              await _ref
+                  .read(orderServiceProvider)
+                  .getLineCookingInstructions(line.id);
           final MealCustomizationPersistedSnapshotRecord? mealSnapshot =
               await transactionRepository.getMealCustomizationSnapshotByLine(
                 line.id,
@@ -550,6 +738,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
           return OrderDetailLine(
             line: line,
             modifiers: modifiers,
+            cookingInstructions: cookingInstructions,
             isBreakfastConfigurable: isBreakfastConfigurable,
             isMealCustomizationConfigurable: isMealCustomizationConfigurable,
             isLegacyMealCustomizationLine: isLegacyMealCustomizationLine,
@@ -582,6 +771,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
 
       return OrderDetails(
         transaction: transaction,
+        user: operatorUser,
         payment: payment,
         paymentAdjustment: paymentAdjustment,
         lines: detailLines,
@@ -642,6 +832,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     _pendingIdempotencyKey = null;
     state = state.copyWith(
       selectedOrderId: null,
+      selectedFilter: state.selectedFilter,
       isRefreshing: false,
       isCheckoutLoading: false,
       isPaymentLoading: false,
@@ -968,6 +1159,22 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     return checkoutItems;
   }
 
+  Future<String?> _buildKitchenAutoPrintMessage(int transactionId) async {
+    final PrintJob? kitchenJob = await _ref
+        .read(printJobRepositoryProvider)
+        .getByTransactionIdAndTarget(
+          transactionId: transactionId,
+          target: PrintJobTarget.kitchen,
+        );
+    if (kitchenJob == null || kitchenJob.isPrinted) {
+      return null;
+    }
+    if (kitchenJob.isPrinting) {
+      return AppStrings.kitchenPrintInProgress;
+    }
+    return AppStrings.kitchenPrintRetryRequired;
+  }
+
   Future<BreakfastEditorData> _buildBreakfastEditorData({
     required int transactionId,
     required int transactionLineId,
@@ -1120,6 +1327,89 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       return a.name.compareTo(b.name);
     });
     return products;
+  }
+
+  Future<OrderSummariesPage> _loadOrderPage({int offset = 0}) {
+    final String searchQuery = state.searchQuery.trim();
+    final int? transactionId = _parseOrderNumberSearch(searchQuery);
+    if (searchQuery.isNotEmpty && transactionId == null) {
+      return Future<OrderSummariesPage>.value(
+        const OrderSummariesPage(
+          orderSummaries: <OpenOrderSummary>[],
+          hasMore: false,
+        ),
+      );
+    }
+
+    final ({DateTime? startInclusive, DateTime? endExclusive}) bounds =
+        transactionId == null
+        ? _dateBoundsForFilter(state.selectedDateFilter)
+        : (startInclusive: null, endExclusive: null);
+    return _ref
+        .read(orderServiceProvider)
+        .getOrderSummaries(
+          statuses: _statusesForFilter(state.selectedFilter),
+          startCreatedAtInclusive: bounds.startInclusive,
+          endCreatedAtExclusive: bounds.endExclusive,
+          transactionId: transactionId,
+          limit: _pageSize,
+          offset: offset,
+        );
+  }
+
+  String _normalizeSearchQuery(String value) {
+    return value.trim();
+  }
+
+  int? _parseOrderNumberSearch(String value) {
+    if (value.isEmpty) {
+      return null;
+    }
+    final String digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digitsOnly.isEmpty) {
+      return null;
+    }
+    return int.tryParse(digitsOnly);
+  }
+
+  ({DateTime? startInclusive, DateTime? endExclusive}) _dateBoundsForFilter(
+    OrdersDateFilter filter,
+  ) {
+    final DateTime now = DateTime.now();
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    switch (filter) {
+      case OrdersDateFilter.today:
+        return (
+          startInclusive: today,
+          endExclusive: today.add(const Duration(days: 1)),
+        );
+      case OrdersDateFilter.thisWeek:
+        final DateTime weekStart = today.subtract(
+          Duration(days: today.weekday - DateTime.monday),
+        );
+        return (
+          startInclusive: weekStart,
+          endExclusive: today.add(const Duration(days: 1)),
+        );
+      case OrdersDateFilter.allTime:
+        return (startInclusive: null, endExclusive: null);
+    }
+  }
+
+  List<TransactionStatus>? _statusesForFilter(OrdersFilter filter) {
+    switch (filter) {
+      case OrdersFilter.all:
+        return null;
+      case OrdersFilter.openSent:
+        return <TransactionStatus>[
+          TransactionStatus.draft,
+          TransactionStatus.sent,
+        ];
+      case OrdersFilter.paid:
+        return <TransactionStatus>[TransactionStatus.paid];
+      case OrdersFilter.cancelled:
+        return <TransactionStatus>[TransactionStatus.cancelled];
+    }
   }
 }
 

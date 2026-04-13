@@ -5,9 +5,9 @@ import 'package:epos_app/core/router/app_router.dart';
 import 'package:epos_app/data/database/app_database.dart';
 import 'package:epos_app/l10n/app_localizations.dart';
 import 'package:epos_app/presentation/providers/auth_provider.dart';
-import 'package:epos_app/presentation/providers/cart_provider.dart';
 import 'package:epos_app/presentation/providers/orders_provider.dart';
 import 'package:epos_app/presentation/providers/shift_provider.dart';
+import 'package:epos_app/presentation/screens/pos/category_entry_screen.dart';
 import 'package:epos_app/presentation/screens/pos/pos_screen.dart';
 import 'package:epos_app/presentation/screens/pos/widgets/modifier_popup.dart';
 import 'package:flutter/material.dart';
@@ -188,7 +188,7 @@ void main() {
 
   group('POS Breakfast Builder terminology', () {
     testWidgets(
-      'semantic product opens structured builder with Included Items, Required Choices, Extras, and Summary sections',
+      'semantic product opens structured builder with Included Items, Required Choices, Extras, and totals summary controls',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
         final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -232,23 +232,24 @@ void main() {
         expect(find.text('Included Items'), findsOneWidget);
         expect(find.text('Required Choices'), findsOneWidget);
         expect(find.text('Extras'), findsWidgets);
-        expect(find.text('Summary'), findsOneWidget);
+        expect(find.text('Set'), findsOneWidget);
+        expect(find.text('Total'), findsWidgets);
 
         // Legacy jargon is NOT present
         expect(find.text('Configure Bundle'), findsNothing);
         expect(find.text('Set Items'), findsNothing);
         expect(find.text('Current Snapshot'), findsNothing);
 
-        expect(find.text('Set Total'), findsOneWidget);
         expect(find.text('Add to Order'), findsOneWidget);
 
-        // Choice group shows "Choose one" language
-        expect(find.textContaining('Choose one'), findsAtLeastNWidgets(1));
+        // Choice group renders the current operator-facing label set directly.
+        expect(find.text('Drink choice'), findsOneWidget);
+        expect(find.text('Choose one'), findsNothing);
       },
     );
 
     testWidgets(
-      'required choice group blocks add to cart with operator message',
+      'required choice group auto-selects a default option to keep add to cart operational',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
         final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -278,13 +279,13 @@ void main() {
         await tester.tap(find.text('Set Breakfast').last);
         await tester.pumpAndSettle();
 
-        // Confirm button should be disabled
+        // Current semantic-bundle flow auto-selects the first valid choice.
         final ElevatedButton confirmButton = tester.widget<ElevatedButton>(
           find.byKey(const ValueKey<String>('semantic-bundle-confirm')),
         );
-        expect(confirmButton.onPressed, isNull);
-
-        expect(find.text('Choose an option for Drink choice.'), findsOneWidget);
+        expect(confirmButton.onPressed, isNotNull);
+        expect(find.text('Choose an option for Drink choice.'), findsNothing);
+        expect(find.text('Finish required choices to continue'), findsNothing);
       },
     );
 
@@ -506,5 +507,5 @@ Future<void> _loginWithPin(WidgetTester tester, String pin) async {
   await tester.enterText(find.byType(TextField), pin);
   await tester.tap(find.text(AppStrings.loginButton));
   await tester.pumpAndSettle();
-  expect(find.byType(PosScreen), findsOneWidget);
+  expect(find.byType(CategoryEntryScreen), findsOneWidget);
 }

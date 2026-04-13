@@ -1,5 +1,6 @@
 import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/data/repositories/payment_repository.dart';
+import 'package:epos_app/data/repositories/print_job_repository.dart';
 import 'package:epos_app/data/repositories/shift_repository.dart';
 import 'package:epos_app/data/repositories/transaction_repository.dart';
 import 'package:epos_app/data/repositories/transaction_state_repository.dart';
@@ -96,6 +97,13 @@ void main() {
         expect(payment.amountMinor, 850);
         expect(updatedTransaction, isNotNull);
         expect(updatedTransaction!.status.name, 'paid');
+        expect(
+          await PrintJobRepository(db).getByTransactionIdAndTarget(
+            transactionId: transactionId,
+            target: PrintJobTarget.receipt,
+          ),
+          isNull,
+        );
       },
     );
 
@@ -491,6 +499,7 @@ class _FailingPrinterService extends PrinterService {
   Future<PrintJob> printKitchenTicket(
     int transactionId, {
     bool allowReprint = false,
+    int? actorUserId,
   }) async {
     throw PrinterException('Kitchen printer offline');
   }

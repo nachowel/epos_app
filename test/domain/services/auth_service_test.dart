@@ -1,3 +1,4 @@
+import 'package:epos_app/core/config/app_config.dart';
 import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/data/repositories/shift_repository.dart';
 import 'package:epos_app/data/repositories/user_repository.dart';
@@ -12,6 +13,10 @@ import '../../support/test_database.dart';
 
 void main() {
   group('AuthService', () {
+    final AppConfig config = AppConfig.fallback(
+      issue: 'AuthService test config',
+    );
+
     test(
       'upgrades legacy plain text pins to hashed storage on successful login',
       () async {
@@ -28,6 +33,7 @@ void main() {
         final service = AuthService(
           UserRepository(db),
           ShiftSessionService(ShiftRepository(db)),
+          config,
         );
         final user = await service.loginWithPin('1234');
         final upgraded = await UserRepository(db).getById(userId);
@@ -58,6 +64,7 @@ void main() {
       final service = AuthService(
         UserRepository(db),
         ShiftSessionService(shiftRepository),
+        config,
       );
 
       final user = await service.loginWithPin('2468');
@@ -89,6 +96,7 @@ void main() {
       final service = AuthService(
         UserRepository(db),
         ShiftSessionService(shiftRepository),
+        config,
       );
 
       final firstUser = await service.loginWithPin('1111');
@@ -119,6 +127,7 @@ void main() {
       final service = AuthService(
         UserRepository(db),
         ShiftSessionService(ShiftRepository(db)),
+        config,
       );
       final user = await service.loginWithPin('1234');
 

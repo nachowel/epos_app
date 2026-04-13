@@ -1,4 +1,5 @@
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/logging/app_logger.dart';
 import '../../core/errors/exceptions.dart';
@@ -36,6 +37,16 @@ import 'breakfast_requested_state_transformer.dart';
 import 'meal_adjustment_profile_validation_service.dart';
 import 'meal_customization_engine.dart';
 import 'shift_session_service.dart';
+
+class OrderSummariesPage {
+  const OrderSummariesPage({
+    required this.orderSummaries,
+    required this.hasMore,
+  });
+
+  final List<OpenOrderSummary> orderSummaries;
+  final bool hasMore;
+}
 
 class OrderService {
   OrderService({
@@ -1086,11 +1097,6 @@ class OrderService {
         transactionId: transactionId,
         paidAt: paidAt,
       );
-      await _printJobRepository?.ensureQueued(
-        transactionId: transactionId,
-        target: PrintJobTarget.receipt,
-        now: paidAt,
-      );
       await _enqueueSyncGraph(transactionUuid: refreshedTransaction.uuid);
       _logger.audit(
         eventType: 'order_paid',
@@ -1286,9 +1292,10 @@ class OrderService {
       await _transactionStateRepository.transitionDraftOrderToSent(
         transactionId: transactionId,
       );
-      await _printJobRepository?.ensureQueued(
+      await _ensurePrintJobQueued(
         transactionId: transactionId,
         target: PrintJobTarget.kitchen,
+        source: 'sendOrder',
       );
       _logger.audit(
         eventType: 'order_sent',
@@ -1297,6 +1304,25 @@ class OrderService {
         metadata: <String, Object?>{'user_id': currentUser.id},
       );
     });
+  }
+
+  Future<void> queueReceiptPrintJob({required int transactionId}) async {
+    final Transaction? transaction = await _transactionRepository.getById(
+      transactionId,
+    );
+    if (transaction == null) {
+      throw NotFoundException('Transaction not found: $transactionId');
+    }
+    if (!OrderLifecyclePolicy.canPrintReceipt(transaction.status)) {
+      throw InvalidStateTransitionException(
+        'Receipt can be printed only for paid transactions.',
+      );
+    }
+    await _ensurePrintJobQueued(
+      transactionId: transactionId,
+      target: PrintJobTarget.receipt,
+      source: 'queueReceiptPrintJob',
+    );
   }
 
   Future<void> cancelOrder({
@@ -1402,26 +1428,90 @@ class OrderService {
     return _transactionRepository.getActiveOrders(shiftId: shiftId);
   }
 
+  Future<List<Transaction>> listOrders({
+    List<TransactionStatus>? statuses,
+    DateTime? startCreatedAtInclusive,
+    DateTime? endCreatedAtExclusive,
+    int? transactionId,
+    int? limit,
+    int offset = 0,
+  }) {
+    return _transactionRepository.listOrders(
+      statuses: statuses,
+      startCreatedAtInclusive: startCreatedAtInclusive,
+      endCreatedAtExclusive: endCreatedAtExclusive,
+      transactionId: transactionId,
+      limit: limit,
+      offset: offset,
+    );
+  }
+
   Future<List<Transaction>> getOrdersByShift(int shiftId) {
     return _transactionRepository.getByShift(shiftId);
   }
 
+  Future<OrderSummariesPage> getOrderSummaries({
+    List<TransactionStatus>? statuses,
+    DateTime? startCreatedAtInclusive,
+    DateTime? endCreatedAtExclusive,
+    int? transactionId,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final List<Transaction> orders = await listOrders(
+      statuses: statuses,
+      startCreatedAtInclusive: startCreatedAtInclusive,
+      endCreatedAtExclusive: endCreatedAtExclusive,
+      transactionId: transactionId,
+      limit: limit + 1,
+      offset: offset,
+    );
+    final bool hasMore = orders.length > limit;
+    final List<Transaction> visibleOrders = hasMore
+        ? orders.take(limit).toList(growable: false)
+        : orders;
+    final Map<int, List<TransactionLine>> linesByTransactionId =
+        await _refetchLinesForOrders(visibleOrders);
+
+    return OrderSummariesPage(
+      orderSummaries: visibleOrders
+          .map((Transaction transaction) {
+            final List<TransactionLine> lines =
+                linesByTransactionId[transaction.id] ??
+                const <TransactionLine>[];
+            return OpenOrderSummary(
+              transaction: transaction,
+              itemCount: lines.fold<int>(
+                0,
+                (int sum, TransactionLine line) => sum + line.quantity,
+              ),
+              shortContent: _buildShortContent(lines),
+            );
+          })
+          .toList(growable: false),
+      hasMore: hasMore,
+    );
+  }
+
   Future<List<OpenOrderSummary>> getOrderSummariesByShift(int shiftId) async {
     final List<Transaction> orders = await getActiveOrders(shiftId: shiftId);
+    final Map<int, List<TransactionLine>> linesByTransactionId =
+        await _refetchLinesForOrders(orders);
 
-    return Future.wait(
-      orders.map((Transaction transaction) async {
-        final List<TransactionLine> lines = await getOrderLines(transaction.id);
-        return OpenOrderSummary(
-          transaction: transaction,
-          itemCount: lines.fold<int>(
-            0,
-            (int sum, TransactionLine line) => sum + line.quantity,
-          ),
-          shortContent: _buildShortContent(lines),
-        );
-      }),
-    );
+    return orders
+        .map((Transaction transaction) {
+          final List<TransactionLine> lines =
+              linesByTransactionId[transaction.id] ?? const <TransactionLine>[];
+          return OpenOrderSummary(
+            transaction: transaction,
+            itemCount: lines.fold<int>(
+              0,
+              (int sum, TransactionLine line) => sum + line.quantity,
+            ),
+            shortContent: _buildShortContent(lines),
+          );
+        })
+        .toList(growable: false);
   }
 
   Future<Transaction?> getOrderById(int transactionId) {
@@ -1687,6 +1777,14 @@ class OrderService {
         .join(', ');
   }
 
+  Future<Map<int, List<TransactionLine>>> _refetchLinesForOrders(
+    List<Transaction> orders,
+  ) {
+    return _transactionRepository.getLinesByTransactionIds(
+      orders.map((Transaction transaction) => transaction.id),
+    );
+  }
+
   Future<void> _enqueueSyncGraph({required String transactionUuid}) async {
     final SyncQueueRepository? syncQueueRepository = _syncQueueRepository;
     if (syncQueueRepository == null) {
@@ -1720,6 +1818,32 @@ class OrderService {
         !saleAvailability.isVisibleOnPos) {
       throw ValidationException('Product is not available for sale.');
     }
+  }
+
+  Future<void> _ensurePrintJobQueued({
+    required int transactionId,
+    required PrintJobTarget target,
+    required String source,
+  }) async {
+    final PrintJobRepository? printJobRepository = _printJobRepository;
+    if (printJobRepository == null) {
+      return;
+    }
+    final PrintJob? existing = await printJobRepository
+        .getByTransactionIdAndTarget(
+          transactionId: transactionId,
+          target: target,
+        );
+    if (existing == null) {
+      debugPrint(
+        '[PRINT_JOB] creating job'
+        ' tx=$transactionId target=${target.name} source=$source',
+      );
+    }
+    await printJobRepository.ensureQueued(
+      transactionId: transactionId,
+      target: target,
+    );
   }
 
   Future<_StandardProductFlowDecision> _decideStandardProductFlow({

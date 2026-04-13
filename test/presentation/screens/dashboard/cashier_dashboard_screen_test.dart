@@ -20,7 +20,7 @@ import '../../../support/test_database.dart';
 void main() {
   group('CashierDashboardScreen', () {
     testWidgets(
-      'no active shift renders locked state and disables quick actions',
+      'no active shift keeps orders history reachable while blocking shift-bound actions',
       (WidgetTester tester) async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
         final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -69,7 +69,7 @@ void main() {
                 find.byKey(const Key('cashier-dashboard-orders-action')),
               )
               .onPressed,
-          isNull,
+          isNotNull,
         );
         expect(
           tester
