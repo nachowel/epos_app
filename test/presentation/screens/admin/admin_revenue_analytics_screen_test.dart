@@ -29,7 +29,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  group('AdminRevenueAnalyticsScreen', () {
+  group('AdminRevenueAnalyticsDetailScreen', () {
     testWidgets('renders loading skeleton while analytics are loading', (
       WidgetTester tester,
     ) async {
@@ -123,6 +123,33 @@ void main() {
           find.text('İade verileri uzaktan analiz sistemine dahil değildir.'),
           findsNothing,
         );
+      },
+    );
+
+    testWidgets(
+      'shows explicit AOV context when opened from overview AOV card',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(
+          await _buildRouterApp(
+            analyticsState: AdminRevenueAnalyticsState(
+              summary: _sampleSummary(),
+              isLoading: false,
+              errorMessage: null,
+              periodSelection: const AnalyticsPeriodSelection.preset(
+                AnalyticsPresetPeriod.thisWeek,
+              ),
+              savedViews: const <SavedAnalyticsView>[],
+              selectedSavedViewId: null,
+              lastExport: null,
+              isPrintViewOpen: false,
+            ),
+            initialLocation: '/admin/analytics/revenue?p=this_week&entry=aov',
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(revenueDetailContextBannerKey), findsOneWidget);
+        expect(find.textContaining('Opened from AOV.'), findsOneWidget);
       },
     );
 
@@ -303,7 +330,8 @@ void main() {
             lastExport: null,
             isPrintViewOpen: false,
           ),
-          initialLocation: '/admin/analytics?p=this_month&mode=previous',
+          initialLocation:
+              '/admin/analytics/revenue?p=this_month&mode=previous',
           onNotifierCreated: (_FakeAdminRevenueAnalyticsNotifier value) {
             notifier = value;
           },
@@ -527,7 +555,7 @@ void main() {
 
       expect(
         link,
-        '/admin/analytics?p=this_month&mode=previous&insight=period_revenue_delta&trend=2026-03-31&daypart=lunch&mover=current%3A%3Aflat-white',
+        '/admin/analytics/revenue?p=this_month&mode=previous&insight=period_revenue_delta&trend=2026-03-31&daypart=lunch&mover=current%3A%3Aflat-white',
       );
     });
 
@@ -982,7 +1010,7 @@ Future<Widget> _buildApp({
       }),
     ],
     child: MaterialApp(
-      home: const AdminRevenueAnalyticsScreen(
+      home: const AdminRevenueAnalyticsDetailScreen(
         initialPeriodSelection: AnalyticsPeriodSelection.preset(
           AnalyticsPresetPeriod.thisWeek,
         ),
@@ -1010,13 +1038,16 @@ Future<Widget> _buildRouterApp({
     initialLocation: initialLocation,
     routes: <RouteBase>[
       GoRoute(
-        path: '/admin/analytics',
-        builder: (_, GoRouterState state) => AdminRevenueAnalyticsScreen(
+        path: '/admin/analytics/revenue',
+        builder: (_, GoRouterState state) => AdminRevenueAnalyticsDetailScreen(
           initialPeriodSelection: AnalyticsPeriodSelection.fromQueryParameters(
             state.uri.queryParameters,
           ),
           initialComparisonMode: analyticsComparisonModeFromQuery(
             state.uri.queryParameters['mode'],
+          ),
+          initialEntryPoint: analyticsRevenueDetailEntryPointFromQuery(
+            state.uri.queryParameters['entry'],
           ),
         ),
       ),

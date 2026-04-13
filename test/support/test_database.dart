@@ -437,7 +437,10 @@ class _TestAppDatabase extends AppDatabase {
         device_name TEXT NOT NULL,
         device_address TEXT NOT NULL,
         paper_width INTEGER NOT NULL DEFAULT 80 CHECK (paper_width IN (58,80)),
-        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        connection_type TEXT NULL CHECK (connection_type IS NULL OR connection_type IN ('bluetooth','ethernet')),
+        ip_address TEXT NULL,
+        port INTEGER NULL CHECK (port IS NULL OR (port >= 1 AND port <= 65535))
       );
     ''');
     await customStatement('''

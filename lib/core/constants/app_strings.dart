@@ -383,6 +383,8 @@ class AppStrings {
   static String get testPrintSent => _t.testPrintSent;
   static String get testPrintFailed => _t.testPrintFailed;
   static String get testPrint => _t.testPrint;
+  static String get bluetoothUnsupportedPlatform =>
+      _t.bluetoothUnsupportedPlatform;
   static String get reportSettingsTitle => _t.reportSettingsTitle;
   static String get reportSettingSaved => _t.reportSettingSaved;
   static String get reportSettingsInfo => _t.reportSettingsInfo;

@@ -462,5 +462,6 @@
   "netTillAwareness": "Net kasa farkındalığı",
   "shiftNormalOperation": "Normal operasyon",
   "shiftPreviewNotTaken": "Önizleme henüz alınmadı",
-  "shiftPreviewTaken": "Önizleme alındı — kasiyer kilitli"
+  "shiftPreviewTaken": "Önizleme alındı — kasiyer kilitli",
+  "bluetoothUnsupportedPlatform": "Bluetooth bu platformda desteklenmiyor."
 }

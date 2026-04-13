@@ -15048,6 +15048,44 @@ class $PrinterSettingsTable extends PrinterSettings
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _connectionTypeMeta = const VerificationMeta(
+    'connectionType',
+  );
+  @override
+  late final GeneratedColumn<String> connectionType = GeneratedColumn<String>(
+    'connection_type',
+    aliasedName,
+    true,
+    check: () =>
+        connectionType.isNull() |
+        connectionType.isIn(const <String>['bluetooth', 'ethernet']),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _ipAddressMeta = const VerificationMeta(
+    'ipAddress',
+  );
+  @override
+  late final GeneratedColumn<String> ipAddress = GeneratedColumn<String>(
+    'ip_address',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _portMeta = const VerificationMeta('port');
+  @override
+  late final GeneratedColumn<int> port = GeneratedColumn<int>(
+    'port',
+    aliasedName,
+    true,
+    check: () =>
+        port.isNull() |
+        ComparableExpr(port).isBiggerOrEqualValue(1) &
+            ComparableExpr(port).isSmallerOrEqualValue(65535),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _paperWidthMeta = const VerificationMeta(
     'paperWidth',
   );
@@ -15080,6 +15118,9 @@ class $PrinterSettingsTable extends PrinterSettings
     id,
     deviceName,
     deviceAddress,
+    connectionType,
+    ipAddress,
+    port,
     paperWidth,
     isActive,
   ];
@@ -15117,6 +15158,27 @@ class $PrinterSettingsTable extends PrinterSettings
     } else if (isInserting) {
       context.missing(_deviceAddressMeta);
     }
+    if (data.containsKey('connection_type')) {
+      context.handle(
+        _connectionTypeMeta,
+        connectionType.isAcceptableOrUnknown(
+          data['connection_type']!,
+          _connectionTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ip_address')) {
+      context.handle(
+        _ipAddressMeta,
+        ipAddress.isAcceptableOrUnknown(data['ip_address']!, _ipAddressMeta),
+      );
+    }
+    if (data.containsKey('port')) {
+      context.handle(
+        _portMeta,
+        port.isAcceptableOrUnknown(data['port']!, _portMeta),
+      );
+    }
     if (data.containsKey('paper_width')) {
       context.handle(
         _paperWidthMeta,
@@ -15150,6 +15212,18 @@ class $PrinterSettingsTable extends PrinterSettings
         DriftSqlType.string,
         data['${effectivePrefix}device_address'],
       )!,
+      connectionType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}connection_type'],
+      ),
+      ipAddress: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ip_address'],
+      ),
+      port: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}port'],
+      ),
       paperWidth: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}paper_width'],
@@ -15171,12 +15245,18 @@ class PrinterSetting extends DataClass implements Insertable<PrinterSetting> {
   final int id;
   final String deviceName;
   final String deviceAddress;
+  final String? connectionType;
+  final String? ipAddress;
+  final int? port;
   final int paperWidth;
   final bool isActive;
   const PrinterSetting({
     required this.id,
     required this.deviceName,
     required this.deviceAddress,
+    this.connectionType,
+    this.ipAddress,
+    this.port,
     required this.paperWidth,
     required this.isActive,
   });
@@ -15186,6 +15266,15 @@ class PrinterSetting extends DataClass implements Insertable<PrinterSetting> {
     map['id'] = Variable<int>(id);
     map['device_name'] = Variable<String>(deviceName);
     map['device_address'] = Variable<String>(deviceAddress);
+    if (!nullToAbsent || connectionType != null) {
+      map['connection_type'] = Variable<String>(connectionType);
+    }
+    if (!nullToAbsent || ipAddress != null) {
+      map['ip_address'] = Variable<String>(ipAddress);
+    }
+    if (!nullToAbsent || port != null) {
+      map['port'] = Variable<int>(port);
+    }
     map['paper_width'] = Variable<int>(paperWidth);
     map['is_active'] = Variable<bool>(isActive);
     return map;
@@ -15196,6 +15285,13 @@ class PrinterSetting extends DataClass implements Insertable<PrinterSetting> {
       id: Value(id),
       deviceName: Value(deviceName),
       deviceAddress: Value(deviceAddress),
+      connectionType: connectionType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(connectionType),
+      ipAddress: ipAddress == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ipAddress),
+      port: port == null && nullToAbsent ? const Value.absent() : Value(port),
       paperWidth: Value(paperWidth),
       isActive: Value(isActive),
     );
@@ -15210,6 +15306,9 @@ class PrinterSetting extends DataClass implements Insertable<PrinterSetting> {
       id: serializer.fromJson<int>(json['id']),
       deviceName: serializer.fromJson<String>(json['deviceName']),
       deviceAddress: serializer.fromJson<String>(json['deviceAddress']),
+      connectionType: serializer.fromJson<String?>(json['connectionType']),
+      ipAddress: serializer.fromJson<String?>(json['ipAddress']),
+      port: serializer.fromJson<int?>(json['port']),
       paperWidth: serializer.fromJson<int>(json['paperWidth']),
       isActive: serializer.fromJson<bool>(json['isActive']),
     );
@@ -15221,6 +15320,9 @@ class PrinterSetting extends DataClass implements Insertable<PrinterSetting> {
       'id': serializer.toJson<int>(id),
       'deviceName': serializer.toJson<String>(deviceName),
       'deviceAddress': serializer.toJson<String>(deviceAddress),
+      'connectionType': serializer.toJson<String?>(connectionType),
+      'ipAddress': serializer.toJson<String?>(ipAddress),
+      'port': serializer.toJson<int?>(port),
       'paperWidth': serializer.toJson<int>(paperWidth),
       'isActive': serializer.toJson<bool>(isActive),
     };
@@ -15230,12 +15332,20 @@ class PrinterSetting extends DataClass implements Insertable<PrinterSetting> {
     int? id,
     String? deviceName,
     String? deviceAddress,
+    Value<String?> connectionType = const Value.absent(),
+    Value<String?> ipAddress = const Value.absent(),
+    Value<int?> port = const Value.absent(),
     int? paperWidth,
     bool? isActive,
   }) => PrinterSetting(
     id: id ?? this.id,
     deviceName: deviceName ?? this.deviceName,
     deviceAddress: deviceAddress ?? this.deviceAddress,
+    connectionType: connectionType.present
+        ? connectionType.value
+        : this.connectionType,
+    ipAddress: ipAddress.present ? ipAddress.value : this.ipAddress,
+    port: port.present ? port.value : this.port,
     paperWidth: paperWidth ?? this.paperWidth,
     isActive: isActive ?? this.isActive,
   );
@@ -15248,6 +15358,11 @@ class PrinterSetting extends DataClass implements Insertable<PrinterSetting> {
       deviceAddress: data.deviceAddress.present
           ? data.deviceAddress.value
           : this.deviceAddress,
+      connectionType: data.connectionType.present
+          ? data.connectionType.value
+          : this.connectionType,
+      ipAddress: data.ipAddress.present ? data.ipAddress.value : this.ipAddress,
+      port: data.port.present ? data.port.value : this.port,
       paperWidth: data.paperWidth.present
           ? data.paperWidth.value
           : this.paperWidth,
@@ -15261,6 +15376,9 @@ class PrinterSetting extends DataClass implements Insertable<PrinterSetting> {
           ..write('id: $id, ')
           ..write('deviceName: $deviceName, ')
           ..write('deviceAddress: $deviceAddress, ')
+          ..write('connectionType: $connectionType, ')
+          ..write('ipAddress: $ipAddress, ')
+          ..write('port: $port, ')
           ..write('paperWidth: $paperWidth, ')
           ..write('isActive: $isActive')
           ..write(')'))
@@ -15268,8 +15386,16 @@ class PrinterSetting extends DataClass implements Insertable<PrinterSetting> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, deviceName, deviceAddress, paperWidth, isActive);
+  int get hashCode => Object.hash(
+    id,
+    deviceName,
+    deviceAddress,
+    connectionType,
+    ipAddress,
+    port,
+    paperWidth,
+    isActive,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -15277,6 +15403,9 @@ class PrinterSetting extends DataClass implements Insertable<PrinterSetting> {
           other.id == this.id &&
           other.deviceName == this.deviceName &&
           other.deviceAddress == this.deviceAddress &&
+          other.connectionType == this.connectionType &&
+          other.ipAddress == this.ipAddress &&
+          other.port == this.port &&
           other.paperWidth == this.paperWidth &&
           other.isActive == this.isActive);
 }
@@ -15285,12 +15414,18 @@ class PrinterSettingsCompanion extends UpdateCompanion<PrinterSetting> {
   final Value<int> id;
   final Value<String> deviceName;
   final Value<String> deviceAddress;
+  final Value<String?> connectionType;
+  final Value<String?> ipAddress;
+  final Value<int?> port;
   final Value<int> paperWidth;
   final Value<bool> isActive;
   const PrinterSettingsCompanion({
     this.id = const Value.absent(),
     this.deviceName = const Value.absent(),
     this.deviceAddress = const Value.absent(),
+    this.connectionType = const Value.absent(),
+    this.ipAddress = const Value.absent(),
+    this.port = const Value.absent(),
     this.paperWidth = const Value.absent(),
     this.isActive = const Value.absent(),
   });
@@ -15298,6 +15433,9 @@ class PrinterSettingsCompanion extends UpdateCompanion<PrinterSetting> {
     this.id = const Value.absent(),
     required String deviceName,
     required String deviceAddress,
+    this.connectionType = const Value.absent(),
+    this.ipAddress = const Value.absent(),
+    this.port = const Value.absent(),
     this.paperWidth = const Value.absent(),
     this.isActive = const Value.absent(),
   }) : deviceName = Value(deviceName),
@@ -15306,6 +15444,9 @@ class PrinterSettingsCompanion extends UpdateCompanion<PrinterSetting> {
     Expression<int>? id,
     Expression<String>? deviceName,
     Expression<String>? deviceAddress,
+    Expression<String>? connectionType,
+    Expression<String>? ipAddress,
+    Expression<int>? port,
     Expression<int>? paperWidth,
     Expression<bool>? isActive,
   }) {
@@ -15313,6 +15454,9 @@ class PrinterSettingsCompanion extends UpdateCompanion<PrinterSetting> {
       if (id != null) 'id': id,
       if (deviceName != null) 'device_name': deviceName,
       if (deviceAddress != null) 'device_address': deviceAddress,
+      if (connectionType != null) 'connection_type': connectionType,
+      if (ipAddress != null) 'ip_address': ipAddress,
+      if (port != null) 'port': port,
       if (paperWidth != null) 'paper_width': paperWidth,
       if (isActive != null) 'is_active': isActive,
     });
@@ -15322,6 +15466,9 @@ class PrinterSettingsCompanion extends UpdateCompanion<PrinterSetting> {
     Value<int>? id,
     Value<String>? deviceName,
     Value<String>? deviceAddress,
+    Value<String?>? connectionType,
+    Value<String?>? ipAddress,
+    Value<int?>? port,
     Value<int>? paperWidth,
     Value<bool>? isActive,
   }) {
@@ -15329,6 +15476,9 @@ class PrinterSettingsCompanion extends UpdateCompanion<PrinterSetting> {
       id: id ?? this.id,
       deviceName: deviceName ?? this.deviceName,
       deviceAddress: deviceAddress ?? this.deviceAddress,
+      connectionType: connectionType ?? this.connectionType,
+      ipAddress: ipAddress ?? this.ipAddress,
+      port: port ?? this.port,
       paperWidth: paperWidth ?? this.paperWidth,
       isActive: isActive ?? this.isActive,
     );
@@ -15346,6 +15496,15 @@ class PrinterSettingsCompanion extends UpdateCompanion<PrinterSetting> {
     if (deviceAddress.present) {
       map['device_address'] = Variable<String>(deviceAddress.value);
     }
+    if (connectionType.present) {
+      map['connection_type'] = Variable<String>(connectionType.value);
+    }
+    if (ipAddress.present) {
+      map['ip_address'] = Variable<String>(ipAddress.value);
+    }
+    if (port.present) {
+      map['port'] = Variable<int>(port.value);
+    }
     if (paperWidth.present) {
       map['paper_width'] = Variable<int>(paperWidth.value);
     }
@@ -15361,6 +15520,9 @@ class PrinterSettingsCompanion extends UpdateCompanion<PrinterSetting> {
           ..write('id: $id, ')
           ..write('deviceName: $deviceName, ')
           ..write('deviceAddress: $deviceAddress, ')
+          ..write('connectionType: $connectionType, ')
+          ..write('ipAddress: $ipAddress, ')
+          ..write('port: $port, ')
           ..write('paperWidth: $paperWidth, ')
           ..write('isActive: $isActive')
           ..write(')'))
@@ -33057,6 +33219,9 @@ typedef $$PrinterSettingsTableCreateCompanionBuilder =
       Value<int> id,
       required String deviceName,
       required String deviceAddress,
+      Value<String?> connectionType,
+      Value<String?> ipAddress,
+      Value<int?> port,
       Value<int> paperWidth,
       Value<bool> isActive,
     });
@@ -33065,6 +33230,9 @@ typedef $$PrinterSettingsTableUpdateCompanionBuilder =
       Value<int> id,
       Value<String> deviceName,
       Value<String> deviceAddress,
+      Value<String?> connectionType,
+      Value<String?> ipAddress,
+      Value<int?> port,
       Value<int> paperWidth,
       Value<bool> isActive,
     });
@@ -33090,6 +33258,21 @@ class $$PrinterSettingsTableFilterComposer
 
   ColumnFilters<String> get deviceAddress => $composableBuilder(
     column: $table.deviceAddress,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get connectionType => $composableBuilder(
+    column: $table.connectionType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ipAddress => $composableBuilder(
+    column: $table.ipAddress,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get port => $composableBuilder(
+    column: $table.port,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -33128,6 +33311,21 @@ class $$PrinterSettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get connectionType => $composableBuilder(
+    column: $table.connectionType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ipAddress => $composableBuilder(
+    column: $table.ipAddress,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get port => $composableBuilder(
+    column: $table.port,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get paperWidth => $composableBuilder(
     column: $table.paperWidth,
     builder: (column) => ColumnOrderings(column),
@@ -33160,6 +33358,17 @@ class $$PrinterSettingsTableAnnotationComposer
     column: $table.deviceAddress,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get connectionType => $composableBuilder(
+    column: $table.connectionType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get ipAddress =>
+      $composableBuilder(column: $table.ipAddress, builder: (column) => column);
+
+  GeneratedColumn<int> get port =>
+      $composableBuilder(column: $table.port, builder: (column) => column);
 
   GeneratedColumn<int> get paperWidth => $composableBuilder(
     column: $table.paperWidth,
@@ -33210,12 +33419,18 @@ class $$PrinterSettingsTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String> deviceName = const Value.absent(),
                 Value<String> deviceAddress = const Value.absent(),
+                Value<String?> connectionType = const Value.absent(),
+                Value<String?> ipAddress = const Value.absent(),
+                Value<int?> port = const Value.absent(),
                 Value<int> paperWidth = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
               }) => PrinterSettingsCompanion(
                 id: id,
                 deviceName: deviceName,
                 deviceAddress: deviceAddress,
+                connectionType: connectionType,
+                ipAddress: ipAddress,
+                port: port,
                 paperWidth: paperWidth,
                 isActive: isActive,
               ),
@@ -33224,12 +33439,18 @@ class $$PrinterSettingsTableTableManager
                 Value<int> id = const Value.absent(),
                 required String deviceName,
                 required String deviceAddress,
+                Value<String?> connectionType = const Value.absent(),
+                Value<String?> ipAddress = const Value.absent(),
+                Value<int?> port = const Value.absent(),
                 Value<int> paperWidth = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
               }) => PrinterSettingsCompanion.insert(
                 id: id,
                 deviceName: deviceName,
                 deviceAddress: deviceAddress,
+                connectionType: connectionType,
+                ipAddress: ipAddress,
+                port: port,
                 paperWidth: paperWidth,
                 isActive: isActive,
               ),

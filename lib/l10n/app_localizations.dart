@@ -2581,6 +2581,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Preview taken — cashier locked'**
   String get shiftPreviewTaken;
+
+  /// No description provided for @bluetoothUnsupportedPlatform.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth is not available on this platform.'**
+  String get bluetoothUnsupportedPlatform;
 }
 
 class _AppLocalizationsDelegate

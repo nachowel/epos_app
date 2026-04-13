@@ -167,20 +167,36 @@ class SettingsRepository {
               ..limit(1))
             .getSingleOrNull();
 
-    return row == null ? null : _mapPrinter(row);
+    return row == null ? null : _mapPrinterRow(row);
   }
 
   Future<void> savePrinterSettings({
     required String deviceName,
     required String deviceAddress,
     required int paperWidth,
+    PrinterConnectionType connectionType = PrinterConnectionType.bluetooth,
+    String? ipAddress,
+    int? port,
   }) async {
     if (paperWidth != 58 && paperWidth != 80) {
       throw ValidationException('paperWidth must be 58 or 80.');
     }
 
+    final PrinterSettingsModel printer = PrinterSettingsModel(
+      id: 0,
+      // device_name is now persisted as plain user-visible text. Any old
+      // compatibility envelope value coming back from stale UI state is
+      // normalized away before insert.
+      deviceName: PrinterSettingsModel.normalizeEditableDeviceName(deviceName),
+      deviceAddress: deviceAddress.trim(),
+      paperWidth: paperWidth,
+      isActive: true,
+      connectionType: connectionType,
+      ipAddress: ipAddress?.trim(),
+      port: port,
+    );
+
     await _database.transaction(() async {
-      // Deterministic approach: keep only one active printer record.
       await (_database.update(
         _database.printerSettings,
       )..where((db.$PrinterSettingsTable t) => t.isActive.equals(true))).write(
@@ -191,17 +207,49 @@ class SettingsRepository {
           .into(_database.printerSettings)
           .insert(
             db.PrinterSettingsCompanion.insert(
-              deviceName: deviceName,
-              deviceAddress: deviceAddress,
+              deviceName: PrinterSettingsModel.normalizeEditableDeviceName(
+                printer.deviceName,
+              ),
+              deviceAddress: printer.storageDeviceAddress,
               paperWidth: Value<int>(paperWidth),
               isActive: const Value<bool>(true),
+              connectionType: Value<String?>(printer.connectionType.name),
+              ipAddress: Value<String?>(printer.ipAddress?.trim()),
+              port: Value<int?>(
+                printer.connectionType == PrinterConnectionType.ethernet
+                    ? printer.resolvedPort
+                    : null,
+              ),
             ),
           );
     });
   }
 
-  PrinterSettingsModel _mapPrinter(db.PrinterSetting row) {
-    return PrinterSettingsModel(
+  PrinterSettingsModel _mapPrinterRow(db.PrinterSetting row) {
+    final String? connectionTypeValue = row.connectionType;
+    final PrinterConnectionType? connectionType = switch (connectionTypeValue) {
+      'bluetooth' => PrinterConnectionType.bluetooth,
+      'ethernet' => PrinterConnectionType.ethernet,
+      _ => null,
+    };
+    if (connectionType != null) {
+      return PrinterSettingsModel(
+        id: row.id,
+        deviceName: PrinterSettingsModel.normalizeEditableDeviceName(
+          row.deviceName,
+        ),
+        deviceAddress: row.deviceAddress.trim(),
+        paperWidth: row.paperWidth,
+        isActive: row.isActive,
+        connectionType: connectionType,
+        ipAddress: row.ipAddress?.trim(),
+        port: row.port,
+      );
+    }
+
+    // Controlled fallback only for rows that somehow still lack first-class
+    // transport columns after migration/backfill.
+    return PrinterSettingsModel.fromStorage(
       id: row.id,
       deviceName: row.deviceName,
       deviceAddress: row.deviceAddress,

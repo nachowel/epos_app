@@ -49,11 +49,14 @@ import 'package:epos_app/presentation/screens/admin/admin_dashboard_screen.dart'
 import 'package:epos_app/presentation/screens/admin/admin_modifiers_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_printer_settings_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_products_screen.dart';
-import 'package:epos_app/presentation/screens/admin/admin_revenue_analytics_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_report_settings_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_shifts_screen.dart';
 import 'package:epos_app/presentation/screens/admin/admin_sync_screen.dart';
-import 'package:epos_app/presentation/screens/pos/pos_screen.dart';
+import 'package:epos_app/presentation/screens/admin/analytics/analytics_overview_screen.dart';
+import 'package:epos_app/presentation/screens/admin/analytics/analytics_payments_screen.dart';
+import 'package:epos_app/presentation/screens/admin/analytics/analytics_products_screen.dart';
+import 'package:epos_app/presentation/screens/admin/analytics/analytics_revenue_screen.dart';
+import 'package:epos_app/presentation/screens/pos/category_entry_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,9 +109,10 @@ void main() {
           await tester.pumpAndSettle();
 
           expect(
-            find.byType(PosScreen),
+            find.byType(CategoryEntryScreen),
             findsOneWidget,
-            reason: '${route.path} cashier için POS’a dönmeli.',
+            reason:
+                '${route.path} cashier için category entry ekranına dönmeli.',
           );
           expect(
             find.byType(route.screenType),
@@ -157,6 +161,157 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AdminReportSettingsScreen), findsOneWidget);
+    });
+
+    testWidgets('admin analytics route opens overview after login', (
+      WidgetTester tester,
+    ) async {
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+      await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(_testPrefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _TestRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _loginWithPin(tester, '9999');
+
+      container.read(appRouterProvider).go('/admin/analytics');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AnalyticsOverviewScreen), findsOneWidget);
+    });
+
+    testWidgets('admin analytics products route opens products screen', (
+      WidgetTester tester,
+    ) async {
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+      await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(_testPrefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _TestRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _loginWithPin(tester, '9999');
+
+      container.read(appRouterProvider).go('/admin/analytics/products');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AnalyticsProductsScreen), findsOneWidget);
+    });
+
+    testWidgets('admin analytics revenue route opens revenue screen', (
+      WidgetTester tester,
+    ) async {
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+      await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(_testPrefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _TestRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _loginWithPin(tester, '9999');
+
+      container.read(appRouterProvider).go('/admin/analytics/revenue');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AnalyticsRevenueScreen), findsOneWidget);
+    });
+
+    testWidgets('admin analytics payments route opens payments screen', (
+      WidgetTester tester,
+    ) async {
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+      await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(_testPrefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _TestRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _loginWithPin(tester, '9999');
+
+      container.read(appRouterProvider).go('/admin/analytics/payments');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AnalyticsPaymentsScreen), findsOneWidget);
+    });
+
+    testWidgets('admin analytics orders route opens revenue detail context', (
+      WidgetTester tester,
+    ) async {
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+      await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(_testPrefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _TestRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _loginWithPin(tester, '9999');
+
+      container.read(appRouterProvider).go('/admin/analytics/orders');
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AnalyticsRevenueScreen), findsOneWidget);
+      expect(find.textContaining('Opened from Orders.'), findsOneWidget);
     });
 
     test('admin report gerçek veri görür', () async {
@@ -842,6 +997,10 @@ void main() {
         expect(printerService.lastDeviceName, 'Counter Printer');
         expect(printerService.lastDeviceAddress, 'AA:BB:CC');
         expect(printerService.lastPaperWidth, 80);
+        expect(
+          printerService.lastConnectionType,
+          PrinterConnectionType.bluetooth,
+        );
         expect(state.errorMessage, isNull);
       },
     );
@@ -900,6 +1059,66 @@ void main() {
         expect(state.errorMessage, AppStrings.printRetryRecommended);
         expect(before, after);
         expect(state.selectedAddress, 'AA:BB:CC');
+      },
+    );
+
+    test(
+      'ethernet printer test print provider uzerinden dogru hedefe gider',
+      () async {
+        final AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+
+        final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+        await SettingsRepository(db).savePrinterSettings(
+          deviceName: 'Ethernet Printer',
+          deviceAddress: '192.168.1.100',
+          paperWidth: 80,
+          connectionType: PrinterConnectionType.ethernet,
+          ipAddress: '192.168.1.100',
+          port: 9100,
+        );
+        final _TrackingPrinterService printerService = _TrackingPrinterService(
+          db,
+          devices: const <PrinterDeviceOption>[
+            PrinterDeviceOption(name: 'Counter Printer', address: 'AA:BB:CC'),
+          ],
+        );
+
+        final ProviderContainer container = ProviderContainer(
+          overrides: <Override>[
+            appDatabaseProvider.overrideWithValue(db),
+            printerServiceProvider.overrideWithValue(printerService),
+            sharedPreferencesProvider.overrideWithValue(_testPrefs),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(authNotifierProvider.notifier)
+            .loadUserById(adminId);
+        await container
+            .read(adminPrinterSettingsNotifierProvider.notifier)
+            .load();
+
+        final AdminPrinterSettingsState loadedState = container.read(
+          adminPrinterSettingsNotifierProvider,
+        );
+        expect(loadedState.connectionType, PrinterConnectionType.ethernet);
+        expect(loadedState.ipAddress, '192.168.1.100');
+        expect(loadedState.port, '9100');
+
+        final bool printed = await container
+            .read(adminPrinterSettingsNotifierProvider.notifier)
+            .testPrint();
+
+        expect(printed, isTrue);
+        expect(printerService.testPrintCalls, 1);
+        expect(
+          printerService.lastConnectionType,
+          PrinterConnectionType.ethernet,
+        );
+        expect(printerService.lastIpAddress, '192.168.1.100');
+        expect(printerService.lastPort, 9100);
       },
     );
 
@@ -1201,7 +1420,7 @@ class _AdminRouteExpectation {
 
 const List<_AdminRouteExpectation> _adminRoutes = <_AdminRouteExpectation>[
   _AdminRouteExpectation('/admin', AdminDashboardScreen),
-  _AdminRouteExpectation('/admin/analytics', AdminRevenueAnalyticsScreen),
+  _AdminRouteExpectation('/admin/analytics', AnalyticsOverviewScreen),
   _AdminRouteExpectation('/admin/products', AdminProductsScreen),
   _AdminRouteExpectation('/admin/breakfast-sets', AdminBreakfastSetsScreen),
   _AdminRouteExpectation(
@@ -1236,6 +1455,9 @@ class _TrackingPrinterService extends PrinterService {
   String? lastDeviceName;
   String? lastDeviceAddress;
   int? lastPaperWidth;
+  PrinterConnectionType? lastConnectionType;
+  String? lastIpAddress;
+  int? lastPort;
 
   @override
   Future<List<PrinterDeviceOption>> getBondedDevices() async => _devices;
@@ -1245,11 +1467,17 @@ class _TrackingPrinterService extends PrinterService {
     required String deviceName,
     required String deviceAddress,
     required int paperWidth,
+    PrinterConnectionType connectionType = PrinterConnectionType.bluetooth,
+    String? ipAddress,
+    int? port,
   }) async {
     testPrintCalls += 1;
     lastDeviceName = deviceName;
     lastDeviceAddress = deviceAddress;
     lastPaperWidth = paperWidth;
+    lastConnectionType = connectionType;
+    lastIpAddress = ipAddress;
+    lastPort = port;
     if (testPrintError != null) {
       throw testPrintError!;
     }
@@ -1260,7 +1488,7 @@ Future<void> _loginWithPin(WidgetTester tester, String pin) async {
   await tester.enterText(find.byType(TextField), pin);
   await tester.tap(find.text(AppStrings.loginButton));
   await tester.pumpAndSettle();
-  expect(find.byType(PosScreen), findsOneWidget);
+  expect(find.byType(CategoryEntryScreen), findsOneWidget);
 }
 
 User _adminUser(int id) {

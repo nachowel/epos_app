@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../core/errors/exceptions.dart';
 import '../../core/logging/app_logger.dart';
 import '../../data/database/app_database.dart' as db;
@@ -35,12 +37,17 @@ class CheckoutService {
     required String idempotencyKey,
     PaymentMethod? immediatePaymentMethod,
   }) async {
+    final String flow = immediatePaymentMethod != null ? 'PAY_NOW' : 'THEN_PAY';
     if (cartItems.isEmpty) {
       throw EmptyCartException();
     }
     await _shiftSessionService.ensureOrderCreationAllowed(currentUser);
 
     try {
+      debugPrint(
+        '[KITCHEN_PRINT][$flow] CheckoutService.checkoutCart'
+        ' starting items=${cartItems.length}',
+      );
       final Transaction persistedTransaction = await _orderService
           .markOrderPaidInCheckoutIfNeeded(
             currentUser: currentUser,
@@ -49,6 +56,11 @@ class CheckoutService {
             idempotencyKey: idempotencyKey,
             immediatePaymentMethod: immediatePaymentMethod,
           );
+      debugPrint(
+        '[KITCHEN_PRINT][$flow] CheckoutService.checkoutCart'
+        ' order committed tx=${persistedTransaction.id}'
+        ' status=${persistedTransaction.status.name}',
+      );
       _logger.audit(
         eventType: 'checkout_completed',
         entityId: persistedTransaction.uuid,
@@ -63,12 +75,17 @@ class CheckoutService {
       await _runPostCommitPrints(
         transactionId: persistedTransaction.id,
         status: persistedTransaction.status,
+        flow: flow,
       );
 
       return persistedTransaction;
     } on AppException {
       rethrow;
     } catch (error) {
+      debugPrint(
+        '[KITCHEN_PRINT][$flow] CheckoutService.checkoutCart'
+        ' FAILED: $error',
+      );
       _logger.error(
         eventType: 'checkout_failed',
         message: 'Checkout failed.',
@@ -81,14 +98,32 @@ class CheckoutService {
   Future<void> _runPostCommitPrints({
     required int transactionId,
     required TransactionStatus status,
+    required String flow,
   }) async {
+    debugPrint(
+      '[KITCHEN_PRINT][$flow] _runPostCommitPrints'
+      ' tx=$transactionId status=${status.name}',
+    );
     if (status == TransactionStatus.cancelled) {
+      debugPrint('[KITCHEN_PRINT][$flow] skipped — cancelled');
       return;
     }
 
     try {
+      debugPrint(
+        '[KITCHEN_PRINT][$flow] calling printKitchenTicket'
+        ' tx=$transactionId',
+      );
       await _printerService.printKitchenTicket(transactionId);
+      debugPrint(
+        '[KITCHEN_PRINT][$flow] printKitchenTicket returned ok'
+        ' tx=$transactionId',
+      );
     } catch (error, stackTrace) {
+      debugPrint(
+        '[KITCHEN_PRINT][$flow] printKitchenTicket FAILED'
+        ' tx=$transactionId error=$error',
+      );
       _logger.warn(
         eventType: 'checkout_kitchen_print_failed',
         entityId: '$transactionId',
@@ -99,19 +134,15 @@ class CheckoutService {
     }
 
     if (status != TransactionStatus.paid) {
+      debugPrint(
+        '[KITCHEN_PRINT][$flow] receipt skipped — manual only'
+        ' tx=$transactionId status=${status.name}',
+      );
       return;
     }
-
-    try {
-      await _printerService.printReceipt(transactionId);
-    } catch (error, stackTrace) {
-      _logger.warn(
-        eventType: 'checkout_receipt_print_failed',
-        entityId: '$transactionId',
-        message: 'Post-commit receipt print failed.',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
+    debugPrint(
+      '[KITCHEN_PRINT][$flow] receipt skipped — manual only'
+      ' tx=$transactionId status=${status.name}',
+    );
   }
 }

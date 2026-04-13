@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../core/errors/exceptions.dart';
 import '../../domain/models/print_job.dart';
@@ -45,6 +46,14 @@ class PrintJobRepository {
     DateTime? now,
   }) async {
     final DateTime effectiveNow = now ?? DateTime.now();
+    final PrintJob? existing = await getByTransactionIdAndTarget(
+      transactionId: transactionId,
+      target: target,
+    );
+    if (existing != null) {
+      return existing;
+    }
+
     try {
       final int id = await _database
           .into(_database.printJobs)
@@ -60,12 +69,12 @@ class PrintJobRepository {
       return _mapPrintJob(await _findById(id));
     } on SqliteException catch (error) {
       if (_isUniqueTransactionTargetViolation(error)) {
-        final PrintJob? existing = await getByTransactionIdAndTarget(
+        final PrintJob? racedExisting = await getByTransactionIdAndTarget(
           transactionId: transactionId,
           target: target,
         );
-        if (existing != null) {
-          return existing;
+        if (racedExisting != null) {
+          return racedExisting;
         }
       }
       rethrow;
@@ -80,10 +89,9 @@ class PrintJobRepository {
     Duration staleAfter = defaultPrintJobClaimStaleAfter,
   }) async {
     final DateTime effectiveNow = now ?? DateTime.now();
-    final PrintJob existing = await ensureQueued(
+    final PrintJob existing = await requireByTransactionIdAndTarget(
       transactionId: transactionId,
       target: target,
-      now: effectiveNow,
     );
 
     if (existing.isPrinted && !allowReprint) {
@@ -106,6 +114,7 @@ class PrintJobRepository {
         AND (
           status = 'pending'
           OR (? = 1 AND status = 'failed')
+          OR (? = 1 AND status = 'printed')
           OR (
             ? = 1
             AND status = 'printing'
@@ -122,6 +131,7 @@ class PrintJobRepository {
         Variable<DateTime>(effectiveNow),
         Variable<int>(transactionId),
         Variable<String>(_targetToDb(target)),
+        Variable<int>(allowReprint ? 1 : 0),
         Variable<int>(allowReprint ? 1 : 0),
         Variable<int>(allowReprint ? 1 : 0),
         Variable<DateTime>(effectiveNow.subtract(staleAfter)),
@@ -155,6 +165,12 @@ class PrintJobRepository {
       return current;
     }
     if (current.isPrinting) {
+      // `last_attempt_at` currently acts as the printing-start marker until a
+      // dedicated `printing_started_at` column is introduced.
+      debugPrint(
+        '[PRINT_JOB] already printing — skip'
+        ' tx=$transactionId target=${target.name}',
+      );
       throw PrintJobInProgressException(target: target);
     }
     throw DatabaseException(
@@ -169,10 +185,9 @@ class PrintJobRepository {
     DateTime? now,
   }) async {
     final DateTime effectiveNow = now ?? DateTime.now();
-    final PrintJob existing = await ensureQueued(
+    final PrintJob existing = await requireByTransactionIdAndTarget(
       transactionId: transactionId,
       target: target,
-      now: effectiveNow,
     );
 
     await (_database.update(_database.printJobs)..where((db.$PrintJobsTable t) {
@@ -196,10 +211,9 @@ class PrintJobRepository {
     DateTime? now,
   }) async {
     final DateTime effectiveNow = now ?? DateTime.now();
-    final PrintJob existing = await ensureQueued(
+    final PrintJob existing = await requireByTransactionIdAndTarget(
       transactionId: transactionId,
       target: target,
-      now: effectiveNow,
     );
 
     await (_database.update(_database.printJobs)..where((db.$PrintJobsTable t) {
@@ -215,6 +229,22 @@ class PrintJobRepository {
         );
 
     return _mapPrintJob(await _findById(existing.id));
+  }
+
+  Future<PrintJob> requireByTransactionIdAndTarget({
+    required int transactionId,
+    required PrintJobTarget target,
+  }) async {
+    final PrintJob? existing = await getByTransactionIdAndTarget(
+      transactionId: transactionId,
+      target: target,
+    );
+    if (existing != null) {
+      return existing;
+    }
+    throw NotFoundException(
+      'Print job not found for transaction $transactionId and ${target.name}.',
+    );
   }
 
   Future<db.PrintJob> _findById(int id) async {

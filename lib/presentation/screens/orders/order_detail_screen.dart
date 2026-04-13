@@ -10,6 +10,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../domain/models/authorization_policy.dart';
+import '../../../domain/models/breakfast_cooking_instruction.dart';
 import '../../../domain/models/draft_order_policy.dart';
 import '../../../domain/models/meal_customization.dart';
 import '../../../domain/models/order_lifecycle_policy.dart';
@@ -26,6 +27,7 @@ import '../../../domain/models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/orders_provider.dart';
 import '../../providers/shift_provider.dart';
+import '../../widgets/order_status_chip.dart';
 import '../../widgets/section_app_bar.dart';
 import '../pos/widgets/payment_dialog.dart';
 import '../pos/widgets/standard_meal_customization_dialog.dart';
@@ -538,9 +540,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
     final MealCustomizationPosEditorData? editorData;
     try {
       final Product product = detailLine.line.productId > 0
-          ? (await ref.read(ordersNotifierProvider.notifier)
-                  .loadProductForRecreate(detailLine.line.productId)) ??
-              (throw Exception('Product not found'))
+          ? (await ref
+                    .read(ordersNotifierProvider.notifier)
+                    .loadProductForRecreate(detailLine.line.productId)) ??
+                (throw Exception('Product not found'))
           : throw Exception('Invalid product ID');
       editorData = await ref
           .read(mealCustomizationPosServiceProvider)
@@ -820,6 +823,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               children: <Widget>[
                 _OrderHeaderCard(
                   transaction: details.transaction,
+                  operatorUser: details.user,
                   paymentEligibility: paymentEligibility,
                   payment: details.payment,
                   paymentAdjustment: details.paymentAdjustment,
@@ -833,6 +837,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                   kitchenPrintStatus: kitchenPrintStatus,
                   receiptPrintStatus: receiptPrintStatus,
                 ),
+                const SizedBox(height: 12),
+                _OrderFinancialSummaryCard(transaction: details.transaction),
                 const SizedBox(height: 12),
                 Container(
                   decoration: BoxDecoration(
@@ -869,25 +875,27 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                               ? () => _handleBreakfastEdit(details.lines[index])
                               : null,
                           onEditMeal:
-                              details.lines[index]
-                                          .isMealCustomizationConfigurable &&
-                                      details.transaction.status ==
-                                          TransactionStatus.draft &&
-                                      !isActionLocked
-                                  ? () => _handleMealCustomizationEdit(
-                                      details.lines[index],
-                                    )
-                                  : null,
+                              details
+                                      .lines[index]
+                                      .isMealCustomizationConfigurable &&
+                                  details.transaction.status ==
+                                      TransactionStatus.draft &&
+                                  !isActionLocked
+                              ? () => _handleMealCustomizationEdit(
+                                  details.lines[index],
+                                )
+                              : null,
                           onRecreateLegacyMeal:
-                              details.lines[index]
-                                          .isLegacyMealCustomizationLine &&
-                                      details.transaction.status ==
-                                          TransactionStatus.draft &&
-                                      !isActionLocked
-                                  ? () => _handleLegacyMealRecreate(
-                                      details.lines[index],
-                                    )
-                                  : null,
+                              details
+                                      .lines[index]
+                                      .isLegacyMealCustomizationLine &&
+                                  details.transaction.status ==
+                                      TransactionStatus.draft &&
+                                  !isActionLocked
+                              ? () => _handleLegacyMealRecreate(
+                                  details.lines[index],
+                                )
+                              : null,
                         ),
                       ],
                     ],
@@ -1063,6 +1071,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 class _OrderHeaderCard extends StatelessWidget {
   const _OrderHeaderCard({
     required this.transaction,
+    required this.operatorUser,
     required this.paymentEligibility,
     required this.payment,
     required this.paymentAdjustment,
@@ -1073,6 +1082,7 @@ class _OrderHeaderCard extends StatelessWidget {
   });
 
   final Transaction transaction;
+  final User? operatorUser;
   final OrderPaymentEligibility paymentEligibility;
   final Payment? payment;
   final PaymentAdjustment? paymentAdjustment;
@@ -1083,10 +1093,9 @@ class _OrderHeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String headerTitle =
-        '${AppStrings.orderNumber(transaction.id)} • ${CurrencyFormatter.fromMinor(transaction.totalAmountMinor)}';
-    final String metaLabel =
-        '${DateFormatter.formatTime(transaction.createdAt)} • ${transaction.tableNumber == null ? AppStrings.tableUnassigned : '${AppStrings.table} ${transaction.tableNumber}'}';
+    final bool isStaleDraft =
+        transaction.status == TransactionStatus.draft &&
+        DraftOrderPolicy.isStale(transaction);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1104,25 +1113,57 @@ class _OrderHeaderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            headerTitle,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-              height: 1.05,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  AppStrings.orderNumber(transaction.id),
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    height: 1.05,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                CurrencyFormatter.fromMinor(transaction.totalAmountMinor),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  height: 1.05,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            metaLabel,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
-              height: 1.1,
-            ),
+          const SizedBox(height: 10),
+          OrderStatusChip(
+            status: transaction.status,
+            updatedAt: isStaleDraft ? transaction.updatedAt : null,
           ),
+          const SizedBox(height: 12),
+          _HeaderMetaRow(
+            label: 'Created',
+            value: DateFormatter.formatDefault(transaction.createdAt),
+          ),
+          _HeaderMetaRow(
+            label: 'User',
+            value: operatorUser?.name ?? AppStrings.unknownUser,
+          ),
+          _HeaderMetaRow(
+            label: AppStrings.table,
+            value: transaction.tableNumber == null
+                ? AppStrings.tableUnassigned
+                : '${transaction.tableNumber}',
+          ),
+          if (payment?.paidAt != null)
+            _HeaderMetaRow(
+              label: 'Paid At',
+              value: DateFormatter.formatDefault(payment!.paidAt),
+            ),
           if (!paymentEligibility.isAllowed &&
               transaction.status == TransactionStatus.sent) ...<Widget>[
             const SizedBox(height: 10),
@@ -1137,7 +1178,7 @@ class _OrderHeaderCard extends StatelessWidget {
             const SizedBox(height: 8),
             _InlineNotice(
               message:
-                  '${AppStrings.paymentTitle}: ${payment!.method.name.toUpperCase()} • ${CurrencyFormatter.fromMinor(payment!.amountMinor)}',
+                  '${AppStrings.paymentTitle}: ${payment!.method.name.toUpperCase()} • ${CurrencyFormatter.fromMinor(payment!.amountMinor)} • ${DateFormatter.formatDefault(payment!.paidAt)}',
               color: AppColors.success,
               useTint: true,
             ),
@@ -1186,6 +1227,121 @@ class _OrderHeaderCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _HeaderMetaRow extends StatelessWidget {
+  const _HeaderMetaRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(
+            width: 78,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrderFinancialSummaryCard extends StatelessWidget {
+  const _OrderFinancialSummaryCard({required this.transaction});
+
+  final Transaction transaction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x080F172A),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: <Widget>[
+          _SummaryRow(
+            label: AppStrings.subtotal,
+            value: CurrencyFormatter.fromMinor(transaction.subtotalMinor),
+          ),
+          const SizedBox(height: 8),
+          _SummaryRow(
+            label: AppStrings.modifierTotal,
+            value: CurrencyFormatter.fromMinor(transaction.modifierTotalMinor),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: Divider(height: 1, color: AppColors.border),
+          ),
+          _SummaryRow(
+            label: AppStrings.total,
+            value: CurrencyFormatter.fromMinor(transaction.totalAmountMinor),
+            emphasize: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryRow extends StatelessWidget {
+  const _SummaryRow({
+    required this.label,
+    required this.value,
+    this.emphasize = false,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasize;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextStyle style = TextStyle(
+      fontSize: emphasize ? 15 : 13,
+      fontWeight: emphasize ? FontWeight.w800 : FontWeight.w700,
+      color: AppColors.textPrimary,
+    );
+
+    return Row(
+      children: <Widget>[
+        Expanded(child: Text(label, style: style)),
+        Text(value, style: style),
+      ],
     );
   }
 }
@@ -1353,6 +1509,25 @@ class _OrderLineRow extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                    height: 1.2,
+                  ),
+                ),
+              );
+            }),
+          ],
+          if (detailLine.cookingInstructions.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 4),
+            ...detailLine.cookingInstructions.map((
+              BreakfastCookingInstructionRecord instruction,
+            ) {
+              return Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '>>> ${instruction.itemName} - ${instruction.instructionLabel}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textSecondary,
                     height: 1.2,
                   ),

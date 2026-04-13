@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_sizes.dart';
 import '../../../domain/models/analytics/analytics_export.dart';
 import '../../../domain/models/analytics/analytics_period.dart';
 import '../../../domain/models/analytics/analytics_snapshot.dart';
@@ -15,15 +17,38 @@ import 'widgets/admin_revenue_analytics_dashboard.dart';
 import 'widgets/admin_scaffold.dart';
 
 const String _analyticsTitle = 'Revenue Analytics';
+const String _aovContextTitle = 'Revenue Analytics · AOV Context';
+const Key revenueDetailContextBannerKey = Key('revenue-detail-context-banner');
 
-class AdminRevenueAnalyticsScreen extends ConsumerStatefulWidget {
-  const AdminRevenueAnalyticsScreen({
+enum AnalyticsRevenueDetailEntryPoint { revenue, aov }
+
+AnalyticsRevenueDetailEntryPoint analyticsRevenueDetailEntryPointFromQuery(
+  String? value,
+) {
+  return switch (value) {
+    'aov' => AnalyticsRevenueDetailEntryPoint.aov,
+    _ => AnalyticsRevenueDetailEntryPoint.revenue,
+  };
+}
+
+String? analyticsRevenueDetailEntryPointQueryValue(
+  AnalyticsRevenueDetailEntryPoint entryPoint,
+) {
+  return switch (entryPoint) {
+    AnalyticsRevenueDetailEntryPoint.revenue => null,
+    AnalyticsRevenueDetailEntryPoint.aov => 'aov',
+  };
+}
+
+class AdminRevenueAnalyticsDetailScreen extends ConsumerStatefulWidget {
+  const AdminRevenueAnalyticsDetailScreen({
     required this.initialPeriodSelection,
     required this.initialComparisonMode,
     this.initialInsightCode,
     this.initialTrendDate,
     this.initialDaypart,
     this.initialMoverId,
+    this.initialEntryPoint = AnalyticsRevenueDetailEntryPoint.revenue,
     super.key,
   });
 
@@ -33,14 +58,29 @@ class AdminRevenueAnalyticsScreen extends ConsumerStatefulWidget {
   final DateTime? initialTrendDate;
   final String? initialDaypart;
   final String? initialMoverId;
+  final AnalyticsRevenueDetailEntryPoint initialEntryPoint;
 
   @override
-  ConsumerState<AdminRevenueAnalyticsScreen> createState() =>
-      _AdminRevenueAnalyticsScreenState();
+  ConsumerState<AdminRevenueAnalyticsDetailScreen> createState() =>
+      _AdminRevenueAnalyticsDetailScreenState();
 }
 
-class _AdminRevenueAnalyticsScreenState
-    extends ConsumerState<AdminRevenueAnalyticsScreen> {
+@Deprecated('Use AdminRevenueAnalyticsDetailScreen')
+class AdminRevenueAnalyticsScreen extends AdminRevenueAnalyticsDetailScreen {
+  const AdminRevenueAnalyticsScreen({
+    required super.initialPeriodSelection,
+    required super.initialComparisonMode,
+    super.initialInsightCode,
+    super.initialTrendDate,
+    super.initialDaypart,
+    super.initialMoverId,
+    super.initialEntryPoint,
+    super.key,
+  });
+}
+
+class _AdminRevenueAnalyticsDetailScreenState
+    extends ConsumerState<AdminRevenueAnalyticsDetailScreen> {
   late AnalyticsComparisonMode _comparisonMode;
   String? _selectedInsightCode;
   DateTime? _selectedTrendDate;
@@ -63,7 +103,7 @@ class _AdminRevenueAnalyticsScreenState
   }
 
   @override
-  void didUpdateWidget(covariant AdminRevenueAnalyticsScreen oldWidget) {
+  void didUpdateWidget(covariant AdminRevenueAnalyticsDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialComparisonMode != widget.initialComparisonMode) {
       _comparisonMode = widget.initialComparisonMode;
@@ -167,16 +207,37 @@ class _AdminRevenueAnalyticsScreenState
     };
 
     return AdminScaffold(
-      title: _analyticsTitle,
-      currentRoute: '/admin/analytics',
+      title: _screenTitle,
+      currentRoute: '/admin/analytics/revenue',
       child: RefreshIndicator(
         onRefresh: () => notifier.load(),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          children: <Widget>[content],
+          children: <Widget>[
+            if (_entryHintMessage case final String message) ...<Widget>[
+              _RevenueDetailContextBanner(message: message),
+              const SizedBox(height: AppSizes.spacingMd),
+            ],
+            content,
+          ],
         ),
       ),
     );
+  }
+
+  String get _screenTitle {
+    return switch (widget.initialEntryPoint) {
+      AnalyticsRevenueDetailEntryPoint.revenue => _analyticsTitle,
+      AnalyticsRevenueDetailEntryPoint.aov => _aovContextTitle,
+    };
+  }
+
+  String? get _entryHintMessage {
+    return switch (widget.initialEntryPoint) {
+      AnalyticsRevenueDetailEntryPoint.revenue => null,
+      AnalyticsRevenueDetailEntryPoint.aov =>
+        'Opened from AOV. Review revenue trend and comparison context to explain average ticket movement.',
+    };
   }
 
   Future<void> _handlePresetSelected(AnalyticsPresetPeriod preset) async {
@@ -571,6 +632,7 @@ class _AdminRevenueAnalyticsScreenState
         selectedTrendDate: _selectedTrendDate,
         selectedDaypart: _selectedDaypart,
         selectedMoverId: _selectedMoverId,
+        entryPoint: widget.initialEntryPoint,
       ),
     );
   }
@@ -583,6 +645,8 @@ String buildAdminAnalyticsShareLink({
   DateTime? selectedTrendDate,
   String? selectedDaypart,
   String? selectedMoverId,
+  AnalyticsRevenueDetailEntryPoint entryPoint =
+      AnalyticsRevenueDetailEntryPoint.revenue,
 }) {
   final Map<String, String> queryParameters = <String, String>{
     ...periodSelection.toQueryParameters(),
@@ -595,9 +659,12 @@ String buildAdminAnalyticsShareLink({
       'daypart': selectedDaypart,
     if (selectedMoverId != null && selectedMoverId.isNotEmpty)
       'mover': selectedMoverId,
+    if (analyticsRevenueDetailEntryPointQueryValue(entryPoint)
+        case final String value)
+      'entry': value,
   };
   return Uri(
-    path: '/admin/analytics',
+    path: '/admin/analytics/revenue',
     queryParameters: queryParameters,
   ).toString();
 }
@@ -615,4 +682,39 @@ String _comparisonModeLabel(AnalyticsComparisonMode mode) {
     AnalyticsComparisonMode.previousEquivalentPeriod => 'Previous',
     AnalyticsComparisonMode.momentumView => 'Momentum',
   };
+}
+
+class _RevenueDetailContextBanner extends StatelessWidget {
+  const _RevenueDetailContextBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: revenueDetailContextBannerKey,
+      padding: const EdgeInsets.all(AppSizes.spacingMd),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLighter,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: <Widget>[
+          const Icon(Icons.filter_alt_outlined, color: AppColors.primaryStrong),
+          const SizedBox(width: AppSizes.spacingSm),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

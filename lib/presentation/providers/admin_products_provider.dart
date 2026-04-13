@@ -10,7 +10,9 @@ import '../../domain/models/semantic_product_configuration.dart';
 import '../../domain/services/admin_service.dart';
 import '../../domain/services/meal_adjustment_profile_validation_service.dart';
 import '../../domain/models/user.dart';
+import '../utils/sort_mode_draft.dart' as sort_draft;
 import 'auth_provider.dart';
+import 'products_provider.dart';
 
 enum AdminProductStatusFilter { active, archived, all }
 
@@ -42,6 +44,7 @@ class AdminProductsState {
     required this.legacyMealLineCountsByProduct,
     required this.selectedCategoryId,
     required this.selectedStatusFilter,
+    required this.sortDraft,
     required this.isLoading,
     required this.isSaving,
     required this.errorMessage,
@@ -59,6 +62,7 @@ class AdminProductsState {
       legacyMealLineCountsByProduct = const <int, int>{},
       selectedCategoryId = null,
       selectedStatusFilter = AdminProductStatusFilter.active,
+      sortDraft = const <Product>[],
       isLoading = false,
       isSaving = false,
       errorMessage = null;
@@ -73,9 +77,15 @@ class AdminProductsState {
   final Map<int, int> legacyMealLineCountsByProduct;
   final int? selectedCategoryId;
   final AdminProductStatusFilter selectedStatusFilter;
+  final List<Product> sortDraft;
   final bool isLoading;
   final bool isSaving;
   final String? errorMessage;
+
+  bool get canEnterSortMode =>
+      selectedCategoryId != null && allProducts.length > 1;
+
+  bool get hasSortChanges => !_productsInSameOrder(allProducts, sortDraft);
 
   AdminProductsState copyWith({
     List<Category>? categories,
@@ -88,6 +98,7 @@ class AdminProductsState {
     Map<int, int>? legacyMealLineCountsByProduct,
     Object? selectedCategoryId = _unset,
     AdminProductStatusFilter? selectedStatusFilter,
+    List<Product>? sortDraft,
     bool? isLoading,
     bool? isSaving,
     Object? errorMessage = _unset,
@@ -103,12 +114,12 @@ class AdminProductsState {
           mealProfileVisibilityByProductId ??
           this.mealProfileVisibilityByProductId,
       legacyMealLineCountsByProduct:
-          legacyMealLineCountsByProduct ??
-          this.legacyMealLineCountsByProduct,
+          legacyMealLineCountsByProduct ?? this.legacyMealLineCountsByProduct,
       selectedCategoryId: selectedCategoryId == _unset
           ? this.selectedCategoryId
           : selectedCategoryId as int?,
       selectedStatusFilter: selectedStatusFilter ?? this.selectedStatusFilter,
+      sortDraft: sortDraft ?? this.sortDraft,
       isLoading: isLoading ?? this.isLoading,
       isSaving: isSaving ?? this.isSaving,
       errorMessage: errorMessage == _unset
@@ -122,6 +133,12 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
   AdminProductsNotifier(this._ref) : super(const AdminProductsState.initial());
 
   final Ref _ref;
+
+  Future<void> _refreshSharedProductConsumers() async {
+    await _ref
+        .read(productsNotifierProvider.notifier)
+        .loadCatalog(preferredCategoryId: state.selectedCategoryId);
+  }
 
   Future<void> load() async {
     state = state.copyWith(isLoading: true, errorMessage: null);
@@ -143,8 +160,10 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
       final Map<int, ProductMenuConfigurationProfile> profiles = await _ref
           .read(semanticMenuAdminServiceProvider)
           .getProductProfiles(allProducts.map((Product product) => product.id));
-      final Map<int, AdminMealProfileVisibility> mealProfileVisibilityByProductId =
-          await _loadMealProfileVisibility(allProducts);
+      final Map<int, AdminMealProfileVisibility>
+      mealProfileVisibilityByProductId = await _loadMealProfileVisibility(
+        allProducts,
+      );
       Map<int, int> legacyLineCounts = const <int, int>{};
       try {
         legacyLineCounts = await _ref
@@ -165,6 +184,7 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
         mealProfileVisibilityByProductId: mealProfileVisibilityByProductId,
         legacyMealLineCountsByProduct: legacyLineCounts,
         selectedCategoryId: selectedCategoryId,
+        sortDraft: allProducts,
         isLoading: false,
         errorMessage: null,
       );
@@ -202,8 +222,10 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
       final Map<int, ProductMenuConfigurationProfile> profiles = await _ref
           .read(semanticMenuAdminServiceProvider)
           .getProductProfiles(allProducts.map((Product product) => product.id));
-      final Map<int, AdminMealProfileVisibility> mealProfileVisibilityByProductId =
-          await _loadMealProfileVisibility(allProducts);
+      final Map<int, AdminMealProfileVisibility>
+      mealProfileVisibilityByProductId = await _loadMealProfileVisibility(
+        allProducts,
+      );
       final _ProductSections sections = _splitProducts(products, profiles);
       state = state.copyWith(
         allProducts: allProducts,
@@ -212,6 +234,7 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
         normalProducts: sections.normalProducts,
         profiles: profiles,
         mealProfileVisibilityByProductId: mealProfileVisibilityByProductId,
+        sortDraft: allProducts,
         isLoading: false,
         errorMessage: null,
       );
@@ -247,6 +270,7 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
     required int categoryId,
     required String name,
     required int priceMinor,
+    String? imageUrl,
     required bool hasModifiers,
     required int sortOrder,
     required bool isActive,
@@ -266,6 +290,7 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
             categoryId: categoryId,
             name: name,
             priceMinor: priceMinor,
+            imageUrl: imageUrl,
             hasModifiers: hasModifiers,
             sortOrder: sortOrder,
             isActive: isActive,
@@ -293,6 +318,7 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
     required int categoryId,
     required String name,
     required int priceMinor,
+    String? imageUrl,
     required bool hasModifiers,
     required int sortOrder,
     required bool isActive,
@@ -313,6 +339,7 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
             categoryId: categoryId,
             name: name,
             priceMinor: priceMinor,
+            imageUrl: imageUrl,
             hasModifiers: hasModifiers,
             sortOrder: sortOrder,
             isActive: isActive,
@@ -486,6 +513,84 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
     }
   }
 
+  void moveSortDraftUp(int index) {
+    state = state.copyWith(
+      sortDraft: sort_draft.moveDraftItemUp(state.sortDraft, index),
+      errorMessage: null,
+    );
+  }
+
+  void moveSortDraftDown(int index) {
+    state = state.copyWith(
+      sortDraft: sort_draft.moveDraftItemDown(state.sortDraft, index),
+      errorMessage: null,
+    );
+  }
+
+  void moveSortDraftToTop(int index) {
+    state = state.copyWith(
+      sortDraft: sort_draft.moveDraftItemToTop(state.sortDraft, index),
+      errorMessage: null,
+    );
+  }
+
+  void moveSortDraftToBottom(int index) {
+    state = state.copyWith(
+      sortDraft: sort_draft.moveDraftItemToBottom(state.sortDraft, index),
+      errorMessage: null,
+    );
+  }
+
+  void discardSortChanges() {
+    state = state.copyWith(sortDraft: state.allProducts, errorMessage: null);
+  }
+
+  Future<bool> saveSortOrder() async {
+    final User? currentUser = _ref.read(authNotifierProvider).currentUser;
+    if (currentUser == null) {
+      state = state.copyWith(errorMessage: AppStrings.accessDenied);
+      return false;
+    }
+    final int? categoryId = state.selectedCategoryId;
+    if (categoryId == null) {
+      state = state.copyWith(
+        errorMessage: 'Select a category before sorting products.',
+      );
+      return false;
+    }
+    if (!state.hasSortChanges) {
+      return true;
+    }
+
+    state = state.copyWith(isSaving: true, errorMessage: null);
+    try {
+      await _ref
+          .read(adminServiceProvider)
+          .reorderProductsInCategory(
+            user: currentUser,
+            categoryId: categoryId,
+            orderedIds: state.sortDraft
+                .map((Product product) => product.id)
+                .toList(growable: false),
+          );
+      await _refreshSharedProductConsumers();
+      await load();
+      state = state.copyWith(isSaving: false, errorMessage: null);
+      return true;
+    } catch (error, stackTrace) {
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: ErrorMapper.toUserMessageAndLog(
+          error,
+          logger: _ref.read(appLoggerProvider),
+          eventType: 'admin_product_reorder_failed',
+          stackTrace: stackTrace,
+        ),
+      );
+      return false;
+    }
+  }
+
   List<Product> _applyStatusFilter(
     List<Product> products,
     AdminProductStatusFilter filter,
@@ -616,7 +721,8 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
         component.defaultItemProductId,
       for (final MealAdjustmentComponentDraft component in draft.components)
         ...component.swapOptions.map(
-          (MealAdjustmentComponentOptionDraft option) => option.optionItemProductId,
+          (MealAdjustmentComponentOptionDraft option) =>
+              option.optionItemProductId,
         ),
       for (final MealAdjustmentExtraOptionDraft extra in draft.extraOptions)
         extra.itemProductId,
@@ -632,7 +738,8 @@ class AdminProductsNotifier extends StateNotifier<AdminProductsState> {
     }
 
     final List<String> fragments = <String>[
-      for (final MealAdjustmentComponentDraft component in draft.components.take(2))
+      for (final MealAdjustmentComponentDraft component
+          in draft.components.take(2))
         '${component.displayName}: ${namesById[component.defaultItemProductId] ?? '#${component.defaultItemProductId}'}',
     ];
     if (draft.extraOptions.isNotEmpty) {
@@ -669,3 +776,11 @@ adminProductsNotifierProvider =
     );
 
 const Object _unset = Object();
+
+bool _productsInSameOrder(List<Product> left, List<Product> right) {
+  return sort_draft.idsInSameOrder(
+    left,
+    right,
+    idOf: (Product product) => product.id,
+  );
+}

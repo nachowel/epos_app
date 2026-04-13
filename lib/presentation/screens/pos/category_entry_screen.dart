@@ -5,16 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../core/providers/app_providers.dart';
 import '../../../domain/models/category.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/category_catalog_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../widgets/section_app_bar.dart';
-
-final FutureProvider<List<Category>> posEntryCategoriesProvider =
-    FutureProvider<List<Category>>((Ref ref) {
-      return ref.read(catalogServiceProvider).getCategories();
-    });
 
 class CategoryEntryScreen extends ConsumerStatefulWidget {
   const CategoryEntryScreen({super.key});
@@ -256,12 +251,7 @@ class _EntryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        20,
-        20,
-        20,
-        14,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
       child: Text(
         title,
         style: const TextStyle(

@@ -20,6 +20,7 @@ import '../../providers/pos_interaction_provider.dart';
 import '../../providers/products_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../widgets/section_app_bar.dart';
+import 'pos_product_presentation_policy.dart';
 import 'widgets/cart_panel.dart';
 import 'widgets/category_bar.dart';
 import 'widgets/checkout_sheet.dart';
@@ -45,6 +46,9 @@ class PosScreen extends ConsumerStatefulWidget {
 class _PosScreenState extends ConsumerState<PosScreen> {
   static const Map<String, String?> _breakfastChoiceDefaults =
       <String, String?>{'drink': 'Cappuccino/Latte', 'bread': 'Toast'};
+  static const String _productSortLockedMessage =
+      'Ürün sıralamasını değiştirmeden önce Kaydet veya İptal seçin.';
+  static const String _productSortSavedMessage = 'Ürün sırası kaydedildi.';
   bool _shouldReturnToCategoryEntryAfterPayment = false;
   bool _isCompletingSuccessfulPaymentTransition = false;
 
@@ -492,10 +496,19 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final PosInteractionController interactionController = ref.read(
       posInteractionControllerProvider,
     );
+    final Category? selectedCategory =
+        PosProductPresentationPolicy.findSelectedCategory(
+          categories: productsState.categories,
+          selectedCategoryId: productsState.selectedCategoryId,
+        );
     final String selectedCategoryTitle = _resolveSelectedCategoryTitle(
       categories: productsState.categories,
       selectedCategoryId: productsState.selectedCategoryId,
     );
+    final ProductCardPresentationMode productPresentationMode =
+        PosProductPresentationPolicy.resolveDecisionForCategory(
+          selectedCategory,
+        ).mode;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -584,6 +597,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                   productsState.selectedCategoryId,
                               isLoading: productsState.isLoading,
                               onSelectCategory: (int? categoryId) async {
+                                if (productsState.isSortMode) {
+                                  _showMessage(_productSortLockedMessage);
+                                  return;
+                                }
                                 await ref
                                     .read(productsNotifierProvider.notifier)
                                     .selectCategory(categoryId);
@@ -605,10 +622,74 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                               title: selectedCategoryTitle,
                               productCount: productsState.products.length,
                               products: productsState.products,
+                              sortDraft: productsState.sortDraft,
                               isLoading: productsState.isLoading,
                               viewportWidth: constraints.maxWidth,
+                              presentationMode: productPresentationMode,
+                              isSortMode: productsState.isSortMode,
+                              isSavingSortOrder:
+                                  productsState.isSavingSortOrder,
+                              hasSortChanges: productsState.hasSortChanges,
+                              onEnterSortMode:
+                                  interactionPolicy.isInteractionLocked ||
+                                      productsState.selectedCategoryId ==
+                                          null ||
+                                      productsState.products.isEmpty ||
+                                      productsState.isLoading
+                                  ? null
+                                  : () {
+                                      ref
+                                          .read(
+                                            productsNotifierProvider.notifier,
+                                          )
+                                          .enterSortMode();
+                                    },
+                              onCancelSortMode: () {
+                                ref
+                                    .read(productsNotifierProvider.notifier)
+                                    .discardSortChanges();
+                              },
+                              onSaveSortOrder: () async {
+                                final bool success = await ref
+                                    .read(productsNotifierProvider.notifier)
+                                    .saveSortOrder();
+                                if (!mounted) {
+                                  return;
+                                }
+                                if (success) {
+                                  _showMessage(_productSortSavedMessage);
+                                  return;
+                                }
+                                final String? message = ref
+                                    .read(productsNotifierProvider)
+                                    .errorMessage;
+                                if (message != null) {
+                                  _showMessage(message);
+                                }
+                              },
+                              onMoveProductUp: (int index) {
+                                ref
+                                    .read(productsNotifierProvider.notifier)
+                                    .moveSortDraftUp(index);
+                              },
+                              onMoveProductDown: (int index) {
+                                ref
+                                    .read(productsNotifierProvider.notifier)
+                                    .moveSortDraftDown(index);
+                              },
+                              onMoveProductToTop: (int index) {
+                                ref
+                                    .read(productsNotifierProvider.notifier)
+                                    .moveSortDraftToTop(index);
+                              },
+                              onMoveProductToBottom: (int index) {
+                                ref
+                                    .read(productsNotifierProvider.notifier)
+                                    .moveSortDraftToBottom(index);
+                              },
                               onTapProduct:
-                                  interactionPolicy.isInteractionLocked
+                                  interactionPolicy.isInteractionLocked ||
+                                      productsState.isSortMode
                                   ? null
                                   : _onTapProduct,
                             ),
@@ -631,7 +712,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                       interactionPolicy.canTakePayment ||
                                       interactionPolicy.canClearCart),
                               isCheckoutLoading:
-                                interactionPolicy.isCheckoutBusy,
+                                  interactionPolicy.isCheckoutBusy,
                               onIncreaseQuantity: (String localId) {
                                 interactionController.increaseQuantity(localId);
                               },
@@ -661,17 +742,15 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     required List<Category> categories,
     required int? selectedCategoryId,
   }) {
-    if (selectedCategoryId == null) {
+    final Category? selectedCategory =
+        PosProductPresentationPolicy.findSelectedCategory(
+          categories: categories,
+          selectedCategoryId: selectedCategoryId,
+        );
+    if (selectedCategory == null) {
       return AppStrings.allCategories;
     }
-
-    for (final Category category in categories) {
-      if (category.id == selectedCategoryId) {
-        return category.name;
-      }
-    }
-
-    return AppStrings.products;
+    return selectedCategory.name;
   }
 
   double _resolveCategoryPanelWidth({

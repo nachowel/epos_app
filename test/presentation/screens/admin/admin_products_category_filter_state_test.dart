@@ -3,6 +3,7 @@ import 'package:epos_app/core/providers/app_providers.dart';
 import 'package:epos_app/core/router/app_router.dart';
 import 'package:epos_app/data/database/app_database.dart';
 import 'package:epos_app/data/repositories/category_repository.dart';
+import 'package:epos_app/data/repositories/product_repository.dart';
 import 'package:epos_app/domain/services/admin_service.dart';
 import 'package:epos_app/presentation/providers/admin_products_provider.dart';
 import 'package:epos_app/presentation/providers/auth_provider.dart';
@@ -283,6 +284,100 @@ void main() {
           of: find.byType(AlertDialog),
           matching: find.text('Set Breakfast'),
         ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'product dialog shows image URL preview, preloads existing URL, and clear removes it',
+    (WidgetTester tester) async {
+      _setLargeView(tester);
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+
+      await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+      final int categoryId = await insertCategory(
+        db,
+        name: 'Breakfast',
+        sortOrder: 0,
+      );
+      final int productId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Bagel',
+        priceMinor: 450,
+        sortOrder: 0,
+      );
+      await ProductRepository(db).updateProduct(
+        id: productId,
+        imageUrl:
+            'https://example.supabase.co/storage/v1/object/public/menu/bagel.jpg',
+      );
+
+      final ProviderContainer container = _makeContainer(db);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _TestRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _loginWithPin(tester, '9999');
+
+      container.read(appRouterProvider).go('/admin/products');
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(ValueKey<String>('product-tile-$productId')),
+          matching: find.text(AppStrings.edit),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final TextField editField = tester.widget<TextField>(
+        find.byKey(const ValueKey<String>('product-image-url-field')),
+      );
+      expect(editField.controller!.text, contains('bagel.jpg'));
+      expect(
+        find.byKey(const ValueKey<String>('product-image-preview')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('product-image-url-clear')),
+      );
+      await tester.pumpAndSettle();
+
+      final TextField clearedField = tester.widget<TextField>(
+        find.byKey(const ValueKey<String>('product-image-url-field')),
+      );
+      expect(clearedField.controller!.text, isEmpty);
+      expect(
+        find.byKey(const ValueKey<String>('product-image-preview')),
+        findsNothing,
+      );
+
+      await tester.tap(find.text(AppStrings.cancel));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(AppStrings.addProduct).last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('product-image-url-field')),
+        'https://example.supabase.co/storage/v1/object/public/menu/new-item.jpg',
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey<String>('product-image-preview')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('product-image-preview-fallback')),
         findsOneWidget,
       );
     },

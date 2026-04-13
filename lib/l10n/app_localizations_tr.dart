@@ -1318,4 +1318,8 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get shiftPreviewTaken => 'Önizleme alındı — kasiyer kilitli';
+
+  @override
+  String get bluetoothUnsupportedPlatform =>
+      'Bluetooth bu platformda desteklenmiyor.';
 }

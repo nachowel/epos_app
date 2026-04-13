@@ -2,12 +2,53 @@ import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/data/database/app_database.dart' show AppDatabase;
 import 'package:epos_app/data/repositories/print_job_repository.dart';
 import 'package:epos_app/domain/models/print_job.dart';
+import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/test_database.dart';
 
 void main() {
   group('PrintJobRepository', () {
+    test(
+      'existing pending job is reused and duplicate insert is skipped',
+      () async {
+        final db = createTestDatabase();
+        addTearDown(db.close);
+        final int transactionId = await _seedSentTransaction(db);
+        final PrintJobRepository repository = PrintJobRepository(db);
+
+        final int existingId = await insertPrintJob(
+          db,
+          transactionId: transactionId,
+          target: PrintJobTarget.kitchen,
+          status: 'pending',
+        );
+
+        final PrintJob reused = await repository.ensureQueued(
+          transactionId: transactionId,
+          target: PrintJobTarget.kitchen,
+        );
+        final int rowCount = await db
+            .customSelect(
+              '''
+            SELECT COUNT(*) AS row_count
+            FROM print_jobs
+            WHERE transaction_id = ? AND target = ?
+            ''',
+              variables: <Variable<Object>>[
+                Variable<int>(transactionId),
+                const Variable<String>('kitchen'),
+              ],
+            )
+            .getSingle()
+            .then((row) => row.read<int>('row_count'));
+
+        expect(reused.id, existingId);
+        expect(reused.status, PrintJobStatus.pending);
+        expect(rowCount, 1);
+      },
+    );
+
     test('only one claimant can move a pending job into printing', () async {
       final db = createTestDatabase();
       addTearDown(db.close);
@@ -125,6 +166,35 @@ void main() {
       expect(noOp.attemptCount, 0);
     });
 
+    test('printed job can be reclaimed by explicit reprint', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
+      final int transactionId = await _seedSentTransaction(db);
+      final PrintJobRepository repository = PrintJobRepository(db);
+      final DateTime completedAt = DateTime(2026, 1, 1, 11, 0, 0);
+
+      await repository.ensureQueued(
+        transactionId: transactionId,
+        target: PrintJobTarget.kitchen,
+        now: completedAt,
+      );
+      await repository.markPrinted(
+        transactionId: transactionId,
+        target: PrintJobTarget.kitchen,
+        now: completedAt,
+      );
+
+      final PrintJob reclaimed = await repository.markInProgress(
+        transactionId: transactionId,
+        target: PrintJobTarget.kitchen,
+        allowReprint: true,
+        now: completedAt.add(const Duration(minutes: 1)),
+      );
+
+      expect(reclaimed.status, PrintJobStatus.printing);
+      expect(reclaimed.attemptCount, 1);
+    });
+
     test('stale printing job can be recovered by explicit retry', () async {
       final db = createTestDatabase();
       addTearDown(db.close);
@@ -161,6 +231,51 @@ void main() {
           defaultPrintJobClaimStaleAfter + const Duration(seconds: 1),
         ),
       );
+    });
+
+    test('mark methods never create a missing job row', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
+      final int transactionId = await _seedSentTransaction(db);
+      final PrintJobRepository repository = PrintJobRepository(db);
+
+      await expectLater(
+        repository.markInProgress(
+          transactionId: transactionId,
+          target: PrintJobTarget.kitchen,
+          allowReprint: false,
+        ),
+        throwsA(isA<NotFoundException>()),
+      );
+      await expectLater(
+        repository.markPrinted(
+          transactionId: transactionId,
+          target: PrintJobTarget.kitchen,
+        ),
+        throwsA(isA<NotFoundException>()),
+      );
+      await expectLater(
+        repository.markFailed(
+          transactionId: transactionId,
+          target: PrintJobTarget.kitchen,
+          error: 'missing row',
+        ),
+        throwsA(isA<NotFoundException>()),
+      );
+
+      final int rowCount = await db
+          .customSelect(
+            '''
+            SELECT COUNT(*) AS row_count
+            FROM print_jobs
+            WHERE transaction_id = ?
+            ''',
+            variables: <Variable<Object>>[Variable<int>(transactionId)],
+          )
+          .getSingle()
+          .then((row) => row.read<int>('row_count'));
+
+      expect(rowCount, 0);
     });
   });
 }

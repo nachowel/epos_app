@@ -82,20 +82,6 @@ class PaymentService {
         'amount_minor': payment.amountMinor,
       },
     );
-
-    try {
-      await _printerService.printReceipt(transactionId);
-    } catch (error, stackTrace) {
-      _logger.warn(
-        eventType: 'payment_receipt_print_failed',
-        entityId: '$transactionId',
-        message: 'Payment succeeded but receipt print failed.',
-        metadata: <String, Object?>{'method': method.name},
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
     return payment;
   }
 

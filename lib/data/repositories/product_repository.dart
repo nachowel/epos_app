@@ -194,7 +194,7 @@ class ProductRepository {
     int? categoryId,
     String? name,
     int? priceMinor,
-    String? imageUrl,
+    Object? imageUrl = _unset,
     bool? hasModifiers,
     bool? isActive,
     bool? isVisibleOnPos,
@@ -214,9 +214,9 @@ class ProductRepository {
             priceMinor: priceMinor == null
                 ? const Value<int>.absent()
                 : Value<int>(priceMinor),
-            imageUrl: imageUrl == null
+            imageUrl: imageUrl == _unset
                 ? const Value<String?>.absent()
-                : Value<String?>(imageUrl),
+                : Value<String?>(imageUrl as String?),
             hasModifiers: hasModifiers == null
                 ? const Value<bool>.absent()
                 : Value<bool>(hasModifiers),
@@ -253,6 +253,22 @@ class ProductRepository {
         );
 
     return updatedCount > 0;
+  }
+
+  Future<void> reorderWithinCategory({
+    required int categoryId,
+    required List<int> orderedIds,
+  }) async {
+    await _database.transaction(() async {
+      for (int index = 0; index < orderedIds.length; index += 1) {
+        final int id = orderedIds[index];
+        await (_database.update(_database.products)..where(
+              (db.$ProductsTable t) =>
+                  t.id.equals(id) & t.categoryId.equals(categoryId),
+            ))
+            .write(db.ProductsCompanion(sortOrder: Value<int>(index)));
+      }
+    });
   }
 
   Future<bool> hasHistoricalUsage(int id) async {
@@ -520,3 +536,5 @@ class ProductRepository {
     );
   }
 }
+
+const Object _unset = Object();

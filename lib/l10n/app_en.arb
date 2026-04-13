@@ -462,5 +462,6 @@
   "netTillAwareness": "Net till awareness",
   "shiftNormalOperation": "Normal operation",
   "shiftPreviewNotTaken": "Preview not yet taken",
-  "shiftPreviewTaken": "Preview taken — cashier locked"
+  "shiftPreviewTaken": "Preview taken — cashier locked",
+  "bluetoothUnsupportedPlatform": "Bluetooth is not available on this platform."
 }

@@ -5,14 +5,18 @@ import '../../core/providers/app_providers.dart';
 import '../../domain/models/category.dart';
 import '../../domain/models/product.dart';
 import '../../domain/services/catalog_service.dart';
+import '../utils/sort_mode_draft.dart' as sort_draft;
 
 class ProductsState {
   const ProductsState({
     required this.categories,
     required this.categoryProductCounts,
     required this.products,
+    required this.sortDraft,
     required this.selectedCategoryId,
     required this.isLoading,
+    required this.isSavingSortOrder,
+    required this.isSortMode,
     required this.errorMessage,
   });
 
@@ -20,23 +24,38 @@ class ProductsState {
     : categories = const <Category>[],
       categoryProductCounts = const <int, int>{},
       products = const <Product>[],
+      sortDraft = const <Product>[],
       selectedCategoryId = null,
       isLoading = false,
+      isSavingSortOrder = false,
+      isSortMode = false,
       errorMessage = null;
 
   final List<Category> categories;
   final Map<int, int> categoryProductCounts;
   final List<Product> products;
+  final List<Product> sortDraft;
   final int? selectedCategoryId;
   final bool isLoading;
+  final bool isSavingSortOrder;
+  final bool isSortMode;
   final String? errorMessage;
+
+  bool get hasSortChanges => !sort_draft.idsInSameOrder(
+    products,
+    sortDraft,
+    idOf: (Product product) => product.id,
+  );
 
   ProductsState copyWith({
     List<Category>? categories,
     Map<int, int>? categoryProductCounts,
     List<Product>? products,
+    List<Product>? sortDraft,
     Object? selectedCategoryId = _unset,
     bool? isLoading,
+    bool? isSavingSortOrder,
+    bool? isSortMode,
     Object? errorMessage = _unset,
   }) {
     return ProductsState(
@@ -44,10 +63,13 @@ class ProductsState {
       categoryProductCounts:
           categoryProductCounts ?? this.categoryProductCounts,
       products: products ?? this.products,
+      sortDraft: sortDraft ?? this.sortDraft,
       selectedCategoryId: selectedCategoryId == _unset
           ? this.selectedCategoryId
           : selectedCategoryId as int?,
       isLoading: isLoading ?? this.isLoading,
+      isSavingSortOrder: isSavingSortOrder ?? this.isSavingSortOrder,
+      isSortMode: isSortMode ?? this.isSortMode,
       errorMessage: errorMessage == _unset
           ? this.errorMessage
           : errorMessage as String?,
@@ -94,13 +116,17 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
         categories: categories,
         categoryProductCounts: categoryProductCounts,
         products: products,
+        sortDraft: products,
         selectedCategoryId: effectiveCategoryId,
         isLoading: false,
+        isSavingSortOrder: false,
+        isSortMode: false,
         errorMessage: null,
       );
     } catch (error, stackTrace) {
       state = state.copyWith(
         isLoading: false,
+        isSavingSortOrder: false,
         errorMessage: ErrorMapper.toUserMessageAndLog(
           error,
           logger: _ref.read(appLoggerProvider),
@@ -115,6 +141,8 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
     state = state.copyWith(
       selectedCategoryId: categoryId,
       isLoading: true,
+      isSortMode: false,
+      isSavingSortOrder: false,
       errorMessage: null,
     );
     try {
@@ -123,12 +151,14 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
           .getProducts(categoryId: categoryId);
       state = state.copyWith(
         products: products,
+        sortDraft: products,
         isLoading: false,
         errorMessage: null,
       );
     } catch (error, stackTrace) {
       state = state.copyWith(
         isLoading: false,
+        isSavingSortOrder: false,
         errorMessage: ErrorMapper.toUserMessageAndLog(
           error,
           logger: _ref.read(appLoggerProvider),
@@ -142,10 +172,112 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
   void resetToPreOrder() {
     state = state.copyWith(
       products: const <Product>[],
+      sortDraft: const <Product>[],
       selectedCategoryId: null,
       isLoading: false,
+      isSavingSortOrder: false,
+      isSortMode: false,
       errorMessage: null,
     );
+  }
+
+  void enterSortMode() {
+    if (state.isLoading ||
+        state.isSavingSortOrder ||
+        state.selectedCategoryId == null ||
+        state.products.isEmpty) {
+      return;
+    }
+
+    state = state.copyWith(
+      isSortMode: true,
+      sortDraft: state.products,
+      errorMessage: null,
+    );
+  }
+
+  void discardSortChanges() {
+    state = state.copyWith(
+      sortDraft: state.products,
+      isSortMode: false,
+      isSavingSortOrder: false,
+      errorMessage: null,
+    );
+  }
+
+  void moveSortDraftUp(int index) {
+    _updateSortDraft(sort_draft.moveDraftItemUp(state.sortDraft, index));
+  }
+
+  void moveSortDraftDown(int index) {
+    _updateSortDraft(sort_draft.moveDraftItemDown(state.sortDraft, index));
+  }
+
+  void moveSortDraftToTop(int index) {
+    _updateSortDraft(sort_draft.moveDraftItemToTop(state.sortDraft, index));
+  }
+
+  void moveSortDraftToBottom(int index) {
+    _updateSortDraft(sort_draft.moveDraftItemToBottom(state.sortDraft, index));
+  }
+
+  Future<bool> saveSortOrder() async {
+    final int? categoryId = state.selectedCategoryId;
+    if (categoryId == null) {
+      return false;
+    }
+    if (!state.isSortMode) {
+      return true;
+    }
+    if (!state.hasSortChanges) {
+      state = state.copyWith(
+        isSortMode: false,
+        sortDraft: state.products,
+        errorMessage: null,
+      );
+      return true;
+    }
+
+    state = state.copyWith(isSavingSortOrder: true, errorMessage: null);
+    try {
+      await _ref
+          .read(productRepositoryProvider)
+          .reorderWithinCategory(
+            categoryId: categoryId,
+            orderedIds: state.sortDraft
+                .map((Product product) => product.id)
+                .toList(growable: false),
+          );
+      final List<Product> products = await _ref
+          .read(catalogServiceProvider)
+          .getProducts(categoryId: categoryId);
+      state = state.copyWith(
+        products: products,
+        sortDraft: products,
+        isSortMode: false,
+        isSavingSortOrder: false,
+        errorMessage: null,
+      );
+      return true;
+    } catch (error, stackTrace) {
+      state = state.copyWith(
+        isSavingSortOrder: false,
+        errorMessage: ErrorMapper.toUserMessageAndLog(
+          error,
+          logger: _ref.read(appLoggerProvider),
+          eventType: 'catalog_reorder_products_failed',
+          stackTrace: stackTrace,
+        ),
+      );
+      return false;
+    }
+  }
+
+  void _updateSortDraft(List<Product> nextDraft) {
+    if (!state.isSortMode || identical(nextDraft, state.sortDraft)) {
+      return;
+    }
+    state = state.copyWith(sortDraft: nextDraft, errorMessage: null);
   }
 
   int? _resolveEffectiveCategoryId({

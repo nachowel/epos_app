@@ -5,7 +5,10 @@ import '../../core/errors/error_mapper.dart';
 import '../../core/providers/app_providers.dart';
 import '../../domain/models/category.dart';
 import '../../domain/models/user.dart';
+import '../utils/sort_mode_draft.dart' as sort_draft;
 import 'auth_provider.dart';
+import 'category_catalog_provider.dart';
+import 'products_provider.dart';
 
 class AdminCategoriesState {
   const AdminCategoriesState({
@@ -81,6 +84,11 @@ class AdminCategoriesNotifier extends StateNotifier<AdminCategoriesState> {
     }
   }
 
+  Future<void> _refreshSharedCategoryConsumers() async {
+    await _ref.refresh(posEntryCategoriesProvider.future);
+    await _ref.read(productsNotifierProvider.notifier).loadCatalog();
+  }
+
   Future<bool> createCategory({
     required String name,
     required int sortOrder,
@@ -103,6 +111,7 @@ class AdminCategoriesNotifier extends StateNotifier<AdminCategoriesState> {
             isActive: isActive,
             imageUrl: imageUrl,
           );
+      await _refreshSharedCategoryConsumers();
       await load();
       state = state.copyWith(isSaving: false, errorMessage: null);
       return true;
@@ -144,6 +153,7 @@ class AdminCategoriesNotifier extends StateNotifier<AdminCategoriesState> {
             isActive: isActive,
             imageUrl: imageUrl,
           );
+      await _refreshSharedCategoryConsumers();
       await load();
       state = state.copyWith(isSaving: false, errorMessage: null);
       return true;
@@ -221,13 +231,49 @@ class AdminCategoriesNotifier extends StateNotifier<AdminCategoriesState> {
       return;
     }
 
-    final List<Category> nextDraft = List<Category>.from(state.reorderDraft);
     if (newIndex > oldIndex) {
       newIndex -= 1;
     }
-    final Category movedCategory = nextDraft.removeAt(oldIndex);
-    nextDraft.insert(newIndex, movedCategory);
-    state = state.copyWith(reorderDraft: nextDraft, errorMessage: null);
+    moveDraftItemToIndex(oldIndex: oldIndex, newIndex: newIndex);
+  }
+
+  void moveDraftItemToIndex({required int oldIndex, required int newIndex}) {
+    state = state.copyWith(
+      reorderDraft: sort_draft.moveDraftItem(
+        items: state.reorderDraft,
+        fromIndex: oldIndex,
+        toIndex: newIndex,
+      ),
+      errorMessage: null,
+    );
+  }
+
+  void moveDraftItemUp(int index) {
+    state = state.copyWith(
+      reorderDraft: sort_draft.moveDraftItemUp(state.reorderDraft, index),
+      errorMessage: null,
+    );
+  }
+
+  void moveDraftItemDown(int index) {
+    state = state.copyWith(
+      reorderDraft: sort_draft.moveDraftItemDown(state.reorderDraft, index),
+      errorMessage: null,
+    );
+  }
+
+  void moveDraftItemToTop(int index) {
+    state = state.copyWith(
+      reorderDraft: sort_draft.moveDraftItemToTop(state.reorderDraft, index),
+      errorMessage: null,
+    );
+  }
+
+  void moveDraftItemToBottom(int index) {
+    state = state.copyWith(
+      reorderDraft: sort_draft.moveDraftItemToBottom(state.reorderDraft, index),
+      errorMessage: null,
+    );
   }
 
   void discardReorderChanges() {
@@ -254,6 +300,7 @@ class AdminCategoriesNotifier extends StateNotifier<AdminCategoriesState> {
                 .map((Category category) => category.id)
                 .toList(growable: false),
           );
+      await _refreshSharedCategoryConsumers();
       await load();
       state = state.copyWith(isSaving: false, errorMessage: null);
       return true;
@@ -281,13 +328,9 @@ adminCategoriesNotifierProvider =
 const Object _unset = Object();
 
 bool _idsInSameOrder(List<Category> left, List<Category> right) {
-  if (left.length != right.length) {
-    return false;
-  }
-  for (int index = 0; index < left.length; index += 1) {
-    if (left[index].id != right[index].id) {
-      return false;
-    }
-  }
-  return true;
+  return sort_draft.idsInSameOrder(
+    left,
+    right,
+    idOf: (Category category) => category.id,
+  );
 }

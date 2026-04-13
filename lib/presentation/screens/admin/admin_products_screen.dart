@@ -17,6 +17,7 @@ import '../../../domain/models/meal_insights.dart';
 import '../../../domain/services/meal_adjustment_profile_validation_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/admin_products_provider.dart';
+import 'widgets/admin_sort_mode_list.dart';
 import 'widgets/admin_scaffold.dart';
 import 'widgets/semantic_product_configuration_dialog.dart';
 
@@ -35,9 +36,7 @@ const String _productDeletedMessage = 'Product deleted.';
 const String _setDeletedMessage = 'Set product deleted.';
 const String _manageModifiersLabel = 'Modifiers';
 const String _addProductModifierLabel = 'Add modifier';
-const String _modifierCategoryLabel = 'Modifier category';
 const String _modifierTypeLabel = 'Type';
-const String _modifierProductLabel = 'Select product';
 const String _modifierProductSearchLabel = 'Search products';
 const String _modifierProductFilterLabel = 'Filter by category';
 const String _modifierSourceCategoryLabel = 'Source category';
@@ -79,6 +78,7 @@ const String _productArchivedOnDeleteMessage =
     'Product cannot be deleted because it exists in past orders. It has been archived instead.';
 const String _setArchivedOnDeleteMessage =
     'This set exists in past orders. It has been archived instead.';
+const String _productSortSavedMessage = 'Product order saved.';
 
 class AdminProductsScreen extends ConsumerStatefulWidget {
   const AdminProductsScreen({super.key});
@@ -90,6 +90,7 @@ class AdminProductsScreen extends ConsumerStatefulWidget {
 
 class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
   bool _pendingCategorySelectionRepair = false;
+  bool _isSortMode = false;
 
   @override
   void initState() {
@@ -106,6 +107,13 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
       current: state.selectedCategoryId,
       items: state.categories.map((Category category) => category.id),
     );
+    Category? selectedCategory;
+    for (final Category category in state.categories) {
+      if (category.id == safeSelectedCategoryId) {
+        selectedCategory = category;
+        break;
+      }
+    }
     if (safeSelectedCategoryId != state.selectedCategoryId) {
       _scheduleCategorySelectionRepair();
     }
@@ -134,7 +142,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                         ),
                       )
                       .toList(growable: false),
-                  onChanged: state.isLoading
+                  onChanged: state.isLoading || _isSortMode
                       ? null
                       : (int? value) {
                           ref
@@ -144,187 +152,285 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
                 ),
               ),
               const SizedBox(width: AppSizes.spacingMd),
-              ElevatedButton.icon(
-                onPressed: state.categories.isEmpty || state.isSaving
-                    ? null
-                    : () => _openProductDialog(
-                        context,
-                        categories: state.categories,
-                        initialCategoryId: safeSelectedCategoryId,
-                      ),
-                icon: const Icon(Icons.add_rounded),
-                label: Text(AppStrings.addProduct),
-              ),
+              if (_isSortMode) ...<Widget>[
+                OutlinedButton(
+                  key: const ValueKey<String>('product-sort-cancel'),
+                  onPressed: state.isSaving ? null : _cancelSortMode,
+                  child: Text(AppStrings.cancel),
+                ),
+                const SizedBox(width: AppSizes.spacingSm),
+                ElevatedButton.icon(
+                  key: const ValueKey<String>('product-sort-save'),
+                  onPressed: state.isSaving || !state.hasSortChanges
+                      ? null
+                      : _saveSortMode,
+                  icon: const Icon(Icons.save_rounded),
+                  label: Text(AppStrings.saveSettings),
+                ),
+              ] else ...<Widget>[
+                OutlinedButton.icon(
+                  key: const ValueKey<String>('product-enter-sort-mode'),
+                  onPressed:
+                      state.isLoading ||
+                          state.isSaving ||
+                          !state.canEnterSortMode
+                      ? null
+                      : () => setState(() => _isSortMode = true),
+                  icon: const Icon(Icons.swap_vert_rounded),
+                  label: const Text('Sırala'),
+                ),
+                const SizedBox(width: AppSizes.spacingSm),
+                ElevatedButton.icon(
+                  onPressed: state.categories.isEmpty || state.isSaving
+                      ? null
+                      : () => _openProductDialog(
+                          context,
+                          categories: state.categories,
+                          initialCategoryId: safeSelectedCategoryId,
+                        ),
+                  icon: const Icon(Icons.add_rounded),
+                  label: Text(AppStrings.addProduct),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: AppSizes.spacingMd),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Wrap(
-              spacing: AppSizes.spacingSm,
-              children: <Widget>[
-                _StatusFilterChip(
-                  key: const ValueKey<String>('product-filter-active'),
-                  label: 'Active',
-                  selected:
-                      state.selectedStatusFilter ==
-                      AdminProductStatusFilter.active,
-                  onSelected: () => ref
-                      .read(adminProductsNotifierProvider.notifier)
-                      .selectStatusFilter(AdminProductStatusFilter.active),
-                ),
-                _StatusFilterChip(
-                  key: const ValueKey<String>('product-filter-archived'),
-                  label: 'Archived',
-                  selected:
-                      state.selectedStatusFilter ==
-                      AdminProductStatusFilter.archived,
-                  onSelected: () => ref
-                      .read(adminProductsNotifierProvider.notifier)
-                      .selectStatusFilter(AdminProductStatusFilter.archived),
-                ),
-                _StatusFilterChip(
-                  key: const ValueKey<String>('product-filter-all'),
-                  label: 'All',
-                  selected:
-                      state.selectedStatusFilter ==
-                      AdminProductStatusFilter.all,
-                  onSelected: () => ref
-                      .read(adminProductsNotifierProvider.notifier)
-                      .selectStatusFilter(AdminProductStatusFilter.all),
-                ),
-              ],
+          if (_isSortMode) ...<Widget>[
+            _MessageBox(
+              key: const ValueKey<String>('product-sort-mode-banner'),
+              message:
+                  'Sıralama modu ${selectedCategory?.name ?? ''} kategorisindeki tüm ürünleri kapsar. Değişiklikler yalnızca Kaydet ile uygulanır.',
+              color: AppColors.primary,
             ),
-          ),
-          const SizedBox(height: AppSizes.spacingMd),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () =>
-                  ref.read(adminProductsNotifierProvider.notifier).load(),
-              child: ListView(
+          ] else ...<Widget>[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: AppSizes.spacingSm,
                 children: <Widget>[
-                  if (state.errorMessage != null)
-                    _MessageBox(
-                      message: state.errorMessage!,
-                      color: AppColors.error,
-                    ),
-                  _MessageBox(
-                    message: AppStrings.productListInfoMessage,
-                    color: AppColors.primary,
+                  _StatusFilterChip(
+                    key: const ValueKey<String>('product-filter-active'),
+                    label: 'Active',
+                    selected:
+                        state.selectedStatusFilter ==
+                        AdminProductStatusFilter.active,
+                    onSelected: () => ref
+                        .read(adminProductsNotifierProvider.notifier)
+                        .selectStatusFilter(AdminProductStatusFilter.active),
                   ),
-                  if (state.legacyMealLineCountsByProduct.isNotEmpty)
-                    _LegacyCleanupBanner(
-                      totalLines: state.legacyMealLineCountsByProduct.values
-                          .fold<int>(0, (int a, int b) => a + b),
-                      productCount: state.legacyMealLineCountsByProduct.length,
-                    ),
-                  if (state.isLoading)
-                    const Padding(
-                      padding: EdgeInsets.all(AppSizes.spacingXl),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else if (state.products.isEmpty)
-                    _EmptyState(message: AppStrings.noProductsForSelection)
-                  else ...<Widget>[
-                    _ProductSection(
-                      key: const ValueKey<String>('set-products-section'),
-                      title: 'Set Products',
-                      emptyMessage: 'No set products',
-                      children: state.setProducts
-                          .map(
-                            (Product product) => _ProductTile(
-                              product: product,
-                              profile:
-                                  state.profiles[product.id] ??
-                                  ProductMenuConfigurationProfile(
-                                    productId: product.id,
-                                    flatModifierCount: 0,
-                                    setItemCount: 0,
-                                    choiceGroupCount: 0,
-                                    choiceMemberCount: 0,
-                                  ),
-                              mealProfileVisibility: state
-                                  .mealProfileVisibilityByProductId[product.id],
-                              categories: state.categories,
-                              isSaving: state.isSaving,
-                              showSetBuilder: true,
-                              legacyLineCount:
-                                  state.legacyMealLineCountsByProduct[product
-                                      .id] ??
-                                  0,
-                              onEdit: () => _openProductDialog(
-                                context,
-                                categories: state.categories,
-                                product: product,
-                              ),
-                              onConfigureSemantic: () =>
-                                  _openSemanticConfigurationDialog(
-                                    context,
-                                    productId: product.id,
-                                  ),
-                              onConfigureMealAdjustment: () =>
-                                  _openMealAdjustmentDialog(product),
-                              onManageModifiers: () =>
-                                  _openProductModifiersDialog(product),
-                              onDelete: () => _confirmDeleteProduct(product),
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                    const SizedBox(height: AppSizes.spacingLg),
-                    _ProductSection(
-                      key: const ValueKey<String>('normal-products-section'),
-                      title: 'Items',
-                      emptyMessage: 'No items',
-                      children: state.normalProducts
-                          .map(
-                            (Product product) => _ProductTile(
-                              product: product,
-                              profile:
-                                  state.profiles[product.id] ??
-                                  ProductMenuConfigurationProfile(
-                                    productId: product.id,
-                                    flatModifierCount: 0,
-                                    setItemCount: 0,
-                                    choiceGroupCount: 0,
-                                    choiceMemberCount: 0,
-                                  ),
-                              mealProfileVisibility: state
-                                  .mealProfileVisibilityByProductId[product.id],
-                              categories: state.categories,
-                              isSaving: state.isSaving,
-                              showSetBuilder: false,
-                              legacyLineCount:
-                                  state.legacyMealLineCountsByProduct[product
-                                      .id] ??
-                                  0,
-                              onEdit: () => _openProductDialog(
-                                context,
-                                categories: state.categories,
-                                product: product,
-                              ),
-                              onConfigureSemantic: () =>
-                                  _openSemanticConfigurationDialog(
-                                    context,
-                                    productId: product.id,
-                                  ),
-                              onConfigureMealAdjustment: () =>
-                                  _openMealAdjustmentDialog(product),
-                              onManageModifiers: () =>
-                                  _openProductModifiersDialog(product),
-                              onDelete: () => _confirmDeleteProduct(product),
-                            ),
-                          )
-                          .toList(growable: false),
-                    ),
-                  ],
+                  _StatusFilterChip(
+                    key: const ValueKey<String>('product-filter-archived'),
+                    label: 'Archived',
+                    selected:
+                        state.selectedStatusFilter ==
+                        AdminProductStatusFilter.archived,
+                    onSelected: () => ref
+                        .read(adminProductsNotifierProvider.notifier)
+                        .selectStatusFilter(AdminProductStatusFilter.archived),
+                  ),
+                  _StatusFilterChip(
+                    key: const ValueKey<String>('product-filter-all'),
+                    label: 'All',
+                    selected:
+                        state.selectedStatusFilter ==
+                        AdminProductStatusFilter.all,
+                    onSelected: () => ref
+                        .read(adminProductsNotifierProvider.notifier)
+                        .selectStatusFilter(AdminProductStatusFilter.all),
+                  ),
                 ],
               ),
             ),
+            const SizedBox(height: AppSizes.spacingMd),
+          ],
+          Expanded(
+            child: _isSortMode
+                ? _ProductSortModePanel(
+                    products: state.sortDraft,
+                    categories: state.categories,
+                    profiles: state.profiles,
+                    isLoading: state.isLoading,
+                    isSaving: state.isSaving,
+                    onMoveUp: (int index) => ref
+                        .read(adminProductsNotifierProvider.notifier)
+                        .moveSortDraftUp(index),
+                    onMoveDown: (int index) => ref
+                        .read(adminProductsNotifierProvider.notifier)
+                        .moveSortDraftDown(index),
+                    onMoveToTop: (int index) => ref
+                        .read(adminProductsNotifierProvider.notifier)
+                        .moveSortDraftToTop(index),
+                    onMoveToBottom: (int index) => ref
+                        .read(adminProductsNotifierProvider.notifier)
+                        .moveSortDraftToBottom(index),
+                  )
+                : RefreshIndicator(
+                    onRefresh: () =>
+                        ref.read(adminProductsNotifierProvider.notifier).load(),
+                    child: ListView(
+                      children: <Widget>[
+                        if (state.errorMessage != null)
+                          _MessageBox(
+                            message: state.errorMessage!,
+                            color: AppColors.error,
+                          ),
+                        _MessageBox(
+                          message: AppStrings.productListInfoMessage,
+                          color: AppColors.primary,
+                        ),
+                        if (state.legacyMealLineCountsByProduct.isNotEmpty)
+                          _LegacyCleanupBanner(
+                            totalLines: state
+                                .legacyMealLineCountsByProduct
+                                .values
+                                .fold<int>(0, (int a, int b) => a + b),
+                            productCount:
+                                state.legacyMealLineCountsByProduct.length,
+                          ),
+                        if (state.isLoading)
+                          const Padding(
+                            padding: EdgeInsets.all(AppSizes.spacingXl),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (state.products.isEmpty)
+                          _EmptyState(
+                            message: AppStrings.noProductsForSelection,
+                          )
+                        else ...<Widget>[
+                          _ProductSection(
+                            key: const ValueKey<String>('set-products-section'),
+                            title: 'Set Products',
+                            emptyMessage: 'No set products',
+                            children: state.setProducts
+                                .map(
+                                  (Product product) => _ProductTile(
+                                    product: product,
+                                    profile:
+                                        state.profiles[product.id] ??
+                                        ProductMenuConfigurationProfile(
+                                          productId: product.id,
+                                          flatModifierCount: 0,
+                                          setItemCount: 0,
+                                          choiceGroupCount: 0,
+                                          choiceMemberCount: 0,
+                                        ),
+                                    mealProfileVisibility:
+                                        state
+                                            .mealProfileVisibilityByProductId[product
+                                            .id],
+                                    categories: state.categories,
+                                    isSaving: state.isSaving,
+                                    showSetBuilder: true,
+                                    legacyLineCount:
+                                        state
+                                            .legacyMealLineCountsByProduct[product
+                                            .id] ??
+                                        0,
+                                    onEdit: () => _openProductDialog(
+                                      context,
+                                      categories: state.categories,
+                                      product: product,
+                                    ),
+                                    onConfigureSemantic: () =>
+                                        _openSemanticConfigurationDialog(
+                                          context,
+                                          productId: product.id,
+                                        ),
+                                    onConfigureMealAdjustment: () =>
+                                        _openMealAdjustmentDialog(product),
+                                    onManageModifiers: () =>
+                                        _openProductModifiersDialog(product),
+                                    onDelete: () =>
+                                        _confirmDeleteProduct(product),
+                                  ),
+                                )
+                                .toList(growable: false),
+                          ),
+                          const SizedBox(height: AppSizes.spacingLg),
+                          _ProductSection(
+                            key: const ValueKey<String>(
+                              'normal-products-section',
+                            ),
+                            title: 'Items',
+                            emptyMessage: 'No items',
+                            children: state.normalProducts
+                                .map(
+                                  (Product product) => _ProductTile(
+                                    product: product,
+                                    profile:
+                                        state.profiles[product.id] ??
+                                        ProductMenuConfigurationProfile(
+                                          productId: product.id,
+                                          flatModifierCount: 0,
+                                          setItemCount: 0,
+                                          choiceGroupCount: 0,
+                                          choiceMemberCount: 0,
+                                        ),
+                                    mealProfileVisibility:
+                                        state
+                                            .mealProfileVisibilityByProductId[product
+                                            .id],
+                                    categories: state.categories,
+                                    isSaving: state.isSaving,
+                                    showSetBuilder: false,
+                                    legacyLineCount:
+                                        state
+                                            .legacyMealLineCountsByProduct[product
+                                            .id] ??
+                                        0,
+                                    onEdit: () => _openProductDialog(
+                                      context,
+                                      categories: state.categories,
+                                      product: product,
+                                    ),
+                                    onConfigureSemantic: () =>
+                                        _openSemanticConfigurationDialog(
+                                          context,
+                                          productId: product.id,
+                                        ),
+                                    onConfigureMealAdjustment: () =>
+                                        _openMealAdjustmentDialog(product),
+                                    onManageModifiers: () =>
+                                        _openProductModifiersDialog(product),
+                                    onDelete: () =>
+                                        _confirmDeleteProduct(product),
+                                  ),
+                                )
+                                .toList(growable: false),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _saveSortMode() async {
+    final bool success = await ref
+        .read(adminProductsNotifierProvider.notifier)
+        .saveSortOrder();
+    if (!mounted) {
+      return;
+    }
+
+    final String message = success
+        ? _productSortSavedMessage
+        : (ref.read(adminProductsNotifierProvider).errorMessage ??
+              AppStrings.operationFailed);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+    if (success) {
+      setState(() => _isSortMode = false);
+    }
+  }
+
+  void _cancelSortMode() {
+    ref.read(adminProductsNotifierProvider.notifier).discardSortChanges();
+    setState(() => _isSortMode = false);
   }
 
   void _scheduleCategorySelectionRepair() {
@@ -375,6 +481,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
             categoryId: result.categoryId,
             name: result.name,
             priceMinor: result.priceMinor,
+            imageUrl: result.imageUrl,
             hasModifiers: result.hasModifiers,
             sortOrder: result.sortOrder,
             isActive: result.isActive,
@@ -385,6 +492,7 @@ class _AdminProductsScreenState extends ConsumerState<AdminProductsScreen> {
             categoryId: result.categoryId,
             name: result.name,
             priceMinor: result.priceMinor,
+            imageUrl: result.imageUrl,
             hasModifiers: result.hasModifiers,
             sortOrder: result.sortOrder,
             isActive: result.isActive,
@@ -1259,6 +1367,7 @@ class _ProductDialog extends StatefulWidget {
 class _ProductDialogState extends State<_ProductDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _priceController;
+  late final TextEditingController _imageUrlController;
   late final TextEditingController _sortOrderController;
   late int _categoryId;
   late bool _hasModifiers;
@@ -1271,6 +1380,9 @@ class _ProductDialogState extends State<_ProductDialog> {
     _nameController = TextEditingController(text: widget.product?.name ?? '');
     _priceController = TextEditingController(
       text: '${widget.product?.priceMinor ?? 0}',
+    );
+    _imageUrlController = TextEditingController(
+      text: widget.product?.imageUrl ?? '',
     );
     _sortOrderController = TextEditingController(
       text: '${widget.product?.sortOrder ?? 0}',
@@ -1291,6 +1403,7 @@ class _ProductDialogState extends State<_ProductDialog> {
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
+    _imageUrlController.dispose();
     _sortOrderController.dispose();
     super.dispose();
   }
@@ -1305,73 +1418,108 @@ class _ProductDialogState extends State<_ProductDialog> {
       ),
       content: SizedBox(
         width: 440,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            DropdownButtonFormField<int>(
-              value: _categoryId,
-              decoration: InputDecoration(labelText: AppStrings.categoryLabel),
-              items: widget.categories
-                  .map(
-                    (Category category) => DropdownMenuItem<int>(
-                      value: category.id,
-                      child: Text(category.name),
-                    ),
-                  )
-                  .toList(growable: false),
-              onChanged: (int? value) {
-                if (value != null) {
-                  setState(() => _categoryId = value);
-                }
-              },
-            ),
-            const SizedBox(height: AppSizes.spacingMd),
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: AppStrings.productNameLabel,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              DropdownButtonFormField<int>(
+                value: _categoryId,
+                decoration: InputDecoration(
+                  labelText: AppStrings.categoryLabel,
+                ),
+                items: widget.categories
+                    .map(
+                      (Category category) => DropdownMenuItem<int>(
+                        value: category.id,
+                        child: Text(category.name),
+                      ),
+                    )
+                    .toList(growable: false),
+                onChanged: (int? value) {
+                  if (value != null) {
+                    setState(() => _categoryId = value);
+                  }
+                },
               ),
-            ),
-            const SizedBox(height: AppSizes.spacingMd),
-            TextField(
-              controller: _priceController,
-              decoration: InputDecoration(
-                labelText: AppStrings.priceMinorLabel,
+              const SizedBox(height: AppSizes.spacingMd),
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: AppStrings.productNameLabel,
+                ),
               ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: AppSizes.spacingMd),
-            TextField(
-              controller: _sortOrderController,
-              decoration: InputDecoration(labelText: AppStrings.sortOrderLabel),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: AppSizes.spacingMd),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _hasModifiers,
-              onChanged: (bool? value) {
-                setState(() => _hasModifiers = value ?? false);
-              },
-              title: Text(AppStrings.hasModifiersLabel),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _isActive,
-              onChanged: (bool value) => setState(() => _isActive = value),
-              title: Text(AppStrings.active),
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _isVisibleOnPos,
-              onChanged: (bool value) =>
-                  setState(() => _isVisibleOnPos = value),
-              title: const Text(_visibleOnPosLabel),
-              subtitle: const Text(
-                'Hide product from cashier POS without deleting it.',
+              const SizedBox(height: AppSizes.spacingMd),
+              TextField(
+                controller: _priceController,
+                decoration: InputDecoration(
+                  labelText: AppStrings.priceMinorLabel,
+                ),
+                keyboardType: TextInputType.number,
               ),
-            ),
-          ],
+              const SizedBox(height: AppSizes.spacingMd),
+              TextField(
+                key: const ValueKey<String>('product-image-url-field'),
+                controller: _imageUrlController,
+                decoration: InputDecoration(
+                  labelText: 'Image URL',
+                  hintText: 'https://example.supabase.co/storage/...',
+                  suffixIcon: _imageUrlController.text.trim().isEmpty
+                      ? null
+                      : IconButton(
+                          key: const ValueKey<String>(
+                            'product-image-url-clear',
+                          ),
+                          tooltip: 'Clear image URL',
+                          onPressed: () {
+                            _imageUrlController.clear();
+                            setState(() {});
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                ),
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
+              ),
+              if (_normalizedImageUrl != null) ...<Widget>[
+                const SizedBox(height: AppSizes.spacingSm),
+                _ProductImageUrlPreview(imageUrl: _normalizedImageUrl!),
+              ],
+              const SizedBox(height: AppSizes.spacingMd),
+              TextField(
+                controller: _sortOrderController,
+                decoration: InputDecoration(
+                  labelText: AppStrings.sortOrderLabel,
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: AppSizes.spacingMd),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _hasModifiers,
+                onChanged: (bool? value) {
+                  setState(() => _hasModifiers = value ?? false);
+                },
+                title: Text(AppStrings.hasModifiersLabel),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _isActive,
+                onChanged: (bool value) => setState(() => _isActive = value),
+                title: Text(AppStrings.active),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _isVisibleOnPos,
+                onChanged: (bool value) =>
+                    setState(() => _isVisibleOnPos = value),
+                title: const Text(_visibleOnPosLabel),
+                subtitle: const Text(
+                  'Hide product from cashier POS without deleting it.',
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       actions: <Widget>[
@@ -1386,6 +1534,7 @@ class _ProductDialogState extends State<_ProductDialog> {
                 categoryId: _categoryId,
                 name: _nameController.text,
                 priceMinor: int.tryParse(_priceController.text) ?? -1,
+                imageUrl: _normalizedImageUrl,
                 sortOrder: int.tryParse(_sortOrderController.text) ?? 0,
                 hasModifiers: _hasModifiers,
                 isActive: _isActive,
@@ -1398,6 +1547,11 @@ class _ProductDialogState extends State<_ProductDialog> {
       ],
     );
   }
+
+  String? get _normalizedImageUrl {
+    final String trimmed = _imageUrlController.text.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
 }
 
 class _ProductFormResult {
@@ -1405,6 +1559,7 @@ class _ProductFormResult {
     required this.categoryId,
     required this.name,
     required this.priceMinor,
+    required this.imageUrl,
     required this.sortOrder,
     required this.hasModifiers,
     required this.isActive,
@@ -1414,10 +1569,89 @@ class _ProductFormResult {
   final int categoryId;
   final String name;
   final int priceMinor;
+  final String? imageUrl;
   final int sortOrder;
   final bool hasModifiers;
   final bool isActive;
   final bool isVisibleOnPos;
+}
+
+class _ProductImageUrlPreview extends StatelessWidget {
+  const _ProductImageUrlPreview({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey<String>('product-image-preview'),
+      width: double.infinity,
+      height: 116,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: AppColors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => const _ProductImagePreviewFallback(),
+        loadingBuilder:
+            (
+              BuildContext context,
+              Widget child,
+              ImageChunkEvent? loadingProgress,
+            ) {
+              if (loadingProgress == null) {
+                return child;
+              }
+              return const _ProductImagePreviewFallback(isLoading: true);
+            },
+      ),
+    );
+  }
+}
+
+class _ProductImagePreviewFallback extends StatelessWidget {
+  const _ProductImagePreviewFallback({this.isLoading = false});
+
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      key: const ValueKey<String>('product-image-preview-fallback'),
+      color: AppColors.surfaceAlt,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (isLoading)
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              const Icon(
+                Icons.image_outlined,
+                color: AppColors.textSecondary,
+                size: 26,
+              ),
+            const SizedBox(height: AppSizes.spacingSm),
+            Text(
+              isLoading ? 'Loading preview...' : 'Preview unavailable',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ProductModifiersDialog extends ConsumerStatefulWidget {
@@ -2990,6 +3224,130 @@ class _StatusFilterChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: (_) => onSelected(),
+    );
+  }
+}
+
+class _ProductSortModePanel extends StatelessWidget {
+  const _ProductSortModePanel({
+    required this.products,
+    required this.profiles,
+    required this.categories,
+    required this.isLoading,
+    required this.isSaving,
+    required this.onMoveUp,
+    required this.onMoveDown,
+    required this.onMoveToTop,
+    required this.onMoveToBottom,
+  });
+
+  final List<Product> products;
+  final Map<int, ProductMenuConfigurationProfile> profiles;
+  final List<Category> categories;
+  final bool isLoading;
+  final bool isSaving;
+  final void Function(int index) onMoveUp;
+  final void Function(int index) onMoveDown;
+  final void Function(int index) onMoveToTop;
+  final void Function(int index) onMoveToBottom;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return AdminSortModeList<Product>(
+      listKey: const ValueKey<String>('product-sort-list'),
+      items: products,
+      isBusy: isSaving,
+      emptyMessage: 'No products available to reorder in this category.',
+      itemIdBuilder: (Product product) => product.id,
+      onMoveUp: onMoveUp,
+      onMoveDown: onMoveDown,
+      onMoveToTop: onMoveToTop,
+      onMoveToBottom: onMoveToBottom,
+      itemContentBuilder: (BuildContext context, Product product, int index) {
+        final ProductMenuConfigurationProfile? profile = profiles[product.id];
+        final String categoryName = _categoryNameForProduct(
+          product: product,
+          categories: categories,
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(
+              '${index + 1}. ${product.name}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: AppSizes.spacingXs),
+            Text(
+              '$categoryName · ${CurrencyFormatter.fromMinor(product.priceMinor)}',
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: AppSizes.spacingXs),
+            Wrap(
+              spacing: AppSizes.spacingXs,
+              runSpacing: AppSizes.spacingXs,
+              children: <Widget>[
+                if (!product.isActive)
+                  const _ProductSortChip(label: 'Archived'),
+                if (product.isActive && !product.isVisibleOnPos)
+                  const _ProductSortChip(label: 'POS gizli'),
+                if (profile?.hasSemanticSetConfig ?? false)
+                  const _ProductSortChip(label: 'Set Product'),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+String _categoryNameForProduct({
+  required Product product,
+  required List<Category> categories,
+}) {
+  for (final Category category in categories) {
+    if (category.id == product.categoryId) {
+      return category.name;
+    }
+  }
+  return 'Unknown category';
+}
+
+class _ProductSortChip extends StatelessWidget {
+  const _ProductSortChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.spacingSm,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textSecondary,
+        ),
+      ),
     );
   }
 }

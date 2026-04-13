@@ -7,6 +7,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../domain/models/category.dart';
 import '../../../domain/services/admin_service.dart';
 import '../../providers/admin_categories_provider.dart';
+import 'widgets/admin_sort_mode_list.dart';
 import 'widgets/admin_scaffold.dart';
 
 class AdminCategoriesScreen extends ConsumerStatefulWidget {
@@ -74,8 +75,18 @@ class _AdminCategoriesScreenState extends ConsumerState<AdminCategoriesScreen> {
                     categories: state.reorderDraft,
                     isLoading: state.isLoading,
                     isSaving: state.isSaving,
-                    hasUnsavedChanges: state.hasReorderChanges,
-                    onReorder: _handleReorderDraft,
+                    onMoveUp: (int index) => ref
+                        .read(adminCategoriesNotifierProvider.notifier)
+                        .moveDraftItemUp(index),
+                    onMoveDown: (int index) => ref
+                        .read(adminCategoriesNotifierProvider.notifier)
+                        .moveDraftItemDown(index),
+                    onMoveToTop: (int index) => ref
+                        .read(adminCategoriesNotifierProvider.notifier)
+                        .moveDraftItemToTop(index),
+                    onMoveToBottom: (int index) => ref
+                        .read(adminCategoriesNotifierProvider.notifier)
+                        .moveDraftItemToBottom(index),
                   )
                 : RefreshIndicator(
                     onRefresh: () => ref
@@ -134,28 +145,6 @@ class _AdminCategoriesScreenState extends ConsumerState<AdminCategoriesScreen> {
   void _cancelReorder() {
     ref.read(adminCategoriesNotifierProvider.notifier).discardReorderChanges();
     setState(() => _isReorderMode = false);
-  }
-
-  void _handleReorderDraft(int oldIndex, int newIndex) {
-    final List<int> before = ref
-        .read(adminCategoriesNotifierProvider)
-        .reorderDraft
-        .map((Category category) => category.id)
-        .toList(growable: false);
-    debugPrint(
-      'admin_category_reorder requested '
-      'oldIndex=$oldIndex newIndex=$newIndex before=$before',
-    );
-    ref.read(adminCategoriesNotifierProvider.notifier).reorderDraft(
-      oldIndex,
-      newIndex,
-    );
-    final List<int> after = ref
-        .read(adminCategoriesNotifierProvider)
-        .reorderDraft
-        .map((Category category) => category.id)
-        .toList(growable: false);
-    debugPrint('admin_category_reorder applied after=$after');
   }
 
   Future<void> _openCategoryDialog(
@@ -312,7 +301,7 @@ class _Toolbar extends StatelessWidget {
         Expanded(
           child: Text(
             isReorderMode
-                ? 'Long-press and drag cards to set the exact category order. Positions 1 to 3 become the featured Category Entry row.'
+                ? 'Kategori sırasını yukarı/aşağı düğmeleriyle taslak olarak düzenleyin. Kaydetmeden hiçbir değişiklik uygulanmaz.'
                 : AppStrings.categoryToolbarMessage,
             style: const TextStyle(color: AppColors.textSecondary),
           ),
@@ -335,8 +324,8 @@ class _Toolbar extends StatelessWidget {
           OutlinedButton.icon(
             key: const ValueKey<String>('category-enter-reorder-mode'),
             onPressed: isBusy || !hasCategories ? null : onEnterReorderMode,
-            icon: const Icon(Icons.drag_indicator_rounded),
-            label: const Text('Reorder'),
+            icon: const Icon(Icons.swap_vert_rounded),
+            label: const Text('Sırala'),
           ),
           const SizedBox(width: AppSizes.spacingSm),
           ElevatedButton.icon(
@@ -487,15 +476,19 @@ class _CategoryReorderPanel extends StatelessWidget {
     required this.categories,
     required this.isLoading,
     required this.isSaving,
-    required this.hasUnsavedChanges,
-    required this.onReorder,
+    required this.onMoveUp,
+    required this.onMoveDown,
+    required this.onMoveToTop,
+    required this.onMoveToBottom,
   });
 
   final List<Category> categories;
   final bool isLoading;
   final bool isSaving;
-  final bool hasUnsavedChanges;
-  final void Function(int oldIndex, int newIndex) onReorder;
+  final void Function(int index) onMoveUp;
+  final void Function(int index) onMoveDown;
+  final void Function(int index) onMoveToTop;
+  final void Function(int index) onMoveToBottom;
 
   @override
   Widget build(BuildContext context) {
@@ -508,329 +501,59 @@ class _CategoryReorderPanel extends StatelessWidget {
       );
     }
 
-    return ReorderableListView.builder(
-      key: const ValueKey<String>('category-reorder-list'),
-      buildDefaultDragHandles: false,
-      padding: const EdgeInsets.only(bottom: AppSizes.spacingLg),
-      header: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          _ReorderOverview(hasUnsavedChanges: hasUnsavedChanges),
-          const SizedBox(height: AppSizes.spacingMd),
-          const _ReorderModeHint(
-            key: ValueKey<String>('category-reorder-primary-zone'),
-          ),
-        ],
-      ),
-      onReorder: isSaving ? (_, __) {} : onReorder,
-      itemCount: categories.length,
-      itemBuilder: (BuildContext context, int index) {
-        final Category category = categories[index];
-        return Container(
-          key: ValueKey<int>(category.id),
-          margin: const EdgeInsets.only(bottom: AppSizes.spacingSm),
-          child: _ReorderCategoryListTile(
-            category: category,
-            position: index,
-            dragHandle: _CategoryReorderDragHandle(
-              index: index,
-              categoryId: category.id,
-              enabled: !isSaving,
+    return AdminSortModeList<Category>(
+      listKey: const ValueKey<String>('category-reorder-list'),
+      items: categories,
+      isBusy: isSaving,
+      emptyMessage: 'No categories available to reorder yet.',
+      itemIdBuilder: (Category category) => category.id,
+      onMoveUp: onMoveUp,
+      onMoveDown: onMoveDown,
+      onMoveToTop: onMoveToTop,
+      onMoveToBottom: onMoveToBottom,
+      itemContentBuilder: (BuildContext context, Category category, int index) {
+        return Row(
+          children: <Widget>[
+            _CategorySortPreview(category: category),
+            const SizedBox(width: AppSizes.spacingMd),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    '${index + 1}. ${category.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSizes.spacingXs),
+                  Wrap(
+                    spacing: AppSizes.spacingXs,
+                    runSpacing: AppSizes.spacingXs,
+                    children: <Widget>[
+                      if (!category.isActive)
+                        const _SortStatusChip(label: 'POS gizli'),
+                      if (_isArchivedCategoryName(category.name))
+                        const _SortStatusChip(label: 'Sistem kategorisi'),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         );
       },
     );
   }
 }
 
-class _ReorderOverview extends StatelessWidget {
-  const _ReorderOverview({required this.hasUnsavedChanges});
-
-  final bool hasUnsavedChanges;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSizes.spacingLg),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: <Widget>[
-          Container(
-            height: 52,
-            width: 52,
-            decoration: BoxDecoration(
-              color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            ),
-            child: const Icon(
-              Icons.view_carousel_rounded,
-              color: AppColors.primaryDarker,
-            ),
-          ),
-          const SizedBox(width: AppSizes.spacingMd),
-          const Expanded(
-            child: Text(
-              'Drag cards into their final order, then choose Save to persist the new sort_order across every category.',
-              style: TextStyle(color: AppColors.textSecondary, height: 1.35),
-            ),
-          ),
-          const SizedBox(width: AppSizes.spacingMd),
-          _StatusChip(
-            label: hasUnsavedChanges ? 'Unsaved changes' : 'Saved order',
-            backgroundColor: hasUnsavedChanges
-                ? AppColors.warningLight
-                : AppColors.successLight,
-            foregroundColor: hasUnsavedChanges
-                ? AppColors.warningStrong
-                : AppColors.successStrong,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReorderModeHint extends StatelessWidget {
-  const _ReorderModeHint({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSizes.spacingSm),
-      padding: const EdgeInsets.all(AppSizes.spacingMd),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            'Reorder categories',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          SizedBox(height: AppSizes.spacingXs),
-          Text(
-            'Positions 1–4 are marked as Category Entry large cards. Positions 5+ remain standard grid cards. Drag using the handle on the right.',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              height: 1.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReorderCategoryListTile extends StatelessWidget {
-  const _ReorderCategoryListTile({
-    required this.category,
-    required this.position,
-    required this.dragHandle,
-  });
-
-  final Category category;
-  final int position;
-  final Widget dragHandle;
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isPrioritySlot = position < 4;
-    final bool isSystemCategory = _isArchivedCategoryName(category.name);
-
-    final List<Widget> chips = <Widget>[
-      _StatusChip(
-        label: 'Position ${position + 1}',
-        backgroundColor: AppColors.surfaceAlt,
-        foregroundColor: AppColors.textSecondary,
-      ),
-      _StatusChip(
-        label: isPrioritySlot ? 'Category Entry large' : 'Standard grid',
-        backgroundColor: isPrioritySlot
-            ? AppColors.primaryLight
-            : AppColors.surfaceAlt,
-        foregroundColor: isPrioritySlot
-            ? AppColors.primaryDarker
-            : AppColors.textSecondary,
-      ),
-      if (!category.isActive)
-        const _StatusChip(
-          label: 'Hidden on POS',
-          backgroundColor: AppColors.warningLight,
-          foregroundColor: AppColors.warningStrong,
-        ),
-      if (isSystemCategory)
-        const _StatusChip(
-          label: 'System fallback',
-          backgroundColor: AppColors.dangerLight,
-          foregroundColor: AppColors.dangerStrong,
-        ),
-    ];
-
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-          border: Border.all(
-            color: isPrioritySlot ? AppColors.primary : AppColors.borderStrong,
-          ),
-        ),
-        child: ListTile(
-          minVerticalPadding: AppSizes.spacingSm,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppSizes.spacingMd,
-            vertical: AppSizes.spacingXs,
-          ),
-          leading: _ReorderThumbnail(category: category),
-          title: Text(
-            category.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: AppSizes.spacingXs),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Wrap(
-                  spacing: AppSizes.spacingXs,
-                  runSpacing: AppSizes.spacingXs,
-                  children: chips,
-                ),
-                const SizedBox(height: AppSizes.spacingXs),
-                Text(
-                  isPrioritySlot
-                      ? 'Large card zone in Category Entry ordering.'
-                      : 'Standard grid zone in Category Entry ordering.',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    height: 1.25,
-                  ),
-                ),
-                _CategoryReorderDebugInfo(
-                  position: position,
-                  categoryId: category.id,
-                ),
-              ],
-            ),
-          ),
-          trailing: dragHandle,
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoryReorderDragHandle extends StatelessWidget {
-  const _CategoryReorderDragHandle({
-    required this.index,
-    required this.categoryId,
-    required this.enabled,
-  });
-
-  final int index;
-  final int categoryId;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final Widget handleVisual = Listener(
-      onPointerDown: (_) {
-        debugPrint(
-          'admin_category_reorder handle_down '
-          'categoryId=$categoryId index=$index enabled=$enabled',
-        );
-      },
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        key: ValueKey<String>('category-reorder-drag-handle-$categoryId'),
-        width: 56,
-        height: 56,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: enabled
-              ? AppColors.primaryLight.withValues(alpha: 0.95)
-              : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-          border: Border.all(
-            color: enabled ? AppColors.primary : AppColors.border,
-            width: enabled ? 1.5 : 1,
-          ),
-          boxShadow: enabled
-              ? <BoxShadow>[
-                  BoxShadow(
-                    color: AppColors.primaryDarker.withValues(alpha: 0.12),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : const <BoxShadow>[],
-        ),
-        child: Icon(
-          Icons.drag_indicator_rounded,
-          size: 28,
-          color: enabled ? AppColors.primaryDarker : AppColors.textMuted,
-        ),
-      ),
-    );
-
-    if (!enabled) {
-      return Tooltip(
-        message: 'Reorder is temporarily disabled while saving.',
-        child: handleVisual,
-      );
-    }
-
-    return ReorderableDragStartListener(
-      index: index,
-      child: handleVisual,
-    );
-  }
-}
-
-class _CategoryReorderDebugInfo extends StatelessWidget {
-  const _CategoryReorderDebugInfo({
-    required this.position,
-    required this.categoryId,
-  });
-
-  final int position;
-  final int categoryId;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      'Row ${position + 1} | ID $categoryId',
-      style: const TextStyle(
-        fontSize: 11,
-        color: AppColors.textMuted,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-}
-
-class _ReorderThumbnail extends StatelessWidget {
-  const _ReorderThumbnail({required this.category});
+class _CategorySortPreview extends StatelessWidget {
+  const _CategorySortPreview({required this.category});
 
   final Category category;
 
@@ -840,15 +563,14 @@ class _ReorderThumbnail extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppSizes.radiusMd),
       child: SizedBox(
-        width: 72,
-        height: 72,
+        width: 52,
+        height: 52,
         child: imageUrl == null || imageUrl.isEmpty
-            ? const _CategoryPreviewPlaceholder()
+            ? const _CategorySortPlaceholder()
             : Image.network(
                 imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    const _CategoryPreviewPlaceholder(),
+                errorBuilder: (_, __, ___) => const _CategorySortPlaceholder(),
                 loadingBuilder:
                     (
                       BuildContext context,
@@ -858,7 +580,7 @@ class _ReorderThumbnail extends StatelessWidget {
                       if (loadingProgress == null) {
                         return child;
                       }
-                      return const _CategoryPreviewPlaceholder();
+                      return const _CategorySortPlaceholder();
                     },
               ),
       ),
@@ -866,62 +588,45 @@ class _ReorderThumbnail extends StatelessWidget {
   }
 }
 
-class _CategoryPreviewPlaceholder extends StatelessWidget {
-  const _CategoryPreviewPlaceholder();
+class _CategorySortPlaceholder extends StatelessWidget {
+  const _CategorySortPlaceholder();
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[
-            AppColors.primaryLight,
-            AppColors.primaryLighter,
-            AppColors.surfaceAlt,
-          ],
-        ),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
       ),
-      child: Center(
-        child: Icon(
-          Icons.image_outlined,
-          size: 40,
-          color: AppColors.primaryDarker.withValues(alpha: 0.72),
-        ),
+      child: const Center(
+        child: Icon(Icons.folder_open_rounded, color: AppColors.primaryDarker),
       ),
     );
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({
-    required this.label,
-    required this.backgroundColor,
-    required this.foregroundColor,
-  });
+class _SortStatusChip extends StatelessWidget {
+  const _SortStatusChip({required this.label});
 
   final String label;
-  final Color backgroundColor;
-  final Color foregroundColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSizes.spacingSm,
-        vertical: 6,
+        vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: AppColors.surfaceAlt,
         borderRadius: BorderRadius.circular(AppSizes.radiusSm),
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: foregroundColor,
+          color: AppColors.textSecondary,
         ),
       ),
     );
@@ -1014,7 +719,9 @@ class _CategoryDialogState extends State<_CategoryDialog> {
               TextField(
                 key: const ValueKey<String>('category-sort-order-field'),
                 controller: _sortOrderController,
-                decoration: InputDecoration(labelText: AppStrings.sortOrderLabel),
+                decoration: InputDecoration(
+                  labelText: AppStrings.sortOrderLabel,
+                ),
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: AppSizes.spacingMd),

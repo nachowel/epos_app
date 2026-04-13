@@ -316,11 +316,56 @@ class AdminService {
     return _productRepository.getByCategory(categoryId, activeOnly: false);
   }
 
+  Future<void> reorderProductsInCategory({
+    required User user,
+    required int categoryId,
+    required List<int> orderedIds,
+  }) async {
+    _ensureAdmin(user);
+    await _requireCategory(categoryId);
+
+    final List<Product> categoryProducts = await _productRepository
+        .getByCategory(categoryId, activeOnly: false);
+    if (categoryProducts.length != orderedIds.length) {
+      throw ValidationException(
+        'Product reorder payload must include every product in the selected category exactly once.',
+      );
+    }
+
+    final Set<int> expectedIds = categoryProducts
+        .map((Product product) => product.id)
+        .toSet();
+    final Set<int> actualIds = orderedIds.toSet();
+    if (expectedIds.length != actualIds.length ||
+        !expectedIds.containsAll(actualIds) ||
+        !actualIds.containsAll(expectedIds)) {
+      throw ValidationException(
+        'Product reorder payload must include every product in the selected category exactly once.',
+      );
+    }
+
+    await _productRepository.reorderWithinCategory(
+      categoryId: categoryId,
+      orderedIds: orderedIds,
+    );
+    await _auditLogService.logActionSafely(
+      actorUserId: user.id,
+      action: 'product_reordered',
+      entityType: 'product',
+      entityId: 'category:$categoryId',
+      metadata: <String, Object?>{
+        'category_id': categoryId,
+        'ordered_ids': orderedIds,
+      },
+    );
+  }
+
   Future<int> createProduct({
     required User user,
     required int categoryId,
     required String name,
     required int priceMinor,
+    String? imageUrl,
     required bool hasModifiers,
     required int sortOrder,
     bool isActive = true,
@@ -336,6 +381,7 @@ class AdminService {
       categoryId: categoryId,
       name: name.trim(),
       priceMinor: priceMinor,
+      imageUrl: _normalizeOptionalImageUrl(imageUrl),
       hasModifiers: hasModifiers,
       sortOrder: sortOrder,
       isActive: isActive,
@@ -350,6 +396,7 @@ class AdminService {
         'category_id': categoryId,
         'name': name.trim(),
         'price_minor': priceMinor,
+        'image_url': _normalizeOptionalImageUrl(imageUrl),
         'has_modifiers': hasModifiers,
         'is_active': isActive,
         'is_visible_on_pos': isVisibleOnPos,
@@ -419,6 +466,7 @@ class AdminService {
     required int categoryId,
     required String name,
     required int priceMinor,
+    String? imageUrl,
     required bool hasModifiers,
     required int sortOrder,
     required bool isActive,
@@ -440,6 +488,7 @@ class AdminService {
       categoryId: categoryId,
       name: name.trim(),
       priceMinor: priceMinor,
+      imageUrl: _normalizeOptionalImageUrl(imageUrl),
       hasModifiers: hasModifiers,
       sortOrder: sortOrder,
       isActive: isActive,
@@ -461,6 +510,8 @@ class AdminService {
         'new_name': after.name,
         'old_price_minor': before.priceMinor,
         'new_price_minor': after.priceMinor,
+        'old_image_url': before.imageUrl,
+        'new_image_url': after.imageUrl,
         'old_has_modifiers': before.hasModifiers,
         'new_has_modifiers': after.hasModifiers,
       },
@@ -812,35 +863,77 @@ class AdminService {
     return _printerService.getBondedDevices();
   }
 
+  Future<bool> isBluetoothAvailable() => _printerService.isBluetoothAvailable();
+
   Future<void> savePrinterSettings({
     required User user,
-    required String deviceName,
-    required String deviceAddress,
+    required PrinterConnectionType connectionType,
+    String? deviceName,
+    String? deviceAddress,
+    String? ipAddress,
+    int? port,
     required int paperWidth,
   }) async {
     _ensureAdmin(user);
-    _validateRequiredName(deviceName, fieldName: 'Printer name');
-    _validateRequiredName(deviceAddress, fieldName: 'Printer address');
+    final String resolvedDeviceName = _resolvePrinterName(
+      deviceName,
+      connectionType: connectionType,
+    );
+    final String? resolvedDeviceAddress = _resolvePrinterAddress(
+      deviceAddress,
+      connectionType: connectionType,
+    );
+    final String? resolvedIpAddress = _resolvePrinterIpAddress(
+      ipAddress,
+      connectionType: connectionType,
+    );
+    final int? resolvedPort = _resolvePrinterPort(
+      port,
+      connectionType: connectionType,
+    );
     await _printerService.savePrinterSettings(
-      deviceName: deviceName.trim(),
-      deviceAddress: deviceAddress.trim(),
+      deviceName: resolvedDeviceName,
+      deviceAddress: resolvedDeviceAddress ?? resolvedIpAddress!,
       paperWidth: paperWidth,
+      connectionType: connectionType,
+      ipAddress: resolvedIpAddress,
+      port: resolvedPort,
     );
   }
 
   Future<void> printTestPage({
     required User user,
-    required String deviceName,
-    required String deviceAddress,
+    required PrinterConnectionType connectionType,
+    String? deviceName,
+    String? deviceAddress,
+    String? ipAddress,
+    int? port,
     required int paperWidth,
   }) async {
     _ensureAdmin(user);
-    _validateRequiredName(deviceName, fieldName: 'Printer name');
-    _validateRequiredName(deviceAddress, fieldName: 'Printer address');
+    final String resolvedDeviceName = _resolvePrinterName(
+      deviceName,
+      connectionType: connectionType,
+    );
+    final String? resolvedDeviceAddress = _resolvePrinterAddress(
+      deviceAddress,
+      connectionType: connectionType,
+    );
+    final String? resolvedIpAddress = _resolvePrinterIpAddress(
+      ipAddress,
+      connectionType: connectionType,
+    );
+    final int? resolvedPort = _resolvePrinterPort(
+      port,
+      connectionType: connectionType,
+    );
     await _printerService.printTestPage(
-      deviceName: deviceName.trim(),
-      deviceAddress: deviceAddress.trim(),
+      deviceName: resolvedDeviceName,
+      deviceAddress: resolvedDeviceAddress ?? resolvedIpAddress!,
       paperWidth: paperWidth,
+      connectionType: connectionType,
+      ipAddress: resolvedIpAddress,
+      port: resolvedPort,
     );
   }
 
@@ -1158,6 +1251,108 @@ class AdminService {
     if (value < 0) {
       throw ValidationException('$fieldName cannot be negative.');
     }
+  }
+
+  String _resolvePrinterName(
+    String? value, {
+    required PrinterConnectionType connectionType,
+  }) {
+    final String trimmed = value?.trim() ?? '';
+    if (trimmed.isNotEmpty) {
+      return trimmed;
+    }
+    if (connectionType == PrinterConnectionType.ethernet) {
+      return 'Ethernet Printer';
+    }
+    throw ValidationException('Printer name is required.');
+  }
+
+  String? _resolvePrinterAddress(
+    String? value, {
+    required PrinterConnectionType connectionType,
+  }) {
+    if (connectionType == PrinterConnectionType.ethernet) {
+      return null;
+    }
+    final String trimmed = value?.trim() ?? '';
+    _validateRequiredName(trimmed, fieldName: 'Printer address');
+    return trimmed;
+  }
+
+  String? _resolvePrinterIpAddress(
+    String? value, {
+    required PrinterConnectionType connectionType,
+  }) {
+    if (connectionType == PrinterConnectionType.bluetooth) {
+      return null;
+    }
+    final String trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      throw ValidationException(
+        'Printer host is required for ethernet connections.',
+      );
+    }
+    if (trimmed.contains(RegExp(r'\s'))) {
+      throw ValidationException('Printer host cannot contain whitespace.');
+    }
+    if (_isValidIpv4(trimmed)) {
+      return trimmed;
+    }
+    if (_looksLikeIpv4Candidate(trimmed)) {
+      throw ValidationException(
+        'Printer host must be a valid IPv4 address or hostname.',
+      );
+    }
+    if (!_isValidHostname(trimmed)) {
+      throw ValidationException(
+        'Printer host must be a valid IPv4 address or hostname.',
+      );
+    }
+    return trimmed.toLowerCase();
+  }
+
+  int? _resolvePrinterPort(
+    int? port, {
+    required PrinterConnectionType connectionType,
+  }) {
+    if (connectionType == PrinterConnectionType.bluetooth) {
+      return null;
+    }
+    final int resolvedPort = port ?? PrinterSettingsModel.defaultEthernetPort;
+    if (resolvedPort <= 0 || resolvedPort > 65535) {
+      throw ValidationException('Printer port must be between 1 and 65535.');
+    }
+    return resolvedPort;
+  }
+
+  bool _isValidIpv4(String value) {
+    final RegExp ipv4RegExp = RegExp(
+      r'^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$',
+    );
+    return ipv4RegExp.hasMatch(value);
+  }
+
+  bool _looksLikeIpv4Candidate(String value) {
+    return RegExp(r'^[0-9.]+$').hasMatch(value);
+  }
+
+  bool _isValidHostname(String value) {
+    if (value.length > 253) {
+      return false;
+    }
+    final List<String> labels = value.split('.');
+    if (labels.any((String label) => label.isEmpty || label.length > 63)) {
+      return false;
+    }
+    const String labelPattern =
+        r'^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$';
+    final RegExp labelRegExp = RegExp(labelPattern);
+    for (final String label in labels) {
+      if (!labelRegExp.hasMatch(label)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   int _nextSortOrder(Iterable<int> existingSortOrders) {

@@ -1316,4 +1316,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shiftPreviewTaken => 'Preview taken — cashier locked';
+
+  @override
+  String get bluetoothUnsupportedPlatform =>
+      'Bluetooth is not available on this platform.';
 }
