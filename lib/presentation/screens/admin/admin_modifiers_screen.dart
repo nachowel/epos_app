@@ -8,6 +8,8 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../domain/models/product.dart';
 import '../../../domain/models/product_modifier.dart';
 import '../../providers/admin_modifiers_provider.dart';
+import '../../widgets/app_numeric_keypad_dialog.dart';
+import '../../widgets/selective_system_keyboard_field.dart';
 import 'widgets/admin_scaffold.dart';
 
 const String _flatModifiersOnlyBanner =
@@ -245,6 +247,7 @@ class _ModifierDialog extends StatefulWidget {
 class _ModifierDialogState extends State<_ModifierDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _priceController;
+  late final FocusNode _priceFocusNode;
   late ModifierType _type;
   late bool _isActive;
 
@@ -253,8 +256,11 @@ class _ModifierDialogState extends State<_ModifierDialog> {
     super.initState();
     _nameController = TextEditingController(text: widget.modifier?.name ?? '');
     _priceController = TextEditingController(
-      text: '${widget.modifier?.extraPriceMinor ?? 0}',
+      text: CurrencyFormatter.toEditableMajorInput(
+        widget.modifier?.extraPriceMinor ?? 0,
+      ),
     );
+    _priceFocusNode = FocusNode(debugLabel: 'admin-modifier-price-field');
     _type = widget.modifier?.type ?? ModifierType.included;
     _isActive = widget.modifier?.isActive ?? true;
   }
@@ -263,6 +269,7 @@ class _ModifierDialogState extends State<_ModifierDialog> {
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
+    _priceFocusNode.dispose();
     super.dispose();
   }
 
@@ -279,7 +286,7 @@ class _ModifierDialogState extends State<_ModifierDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            TextField(
+            SelectiveSystemKeyboardTextField(
               controller: _nameController,
               decoration: InputDecoration(
                 labelText: AppStrings.modifierNameLabel,
@@ -306,11 +313,18 @@ class _ModifierDialogState extends State<_ModifierDialog> {
             const SizedBox(height: AppSizes.spacingMd),
             TextField(
               controller: _priceController,
+              focusNode: _priceFocusNode,
               enabled: _type == ModifierType.extra,
               decoration: InputDecoration(
-                labelText: AppStrings.extraPriceMinorLabel,
+                labelText: 'Extra price (£)',
+                hintText: '0.00',
+                prefixText: '£ ',
               ),
-              keyboardType: TextInputType.number,
+              readOnly: true,
+              showCursor: false,
+              enableInteractiveSelection: false,
+              keyboardType: TextInputType.none,
+              onTap: _type == ModifierType.extra ? _openPriceKeypad : null,
             ),
             const SizedBox(height: AppSizes.spacingMd),
             SwitchListTile(
@@ -334,7 +348,10 @@ class _ModifierDialogState extends State<_ModifierDialog> {
                 name: _nameController.text,
                 type: _type,
                 extraPriceMinor: _type == ModifierType.extra
-                    ? int.tryParse(_priceController.text) ?? -1
+                    ? CurrencyFormatter.tryParseEditableMajorInput(
+                            _priceController.text,
+                          ) ??
+                          -1
                     : 0,
                 isActive: _isActive,
               ),
@@ -343,6 +360,32 @@ class _ModifierDialogState extends State<_ModifierDialog> {
           child: Text(AppStrings.saveSettings),
         ),
       ],
+    );
+  }
+
+  Future<void> _openPriceKeypad() async {
+    final int? extraPriceMinor = await AppNumericKeypadDialog.showCurrencyMinor(
+      context,
+      title: 'Enter extra price',
+      previewLabel: 'Extra price',
+      initialMinor: CurrencyFormatter.tryParseEditableMajorInput(
+        _priceController.text,
+      ),
+      prefixText: '£ ',
+      emptyPreview: '0.00',
+      confirmButtonLabel: 'Apply',
+      restoreFocusNode: _priceFocusNode,
+    );
+    if (!mounted || extraPriceMinor == null) {
+      return;
+    }
+
+    final String value = CurrencyFormatter.toEditableMajorInput(
+      extraPriceMinor,
+    );
+    _priceController.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
     );
   }
 }

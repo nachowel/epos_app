@@ -7,6 +7,7 @@ import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../domain/models/payment.dart';
+import '../../../widgets/app_numeric_keypad_dialog.dart';
 
 typedef PaymentSubmitCallback =
     Future<String?> Function(PaymentMethod paymentMethod);
@@ -32,6 +33,9 @@ class PaymentDialog extends StatefulWidget {
 }
 
 class _PaymentDialogState extends State<PaymentDialog> {
+  static const AppNumericValueOptions _cashInputOptions =
+      AppNumericValueOptions(currencyMode: true);
+
   late PaymentMethod _paymentMethod;
   bool _isSubmitting = false;
   bool _replaceOnNextDigit = true;
@@ -58,12 +62,6 @@ class _PaymentDialogState extends State<PaymentDialog> {
   @override
   Widget build(BuildContext context) {
     final Size screenSize = MediaQuery.sizeOf(context);
-    final double dialogWidth = math.min(
-      screenSize.width * (_isCashMode ? 0.48 : 0.5),
-      _isCashMode ? 580 : 640,
-    );
-    final double horizontalPadding = _isCashMode ? 18 : 24;
-    final double verticalPadding = _isCashMode ? 16 : 22;
     final bool isInteractionBlocked = widget.isSubmissionBlocked;
     final int receivedMinor = _receivedMinor;
     final int shortfallMinor = math.max(
@@ -79,6 +77,15 @@ class _PaymentDialogState extends State<PaymentDialog> {
         !isInteractionBlocked &&
         (!_isCashMode || shortfallMinor == 0);
     final List<int> quickCashAmountsMinor = _buildQuickCashAmountsMinor();
+    final bool compactDialog = screenSize.height <= 700;
+    final double dialogWidth = math.min(
+      screenSize.width * (_isCashMode ? 0.48 : 0.44),
+      _isCashMode ? 580 : 520,
+    );
+    final double dialogHeight = math.min(
+      _isCashMode ? (compactDialog ? 560 : 860) : (compactDialog ? 400 : 470),
+      screenSize.height - 32,
+    );
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -86,297 +93,335 @@ class _PaymentDialogState extends State<PaymentDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: SizedBox(
         width: dialogWidth,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: math.max(360, screenSize.height - 32),
+        height: dialogHeight,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            _isCashMode ? (compactDialog ? 10 : 20) : 24,
+            _isCashMode ? (compactDialog ? 10 : 18) : 24,
+            _isCashMode ? (compactDialog ? 10 : 20) : 24,
+            _isCashMode ? (compactDialog ? 8 : 18) : 20,
           ),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              horizontalPadding,
-              verticalPadding,
-              horizontalPadding,
-              verticalPadding,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Text(
-                    AppStrings.paymentTitle,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textSecondary,
-                    ),
+          child: _isCashMode
+              ? _buildCashScreen(
+                  shortfallMinor: shortfallMinor,
+                  changeMinor: changeMinor,
+                  isInteractionBlocked: isInteractionBlocked,
+                  isPayEnabled: isPayEnabled,
+                  quickCashAmountsMinor: quickCashAmountsMinor,
+                  compactDialog: compactDialog,
+                )
+              : _buildCardScreen(
+                  isInteractionBlocked: isInteractionBlocked,
+                  isPayEnabled: isPayEnabled,
+                  compactDialog: compactDialog,
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardScreen({
+    required bool isInteractionBlocked,
+    required bool isPayEnabled,
+    required bool compactDialog,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        SizedBox(height: compactDialog ? 4 : 8),
+        Text(
+          'Card Payment',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: compactDialog ? 12 : 13,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+            letterSpacing: 0.2,
+          ),
+        ),
+        SizedBox(height: compactDialog ? 10 : 16),
+        Expanded(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  CurrencyFormatter.fromMinor(widget.totalAmountMinor),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: compactDialog ? 44 : 56,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primaryStrong,
+                    height: 1,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    CurrencyFormatter.fromMinor(widget.totalAmountMinor),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 38,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
-                      height: 1,
-                    ),
-                  ),
-                  SizedBox(height: _isCashMode ? 10 : 14),
-                  SizedBox(
-                    height: 44,
-                    child: SegmentedButton<PaymentMethod>(
-                      selected: <PaymentMethod>{_paymentMethod},
-                      showSelectedIcon: false,
-                      style: ButtonStyle(
-                        minimumSize: const WidgetStatePropertyAll<Size>(
-                          Size.fromHeight(44),
-                        ),
-                        textStyle: const WidgetStatePropertyAll<TextStyle>(
-                          TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                        ),
-                        foregroundColor: WidgetStateProperty.resolveWith<Color>(
-                          (Set<WidgetState> states) {
-                            if (states.contains(WidgetState.selected)) {
-                              return AppColors.surface;
-                            }
-                            return AppColors.primary;
-                          },
-                        ),
-                        backgroundColor: WidgetStateProperty.resolveWith<Color>(
-                          (Set<WidgetState> states) {
-                            if (states.contains(WidgetState.selected)) {
-                              return AppColors.primary;
-                            }
-                            return AppColors.surfaceMuted;
-                          },
-                        ),
-                        side: const WidgetStatePropertyAll<BorderSide>(
-                          BorderSide(color: AppColors.border),
-                        ),
-                      ),
-                      segments: <ButtonSegment<PaymentMethod>>[
-                        ButtonSegment(
-                          value: PaymentMethod.cash,
-                          label: Text(AppStrings.cash),
-                        ),
-                        ButtonSegment(
-                          value: PaymentMethod.card,
-                          label: Text(AppStrings.card),
-                        ),
-                      ],
-                      onSelectionChanged: (Set<PaymentMethod> selected) {
-                        if (selected.isEmpty) {
-                          return;
-                        }
-                        final PaymentMethod nextMethod = selected.first;
-                        setState(() {
-                          _paymentMethod = nextMethod;
-                          _errorMessage = null;
-                          if (nextMethod == PaymentMethod.cash) {
-                            _setReceivedAmountMinor(
-                              widget.totalAmountMinor,
-                              replaceOnNextDigit: true,
-                            );
-                          }
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (_isCashMode) ...<Widget>[
-                    Text(
-                      AppStrings.receivedAmount,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    TextField(
-                      key: const ValueKey<String>(
-                        'payment-received-amount-field',
-                      ),
-                      controller: _receivedController,
-                      readOnly: true,
-                      showCursor: false,
-                      enableInteractiveSelection: false,
-                      keyboardType: TextInputType.none,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      decoration: InputDecoration(
-                        prefixText: '£ ',
-                        prefixStyle: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textSecondary,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSizes.radiusMd,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSizes.radiusMd,
-                          ),
-                          borderSide: const BorderSide(color: AppColors.border),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: <Widget>[
-                        _QuickAmountButton(
-                          key: const ValueKey<String>('quick-cash-exact'),
-                          label: 'Exact',
-                          emphasized: true,
-                          onPressed: () => _setReceivedAmountMinor(
-                            widget.totalAmountMinor,
-                            replaceOnNextDigit: true,
-                          ),
-                        ),
-                        for (final int amountMinor in quickCashAmountsMinor)
-                          _QuickAmountButton(
-                            key: ValueKey<String>('quick-cash-$amountMinor'),
-                            label: _quickAmountLabel(amountMinor),
-                            onPressed: () => _setReceivedAmountMinor(
-                              amountMinor,
-                              replaceOnNextDigit: true,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    _NumericKeypad(
-                      onDigit: _appendDigit,
-                      onDecimal: _appendDecimalPoint,
-                      onBackspace: _backspace,
-                    ),
-                    const SizedBox(height: 6),
-                    _CashStatusBanner(
-                      shortfallMinor: shortfallMinor,
-                      changeMinor: changeMinor,
-                    ),
-                  ],
-                  if (_errorMessage != null) ...<Widget>[
-                    const SizedBox(height: 8),
-                    Text(
-                      _errorMessage!,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.error,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                  if (isInteractionBlocked) ...<Widget>[
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.blockedMessage ??
-                          AppStrings.salesLockedAdminCloseRequired,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.error,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                  SizedBox(height: _isCashMode ? 24 : 24),
-                  SizedBox(
-                    height: 64,
-                    child: ElevatedButton(
-                      key: const ValueKey<String>('payment-submit'),
-                      onPressed: isPayEnabled ? _submit : null,
-                      style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSizes.radiusLg,
-                          ),
-                        ),
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.surface,
-                        disabledBackgroundColor: AppColors.surfaceMuted,
-                        disabledForegroundColor: AppColors.textSecondary,
-                        textStyle: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.surface,
-                        ),
-                      ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.6,
-                                color: AppColors.surface,
-                              ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: <Widget>[
-                                Icon(
-                                  _isCashMode
-                                      ? Icons.check_circle_outline_rounded
-                                      : Icons.credit_card_rounded,
-                                  size: 22,
-                                  color: AppColors.surface,
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  '${AppStrings.payAction} ${CurrencyFormatter.fromMinor(widget.totalAmountMinor)}',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.surface,
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    height: 56,
-                    child: OutlinedButton(
-                      key: const ValueKey<String>('payment-cancel'),
-                      onPressed: _isSubmitting
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.border),
-                        foregroundColor: AppColors.textSecondary,
-                        backgroundColor: AppColors.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSizes.radiusLg,
-                          ),
-                        ),
-                      ),
-                      child: Text(
-                        AppStrings.cancel,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                SizedBox(height: compactDialog ? 8 : 10),
+                Icon(
+                  Icons.credit_card_rounded,
+                  size: compactDialog ? 28 : 34,
+                  color: AppColors.textSecondary,
+                ),
+              ],
             ),
           ),
         ),
+        _buildFeedbackMessages(isInteractionBlocked: isInteractionBlocked),
+        SizedBox(
+          height: compactDialog ? 64 : 76,
+          child: ElevatedButton(
+            key: const ValueKey<String>('payment-submit'),
+            onPressed: isPayEnabled ? _submit : null,
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+              ),
+              backgroundColor: AppColors.primaryStrong,
+              foregroundColor: AppColors.surface,
+              disabledBackgroundColor: AppColors.surfaceMuted,
+              disabledForegroundColor: AppColors.textSecondary,
+              textStyle: TextStyle(
+                fontSize: compactDialog ? 19 : 22,
+                fontWeight: FontWeight.w900,
+                color: AppColors.surface,
+              ),
+            ),
+            child: _isSubmitting
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.8,
+                      color: AppColors.surface,
+                    ),
+                  )
+                : Text(
+                    '${AppStrings.payAction} ${CurrencyFormatter.fromMinor(widget.totalAmountMinor)}',
+                  ),
+          ),
+        ),
+        SizedBox(height: compactDialog ? 6 : 10),
+        Center(
+          child: TextButton(
+            key: const ValueKey<String>('payment-cancel'),
+            onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              textStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            child: Text(AppStrings.cancel),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCashScreen({
+    required int shortfallMinor,
+    required int changeMinor,
+    required bool isInteractionBlocked,
+    required bool isPayEnabled,
+    required List<int> quickCashAmountsMinor,
+    required bool compactDialog,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          AppStrings.receivedAmount,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: compactDialog ? 12 : 13,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textSecondary,
+            letterSpacing: 0.2,
+          ),
+        ),
+        SizedBox(height: compactDialog ? 4 : 8),
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: compactDialog ? 10 : 18,
+            vertical: compactDialog ? 10 : 18,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.borderStrong, width: 1.2),
+          ),
+          child: TextField(
+            key: const ValueKey<String>('payment-received-amount-field'),
+            controller: _receivedController,
+            readOnly: true,
+            showCursor: false,
+            enableInteractiveSelection: false,
+            keyboardType: TextInputType.none,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: compactDialog ? 28 : 40,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+              height: 1,
+            ),
+            decoration: InputDecoration(
+              prefixText: '£ ',
+              prefixStyle: TextStyle(
+                fontSize: compactDialog ? 20 : 28,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textSecondary,
+              ),
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ),
+        SizedBox(height: compactDialog ? 6 : 12),
+        Wrap(
+          spacing: compactDialog ? 6 : 10,
+          runSpacing: compactDialog ? 6 : 10,
+          children: <Widget>[
+            _QuickAmountButton(
+              key: const ValueKey<String>('quick-cash-exact'),
+              label: 'Exact',
+              emphasized: true,
+              compact: compactDialog,
+              onPressed: () => _setReceivedAmountMinor(
+                widget.totalAmountMinor,
+                replaceOnNextDigit: true,
+              ),
+            ),
+            for (final int amountMinor in quickCashAmountsMinor)
+              _QuickAmountButton(
+                key: ValueKey<String>('quick-cash-$amountMinor'),
+                label: _quickAmountLabel(amountMinor),
+                compact: compactDialog,
+                onPressed: () => _setReceivedAmountMinor(
+                  amountMinor,
+                  replaceOnNextDigit: true,
+                ),
+              ),
+          ],
+        ),
+        SizedBox(height: compactDialog ? 6 : 12),
+        Container(
+          padding: EdgeInsets.all(compactDialog ? 6 : 12),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLighter,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.24),
+            ),
+          ),
+          child: AppNumericKeypad(
+            keyPrefix: 'payment-keypad',
+            buttonHeight: compactDialog ? 44 : 72,
+            rowSpacing: compactDialog ? 6 : 10,
+            columnSpacing: compactDialog ? 6 : 10,
+            digitTextStyle: TextStyle(
+              fontSize: compactDialog ? 16 : 22,
+              fontWeight: FontWeight.w900,
+            ),
+            iconSize: compactDialog ? 16 : 22,
+            onDigit: _appendDigit,
+            onDecimal: _appendDecimal,
+            onBackspace: _backspace,
+          ),
+        ),
+        SizedBox(height: compactDialog ? 6 : 12),
+        _CashStatusBanner(
+          shortfallMinor: shortfallMinor,
+          changeMinor: changeMinor,
+          compact: compactDialog,
+        ),
+        _buildFeedbackMessages(isInteractionBlocked: isInteractionBlocked),
+        if (!compactDialog) const Spacer() else const SizedBox(height: 6),
+        SizedBox(
+          height: compactDialog ? 56 : 78,
+          child: ElevatedButton(
+            key: const ValueKey<String>('payment-submit'),
+            onPressed: isPayEnabled ? _submit : null,
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+              ),
+              backgroundColor: AppColors.primaryStrong,
+              foregroundColor: AppColors.surface,
+              disabledBackgroundColor: AppColors.surfaceMuted,
+              disabledForegroundColor: AppColors.textSecondary,
+              textStyle: TextStyle(
+                fontSize: compactDialog ? 17 : 22,
+                fontWeight: FontWeight.w900,
+                color: AppColors.surface,
+              ),
+            ),
+            child: _isSubmitting
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.8,
+                      color: AppColors.surface,
+                    ),
+                  )
+                : Text(
+                    '${AppStrings.payAction} ${CurrencyFormatter.fromMinor(widget.totalAmountMinor)}',
+                  ),
+          ),
+        ),
+        SizedBox(height: compactDialog ? 4 : 10),
+        Center(
+          child: TextButton(
+            key: const ValueKey<String>('payment-cancel'),
+            onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.textSecondary,
+              textStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            child: Text(AppStrings.cancel),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeedbackMessages({required bool isInteractionBlocked}) {
+    if (_errorMessage == null && !isInteractionBlocked) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          if (_errorMessage != null)
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          if (_errorMessage != null && isInteractionBlocked)
+            const SizedBox(height: 6),
+          if (isInteractionBlocked)
+            Text(
+              widget.blockedMessage ?? AppStrings.salesLockedAdminCloseRequired,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -407,23 +452,10 @@ class _PaymentDialogState extends State<PaymentDialog> {
     if (!_isCashMode) {
       return widget.totalAmountMinor;
     }
-    return _tryParseReceivedMinor(_receivedController.text) ?? 0;
-  }
-
-  int? _tryParseReceivedMinor(String input) {
-    final String trimmed = input.trim();
-    if (trimmed.isEmpty) {
-      return 0;
-    }
-    final RegExp validPattern = RegExp(r'^\d+(\.\d{0,2})?$');
-    if (!validPattern.hasMatch(trimmed)) {
-      return null;
-    }
-
-    final List<String> parts = trimmed.split('.');
-    final int pounds = int.parse(parts.first);
-    final String pence = parts.length == 2 ? parts[1].padRight(2, '0') : '00';
-    return (pounds * 100) + int.parse(pence.substring(0, 2));
+    return AppNumericInputLogic.tryParseCurrencyMinor(
+          _receivedController.text,
+        ) ??
+        0;
   }
 
   void _setReceivedAmountMinor(
@@ -455,57 +487,44 @@ class _PaymentDialogState extends State<PaymentDialog> {
   }
 
   void _appendDigit(String digit) {
-    String current = _replaceOnNextDigit ? '' : _receivedController.text;
-    if (current == '0') {
-      current = '';
-    }
-    if (current.contains('.')) {
-      final String decimals = current.split('.')[1];
-      if (decimals.length >= 2) {
-        return;
-      }
-    }
-
-    final String nextValue = '${current.isEmpty ? '' : current}$digit';
-    _setReceivedText(nextValue, replaceOnNextDigit: false);
+    final AppNumericEditResult result = AppNumericInputLogic.appendDigit(
+      currentValue: _receivedController.text,
+      digit: digit,
+      replaceOnNextDigit: _replaceOnNextDigit,
+      options: _cashInputOptions,
+    );
+    _setReceivedText(
+      result.value,
+      replaceOnNextDigit: result.replaceOnNextDigit,
+    );
   }
 
-  void _appendDecimalPoint() {
-    String current = _replaceOnNextDigit ? '' : _receivedController.text;
-    if (current.contains('.')) {
-      return;
-    }
-    if (current.isEmpty) {
-      current = '0';
-    }
-    _setReceivedText('$current.', replaceOnNextDigit: false);
+  void _appendDecimal() {
+    final AppNumericEditResult result = AppNumericInputLogic.appendDecimal(
+      currentValue: _receivedController.text,
+      replaceOnNextDigit: _replaceOnNextDigit,
+      options: _cashInputOptions,
+    );
+    _setReceivedText(
+      result.value,
+      replaceOnNextDigit: result.replaceOnNextDigit,
+    );
   }
 
   void _backspace() {
-    if (_replaceOnNextDigit) {
-      _setReceivedText('0', replaceOnNextDigit: false);
-      return;
-    }
-
-    String current = _receivedController.text;
-    if (current.isEmpty) {
-      return;
-    }
-    current = current.substring(0, current.length - 1);
-    if (current.endsWith('.')) {
-      current = current.substring(0, current.length - 1);
-    }
-    if (current.isEmpty) {
-      current = '0';
-    }
-    _setReceivedText(current, replaceOnNextDigit: false);
+    final AppNumericEditResult result = AppNumericInputLogic.backspace(
+      currentValue: _receivedController.text,
+      replaceOnNextDigit: _replaceOnNextDigit,
+      emptyValue: '0',
+    );
+    _setReceivedText(
+      result.value,
+      replaceOnNextDigit: result.replaceOnNextDigit,
+    );
   }
 
   List<int> _buildQuickCashAmountsMinor() {
-    final int firstPreset = ((widget.totalAmountMinor + 999) ~/ 1000) * 1000;
-    return <int>[firstPreset, firstPreset + 1000, firstPreset + 2000]
-        .where((int amountMinor) => amountMinor > widget.totalAmountMinor)
-        .toList(growable: false);
+    return const <int>[2000, 3000, 4000];
   }
 
   String _quickAmountLabel(int amountMinor) => '£${amountMinor ~/ 100}';
@@ -515,10 +534,12 @@ class _CashStatusBanner extends StatelessWidget {
   const _CashStatusBanner({
     required this.shortfallMinor,
     required this.changeMinor,
+    this.compact = false,
   });
 
   final int shortfallMinor;
   final int changeMinor;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -527,182 +548,35 @@ class _CashStatusBanner extends StatelessWidget {
     final Color textColor = isInsufficient
         ? AppColors.error
         : (hasChange ? AppColors.success : AppColors.textPrimary);
+    final Color backgroundColor = isInsufficient
+        ? AppColors.dangerLight
+        : (hasChange ? AppColors.successLight : AppColors.surfaceMuted);
     final String label = isInsufficient
         ? 'Insufficient by ${CurrencyFormatter.fromMinor(shortfallMinor)}'
         : '${AppStrings.change}: ${CurrencyFormatter.fromMinor(changeMinor)}';
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 18,
+        vertical: compact ? 10 : 16,
+      ),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        color: backgroundColor.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        border: Border.all(
+          color: hasChange ? AppColors.success : AppColors.borderStrong,
+          width: hasChange ? 1.4 : 1.0,
+        ),
       ),
       child: Text(
         label,
+        textAlign: TextAlign.center,
         style: TextStyle(
-          fontSize: 16,
+          fontSize: hasChange ? (compact ? 18 : 28) : (compact ? 14 : 20),
           color: textColor,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w900,
+          height: 1,
         ),
-      ),
-    );
-  }
-}
-
-class _NumericKeypad extends StatelessWidget {
-  const _NumericKeypad({
-    required this.onDigit,
-    required this.onDecimal,
-    required this.onBackspace,
-  });
-
-  final ValueChanged<String> onDigit;
-  final VoidCallback onDecimal;
-  final VoidCallback onBackspace;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: <Widget>[
-        _KeypadRow(
-          children: <Widget>[
-            _KeypadButton(
-              key: const ValueKey<String>('payment-keypad-1'),
-              label: '1',
-              onPressed: () => onDigit('1'),
-            ),
-            _KeypadButton(
-              key: const ValueKey<String>('payment-keypad-2'),
-              label: '2',
-              onPressed: () => onDigit('2'),
-            ),
-            _KeypadButton(
-              key: const ValueKey<String>('payment-keypad-3'),
-              label: '3',
-              onPressed: () => onDigit('3'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        _KeypadRow(
-          children: <Widget>[
-            _KeypadButton(
-              key: const ValueKey<String>('payment-keypad-4'),
-              label: '4',
-              onPressed: () => onDigit('4'),
-            ),
-            _KeypadButton(
-              key: const ValueKey<String>('payment-keypad-5'),
-              label: '5',
-              onPressed: () => onDigit('5'),
-            ),
-            _KeypadButton(
-              key: const ValueKey<String>('payment-keypad-6'),
-              label: '6',
-              onPressed: () => onDigit('6'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        _KeypadRow(
-          children: <Widget>[
-            _KeypadButton(
-              key: const ValueKey<String>('payment-keypad-7'),
-              label: '7',
-              onPressed: () => onDigit('7'),
-            ),
-            _KeypadButton(
-              key: const ValueKey<String>('payment-keypad-8'),
-              label: '8',
-              onPressed: () => onDigit('8'),
-            ),
-            _KeypadButton(
-              key: const ValueKey<String>('payment-keypad-9'),
-              label: '9',
-              onPressed: () => onDigit('9'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        _KeypadRow(
-          children: <Widget>[
-            _KeypadButton(
-              key: const ValueKey<String>('payment-keypad-decimal'),
-              label: '.',
-              onPressed: onDecimal,
-            ),
-            _KeypadButton(
-              key: const ValueKey<String>('payment-keypad-0'),
-              label: '0',
-              onPressed: () => onDigit('0'),
-            ),
-            _KeypadButton(
-              key: const ValueKey<String>('payment-keypad-backspace'),
-              icon: Icons.backspace_outlined,
-              onPressed: onBackspace,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _KeypadRow extends StatelessWidget {
-  const _KeypadRow({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: children
-          .expand(
-            (Widget child) => <Widget>[
-              Expanded(child: child),
-              if (child != children.last) const SizedBox(width: 8),
-            ],
-          )
-          .toList(growable: false),
-    );
-  }
-}
-
-class _KeypadButton extends StatelessWidget {
-  const _KeypadButton({
-    required this.onPressed,
-    this.label,
-    this.icon,
-    super.key,
-  }) : assert(label != null || icon != null);
-
-  final VoidCallback onPressed;
-  final String? label;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 44,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.surfaceMuted,
-          foregroundColor: AppColors.textPrimary,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-        child: icon == null
-            ? Text(
-                label!,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              )
-            : Icon(icon, size: 17),
       ),
     );
   }
@@ -713,38 +587,46 @@ class _QuickAmountButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.emphasized = false,
+    this.compact = false,
     super.key,
   });
 
   final String label;
   final VoidCallback onPressed;
   final bool emphasized;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 108,
+      width: compact ? 82 : 122,
       child: OutlinedButton(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(108, 54),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          minimumSize: Size(compact ? 82 : 122, compact ? 40 : 58),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 8 : 16,
+            vertical: compact ? 10 : 16,
+          ),
           side: BorderSide(
-            color: emphasized ? AppColors.primary : AppColors.border,
+            color: emphasized
+                ? AppColors.primaryStrong
+                : AppColors.borderStrong,
+            width: emphasized ? 1.5 : 1.1,
           ),
           backgroundColor: emphasized
-              ? AppColors.primary.withValues(alpha: 0.08)
+              ? AppColors.primary.withValues(alpha: 0.12)
               : AppColors.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
         onPressed: onPressed,
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: emphasized ? AppColors.primary : AppColors.textPrimary,
+            fontSize: compact ? 13 : 17,
+            fontWeight: FontWeight.w800,
+            color: emphasized ? AppColors.primaryStrong : AppColors.textPrimary,
           ),
         ),
       ),

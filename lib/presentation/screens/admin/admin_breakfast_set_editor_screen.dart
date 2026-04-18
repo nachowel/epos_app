@@ -9,6 +9,8 @@ import '../../../domain/models/breakfast_extra_preset.dart';
 import '../../../domain/models/product.dart';
 import '../../../domain/models/semantic_product_configuration.dart';
 import '../../providers/admin_breakfast_set_editor_provider.dart';
+import '../../widgets/app_numeric_keypad_dialog.dart';
+import '../../widgets/selective_system_keyboard_field.dart';
 import 'widgets/admin_scaffold.dart';
 
 const String _listRoute = '/admin/breakfast-sets';
@@ -564,13 +566,14 @@ class _SetItemsSection extends StatelessWidget {
                     ),
                     SizedBox(
                       width: 120,
-                      child: TextFormField(
+                      child: _IntegerKeypadField(
                         key: ValueKey<String>(
                           'breakfast-editor-qty-$index-${item.defaultQuantity}',
                         ),
-                        initialValue: '${item.defaultQuantity}',
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Qty'),
+                        value: item.defaultQuantity,
+                        labelText: 'Qty',
+                        title: 'Enter quantity',
+                        previewLabel: 'Quantity',
                         onChanged: (String value) =>
                             onQuantityChanged(index, value),
                       ),
@@ -701,41 +704,42 @@ class _ChoiceGroupsSection extends StatelessWidget {
                   children: <Widget>[
                     SizedBox(
                       width: 120,
-                      child: TextFormField(
+                      child: _IntegerKeypadField(
                         key: ValueKey<String>(
                           'breakfast-editor-choice-min-$groupIndex-${group.minSelect}',
                         ),
-                        initialValue: '${group.minSelect}',
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Min'),
+                        value: group.minSelect,
+                        labelText: 'Min',
+                        title: 'Enter minimum selection',
+                        previewLabel: 'Minimum selection',
                         onChanged: (String value) =>
                             onMinChanged(groupIndex, value),
                       ),
                     ),
                     SizedBox(
                       width: 120,
-                      child: TextFormField(
+                      child: _IntegerKeypadField(
                         key: ValueKey<String>(
                           'breakfast-editor-choice-max-$groupIndex-${group.maxSelect}',
                         ),
-                        initialValue: '${group.maxSelect}',
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Max'),
+                        value: group.maxSelect,
+                        labelText: 'Max',
+                        title: 'Enter maximum selection',
+                        previewLabel: 'Maximum selection',
                         onChanged: (String value) =>
                             onMaxChanged(groupIndex, value),
                       ),
                     ),
                     SizedBox(
                       width: 160,
-                      child: TextFormField(
+                      child: _IntegerKeypadField(
                         key: ValueKey<String>(
                           'breakfast-editor-choice-included-$groupIndex-${group.includedQuantity}',
                         ),
-                        initialValue: '${group.includedQuantity}',
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Included Qty',
-                        ),
+                        value: group.includedQuantity,
+                        labelText: 'Included Qty',
+                        title: 'Enter included quantity',
+                        previewLabel: 'Included quantity',
                         onChanged: (String value) =>
                             onIncludedChanged(groupIndex, value),
                       ),
@@ -822,6 +826,91 @@ class _ChoiceGroupsSection extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+// Screen-local helper for the breakfast-set editor's quantity/config fields.
+// Keep this local until another screen needs the same integer-only keypad UX.
+class _IntegerKeypadField extends StatefulWidget {
+  const _IntegerKeypadField({
+    required this.value,
+    required this.labelText,
+    required this.title,
+    required this.previewLabel,
+    required this.onChanged,
+    super.key,
+  });
+
+  final int value;
+  final String labelText;
+  final String title;
+  final String previewLabel;
+  final ValueChanged<String> onChanged;
+
+  @override
+  State<_IntegerKeypadField> createState() => _IntegerKeypadFieldState();
+}
+
+class _IntegerKeypadFieldState extends State<_IntegerKeypadField> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.value}');
+    _focusNode = FocusNode(debugLabel: widget.labelText);
+  }
+
+  @override
+  void didUpdateWidget(covariant _IntegerKeypadField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final String nextValue = '${widget.value}';
+    if (oldWidget.value != widget.value && _controller.text != nextValue) {
+      _controller.text = nextValue;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: _controller,
+      focusNode: _focusNode,
+      readOnly: true,
+      showCursor: false,
+      enableInteractiveSelection: false,
+      keyboardType: TextInputType.none,
+      decoration: InputDecoration(labelText: widget.labelText),
+      onTap: _openKeypad,
+    );
+  }
+
+  Future<void> _openKeypad() async {
+    final String? result = await AppNumericKeypadDialog.showNormalizedText(
+      context,
+      title: widget.title,
+      previewLabel: widget.previewLabel,
+      initialValue: _controller.text,
+      allowDecimal: false,
+      confirmButtonLabel: 'Apply',
+      restoreFocusNode: _focusNode,
+    );
+    if (!mounted || result == null) {
+      return;
+    }
+
+    _controller.value = TextEditingValue(
+      text: result,
+      selection: TextSelection.collapsed(offset: result.length),
+    );
+    widget.onChanged(result);
   }
 }
 
@@ -1318,7 +1407,7 @@ class _ExtraPresetEditorDialogState extends State<_ExtraPresetEditorDialog> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: AppSizes.spacingMd),
-            TextField(
+            SelectiveSystemKeyboardTextField(
               key: const ValueKey<String>(
                 'breakfast-editor-extra-preset-search',
               ),
@@ -1462,7 +1551,7 @@ class _SetItemPickerDialogState extends State<_SetItemPickerDialog> {
         height: 560,
         child: Column(
           children: <Widget>[
-            TextField(
+            SelectiveSystemKeyboardTextField(
               key: const ValueKey<String>('breakfast-editor-product-search'),
               decoration: const InputDecoration(
                 hintText: 'Search products',
@@ -1666,7 +1755,7 @@ class _ProductPickerDialogState extends State<_ProductPickerDialog> {
         height: 520,
         child: Column(
           children: <Widget>[
-            TextField(
+            SelectiveSystemKeyboardTextField(
               key: const ValueKey<String>('breakfast-editor-product-search'),
               decoration: const InputDecoration(
                 hintText: 'Search products',

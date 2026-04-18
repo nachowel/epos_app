@@ -7,6 +7,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../domain/models/category.dart';
 import '../../../domain/services/admin_service.dart';
 import '../../providers/admin_categories_provider.dart';
+import '../../widgets/selective_system_keyboard_field.dart';
 import 'widgets/admin_sort_mode_list.dart';
 import 'widgets/admin_scaffold.dart';
 
@@ -688,7 +689,7 @@ class _CategoryDialogState extends State<_CategoryDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              TextField(
+              SelectiveSystemKeyboardTextField(
                 key: const ValueKey<String>('category-name-field'),
                 controller: _nameController,
                 decoration: InputDecoration(

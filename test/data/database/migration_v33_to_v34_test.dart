@@ -115,6 +115,45 @@ void main() {
         );
       },
     );
+
+    test(
+      'inserts the system custom-sale product even when no legacy row signals it by name',
+      () async {
+        final File file =
+            await _createV33DatabaseFileWithoutLegacyCustomSaleSignal();
+        addTearDown(() async {
+          if (await file.exists()) {
+            await file.delete();
+          }
+        });
+
+        final AppDatabase db = AppDatabase.forFile(file);
+        addTearDown(db.close);
+
+        final List<dynamic> customRows = await db.customSelect('''
+          SELECT
+            p.name,
+            p.price_minor,
+            p.is_visible_on_pos,
+            p.is_custom,
+            c.name AS category_name
+          FROM products p
+          INNER JOIN categories c ON c.id = p.category_id
+          WHERE p.is_custom = 1
+          ORDER BY p.id ASC
+        ''').get();
+
+        expect(customRows, hasLength(1));
+        expect(customRows.single.read<String>('name'), 'Custom Sale');
+        expect(customRows.single.read<int>('price_minor'), 0);
+        expect(customRows.single.read<int>('is_visible_on_pos'), 0);
+        expect(customRows.single.read<int>('is_custom'), 1);
+        expect(
+          customRows.single.read<String>('category_name'),
+          'Archived Products',
+        );
+      },
+    );
   });
 
   group('Current schema reopen custom sale startup invariant', () {
@@ -174,6 +213,45 @@ void main() {
             ) VALUES (1, NULL, 'Duplicate Custom', 0, NULL, 0, 1, 0, 1, 3);
           '''),
           throwsA(isA<Object>()),
+        );
+      },
+    );
+
+    test(
+      'reopen inserts the system custom-sale product when the flag-backed row is missing',
+      () async {
+        final File file =
+            await _createExistingV34DatabaseFileWithoutCustomProduct();
+        addTearDown(() async {
+          if (await file.exists()) {
+            await file.delete();
+          }
+        });
+
+        final AppDatabase db = AppDatabase.forFile(file);
+        addTearDown(db.close);
+
+        final List<dynamic> customRows = await db.customSelect('''
+          SELECT
+            p.name,
+            p.price_minor,
+            p.is_visible_on_pos,
+            p.is_custom,
+            c.name AS category_name
+          FROM products p
+          INNER JOIN categories c ON c.id = p.category_id
+          WHERE p.is_custom = 1
+          ORDER BY p.id ASC
+        ''').get();
+
+        expect(customRows, hasLength(1));
+        expect(customRows.single.read<String>('name'), 'Custom Sale');
+        expect(customRows.single.read<int>('price_minor'), 0);
+        expect(customRows.single.read<int>('is_visible_on_pos'), 0);
+        expect(customRows.single.read<int>('is_custom'), 1);
+        expect(
+          customRows.single.read<String>('category_name'),
+          'Archived Products',
         );
       },
     );
@@ -375,6 +453,204 @@ Future<File> _createV33DatabaseFile() async {
   return file;
 }
 
+Future<File> _createV33DatabaseFileWithoutLegacyCustomSaleSignal() async {
+  final Directory dir = await Directory.systemTemp.createTemp(
+    'epos-migration-v33-v34-no-legacy-custom-sale-',
+  );
+  final File file = File('${dir.path}/migration.sqlite');
+  final sqlite3.Database raw = sqlite3.sqlite3.open(file.path);
+  try {
+    raw.execute('PRAGMA user_version = 33;');
+    raw.execute('PRAGMA foreign_keys = OFF;');
+    raw.execute('''
+      CREATE TABLE users (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        pin TEXT NULL,
+        password TEXT NULL,
+        role TEXT NOT NULL CHECK (role IN ('admin','cashier')),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+    ''');
+    raw.execute('''
+      CREATE TABLE categories (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        image_url TEXT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        removal_discount_1_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_1_minor >= 0),
+        removal_discount_2_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_2_minor >= 0)
+      );
+    ''');
+    raw.execute('''
+      CREATE TABLE products (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        category_id INTEGER NOT NULL,
+        meal_adjustment_profile_id INTEGER NULL,
+        name TEXT NOT NULL,
+        price_minor INTEGER NOT NULL CHECK (price_minor >= 0),
+        image_url TEXT NULL,
+        has_modifiers INTEGER NOT NULL DEFAULT 0 CHECK (has_modifiers IN (0, 1)),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        is_visible_on_pos INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_on_pos IN (0, 1)),
+        sort_order INTEGER NOT NULL DEFAULT 0
+      );
+    ''');
+    raw.execute('''
+      CREATE TABLE menu_settings (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        free_swap_limit INTEGER NOT NULL DEFAULT 2 CHECK (free_swap_limit >= 0),
+        max_swaps INTEGER NOT NULL DEFAULT 4 CHECK (max_swaps >= 0),
+        updated_by INTEGER NULL,
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+    ''');
+    raw.execute('''
+      CREATE TABLE transactions (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT NOT NULL UNIQUE,
+        shift_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        table_number INTEGER NULL,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid','cancelled')),
+        subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
+        modifier_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (modifier_total_minor >= 0),
+        discount_type TEXT NULL CHECK (discount_type IS NULL OR discount_type IN ('amount','percent')),
+        discount_value_minor INTEGER NOT NULL DEFAULT 0 CHECK (discount_value_minor >= 0),
+        discount_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (discount_amount_minor >= 0 AND discount_amount_minor <= subtotal_minor + modifier_total_minor),
+        discount_reason TEXT NULL,
+        discount_applied_by INTEGER NULL,
+        total_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_amount_minor >= 0),
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        paid_at INTEGER NULL,
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        cancelled_at INTEGER NULL,
+        cancelled_by INTEGER NULL,
+        idempotency_key TEXT NOT NULL UNIQUE,
+        kitchen_printed INTEGER NOT NULL DEFAULT 0 CHECK (kitchen_printed IN (0, 1)),
+        receipt_printed INTEGER NOT NULL DEFAULT 0 CHECK (receipt_printed IN (0, 1))
+      );
+    ''');
+    raw.execute('''
+      CREATE TABLE transaction_lines (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT NOT NULL UNIQUE,
+        transaction_id INTEGER NOT NULL REFERENCES "transactions" ("id"),
+        product_id INTEGER NOT NULL REFERENCES "products" ("id"),
+        product_name TEXT NOT NULL,
+        unit_price_minor INTEGER NOT NULL CHECK (unit_price_minor >= 0),
+        quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+        line_total_minor INTEGER NOT NULL CHECK (line_total_minor >= 0),
+        pricing_mode TEXT NOT NULL DEFAULT 'standard' CHECK (pricing_mode IN ('standard','set')),
+        removal_discount_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_total_minor >= 0)
+      );
+    ''');
+
+    raw.execute(
+      "INSERT INTO users (id, name, role, is_active, created_at) VALUES (1, 'Admin', 'admin', 1, unixepoch());",
+    );
+    raw.execute('''
+      INSERT INTO categories (id, name, sort_order, is_active)
+      VALUES
+        (1, 'Drinks', 0, 1),
+        (2, 'Food', 1, 1);
+    ''');
+    raw.execute('''
+      INSERT INTO products (
+        id,
+        category_id,
+        meal_adjustment_profile_id,
+        name,
+        price_minor,
+        image_url,
+        has_modifiers,
+        is_active,
+        is_visible_on_pos,
+        sort_order
+      ) VALUES (1, 1, NULL, 'Americano', 250, NULL, 0, 1, 1, 0);
+    ''');
+    raw.execute('''
+      INSERT INTO menu_settings (
+        id,
+        free_swap_limit,
+        max_swaps,
+        updated_by,
+        updated_at
+      ) VALUES (1, 2, 4, NULL, unixepoch());
+    ''');
+    raw.execute('''
+      INSERT INTO transactions (
+        id,
+        uuid,
+        shift_id,
+        user_id,
+        status,
+        subtotal_minor,
+        modifier_total_minor,
+        discount_type,
+        discount_value_minor,
+        discount_amount_minor,
+        discount_reason,
+        discount_applied_by,
+        total_amount_minor,
+        updated_at,
+        idempotency_key,
+        kitchen_printed,
+        receipt_printed
+      ) VALUES (
+        1,
+        'tx-v33-no-custom',
+        1,
+        1,
+        'draft',
+        250,
+        0,
+        NULL,
+        0,
+        0,
+        NULL,
+        NULL,
+        250,
+        unixepoch(),
+        'idem-v33-no-custom',
+        0,
+        0
+      );
+    ''');
+    raw.execute('''
+      INSERT INTO transaction_lines (
+        id,
+        uuid,
+        transaction_id,
+        product_id,
+        product_name,
+        unit_price_minor,
+        quantity,
+        line_total_minor,
+        pricing_mode,
+        removal_discount_total_minor
+      ) VALUES (
+        1,
+        'line-v33-no-custom',
+        1,
+        1,
+        'Americano',
+        250,
+        1,
+        250,
+        'standard',
+        0
+      );
+    ''');
+  } finally {
+    raw.dispose();
+  }
+
+  return file;
+}
+
 Future<File> _createExistingV34DatabaseFile() async {
   final Directory dir = await Directory.systemTemp.createTemp(
     'epos-existing-v34-custom-sale-',
@@ -441,6 +717,81 @@ Future<File> _createExistingV34DatabaseFile() async {
         1,
         1,
         77
+      );
+    ''');
+  } finally {
+    raw.dispose();
+  }
+
+  return file;
+}
+
+Future<File> _createExistingV34DatabaseFileWithoutCustomProduct() async {
+  final Directory dir = await Directory.systemTemp.createTemp(
+    'epos-existing-v34-no-custom-sale-',
+  );
+  final File file = File('${dir.path}/existing.sqlite');
+  final sqlite3.Database raw = sqlite3.sqlite3.open(file.path);
+  try {
+    raw.execute('PRAGMA user_version = 34;');
+    raw.execute('PRAGMA foreign_keys = OFF;');
+    raw.execute('''
+      CREATE TABLE categories (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        image_url TEXT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        removal_discount_1_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_1_minor >= 0),
+        removal_discount_2_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_2_minor >= 0)
+      );
+    ''');
+    raw.execute('''
+      CREATE TABLE products (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        category_id INTEGER NOT NULL,
+        meal_adjustment_profile_id INTEGER NULL,
+        name TEXT NOT NULL,
+        price_minor INTEGER NOT NULL CHECK (price_minor >= 0),
+        image_url TEXT NULL,
+        has_modifiers INTEGER NOT NULL DEFAULT 0 CHECK (has_modifiers IN (0, 1)),
+        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+        is_visible_on_pos INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_on_pos IN (0, 1)),
+        is_custom INTEGER NOT NULL DEFAULT 0 CHECK (is_custom IN (0, 1)),
+        sort_order INTEGER NOT NULL DEFAULT 0
+      );
+    ''');
+    raw.execute('''
+      INSERT INTO categories (id, name, sort_order, is_active)
+      VALUES
+        (1, 'Drinks', 0, 1),
+        (2, 'Food', 1, 1);
+    ''');
+    raw.execute('''
+      INSERT INTO products (
+        id,
+        category_id,
+        meal_adjustment_profile_id,
+        name,
+        price_minor,
+        image_url,
+        has_modifiers,
+        is_active,
+        is_visible_on_pos,
+        is_custom,
+        sort_order
+      ) VALUES (
+        3,
+        1,
+        NULL,
+        'Tea',
+        200,
+        NULL,
+        0,
+        1,
+        1,
+        0,
+        0
       );
     ''');
   } finally {

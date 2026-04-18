@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_sizes.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/utils/currency_formatter.dart';
+import 'app_numeric_keypad_dialog.dart';
 
 class CountedCashDialog extends StatefulWidget {
   const CountedCashDialog({
@@ -22,17 +23,20 @@ class CountedCashDialog extends StatefulWidget {
 
 class _CountedCashDialogState extends State<CountedCashDialog> {
   late final TextEditingController _controller;
+  late final FocusNode _amountFocusNode;
   String? _errorText;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController();
+    _amountFocusNode = FocusNode(debugLabel: 'counted-cash-field');
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _amountFocusNode.dispose();
     super.dispose();
   }
 
@@ -57,15 +61,19 @@ class _CountedCashDialogState extends State<CountedCashDialog> {
             const SizedBox(height: AppSizes.spacingMd),
             TextField(
               controller: _controller,
+              focusNode: _amountFocusNode,
               autofocus: true,
-              keyboardType: TextInputType.number,
+              readOnly: true,
+              showCursor: false,
+              enableInteractiveSelection: false,
+              keyboardType: TextInputType.none,
               decoration: InputDecoration(
                 labelText: AppStrings.countedCash,
-                hintText: AppStrings.countedCashHint,
+                hintText: '0.00',
                 errorText: _errorText,
                 border: const OutlineInputBorder(),
               ),
-              onChanged: (_) => setState(() => _errorText = null),
+              onTap: _openCountedCashKeypad,
             ),
             const SizedBox(height: AppSizes.spacingMd),
             Text(
@@ -90,11 +98,12 @@ class _CountedCashDialogState extends State<CountedCashDialog> {
               setState(() => _errorText = AppStrings.countedCashRequired);
               return;
             }
-            if (int.tryParse(rawValue) == null) {
+            final int? countedCashMinor =
+                AppNumericInputLogic.tryParseCurrencyMinor(rawValue);
+            if (countedCashMinor == null) {
               setState(() => _errorText = AppStrings.countedCashInvalid);
               return;
             }
-            final int countedCashMinor = int.parse(rawValue);
             if (countedCashMinor < 0) {
               setState(() => _errorText = AppStrings.countedCashInvalid);
               return;
@@ -108,7 +117,40 @@ class _CountedCashDialogState extends State<CountedCashDialog> {
   }
 
   int _parseMinorAmount(String value) {
-    final int? parsed = int.tryParse(value.trim());
+    final int? parsed = AppNumericInputLogic.tryParseCurrencyMinor(
+      value.trim(),
+    );
     return parsed == null || parsed < 0 ? 0 : parsed;
+  }
+
+  Future<void> _openCountedCashKeypad() async {
+    final int? countedCashMinor =
+        await AppNumericKeypadDialog.showCurrencyMinor(
+          context,
+          title: AppStrings.countedCash,
+          previewLabel: AppStrings.countedCash,
+          initialMinor: _controller.text.trim().isEmpty
+              ? null
+              : _parseMinorAmount(_controller.text),
+          prefixText: '£ ',
+          emptyPreview: '0.00',
+          confirmButtonLabel:
+              widget.confirmActionLabel ?? AppStrings.adminFinalClose,
+          restoreFocusNode: _amountFocusNode,
+        );
+    if (!mounted || countedCashMinor == null) {
+      return;
+    }
+
+    final String value = CurrencyFormatter.toEditableMajorInput(
+      countedCashMinor,
+    );
+    _controller.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+    setState(() {
+      _errorText = null;
+    });
   }
 }

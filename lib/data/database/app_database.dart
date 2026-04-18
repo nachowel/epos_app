@@ -1001,9 +1001,10 @@ class AppDatabase extends _$AppDatabase {
     return AppDatabase(NativeDatabase(file));
   }
 
-  static const int currentSchemaVersion = 35;
+  static const int currentSchemaVersion = 37;
   final List<MigrationLogEntry> _migrationHistory = <MigrationLogEntry>[];
   MigrationLogEntry? _lastMigrationFailure;
+  int? _upgradeOriginVersion;
 
   List<MigrationLogEntry> get migrationHistory =>
       List<MigrationLogEntry>.unmodifiable(_migrationHistory);
@@ -1041,10 +1042,13 @@ class AppDatabase extends _$AppDatabase {
           await _migrateToV33();
           await _migrateToV34();
           await _migrateToV35();
+          await _migrateToV36();
+          await _migrateToV37();
         },
       );
     },
     onUpgrade: (Migrator m, int from, int to) async {
+      _upgradeOriginVersion = from;
       if (from < 2) {
         await _runMigrationStep(
           step: 'migrate_v2',
@@ -1317,6 +1321,22 @@ class AppDatabase extends _$AppDatabase {
           action: _migrateToV35,
         );
       }
+      if (from < 36) {
+        await _runMigrationStep(
+          step: 'migrate_v36',
+          fromVersion: from < 35 ? 35 : from,
+          toVersion: 36,
+          action: _migrateToV36,
+        );
+      }
+      if (from < 37) {
+        await _runMigrationStep(
+          step: 'migrate_v37',
+          fromVersion: from < 36 ? 36 : from,
+          toVersion: 37,
+          action: _migrateToV37,
+        );
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
@@ -1340,6 +1360,7 @@ class AppDatabase extends _$AppDatabase {
               : 'Database opened.',
         ),
       );
+      _upgradeOriginVersion = null;
     },
   );
 
@@ -3417,162 +3438,210 @@ class AppDatabase extends _$AppDatabase {
     // - allow signed transaction modifier totals so discount rows can persist
     // - allow signed order_modifiers.price_effect_minor for semantic discounts
     // - add combo_discount as a first-class semantic charge reason
+    final bool hasTransactionsTable = await tableExists('transactions');
+    final bool hasOrderModifiersTable = await tableExists('order_modifiers');
+    if (!hasTransactionsTable && !hasOrderModifiersTable) {
+      _logMigrationDetail(
+        'migrate_v24',
+        'Skipped: transactions and order_modifiers tables are absent.',
+      );
+      return;
+    }
+
     await customStatement('PRAGMA foreign_keys = OFF;');
 
     try {
-      await customStatement('DROP INDEX IF EXISTS idx_transactions_shift;');
-      await customStatement('DROP INDEX IF EXISTS idx_transactions_user;');
-      await customStatement(
-        'ALTER TABLE transactions RENAME TO transactions_legacy_v24;',
-      );
-      await customStatement('''
-        CREATE TABLE transactions (
-          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-          uuid TEXT NOT NULL UNIQUE,
-          shift_id INTEGER NOT NULL,
-          user_id INTEGER NOT NULL,
-          table_number INTEGER NULL,
-          status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid','cancelled')),
-          subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
-          modifier_total_minor INTEGER NOT NULL DEFAULT 0,
-          total_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_amount_minor >= 0),
-          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-          paid_at INTEGER NULL,
-          updated_at INTEGER NOT NULL,
-          cancelled_at INTEGER NULL,
-          cancelled_by INTEGER NULL,
-          idempotency_key TEXT NOT NULL UNIQUE,
-          kitchen_printed INTEGER NOT NULL DEFAULT 0 CHECK (kitchen_printed IN (0, 1)),
-          receipt_printed INTEGER NOT NULL DEFAULT 0 CHECK (receipt_printed IN (0, 1))
+      if (hasTransactionsTable) {
+        await customStatement('DROP INDEX IF EXISTS idx_transactions_shift;');
+        await customStatement('DROP INDEX IF EXISTS idx_transactions_user;');
+        await customStatement(
+          'ALTER TABLE transactions RENAME TO transactions_legacy_v24;',
         );
-      ''');
-      await customStatement('''
-        INSERT INTO transactions (
-          id,
-          uuid,
-          shift_id,
-          user_id,
-          table_number,
-          status,
-          subtotal_minor,
-          modifier_total_minor,
-          total_amount_minor,
-          created_at,
-          paid_at,
-          updated_at,
-          cancelled_at,
-          cancelled_by,
-          idempotency_key,
-          kitchen_printed,
-          receipt_printed
-        )
-        SELECT
-          id,
-          uuid,
-          shift_id,
-          user_id,
-          table_number,
-          status,
-          subtotal_minor,
-          modifier_total_minor,
-          total_amount_minor,
-          created_at,
-          paid_at,
-          updated_at,
-          cancelled_at,
-          cancelled_by,
-          idempotency_key,
-          kitchen_printed,
-          receipt_printed
-        FROM transactions_legacy_v24;
-      ''');
-      await customStatement('DROP TABLE transactions_legacy_v24;');
+        await customStatement('''
+          CREATE TABLE transactions (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            uuid TEXT NOT NULL UNIQUE,
+            shift_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            table_number INTEGER NULL,
+            status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid','cancelled')),
+            subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
+            modifier_total_minor INTEGER NOT NULL DEFAULT 0,
+            total_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_amount_minor >= 0),
+            created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+            paid_at INTEGER NULL,
+            updated_at INTEGER NOT NULL,
+            cancelled_at INTEGER NULL,
+            cancelled_by INTEGER NULL,
+            idempotency_key TEXT NOT NULL UNIQUE,
+            kitchen_printed INTEGER NOT NULL DEFAULT 0 CHECK (kitchen_printed IN (0, 1)),
+            receipt_printed INTEGER NOT NULL DEFAULT 0 CHECK (receipt_printed IN (0, 1))
+          );
+        ''');
+        await customStatement('''
+          INSERT INTO transactions (
+            id,
+            uuid,
+            shift_id,
+            user_id,
+            table_number,
+            status,
+            subtotal_minor,
+            modifier_total_minor,
+            total_amount_minor,
+            created_at,
+            paid_at,
+            updated_at,
+            cancelled_at,
+            cancelled_by,
+            idempotency_key,
+            kitchen_printed,
+            receipt_printed
+          )
+          SELECT
+            id,
+            uuid,
+            shift_id,
+            user_id,
+            table_number,
+            status,
+            subtotal_minor,
+            modifier_total_minor,
+            total_amount_minor,
+            created_at,
+            paid_at,
+            updated_at,
+            cancelled_at,
+            cancelled_by,
+            idempotency_key,
+            kitchen_printed,
+            receipt_printed
+          FROM transactions_legacy_v24;
+        ''');
+        await customStatement('DROP TABLE transactions_legacy_v24;');
+      } else {
+        _logMigrationDetail(
+          'migrate_v24',
+          'Skipped transactions rebuild: source table is absent.',
+        );
+      }
 
-      await customStatement('DROP INDEX IF EXISTS idx_order_modifiers_line;');
-      await customStatement(
-        'DROP INDEX IF EXISTS idx_order_modifiers_item_product;',
-      );
-      await customStatement(
-        'DROP INDEX IF EXISTS idx_order_modifiers_item_product_semantics;',
-      );
-      await customStatement(
-        'DROP INDEX IF EXISTS idx_order_modifiers_source_group;',
-      );
-      await customStatement(
-        'ALTER TABLE order_modifiers RENAME TO order_modifiers_legacy_v24;',
-      );
-      await customStatement('''
-        CREATE TABLE order_modifiers (
-          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-          uuid TEXT NOT NULL UNIQUE,
-          transaction_line_id INTEGER NOT NULL,
-          action TEXT NOT NULL CHECK (action IN ('remove','add','choice')),
-          item_name TEXT NOT NULL,
-          quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
-          item_product_id INTEGER NULL,
-          source_group_id INTEGER NULL,
-          extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
-          charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount','combo_discount')),
-          unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
-          price_effect_minor INTEGER NOT NULL DEFAULT 0,
-          sort_key INTEGER NOT NULL DEFAULT 0,
-          CHECK (action != 'choice' OR charge_reason = 'included_choice')
+      if (hasOrderModifiersTable) {
+        await customStatement('DROP INDEX IF EXISTS idx_order_modifiers_line;');
+        await customStatement(
+          'DROP INDEX IF EXISTS idx_order_modifiers_item_product;',
         );
-      ''');
-      await customStatement('''
-        INSERT INTO order_modifiers (
-          id,
-          uuid,
-          transaction_line_id,
-          action,
-          item_name,
-          quantity,
-          item_product_id,
-          source_group_id,
-          extra_price_minor,
-          charge_reason,
-          unit_price_minor,
-          price_effect_minor,
-          sort_key
-        )
-        SELECT
-          id,
-          uuid,
-          transaction_line_id,
-          action,
-          item_name,
-          quantity,
-          item_product_id,
-          source_group_id,
-          extra_price_minor,
-          charge_reason,
-          unit_price_minor,
-          price_effect_minor,
-          sort_key
-        FROM order_modifiers_legacy_v24;
-      ''');
-      await customStatement('DROP TABLE order_modifiers_legacy_v24;');
+        await customStatement(
+          'DROP INDEX IF EXISTS idx_order_modifiers_item_product_semantics;',
+        );
+        await customStatement(
+          'DROP INDEX IF EXISTS idx_order_modifiers_source_group;',
+        );
+        await customStatement(
+          'ALTER TABLE order_modifiers RENAME TO order_modifiers_legacy_v24;',
+        );
+        await customStatement('''
+          CREATE TABLE order_modifiers (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            uuid TEXT NOT NULL UNIQUE,
+            transaction_line_id INTEGER NOT NULL,
+            action TEXT NOT NULL CHECK (action IN ('remove','add','choice')),
+            item_name TEXT NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+            item_product_id INTEGER NULL,
+            source_group_id INTEGER NULL,
+            extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
+            charge_reason TEXT NULL CHECK (charge_reason IS NULL OR charge_reason IN ('extra_add','free_swap','paid_swap','included_choice','removal_discount','combo_discount')),
+            unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
+            price_effect_minor INTEGER NOT NULL DEFAULT 0,
+            sort_key INTEGER NOT NULL DEFAULT 0,
+            CHECK (action != 'choice' OR charge_reason = 'included_choice')
+          );
+        ''');
+        await customStatement('''
+          INSERT INTO order_modifiers (
+            id,
+            uuid,
+            transaction_line_id,
+            action,
+            item_name,
+            quantity,
+            item_product_id,
+            source_group_id,
+            extra_price_minor,
+            charge_reason,
+            unit_price_minor,
+            price_effect_minor,
+            sort_key
+          )
+          SELECT
+            id,
+            uuid,
+            transaction_line_id,
+            action,
+            item_name,
+            quantity,
+            item_product_id,
+            source_group_id,
+            extra_price_minor,
+            charge_reason,
+            unit_price_minor,
+            price_effect_minor,
+            sort_key
+          FROM order_modifiers_legacy_v24;
+        ''');
+        await customStatement('DROP TABLE order_modifiers_legacy_v24;');
+      } else {
+        _logMigrationDetail(
+          'migrate_v24',
+          'Skipped order_modifiers rebuild: source table is absent.',
+        );
+      }
     } finally {
       await customStatement('PRAGMA foreign_keys = ON;');
     }
 
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_transactions_shift ON transactions(shift_id, status, created_at);',
+    await _createIndexIfTableExists(
+      migration: 'migrate_v24',
+      tableName: 'transactions',
+      description: 'idx_transactions_shift',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_transactions_shift ON transactions(shift_id, status, created_at);',
     );
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id, created_at);',
+    await _createIndexIfTableExists(
+      migration: 'migrate_v24',
+      tableName: 'transactions',
+      description: 'idx_transactions_user',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id, created_at);',
     );
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_line ON order_modifiers(transaction_line_id);',
+    await _createIndexIfTableExists(
+      migration: 'migrate_v24',
+      tableName: 'order_modifiers',
+      description: 'idx_order_modifiers_line',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_order_modifiers_line ON order_modifiers(transaction_line_id);',
     );
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_item_product ON order_modifiers(item_product_id, charge_reason);',
+    await _createIndexIfTableExists(
+      migration: 'migrate_v24',
+      tableName: 'order_modifiers',
+      description: 'idx_order_modifiers_item_product',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_order_modifiers_item_product ON order_modifiers(item_product_id, charge_reason);',
     );
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_item_product_semantics ON order_modifiers(item_product_id, action, charge_reason, sort_key);',
+    await _createIndexIfTableExists(
+      migration: 'migrate_v24',
+      tableName: 'order_modifiers',
+      description: 'idx_order_modifiers_item_product_semantics',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_order_modifiers_item_product_semantics ON order_modifiers(item_product_id, action, charge_reason, sort_key);',
     );
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_order_modifiers_source_group ON order_modifiers(source_group_id, item_product_id, charge_reason);',
+    await _createIndexIfTableExists(
+      migration: 'migrate_v24',
+      tableName: 'order_modifiers',
+      description: 'idx_order_modifiers_source_group',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_order_modifiers_source_group ON order_modifiers(source_group_id, item_product_id, charge_reason);',
     );
 
     await _createMigrationFkTrigger(
@@ -3617,48 +3686,54 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _migrateToV26() async {
-    final bool hasProfileKind = await _tableHasColumn(
+    if (!await tableExists('meal_adjustment_profiles')) {
+      _logMigrationDetail(
+        'migrate_v26',
+        'Skipped: meal_adjustment_profiles table is absent.',
+      );
+      return;
+    }
+
+    await _addColumnIfMissing(
+      migration: 'migrate_v26',
       tableName: 'meal_adjustment_profiles',
       columnName: 'profile_kind',
+      sql:
+          "ALTER TABLE meal_adjustment_profiles ADD COLUMN profile_kind TEXT NOT NULL DEFAULT 'standard' CHECK (profile_kind IN ('standard','sandwich'));",
     );
-    if (!hasProfileKind) {
-      await customStatement(
-        "ALTER TABLE meal_adjustment_profiles ADD COLUMN profile_kind TEXT NOT NULL DEFAULT 'standard' CHECK (profile_kind IN ('standard','sandwich'));",
-      );
-    }
   }
 
   Future<void> _migrateToV27() async {
     final String tableName = 'meal_adjustment_profiles';
-    final bool hasSandwichSurchargeMinor = await _tableHasColumn(
+    if (!await tableExists(tableName)) {
+      _logMigrationDetail(
+        'migrate_v27',
+        'Skipped: meal_adjustment_profiles table is absent.',
+      );
+      return;
+    }
+
+    await _addColumnIfMissing(
+      migration: 'migrate_v27',
       tableName: tableName,
       columnName: 'sandwich_surcharge_minor',
+      sql:
+          "ALTER TABLE meal_adjustment_profiles ADD COLUMN sandwich_surcharge_minor INTEGER NOT NULL DEFAULT 100 CHECK (sandwich_surcharge_minor >= 0);",
     );
-    if (!hasSandwichSurchargeMinor) {
-      await customStatement(
-        "ALTER TABLE meal_adjustment_profiles ADD COLUMN sandwich_surcharge_minor INTEGER NOT NULL DEFAULT 100 CHECK (sandwich_surcharge_minor >= 0);",
-      );
-    }
-
-    final bool hasBaguetteSurchargeMinor = await _tableHasColumn(
+    await _addColumnIfMissing(
+      migration: 'migrate_v27',
       tableName: tableName,
       columnName: 'baguette_surcharge_minor',
+      sql:
+          "ALTER TABLE meal_adjustment_profiles ADD COLUMN baguette_surcharge_minor INTEGER NOT NULL DEFAULT 180 CHECK (baguette_surcharge_minor >= 0);",
     );
-    if (!hasBaguetteSurchargeMinor) {
-      await customStatement(
-        "ALTER TABLE meal_adjustment_profiles ADD COLUMN baguette_surcharge_minor INTEGER NOT NULL DEFAULT 180 CHECK (baguette_surcharge_minor >= 0);",
-      );
-    }
-
-    final bool hasSandwichSauceOptionsJson = await _tableHasColumn(
+    await _addColumnIfMissing(
+      migration: 'migrate_v27',
       tableName: tableName,
       columnName: 'sandwich_sauce_options_json',
+      sql:
+          "ALTER TABLE meal_adjustment_profiles ADD COLUMN sandwich_sauce_options_json TEXT NOT NULL DEFAULT '[]';",
     );
-    if (!hasSandwichSauceOptionsJson) {
-      await customStatement(
-        "ALTER TABLE meal_adjustment_profiles ADD COLUMN sandwich_sauce_options_json TEXT NOT NULL DEFAULT '[]';",
-      );
-    }
   }
 
   Future<void> _migrateToV28() async {
@@ -3896,45 +3971,21 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _migrateToV30() async {
-    final bool hasProductModifierPriceBehavior = await _tableHasColumn(
-      tableName: 'product_modifiers',
-      columnName: 'price_behavior',
-    );
-    if (!hasProductModifierPriceBehavior) {
-      await customStatement(
-        "ALTER TABLE product_modifiers ADD COLUMN price_behavior TEXT NULL CHECK (price_behavior IS NULL OR price_behavior IN ('free','paid'));",
-      );
-    }
-
-    final bool hasProductModifierUiSection = await _tableHasColumn(
-      tableName: 'product_modifiers',
-      columnName: 'ui_section',
-    );
-    if (!hasProductModifierUiSection) {
-      await customStatement(
-        "ALTER TABLE product_modifiers ADD COLUMN ui_section TEXT NULL CHECK (ui_section IS NULL OR ui_section IN ('toppings','sauces','add_ins'));",
-      );
-    }
-
-    final bool hasOrderModifierPriceBehavior = await _tableHasColumn(
+    await _rebuildProductModifiersForV30();
+    await _addColumnIfMissing(
+      migration: 'migrate_v30',
       tableName: 'order_modifiers',
       columnName: 'price_behavior',
+      sql:
+          "ALTER TABLE order_modifiers ADD COLUMN price_behavior TEXT NULL CHECK (price_behavior IS NULL OR price_behavior IN ('free','paid'));",
     );
-    if (!hasOrderModifierPriceBehavior) {
-      await customStatement(
-        "ALTER TABLE order_modifiers ADD COLUMN price_behavior TEXT NULL CHECK (price_behavior IS NULL OR price_behavior IN ('free','paid'));",
-      );
-    }
-
-    final bool hasOrderModifierUiSection = await _tableHasColumn(
+    await _addColumnIfMissing(
+      migration: 'migrate_v30',
       tableName: 'order_modifiers',
       columnName: 'ui_section',
+      sql:
+          "ALTER TABLE order_modifiers ADD COLUMN ui_section TEXT NULL CHECK (ui_section IS NULL OR ui_section IN ('toppings','sauces','add_ins'));",
     );
-    if (!hasOrderModifierUiSection) {
-      await customStatement(
-        "ALTER TABLE order_modifiers ADD COLUMN ui_section TEXT NULL CHECK (ui_section IS NULL OR ui_section IN ('toppings','sauces','add_ins'));",
-      );
-    }
 
     await _upgradeSeedBurgerModifiersToStructured();
   }
@@ -3956,6 +4007,26 @@ class AppDatabase extends _$AppDatabase {
           created_at INTEGER NOT NULL DEFAULT (unixepoch())
         );
       ''');
+    }
+
+    if (!await tableExists('meal_adjustment_profiles') ||
+        !await tableExists('products') ||
+        !await tableExists('categories')) {
+      _logMigrationDetail(
+        'migrate_v31',
+        'Skipped sauce migration transform: required source tables are absent.',
+      );
+      return;
+    }
+    if (!await columnExists(
+      tableName: 'meal_adjustment_profiles',
+      columnName: 'sandwich_sauce_options_json',
+    )) {
+      _logMigrationDetail(
+        'migrate_v31',
+        'Skipped sauce migration transform: sandwich_sauce_options_json is absent.',
+      );
+      return;
     }
 
     final List<QueryRow> profileRows = await customSelect('''
@@ -4130,6 +4201,14 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _migrateToV33() async {
+    if (!await tableExists('transactions')) {
+      _logMigrationDetail(
+        'migrate_v33',
+        'Skipped: transactions table is absent.',
+      );
+      return;
+    }
+
     final bool hasDiscountType = await _tableHasColumn(
       tableName: 'transactions',
       columnName: 'discount_type',
@@ -4183,7 +4262,7 @@ class AppDatabase extends _$AppDatabase {
           table_number INTEGER NULL,
           status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid','cancelled')),
           subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
-          modifier_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (modifier_total_minor >= 0),
+          modifier_total_minor INTEGER NOT NULL DEFAULT 0,
           discount_type TEXT NULL CHECK (discount_type IS NULL OR discount_type IN ('amount','percent')),
           discount_value_minor INTEGER NOT NULL DEFAULT 0 CHECK (discount_value_minor >= 0),
           discount_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (discount_amount_minor >= 0 AND discount_amount_minor <= subtotal_minor + modifier_total_minor),
@@ -4192,7 +4271,7 @@ class AppDatabase extends _$AppDatabase {
           total_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_amount_minor >= 0),
           created_at INTEGER NOT NULL DEFAULT (unixepoch()),
           paid_at INTEGER NULL,
-          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          updated_at INTEGER NOT NULL,
           cancelled_at INTEGER NULL,
           cancelled_by INTEGER NULL,
           idempotency_key TEXT NOT NULL UNIQUE,
@@ -4236,11 +4315,11 @@ class AppDatabase extends _$AppDatabase {
           status,
           subtotal_minor,
           modifier_total_minor,
-          NULL,
-          0,
-          0,
-          NULL,
-          NULL,
+          ${hasDiscountType ? 'discount_type' : 'NULL'},
+          ${hasDiscountValueMinor ? 'discount_value_minor' : '0'},
+          ${hasDiscountAmountMinor ? 'discount_amount_minor' : '0'},
+          ${hasDiscountReason ? 'discount_reason' : 'NULL'},
+          ${hasDiscountAppliedBy ? 'discount_applied_by' : 'NULL'},
           total_amount_minor,
           created_at,
           paid_at,
@@ -4260,11 +4339,19 @@ class AppDatabase extends _$AppDatabase {
       await customStatement('PRAGMA foreign_keys = ON;');
     }
 
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_transactions_shift ON transactions(shift_id, status, created_at);',
+    await _createIndexIfTableExists(
+      migration: 'migrate_v33',
+      tableName: 'transactions',
+      description: 'idx_transactions_shift',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_transactions_shift ON transactions(shift_id, status, created_at);',
     );
-    await customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id, created_at);',
+    await _createIndexIfTableExists(
+      migration: 'migrate_v33',
+      tableName: 'transactions',
+      description: 'idx_transactions_user',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id, created_at);',
     );
     await _createMigrationFkTrigger(
       table: 'transactions',
@@ -4292,42 +4379,21 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _migrateToV34() async {
-    final bool hasProductsIsCustom = await _tableHasColumn(
-      tableName: 'products',
-      columnName: 'is_custom',
-    );
-    if (!hasProductsIsCustom) {
-      await customStatement('''
-        ALTER TABLE products
-        ADD COLUMN is_custom INTEGER NOT NULL DEFAULT 0
-        CHECK (is_custom IN (0, 1));
-        ''');
-    }
-
-    final bool hasTransactionLinesCustomNote = await _tableHasColumn(
+    await _rebuildProductsForV34();
+    await _addColumnIfMissing(
+      migration: 'migrate_v34',
       tableName: 'transaction_lines',
       columnName: 'custom_note',
+      sql: 'ALTER TABLE transaction_lines ADD COLUMN custom_note TEXT NULL;',
     );
-    if (!hasTransactionLinesCustomNote) {
-      await customStatement(
-        'ALTER TABLE transaction_lines ADD COLUMN custom_note TEXT NULL;',
-      );
-    }
+    await _rebuildMenuSettingsForV34();
 
-    final bool hasCustomSalesLimitMinor = await _tableHasColumn(
-      tableName: 'menu_settings',
-      columnName: 'custom_sales_limit_minor',
-    );
-    if (!hasCustomSalesLimitMinor) {
-      await customStatement('''
-        ALTER TABLE menu_settings
-        ADD COLUMN custom_sales_limit_minor INTEGER NOT NULL DEFAULT 100000
-        CHECK (custom_sales_limit_minor >= 0);
-        ''');
-    }
-
-    await customStatement(
-      'CREATE UNIQUE INDEX IF NOT EXISTS ux_products_single_custom_product ON products(is_custom) WHERE is_custom = 1;',
+    await _createIndexIfTableExists(
+      migration: 'migrate_v34',
+      tableName: 'products',
+      description: 'ux_products_single_custom_product',
+      sql:
+          'CREATE UNIQUE INDEX IF NOT EXISTS ux_products_single_custom_product ON products(is_custom) WHERE is_custom = 1;',
     );
     await _seedDefaultMenuSettings();
     if (await _tableHasAnyRows('users')) {
@@ -4375,7 +4441,682 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  /// Rebuilds `products` so the column order exactly matches the fresh-schema
+  /// declaration. Historical ALTER TABLE ADD COLUMN steps (v23, v34) appended
+  /// `meal_adjustment_profile_id` and `is_custom` at the end, producing a
+  /// column ordering on migrated databases that diverges from the fresh
+  /// declaration order (`id, category_id, meal_adjustment_profile_id, name,
+  /// price_minor, image_url, has_modifiers, is_active, is_visible_on_pos,
+  /// is_custom, sort_order`).
+  ///
+  /// This migration collapses that drift by doing a classic SQLite table
+  /// rebuild: rename the old table, create a new one with the correct column
+  /// order and constraints, copy the rows explicitly by column name, drop the
+  /// old table, and re-create every products-related index and FK trigger.
+  ///
+  /// The three pre-existing parity gaps that lived alongside v36
+  /// (missing `idx_transaction_lines_tx`, missing `idx_payments_tx`, and the
+  /// `payments.paid_at` default literal drift) are addressed separately in
+  /// `_migrateToV37` so v36 stays narrowly scoped to the products rebuild.
+  Future<void> _migrateToV36() async {
+    if (!await _tableExists('products')) {
+      _logMigrationDetail(
+        'migrate_v36',
+        'Skipped products rebuild: table is absent.',
+      );
+      return;
+    }
+
+    final List<QueryRow> columnRows = await customSelect(
+      'PRAGMA table_info(products);',
+    ).get();
+    final List<String> currentOrder = columnRows
+        .map((QueryRow row) => row.read<String>('name'))
+        .toList(growable: false);
+    const List<String> freshOrder = <String>[
+      'id',
+      'category_id',
+      'meal_adjustment_profile_id',
+      'name',
+      'price_minor',
+      'image_url',
+      'has_modifiers',
+      'is_active',
+      'is_visible_on_pos',
+      'is_custom',
+      'sort_order',
+    ];
+    if (_listEquals(currentOrder, freshOrder)) {
+      _logMigrationDetail(
+        'migrate_v36',
+        'Skipped products rebuild: column order already matches fresh schema.',
+      );
+      return;
+    }
+
+    final bool hasMealAdjustmentProfileId = currentOrder.contains(
+      'meal_adjustment_profile_id',
+    );
+    final bool hasIsVisibleOnPos = currentOrder.contains('is_visible_on_pos');
+    final bool hasIsCustom = currentOrder.contains('is_custom');
+
+    // Every (table, column, nullable) pointing at products.id. SQLite's
+    // ALTER TABLE ... RENAME rewrites the old name inside dependent trigger
+    // bodies to the new name, which would leave these child triggers
+    // referencing products_legacy_v36 — breaking any later insert/update on
+    // the child tables. Drop them up front and recreate against the rebuilt
+    // products table at the end.
+    const List<List<dynamic>> productsReferrerFkTriggers = <List<dynamic>>[
+      <dynamic>['breakfast_extra_preset_items', 'item_product_id', false],
+      <dynamic>[
+        'meal_adjustment_profile_components',
+        'default_item_product_id',
+        false,
+      ],
+      <dynamic>[
+        'meal_adjustment_component_options',
+        'option_item_product_id',
+        false,
+      ],
+      <dynamic>['meal_adjustment_profile_extras', 'item_product_id', false],
+      <dynamic>[
+        'meal_adjustment_pricing_rule_conditions',
+        'item_product_id',
+        true,
+      ],
+      <dynamic>['set_items', 'product_id', false],
+      <dynamic>['set_items', 'item_product_id', false],
+      <dynamic>['modifier_groups', 'product_id', false],
+      <dynamic>['product_modifiers', 'product_id', false],
+      <dynamic>['product_modifiers', 'item_product_id', true],
+      <dynamic>['transaction_lines', 'product_id', false],
+      <dynamic>['meal_customization_line_snapshots', 'product_id', false],
+      <dynamic>['order_modifiers', 'item_product_id', true],
+      <dynamic>['breakfast_cooking_instructions', 'item_product_id', false],
+    ];
+
+    await customStatement('PRAGMA foreign_keys = OFF;');
+    try {
+      // Drop every products-owning index before renaming. SQLite keeps indexes
+      // bound to the renamed table, but recreating them against the new
+      // canonical table is cleaner and avoids carrying over any legacy
+      // metadata.
+      await customStatement('DROP INDEX IF EXISTS idx_products_category;');
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_products_meal_adjustment_profile;',
+      );
+      await customStatement(
+        'DROP INDEX IF EXISTS ux_products_single_custom_product;',
+      );
+
+      // Drop products-owning FK triggers (on products itself).
+      await customStatement(
+        'DROP TRIGGER IF EXISTS fk_products_category_id_insert;',
+      );
+      await customStatement(
+        'DROP TRIGGER IF EXISTS fk_products_category_id_update;',
+      );
+      await customStatement(
+        'DROP TRIGGER IF EXISTS fk_products_meal_adjustment_profile_id_insert;',
+      );
+      await customStatement(
+        'DROP TRIGGER IF EXISTS fk_products_meal_adjustment_profile_id_update;',
+      );
+
+      // Drop every child-table FK trigger that references products.
+      for (final List<dynamic> entry in productsReferrerFkTriggers) {
+        final String table = entry[0] as String;
+        final String column = entry[1] as String;
+        await customStatement(
+          'DROP TRIGGER IF EXISTS fk_${table}_${column}_insert;',
+        );
+        await customStatement(
+          'DROP TRIGGER IF EXISTS fk_${table}_${column}_update;',
+        );
+      }
+
+      await customStatement(
+        'ALTER TABLE products RENAME TO products_legacy_v36;',
+      );
+      await customStatement('''
+        CREATE TABLE products (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          category_id INTEGER NOT NULL,
+          meal_adjustment_profile_id INTEGER NULL,
+          name TEXT NOT NULL,
+          price_minor INTEGER NOT NULL CHECK (price_minor >= 0),
+          image_url TEXT NULL,
+          has_modifiers INTEGER NOT NULL DEFAULT 0 CHECK (has_modifiers IN (0, 1)),
+          is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+          is_visible_on_pos INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_on_pos IN (0, 1)),
+          is_custom INTEGER NOT NULL DEFAULT 0 CHECK (is_custom IN (0, 1)),
+          sort_order INTEGER NOT NULL DEFAULT 0
+        );
+      ''');
+
+      await customStatement('''
+        INSERT INTO products (
+          id,
+          category_id,
+          meal_adjustment_profile_id,
+          name,
+          price_minor,
+          image_url,
+          has_modifiers,
+          is_active,
+          is_visible_on_pos,
+          is_custom,
+          sort_order
+        )
+        SELECT
+          id,
+          category_id,
+          ${hasMealAdjustmentProfileId ? 'meal_adjustment_profile_id' : 'NULL'},
+          name,
+          price_minor,
+          image_url,
+          has_modifiers,
+          is_active,
+          ${hasIsVisibleOnPos ? 'is_visible_on_pos' : '1'},
+          ${hasIsCustom ? 'is_custom' : '0'},
+          sort_order
+        FROM products_legacy_v36;
+      ''');
+
+      await customStatement('DROP TABLE products_legacy_v36;');
+    } finally {
+      await customStatement('PRAGMA foreign_keys = ON;');
+    }
+
+    await _createIndexIfTableExists(
+      migration: 'migrate_v36',
+      tableName: 'products',
+      description: 'idx_products_category',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id, is_active, is_visible_on_pos, sort_order);',
+    );
+    await _createIndexIfTableExists(
+      migration: 'migrate_v36',
+      tableName: 'products',
+      description: 'idx_products_meal_adjustment_profile',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_products_meal_adjustment_profile ON products(meal_adjustment_profile_id);',
+    );
+    await _createIndexIfTableExists(
+      migration: 'migrate_v36',
+      tableName: 'products',
+      description: 'ux_products_single_custom_product',
+      sql:
+          'CREATE UNIQUE INDEX IF NOT EXISTS ux_products_single_custom_product ON products(is_custom) WHERE is_custom = 1;',
+    );
+
+    await _createMigrationFkTrigger(
+      table: 'products',
+      column: 'category_id',
+      referencedTable: 'categories',
+    );
+    await _createMigrationFkTrigger(
+      table: 'products',
+      column: 'meal_adjustment_profile_id',
+      referencedTable: 'meal_adjustment_profiles',
+      nullable: true,
+    );
+
+    // Recreate child-table FK triggers that previously pointed at products.
+    // _createMigrationFkTrigger is a no-op when the child table or column is
+    // absent at this migration point, matching the guard behavior used
+    // elsewhere in the migration system.
+    for (final List<dynamic> entry in productsReferrerFkTriggers) {
+      final String table = entry[0] as String;
+      final String column = entry[1] as String;
+      final bool nullable = entry[2] as bool;
+      await _createMigrationFkTrigger(
+        table: table,
+        column: column,
+        referencedTable: 'products',
+        nullable: nullable,
+      );
+    }
+
+    _logMigrationDetail(
+      'migrate_v36',
+      'Rebuilt products into canonical fresh-schema column order.',
+    );
+  }
+
+  /// Closes the last three pre-existing migration-parity gaps that remained
+  /// after v36:
+  ///
+  ///   1. `idx_transaction_lines_tx` on `transaction_lines(transaction_id)` —
+  ///      present in the fresh schema but never back-filled into databases
+  ///      upgraded from older versions.
+  ///   2. `idx_payments_tx` on `payments(transaction_id)` — same story.
+  ///   3. `payments.paid_at` default literal — the legacy `CREATE TABLE IF
+  ///      NOT EXISTS payments` bootstrap used `DEFAULT (strftime('%s','now'))`
+  ///      while the fresh Drift schema emits the canonical
+  ///      `CAST(strftime('%s', CURRENT_TIMESTAMP) AS INTEGER)`. Both return
+  ///      the current Unix epoch, but PRAGMA table_info reports different
+  ///      literal text on migrated databases, causing parity drift. We
+  ///      normalize the migrated path to `unixepoch()`, which is the canonical
+  ///      equivalent used elsewhere in this migration file and which the
+  ///      parity test collapses to the same canonical token as the fresh
+  ///      default.
+  ///
+  /// Scope rules honored here:
+  ///   * idempotent: every step uses `CREATE INDEX IF NOT EXISTS` or a
+  ///     guarded table rebuild, so re-running the migration is a no-op.
+  ///   * preserves data: the payments rebuild copies rows 1:1 and re-creates
+  ///     the UNIQUE(transaction_id) constraint and every index.
+  ///   * preserves FK behavior: the trigger-backed FKs for
+  ///     `payments.transaction_id -> transactions.id` and
+  ///     `payment_adjustments.payment_id -> payments.id` are dropped before
+  ///     the rebuild (SQLite rewrites trigger bodies on ALTER TABLE RENAME)
+  ///     and re-created against the rebuilt table afterwards.
+  Future<void> _migrateToV37() async {
+    await _createIndexIfTableExists(
+      migration: 'migrate_v37',
+      tableName: 'transaction_lines',
+      description: 'idx_transaction_lines_tx',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_transaction_lines_tx ON transaction_lines(transaction_id);',
+    );
+    await _createIndexIfTableExists(
+      migration: 'migrate_v37',
+      tableName: 'payments',
+      description: 'idx_payments_tx',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_payments_tx ON payments(transaction_id);',
+    );
+
+    if (!await _tableExists('payments')) {
+      _logMigrationDetail(
+        'migrate_v37',
+        'Skipped payments rebuild: table is absent.',
+      );
+      return;
+    }
+
+    final List<QueryRow> columnRows = await customSelect(
+      'PRAGMA table_info(payments);',
+    ).get();
+    String? paidAtDefault;
+    for (final QueryRow row in columnRows) {
+      if (row.read<String>('name') == 'paid_at') {
+        paidAtDefault = row.readNullable<String>('dflt_value');
+        break;
+      }
+    }
+    // Accept any default whose lowercased, paren-stripped text is already
+    // one of the canonical epoch expressions. The parity test collapses
+    // `CAST(strftime('%s', CURRENT_TIMESTAMP) AS INTEGER)` and `unixepoch()`
+    // to the same token, so any of those means the migrated shape already
+    // matches the fresh shape — no rebuild needed.
+    final String? normalizedDefault = _normalizePaidAtDefaultLiteral(
+      paidAtDefault,
+    );
+    const Set<String> canonicalEpochDefaults = <String>{
+      "cast(strftime('%s', current_timestamp) as integer)",
+      'unixepoch()',
+    };
+    if (normalizedDefault != null &&
+        canonicalEpochDefaults.contains(normalizedDefault)) {
+      _logMigrationDetail(
+        'migrate_v37',
+        'Skipped payments rebuild: paid_at default already canonical.',
+      );
+      return;
+    }
+
+    await customStatement('PRAGMA foreign_keys = OFF;');
+    try {
+      // Drop every payments-owning index so the rebuild recreates them against
+      // the new canonical table cleanly.
+      await customStatement('DROP INDEX IF EXISTS idx_payments_tx;');
+
+      // Drop trigger-backed FKs that point AT payments from payment_adjustments,
+      // and the outgoing FK triggers on payments itself. SQLite rewrites the
+      // table name inside dependent trigger bodies when we rename, which would
+      // leave them referencing payments_legacy_v37. Drop up front, recreate at
+      // the end.
+      await customStatement(
+        'DROP TRIGGER IF EXISTS fk_payment_adjustments_payment_id_insert;',
+      );
+      await customStatement(
+        'DROP TRIGGER IF EXISTS fk_payment_adjustments_payment_id_update;',
+      );
+      await customStatement(
+        'DROP TRIGGER IF EXISTS fk_payments_transaction_id_insert;',
+      );
+      await customStatement(
+        'DROP TRIGGER IF EXISTS fk_payments_transaction_id_update;',
+      );
+
+      await customStatement(
+        'ALTER TABLE payments RENAME TO payments_legacy_v37;',
+      );
+      await customStatement('''
+        CREATE TABLE payments (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          transaction_id INTEGER NOT NULL UNIQUE,
+          method TEXT NOT NULL CHECK (method IN ('cash','card')),
+          amount_minor INTEGER NOT NULL CHECK (amount_minor > 0),
+          paid_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+      ''');
+      await customStatement('''
+        INSERT INTO payments (
+          id,
+          uuid,
+          transaction_id,
+          method,
+          amount_minor,
+          paid_at
+        )
+        SELECT
+          id,
+          uuid,
+          transaction_id,
+          method,
+          amount_minor,
+          paid_at
+        FROM payments_legacy_v37;
+      ''');
+      await customStatement('DROP TABLE payments_legacy_v37;');
+    } finally {
+      await customStatement('PRAGMA foreign_keys = ON;');
+    }
+
+    await _createIndexIfTableExists(
+      migration: 'migrate_v37',
+      tableName: 'payments',
+      description: 'idx_payments_tx',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_payments_tx ON payments(transaction_id);',
+    );
+
+    await _createMigrationFkTrigger(
+      table: 'payments',
+      column: 'transaction_id',
+      referencedTable: 'transactions',
+    );
+    await _createMigrationFkTrigger(
+      table: 'payment_adjustments',
+      column: 'payment_id',
+      referencedTable: 'payments',
+    );
+
+    _logMigrationDetail(
+      'migrate_v37',
+      'Rebuilt payments to canonical fresh-schema paid_at default.',
+    );
+  }
+
+  /// Lower-cases and strips outer parentheses around a `paid_at` default
+  /// literal so the migration can compare it against the canonical epoch
+  /// forms regardless of how SQLite happened to echo the stored text back.
+  String? _normalizePaidAtDefaultLiteral(String? raw) {
+    if (raw == null) {
+      return null;
+    }
+    String value = raw.trim();
+    while (value.startsWith('(') && value.endsWith(')')) {
+      final String inner = value.substring(1, value.length - 1).trim();
+      if (inner.isEmpty) {
+        break;
+      }
+      value = inner;
+    }
+    return value.toLowerCase();
+  }
+
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  Future<void> _rebuildProductModifiersForV30() async {
+    if (!await tableExists('product_modifiers')) {
+      _logMigrationDetail(
+        'migrate_v30',
+        'Skipped product_modifiers rebuild: table is absent.',
+      );
+      return;
+    }
+
+    final bool hasPriceBehavior = await columnExists(
+      tableName: 'product_modifiers',
+      columnName: 'price_behavior',
+    );
+    final bool hasUiSection = await columnExists(
+      tableName: 'product_modifiers',
+      columnName: 'ui_section',
+    );
+    final bool relaxChoiceNullability =
+        _upgradeOriginVersion == null || _upgradeOriginVersion! >= 28;
+    final String choiceConstraint = relaxChoiceNullability
+        ? "CHECK ((type = 'choice' AND group_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))"
+        : "CHECK ((type = 'choice' AND group_id IS NOT NULL AND item_product_id IS NOT NULL) OR (type IN ('included','extra') AND group_id IS NULL))";
+
+    await customStatement('PRAGMA foreign_keys = OFF;');
+    try {
+      await customStatement('DROP INDEX IF EXISTS idx_product_modifiers_prod;');
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_product_modifiers_group;',
+      );
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_product_modifiers_item_product;',
+      );
+      await customStatement(
+        'ALTER TABLE product_modifiers RENAME TO product_modifiers_legacy_v30;',
+      );
+      await customStatement('''
+        CREATE TABLE product_modifiers (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          group_id INTEGER NULL,
+          item_product_id INTEGER NULL,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('included','extra','choice')),
+          extra_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (extra_price_minor >= 0),
+          price_behavior TEXT NULL CHECK (price_behavior IS NULL OR price_behavior IN ('free','paid')),
+          ui_section TEXT NULL CHECK (ui_section IS NULL OR ui_section IN ('toppings','sauces','add_ins')),
+          is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+          $choiceConstraint
+        );
+      ''');
+      await customStatement('''
+        INSERT INTO product_modifiers (
+          id,
+          product_id,
+          group_id,
+          item_product_id,
+          name,
+          type,
+          extra_price_minor,
+          price_behavior,
+          ui_section,
+          is_active
+        )
+        SELECT
+          id,
+          product_id,
+          group_id,
+          item_product_id,
+          name,
+          type,
+          extra_price_minor,
+          ${hasPriceBehavior ? 'price_behavior' : 'NULL'},
+          ${hasUiSection ? 'ui_section' : 'NULL'},
+          is_active
+        FROM product_modifiers_legacy_v30;
+      ''');
+      await customStatement('DROP TABLE product_modifiers_legacy_v30;');
+    } finally {
+      await customStatement('PRAGMA foreign_keys = ON;');
+    }
+
+    await _createIndexIfTableExists(
+      migration: 'migrate_v30',
+      tableName: 'product_modifiers',
+      description: 'idx_product_modifiers_prod',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_product_modifiers_prod ON product_modifiers(product_id, is_active);',
+    );
+    await _createIndexIfTableExists(
+      migration: 'migrate_v30',
+      tableName: 'product_modifiers',
+      description: 'idx_product_modifiers_group',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_product_modifiers_group ON product_modifiers(group_id, is_active);',
+    );
+    await _createIndexIfTableExists(
+      migration: 'migrate_v30',
+      tableName: 'product_modifiers',
+      description: 'idx_product_modifiers_item_product',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_product_modifiers_item_product ON product_modifiers(item_product_id, type);',
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'product_id',
+      referencedTable: 'products',
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'group_id',
+      referencedTable: 'modifier_groups',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'product_modifiers',
+      column: 'item_product_id',
+      referencedTable: 'products',
+      nullable: true,
+    );
+  }
+
+  Future<void> _rebuildProductsForV34() async {
+    await _addColumnIfMissing(
+      migration: 'migrate_v34',
+      tableName: 'products',
+      columnName: 'is_custom',
+      sql: '''
+        ALTER TABLE products
+        ADD COLUMN is_custom INTEGER NOT NULL DEFAULT 0
+        CHECK (is_custom IN (0, 1));
+        ''',
+    );
+  }
+
+  Future<void> _rebuildMenuSettingsForV34() async {
+    if (!await tableExists('menu_settings')) {
+      _logMigrationDetail(
+        'migrate_v34',
+        'Skipped menu_settings rebuild: table is absent.',
+      );
+      return;
+    }
+
+    final bool hasMaxSwaps = await columnExists(
+      tableName: 'menu_settings',
+      columnName: 'max_swaps',
+    );
+    final bool hasCustomSalesLimitMinor = await columnExists(
+      tableName: 'menu_settings',
+      columnName: 'custom_sales_limit_minor',
+    );
+
+    await customStatement('PRAGMA foreign_keys = OFF;');
+    try {
+      await customStatement(
+        'DROP INDEX IF EXISTS idx_menu_settings_updated_at;',
+      );
+      await customStatement(
+        'DROP TRIGGER IF EXISTS fk_menu_settings_updated_by_insert;',
+      );
+      await customStatement(
+        'DROP TRIGGER IF EXISTS fk_menu_settings_updated_by_update;',
+      );
+      await customStatement(
+        'ALTER TABLE menu_settings RENAME TO menu_settings_legacy_v34;',
+      );
+      await customStatement('''
+        CREATE TABLE menu_settings (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          free_swap_limit INTEGER NOT NULL DEFAULT 2 CHECK (free_swap_limit >= 0),
+          max_swaps INTEGER NOT NULL DEFAULT 4 CHECK (max_swaps >= 0),
+          custom_sales_limit_minor INTEGER NOT NULL DEFAULT 100000 CHECK (custom_sales_limit_minor >= 0),
+          updated_by INTEGER NULL,
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+        );
+      ''');
+      await customStatement('''
+        INSERT INTO menu_settings (
+          id,
+          free_swap_limit,
+          max_swaps,
+          custom_sales_limit_minor,
+          updated_by,
+          updated_at
+        )
+        SELECT
+          id,
+          free_swap_limit,
+          ${hasMaxSwaps ? 'max_swaps' : '4'},
+          ${hasCustomSalesLimitMinor ? 'custom_sales_limit_minor' : '$kDefaultCustomSalesLimitMinor'},
+          updated_by,
+          updated_at
+        FROM menu_settings_legacy_v34;
+      ''');
+      await customStatement('DROP TABLE menu_settings_legacy_v34;');
+    } finally {
+      await customStatement('PRAGMA foreign_keys = ON;');
+    }
+
+    await _createIndexIfTableExists(
+      migration: 'migrate_v34',
+      tableName: 'menu_settings',
+      description: 'idx_menu_settings_updated_at',
+      sql:
+          'CREATE INDEX IF NOT EXISTS idx_menu_settings_updated_at ON menu_settings(updated_at, id);',
+    );
+    await _createMigrationFkTrigger(
+      table: 'menu_settings',
+      column: 'updated_by',
+      referencedTable: 'users',
+      nullable: true,
+    );
+  }
+
   Future<void> _upgradeSeedBurgerModifiersToStructured() async {
+    if (!await tableExists('products') ||
+        !await tableExists('product_modifiers')) {
+      _logMigrationDetail(
+        'migrate_v30',
+        'Skipped burger seed transform: required tables are absent.',
+      );
+      return;
+    }
+    if (!await columnExists(tableName: 'products', columnName: 'name') ||
+        !await columnExists(
+          tableName: 'product_modifiers',
+          columnName: 'group_id',
+        ) ||
+        !await columnExists(
+          tableName: 'product_modifiers',
+          columnName: 'item_product_id',
+        )) {
+      _logMigrationDetail(
+        'migrate_v30',
+        'Skipped burger seed transform: required columns are absent.',
+      );
+      return;
+    }
+
     final List<QueryRow> burgerRows = await customSelect('''
       SELECT id
       FROM products
@@ -4512,6 +5253,28 @@ class AppDatabase extends _$AppDatabase {
     required String referencedTable,
     bool nullable = false,
   }) async {
+    if (!await tableExists(table)) {
+      _logMigrationDetail(
+        'fk_trigger',
+        'Skipped $table.$column -> $referencedTable.id: table is absent.',
+      );
+      return;
+    }
+    if (!await columnExists(tableName: table, columnName: column)) {
+      _logMigrationDetail(
+        'fk_trigger',
+        'Skipped $table.$column -> $referencedTable.id: column is absent.',
+      );
+      return;
+    }
+    if (!await tableExists(referencedTable)) {
+      _logMigrationDetail(
+        'fk_trigger',
+        'Skipped $table.$column -> $referencedTable.id: referenced table is absent.',
+      );
+      return;
+    }
+
     final String condition =
         '${nullable ? 'NEW.$column IS NOT NULL AND ' : ''}'
         '(SELECT id FROM $referencedTable WHERE id = NEW.$column) IS NULL';
@@ -4538,6 +5301,14 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _seedDefaultMenuSettings() async {
+    if (!await tableExists('menu_settings')) {
+      _logMigrationDetail(
+        'menu_settings_seed',
+        'Skipped: menu_settings table is absent.',
+      );
+      return;
+    }
+
     final bool hasCustomSalesLimitMinor = await _tableHasColumn(
       tableName: 'menu_settings',
       columnName: 'custom_sales_limit_minor',
@@ -4580,7 +5351,6 @@ class AppDatabase extends _$AppDatabase {
       return;
     }
 
-    final int categoryId = await _ensureArchivedProductsCategory();
     final List<QueryRow> customRows = await customSelect(
       '''
       SELECT id
@@ -4608,6 +5378,11 @@ class AppDatabase extends _$AppDatabase {
     final int? existingId = customRows.isEmpty
         ? null
         : customRows.first.read<int>('id');
+    // v34 introduced Custom Sale as a system-owned invariant, not as a
+    // best-effort migration from legacy names. Once the schema supports
+    // `is_custom`, upgraded databases must end with exactly one internal
+    // custom-sale product, even if no legacy row advertised that intent.
+    final int categoryId = await _ensureArchivedProductsCategory();
     if (existingId == null) {
       await into(products).insert(
         ProductsCompanion.insert(
@@ -4741,14 +5516,24 @@ class AppDatabase extends _$AppDatabase {
   Future<bool> _tableHasColumn({
     required String tableName,
     required String columnName,
+  }) => columnExists(tableName: tableName, columnName: columnName);
+
+  Future<bool> columnExists({
+    required String tableName,
+    required String columnName,
   }) async {
+    if (!await tableExists(tableName)) {
+      return false;
+    }
     final List<QueryRow> rows = await customSelect(
       'PRAGMA table_info($tableName)',
     ).get();
     return rows.any((QueryRow row) => row.read<String>('name') == columnName);
   }
 
-  Future<bool> _tableExists(String tableName) async {
+  Future<bool> _tableExists(String tableName) => tableExists(tableName);
+
+  Future<bool> tableExists(String tableName) async {
     final QueryRow? row = await customSelect(
       '''
       SELECT name
@@ -4761,10 +5546,67 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<bool> _tableHasAnyRows(String tableName) async {
+    if (!await tableExists(tableName)) {
+      return false;
+    }
     final QueryRow? row = await customSelect(
       'SELECT 1 AS has_row FROM $tableName LIMIT 1',
     ).getSingleOrNull();
     return row != null;
+  }
+
+  Future<bool> _addColumnIfMissing({
+    required String migration,
+    required String tableName,
+    required String columnName,
+    required String sql,
+  }) async {
+    if (!await tableExists(tableName)) {
+      _logMigrationDetail(
+        migration,
+        'Skipped $tableName.$columnName: table is absent.',
+      );
+      return false;
+    }
+    if (await columnExists(tableName: tableName, columnName: columnName)) {
+      _logMigrationDetail(
+        migration,
+        'Skipped $tableName.$columnName: column already exists.',
+      );
+      return false;
+    }
+
+    await customStatement(sql);
+    _logMigrationDetail(
+      migration,
+      'Applied $tableName.$columnName schema addition.',
+    );
+    return true;
+  }
+
+  Future<bool> _createIndexIfTableExists({
+    required String migration,
+    required String tableName,
+    required String description,
+    required String sql,
+  }) async {
+    if (!await tableExists(tableName)) {
+      _logMigrationDetail(
+        migration,
+        'Skipped index $description: $tableName table is absent.',
+      );
+      return false;
+    }
+
+    await customStatement(sql);
+    _logMigrationDetail(migration, 'Ensured index $description.');
+    return true;
+  }
+
+  void _logMigrationDetail(String step, String message) {
+    if (kDebugMode) {
+      debugPrint('[AppDatabase][$step] $message');
+    }
   }
 
   Future<int> _pragmaIntValue(String pragmaName) async {

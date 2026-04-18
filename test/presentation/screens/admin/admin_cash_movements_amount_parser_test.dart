@@ -15,12 +15,24 @@ void main() {
       expect(parseCashMovementAmountMinor('12.50'), 1250);
     });
 
+    test('".5" -> 50', () {
+      expect(parseCashMovementAmountMinor('.5'), 50);
+    });
+
+    test('"12." -> 1200', () {
+      expect(parseCashMovementAmountMinor('12.'), 1200);
+    });
+
     test('"0.01" -> 1', () {
       expect(parseCashMovementAmountMinor('0.01'), 1);
     });
 
     test('"0" is rejected', () {
       expect(parseCashMovementAmountMinor('0'), isNull);
+    });
+
+    test('"00" is rejected', () {
+      expect(parseCashMovementAmountMinor('00'), isNull);
     });
 
     test('negative is rejected', () {

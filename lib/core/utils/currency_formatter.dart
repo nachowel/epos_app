@@ -39,16 +39,19 @@ class CurrencyFormatter {
         .replaceAll(RegExp(r'\s+'), '')
         .replaceAll(',', '.');
     final RegExp validPattern = allowNegative
-        ? RegExp(r'^-?\d+(\.\d{1,2})?$')
-        : RegExp(r'^\d+(\.\d{1,2})?$');
+        ? RegExp(r'^-?(?:(?:\d+)(?:\.\d{0,2})?|\.\d{1,2})$')
+        : RegExp(r'^(?:(?:\d+)(?:\.\d{0,2})?|\.\d{1,2})$');
     if (!validPattern.hasMatch(normalized)) {
       return null;
     }
 
     final bool isNegative = normalized.startsWith('-');
-    final String unsigned = isNegative ? normalized.substring(1) : normalized;
+    String unsigned = isNegative ? normalized.substring(1) : normalized;
     if (unsigned.isEmpty) {
       return null;
+    }
+    if (unsigned.startsWith('.')) {
+      unsigned = '0$unsigned';
     }
 
     final List<String> parts = unsigned.split('.');

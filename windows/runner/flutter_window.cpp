@@ -1,8 +1,36 @@
 #include "flutter_window.h"
 
+#include <flutter/standard_method_codec.h>
+#include <inputpaneinterop.h>
 #include <optional>
+#include <winrt/Windows.UI.ViewManagement.h>
 
 #include "flutter/generated_plugin_registrant.h"
+
+namespace {
+
+bool InvokeInputPane(HWND window, bool show) {
+  if (!window) {
+    return false;
+  }
+
+  try {
+    auto const factory = winrt::get_activation_factory<
+        winrt::Windows::UI::ViewManagement::InputPane, IInputPaneInterop>();
+    winrt::Windows::UI::ViewManagement::IInputPane2 input_pane{nullptr};
+    HRESULT result = factory->GetForWindow(
+        window, winrt::guid_of<winrt::Windows::UI::ViewManagement::IInputPane2>(),
+        winrt::put_abi(input_pane));
+    if (FAILED(result) || !input_pane) {
+      return false;
+    }
+    return show ? input_pane.TryShow() : input_pane.TryHide();
+  } catch (...) {
+    return false;
+  }
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -26,6 +54,24 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+  system_keyboard_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "epos/system_keyboard",
+          &flutter::StandardMethodCodec::GetInstance());
+  system_keyboard_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        if (call.method_name() == "show") {
+          result->Success(flutter::EncodableValue(InvokeInputPane(GetHandle(), true)));
+          return;
+        }
+        if (call.method_name() == "hide") {
+          result->Success(flutter::EncodableValue(InvokeInputPane(GetHandle(), false)));
+          return;
+        }
+        result->NotImplemented();
+      });
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
@@ -40,6 +86,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  system_keyboard_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

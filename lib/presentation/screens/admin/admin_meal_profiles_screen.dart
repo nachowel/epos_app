@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../domain/models/meal_adjustment_profile.dart';
 import '../../providers/admin_meal_profiles_provider.dart';
+import '../../widgets/selective_system_keyboard_field.dart';
 import 'widgets/admin_scaffold.dart';
 
 class AdminMealProfilesScreen extends ConsumerStatefulWidget {
@@ -464,14 +465,14 @@ class _CreateProfileDialogState extends State<_CreateProfileDialog> {
           children: <Widget>[
             _CreateProfileHelperBanner(kind: widget.kind),
             const SizedBox(height: AppSizes.spacingSm),
-            TextField(
+            SelectiveSystemKeyboardTextField(
               key: const ValueKey<String>('meal-profile-create-name'),
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Profile name'),
               autofocus: true,
             ),
             const SizedBox(height: AppSizes.spacingSm),
-            TextField(
+            SelectiveSystemKeyboardTextField(
               key: const ValueKey<String>('meal-profile-create-desc'),
               controller: _descriptionController,
               decoration: const InputDecoration(

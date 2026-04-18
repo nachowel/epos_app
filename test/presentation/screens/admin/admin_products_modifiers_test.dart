@@ -668,9 +668,10 @@ void main() {
         find.byKey(const ValueKey<String>('quick-product-name')),
         'Sauce Pot',
       );
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('quick-product-price')),
-        '90',
+      await _enterMoneyFieldValue(
+        tester,
+        fieldKey: 'quick-product-price',
+        value: '0.90',
       );
       await tester.tap(find.text(AppStrings.saveSettings).last);
       await tester.pumpAndSettle();
@@ -769,4 +770,23 @@ void _setLargeView(WidgetTester tester) {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Future<void> _enterMoneyFieldValue(
+  WidgetTester tester, {
+  required String fieldKey,
+  required String value,
+}) async {
+  await tester.tap(find.byKey(ValueKey<String>(fieldKey)));
+  await tester.pumpAndSettle();
+  for (final String character in value.split('')) {
+    final String key = switch (character) {
+      '.' => 'app-numeric-keypad-decimal',
+      _ => 'app-numeric-keypad-digit-$character',
+    };
+    await tester.tap(find.byKey(ValueKey<String>(key)));
+    await tester.pump();
+  }
+  await tester.tap(find.byKey(const ValueKey<String>('app-numeric-keypad-apply')));
+  await tester.pumpAndSettle();
 }

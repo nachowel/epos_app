@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +8,8 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../domain/models/meal_adjustment_profile.dart';
 import '../../../domain/services/meal_adjustment_profile_validation_service.dart';
 import '../../providers/admin_meal_profiles_provider.dart';
+import '../../widgets/app_numeric_keypad_dialog.dart';
+import '../../widgets/selective_system_keyboard_field.dart';
 import 'widgets/admin_scaffold.dart';
 
 class AdminMealProfileEditorScreen extends ConsumerStatefulWidget {
@@ -335,6 +336,7 @@ class _BasicInfoSectionState extends ConsumerState<_BasicInfoSection> {
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
   late TextEditingController _freeSwapController;
+  late final FocusNode _freeSwapFocusNode;
 
   @override
   void initState() {
@@ -346,6 +348,7 @@ class _BasicInfoSectionState extends ConsumerState<_BasicInfoSection> {
     _freeSwapController = TextEditingController(
       text: '${widget.draft.freeSwapLimit}',
     );
+    _freeSwapFocusNode = FocusNode(debugLabel: 'meal-profile-free-swaps');
   }
 
   @override
@@ -365,6 +368,7 @@ class _BasicInfoSectionState extends ConsumerState<_BasicInfoSection> {
     _nameController.dispose();
     _descriptionController.dispose();
     _freeSwapController.dispose();
+    _freeSwapFocusNode.dispose();
     super.dispose();
   }
 
@@ -404,7 +408,7 @@ class _BasicInfoSectionState extends ConsumerState<_BasicInfoSection> {
             ),
             const SizedBox(height: AppSizes.spacingSm),
           ],
-          TextField(
+          SelectiveSystemKeyboardTextField(
             key: const ValueKey<String>('meal-profile-editor-name'),
             controller: _nameController,
             decoration: const InputDecoration(labelText: 'Profile name'),
@@ -413,7 +417,7 @@ class _BasicInfoSectionState extends ConsumerState<_BasicInfoSection> {
                 .updateBasicInfo(name: value.trim()),
           ),
           const SizedBox(height: AppSizes.spacingSm),
-          TextField(
+          SelectiveSystemKeyboardTextField(
             key: const ValueKey<String>('meal-profile-editor-desc'),
             controller: _descriptionController,
             decoration: const InputDecoration(
@@ -430,11 +434,13 @@ class _BasicInfoSectionState extends ConsumerState<_BasicInfoSection> {
             TextField(
               key: const ValueKey<String>('meal-profile-editor-swaps'),
               controller: _freeSwapController,
+              focusNode: _freeSwapFocusNode,
+              readOnly: true,
+              showCursor: false,
+              enableInteractiveSelection: false,
               decoration: const InputDecoration(labelText: 'Free swap limit'),
-              keyboardType: TextInputType.number,
-              onChanged: (String value) => ref
-                  .read(adminMealProfileEditorNotifierProvider.notifier)
-                  .updateBasicInfo(freeSwapLimit: int.tryParse(value) ?? 0),
+              keyboardType: TextInputType.none,
+              onTap: _openFreeSwapKeypad,
             ),
           ],
           const SizedBox(height: AppSizes.spacingMd),
@@ -452,6 +458,33 @@ class _BasicInfoSectionState extends ConsumerState<_BasicInfoSection> {
         ],
       ),
     );
+  }
+
+  Future<void> _openFreeSwapKeypad() async {
+    final String? normalized = await AppNumericKeypadDialog.showNormalizedText(
+      context,
+      title: 'Enter free swap limit',
+      previewLabel: 'Free swap limit',
+      initialValue: _freeSwapController.text,
+      allowDecimal: false,
+      confirmButtonLabel: 'Apply',
+      allowEmpty: true,
+      restoreFocusNode: _freeSwapFocusNode,
+    );
+    if (!mounted || normalized == null) {
+      return;
+    }
+
+    // Preserve legacy admin behavior: applying an empty free-swap limit stores
+    // `0` at the field boundary rather than teaching that rule to the keypad.
+    final String nextValue = normalized.isEmpty ? '0' : normalized;
+    _freeSwapController.value = TextEditingValue(
+      text: nextValue,
+      selection: TextSelection.collapsed(offset: nextValue.length),
+    );
+    ref
+        .read(adminMealProfileEditorNotifierProvider.notifier)
+        .updateBasicInfo(freeSwapLimit: int.tryParse(nextValue) ?? 0);
   }
 }
 
@@ -537,8 +570,8 @@ class _SandwichSettingsSectionState
     extends ConsumerState<_SandwichSettingsSection> {
   late final TextEditingController _sandwichSurchargeController;
   late final TextEditingController _baguetteSurchargeController;
-  String? _sandwichSurchargeParseError;
-  String? _baguetteSurchargeParseError;
+  late final FocusNode _sandwichSurchargeFocusNode;
+  late final FocusNode _baguetteSurchargeFocusNode;
 
   @override
   void initState() {
@@ -553,6 +586,8 @@ class _SandwichSettingsSectionState
         widget.draft.sandwichSettings.baguetteSurchargeMinor,
       ),
     );
+    _sandwichSurchargeFocusNode = FocusNode(debugLabel: 'sandwich-surcharge');
+    _baguetteSurchargeFocusNode = FocusNode(debugLabel: 'baguette-surcharge');
   }
 
   @override
@@ -580,6 +615,8 @@ class _SandwichSettingsSectionState
   void dispose() {
     _sandwichSurchargeController.dispose();
     _baguetteSurchargeController.dispose();
+    _sandwichSurchargeFocusNode.dispose();
+    _baguetteSurchargeFocusNode.dispose();
     super.dispose();
   }
 
@@ -657,25 +694,31 @@ class _SandwichSettingsSectionState
         TextField(
           key: const ValueKey<String>('meal-profile-editor-sandwich-surcharge'),
           controller: _sandwichSurchargeController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          focusNode: _sandwichSurchargeFocusNode,
+          readOnly: true,
+          showCursor: false,
+          enableInteractiveSelection: false,
+          keyboardType: TextInputType.none,
           decoration: InputDecoration(
             labelText: 'Sandwich surcharge',
             helperText: 'Added to the base product price for Sandwich bread.',
-            errorText: _sandwichSurchargeParseError,
           ),
-          onChanged: _updateSandwichSurcharge,
+          onTap: _openSandwichSurchargeKeypad,
         ),
         const SizedBox(height: AppSizes.spacingMd),
         TextField(
           key: const ValueKey<String>('meal-profile-editor-baguette-surcharge'),
           controller: _baguetteSurchargeController,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          focusNode: _baguetteSurchargeFocusNode,
+          readOnly: true,
+          showCursor: false,
+          enableInteractiveSelection: false,
+          keyboardType: TextInputType.none,
           decoration: InputDecoration(
             labelText: 'Baguette surcharge',
             helperText: 'Added to the base product price for Baguette bread.',
-            errorText: _baguetteSurchargeParseError,
           ),
-          onChanged: _updateBaguetteSurcharge,
+          onTap: _openBaguetteSurchargeKeypad,
         ),
         const SizedBox(height: AppSizes.spacingMd),
         const Text(
@@ -738,43 +781,55 @@ class _SandwichSettingsSectionState
     );
   }
 
-  void _updateSandwichSurcharge(String value) {
-    final int? parsed = CurrencyFormatter.tryParseEditableMajorInput(
-      value.trim(),
+  Future<void> _openSandwichSurchargeKeypad() async {
+    final int? surchargeMinor = await AppNumericKeypadDialog.showCurrencyMinor(
+      context,
+      title: 'Enter sandwich surcharge',
+      previewLabel: 'Sandwich surcharge',
+      initialMinor: _currentSandwichSettings.sandwichSurchargeMinor,
+      prefixText: '£ ',
+      emptyPreview: '0.00',
+      confirmButtonLabel: 'Apply',
+      restoreFocusNode: _sandwichSurchargeFocusNode,
     );
-    if (parsed == null) {
-      setState(() {
-        _sandwichSurchargeParseError = 'Enter a valid amount';
-      });
+    if (!mounted || surchargeMinor == null) {
       return;
     }
-    if (_sandwichSurchargeParseError != null) {
-      setState(() {
-        _sandwichSurchargeParseError = null;
-      });
-    }
+    final String nextValue = CurrencyFormatter.toEditableMajorInput(
+      surchargeMinor,
+    );
+    _sandwichSurchargeController.value = TextEditingValue(
+      text: nextValue,
+      selection: TextSelection.collapsed(offset: nextValue.length),
+    );
     _updateSandwichSettings(
-      _currentSandwichSettings.copyWith(sandwichSurchargeMinor: parsed),
+      _currentSandwichSettings.copyWith(sandwichSurchargeMinor: surchargeMinor),
     );
   }
 
-  void _updateBaguetteSurcharge(String value) {
-    final int? parsed = CurrencyFormatter.tryParseEditableMajorInput(
-      value.trim(),
+  Future<void> _openBaguetteSurchargeKeypad() async {
+    final int? surchargeMinor = await AppNumericKeypadDialog.showCurrencyMinor(
+      context,
+      title: 'Enter baguette surcharge',
+      previewLabel: 'Baguette surcharge',
+      initialMinor: _currentSandwichSettings.baguetteSurchargeMinor,
+      prefixText: '£ ',
+      emptyPreview: '0.00',
+      confirmButtonLabel: 'Apply',
+      restoreFocusNode: _baguetteSurchargeFocusNode,
     );
-    if (parsed == null) {
-      setState(() {
-        _baguetteSurchargeParseError = 'Enter a valid amount';
-      });
+    if (!mounted || surchargeMinor == null) {
       return;
     }
-    if (_baguetteSurchargeParseError != null) {
-      setState(() {
-        _baguetteSurchargeParseError = null;
-      });
-    }
+    final String nextValue = CurrencyFormatter.toEditableMajorInput(
+      surchargeMinor,
+    );
+    _baguetteSurchargeController.value = TextEditingValue(
+      text: nextValue,
+      selection: TextSelection.collapsed(offset: nextValue.length),
+    );
     _updateSandwichSettings(
-      _currentSandwichSettings.copyWith(baguetteSurchargeMinor: parsed),
+      _currentSandwichSettings.copyWith(baguetteSurchargeMinor: surchargeMinor),
     );
   }
 
@@ -965,6 +1020,7 @@ class _ComponentCardState extends State<_ComponentCard> {
   late final TextEditingController _displayNameController;
   late final TextEditingController _componentKeyController;
   late final TextEditingController _quantityController;
+  late final FocusNode _quantityFocusNode;
   String? _swapMessage;
 
   @override
@@ -979,6 +1035,7 @@ class _ComponentCardState extends State<_ComponentCard> {
     _quantityController = TextEditingController(
       text: '${widget.component.quantity}',
     );
+    _quantityFocusNode = FocusNode(debugLabel: 'component-qty-${widget.index}');
   }
 
   @override
@@ -1008,6 +1065,7 @@ class _ComponentCardState extends State<_ComponentCard> {
     _displayNameController.dispose();
     _componentKeyController.dispose();
     _quantityController.dispose();
+    _quantityFocusNode.dispose();
     super.dispose();
   }
 
@@ -1253,17 +1311,13 @@ class _ComponentCardState extends State<_ComponentCard> {
                           'component-qty-input-${widget.index}',
                         ),
                         controller: _quantityController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: <TextInputFormatter>[
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
+                        focusNode: _quantityFocusNode,
+                        readOnly: true,
+                        showCursor: false,
+                        enableInteractiveSelection: false,
+                        keyboardType: TextInputType.none,
                         decoration: InputDecoration(errorText: quantityError),
-                        onChanged: (String value) {
-                          final int nextValue = int.tryParse(value) ?? 0;
-                          widget.onChanged(
-                            widget.component.copyWith(quantity: nextValue),
-                          );
-                        },
+                        onTap: _openQuantityKeypad,
                       ),
                     ),
                     IconButton(
@@ -1460,6 +1514,33 @@ class _ComponentCardState extends State<_ComponentCard> {
     return messages;
   }
 
+  Future<void> _openQuantityKeypad() async {
+    final String? normalized = await AppNumericKeypadDialog.showNormalizedText(
+      context,
+      title: 'Enter component quantity',
+      previewLabel: 'Component quantity',
+      initialValue: _quantityController.text,
+      allowDecimal: false,
+      confirmButtonLabel: 'Apply',
+      allowEmpty: true,
+      restoreFocusNode: _quantityFocusNode,
+    );
+    if (!mounted || normalized == null) {
+      return;
+    }
+
+    // Preserve legacy component semantics: empty Apply becomes `0` here, and
+    // the existing component validation still rejects non-positive quantities.
+    final String nextValue = normalized.isEmpty ? '0' : normalized;
+    _quantityController.value = TextEditingValue(
+      text: nextValue,
+      selection: TextSelection.collapsed(offset: nextValue.length),
+    );
+    widget.onChanged(
+      widget.component.copyWith(quantity: int.tryParse(nextValue) ?? 0),
+    );
+  }
+
   Future<void> _selectDefaultProduct() async {
     final AdminMealProfileProductCatalog? catalog = widget.catalog;
     if (catalog == null) {
@@ -1583,6 +1664,7 @@ class _SwapOptionRow extends StatefulWidget {
 
 class _SwapOptionRowState extends State<_SwapOptionRow> {
   late final TextEditingController _deltaController;
+  late final FocusNode _deltaFocusNode;
 
   @override
   void initState() {
@@ -1593,6 +1675,9 @@ class _SwapOptionRowState extends State<_SwapOptionRow> {
           : CurrencyFormatter.toEditableMajorInput(
               widget.option.fixedPriceDeltaMinor!,
             ),
+    );
+    _deltaFocusNode = FocusNode(
+      debugLabel: 'swap-delta-${widget.componentIndex}-${widget.swapIndex}',
     );
   }
 
@@ -1614,6 +1699,7 @@ class _SwapOptionRowState extends State<_SwapOptionRow> {
   @override
   void dispose() {
     _deltaController.dispose();
+    _deltaFocusNode.dispose();
     super.dispose();
   }
 
@@ -1690,31 +1776,18 @@ class _SwapOptionRowState extends State<_SwapOptionRow> {
               'component-swap-delta-${widget.componentIndex}-${widget.swapIndex}',
             ),
             controller: _deltaController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            focusNode: _deltaFocusNode,
+            readOnly: true,
+            showCursor: false,
+            enableInteractiveSelection: false,
+            keyboardType: TextInputType.none,
             decoration: const InputDecoration(
               labelText: 'Fixed price delta',
               hintText: 'Optional',
               helperText:
                   'Leave blank to use rule pricing or a zero fallback for this swap.',
             ),
-            onChanged: (String value) {
-              final String trimmed = value.trim();
-              if (trimmed.isEmpty) {
-                widget.onChanged(
-                  widget.option.copyWith(fixedPriceDeltaMinor: null),
-                );
-                return;
-              }
-              final int? parsed = CurrencyFormatter.tryParseEditableMajorInput(
-                trimmed,
-              );
-              if (parsed == null) {
-                return;
-              }
-              widget.onChanged(
-                widget.option.copyWith(fixedPriceDeltaMinor: parsed),
-              );
-            },
+            onTap: _openDeltaKeypad,
           ),
           if (errorMessages.length > 1)
             Padding(
@@ -1776,6 +1849,46 @@ class _SwapOptionRowState extends State<_SwapOptionRow> {
     }
     widget.onValidSelection();
     widget.onChanged(widget.option.copyWith(optionItemProductId: selected.id));
+  }
+
+  Future<void> _openDeltaKeypad() async {
+    final String? normalized = await AppNumericKeypadDialog.showNormalizedText(
+      context,
+      title: 'Enter swap fixed price delta',
+      previewLabel: 'Swap fixed price delta',
+      initialValue: widget.option.fixedPriceDeltaMinor == null
+          ? ''
+          : CurrencyFormatter.toEditableMajorInput(
+              widget.option.fixedPriceDeltaMinor!,
+            ),
+      prefixText: '£ ',
+      emptyPreview: '0.00',
+      confirmButtonLabel: 'Apply',
+      allowEmpty: true,
+      restoreFocusNode: _deltaFocusNode,
+    );
+    if (!mounted || normalized == null) {
+      return;
+    }
+
+    // Contract: empty apply clears the explicit swap override. Runtime then
+    // falls back to pricing-rule delta, then a zero delta.
+    final int? nextDeltaMinor = normalized.isEmpty
+        ? null
+        : CurrencyFormatter.tryParseEditableMajorInput(normalized);
+    if (normalized.isNotEmpty && nextDeltaMinor == null) {
+      return;
+    }
+    final String nextValue = nextDeltaMinor == null
+        ? ''
+        : CurrencyFormatter.toEditableMajorInput(nextDeltaMinor);
+    _deltaController.value = TextEditingValue(
+      text: nextValue,
+      selection: TextSelection.collapsed(offset: nextValue.length),
+    );
+    widget.onChanged(
+      widget.option.copyWith(fixedPriceDeltaMinor: nextDeltaMinor),
+    );
   }
 }
 
@@ -1913,7 +2026,7 @@ class _ProductPickerDialogState extends State<_ProductPickerDialog> {
         height: 420,
         child: Column(
           children: <Widget>[
-            TextField(
+            SelectiveSystemKeyboardTextField(
               key: const ValueKey<String>('meal-profile-product-search'),
               controller: _searchController,
               decoration: const InputDecoration(
@@ -2251,7 +2364,7 @@ class _ExtraOptionCard extends ConsumerStatefulWidget {
 
 class _ExtraOptionCardState extends ConsumerState<_ExtraOptionCard> {
   late final TextEditingController _deltaController;
-  String? _deltaParseError;
+  late final FocusNode _deltaFocusNode;
 
   @override
   void initState() {
@@ -2261,6 +2374,7 @@ class _ExtraOptionCardState extends ConsumerState<_ExtraOptionCard> {
         widget.extra.fixedPriceDeltaMinor,
       ),
     );
+    _deltaFocusNode = FocusNode(debugLabel: 'extra-delta-${widget.index}');
   }
 
   @override
@@ -2279,6 +2393,7 @@ class _ExtraOptionCardState extends ConsumerState<_ExtraOptionCard> {
   @override
   void dispose() {
     _deltaController.dispose();
+    _deltaFocusNode.dispose();
     super.dispose();
   }
 
@@ -2420,20 +2535,20 @@ class _ExtraOptionCardState extends ConsumerState<_ExtraOptionCard> {
               TextField(
                 key: ValueKey<String>('extra-delta-${widget.index}'),
                 controller: _deltaController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                focusNode: _deltaFocusNode,
+                readOnly: true,
+                showCursor: false,
+                enableInteractiveSelection: false,
+                keyboardType: TextInputType.none,
                 decoration: InputDecoration(
                   labelText: 'Add-in price',
                   helperText:
                       'Enter the price for adding this item into the meal.',
-                  errorText:
-                      _deltaParseError ??
-                      (widget.extra.fixedPriceDeltaMinor < 0
-                          ? 'Add-in price cannot be negative'
-                          : null),
+                  errorText: widget.extra.fixedPriceDeltaMinor < 0
+                      ? 'Add-in price cannot be negative'
+                      : null,
                 ),
-                onChanged: _updateDelta,
+                onTap: _openDeltaKeypad,
               ),
               const SizedBox(height: AppSizes.spacingSm),
               SwitchListTile(
@@ -2530,29 +2645,32 @@ class _ExtraOptionCardState extends ConsumerState<_ExtraOptionCard> {
     widget.onChanged(widget.extra.copyWith(itemProductId: selected.id));
   }
 
-  void _updateDelta(String value) {
-    final String trimmed = value.trim();
-    if (trimmed.isEmpty) {
-      setState(() {
-        _deltaParseError = 'Enter a valid amount';
-      });
-      return;
-    }
-    final int? parsed = CurrencyFormatter.tryParseSignedEditableMajorInput(
-      trimmed,
+  Future<void> _openDeltaKeypad() async {
+    // Business contract: add-ins are sell-up charges only. Validation blocks
+    // negative fixedPriceDeltaMinor values, so this editor keeps entry
+    // non-negative instead of exposing signed money UX here.
+    final int? deltaMinor = await AppNumericKeypadDialog.showCurrencyMinor(
+      context,
+      title: 'Enter add-in price',
+      previewLabel: 'Add-in price',
+      initialMinor: widget.extra.fixedPriceDeltaMinor < 0
+          ? null
+          : widget.extra.fixedPriceDeltaMinor,
+      prefixText: '£ ',
+      emptyPreview: '0.00',
+      confirmButtonLabel: 'Apply',
+      restoreFocusNode: _deltaFocusNode,
     );
-    if (parsed == null) {
-      setState(() {
-        _deltaParseError = 'Enter a valid amount';
-      });
+    if (!mounted || deltaMinor == null) {
       return;
     }
-    if (_deltaParseError != null) {
-      setState(() {
-        _deltaParseError = null;
-      });
-    }
-    widget.onChanged(widget.extra.copyWith(fixedPriceDeltaMinor: parsed));
+
+    final String nextValue = CurrencyFormatter.toEditableMajorInput(deltaMinor);
+    _deltaController.value = TextEditingValue(
+      text: nextValue,
+      selection: TextSelection.collapsed(offset: nextValue.length),
+    );
+    widget.onChanged(widget.extra.copyWith(fixedPriceDeltaMinor: deltaMinor));
   }
 }
 
@@ -2775,7 +2893,8 @@ class _PricingRuleCardState extends State<_PricingRuleCard> {
   late final TextEditingController _nameController;
   late final TextEditingController _deltaController;
   late final TextEditingController _priorityController;
-  String? _deltaParseError;
+  late final FocusNode _deltaFocusNode;
+  late final FocusNode _priorityFocusNode;
   String? _priorityParseError;
   String? _interactionMessage;
 
@@ -2789,6 +2908,8 @@ class _PricingRuleCardState extends State<_PricingRuleCard> {
     _priorityController = TextEditingController(
       text: '${widget.rule.priority}',
     );
+    _deltaFocusNode = FocusNode(debugLabel: 'rule-delta-${widget.index}');
+    _priorityFocusNode = FocusNode(debugLabel: 'rule-priority-${widget.index}');
   }
 
   @override
@@ -2817,6 +2938,8 @@ class _PricingRuleCardState extends State<_PricingRuleCard> {
     _nameController.dispose();
     _deltaController.dispose();
     _priorityController.dispose();
+    _deltaFocusNode.dispose();
+    _priorityFocusNode.dispose();
     super.dispose();
   }
 
@@ -2980,7 +3103,7 @@ class _PricingRuleCardState extends State<_PricingRuleCard> {
         ),
         const SizedBox(height: AppSizes.spacingSm),
       ],
-      TextField(
+      SelectiveSystemKeyboardTextField(
         key: ValueKey<String>('rule-name-${widget.index}'),
         controller: _nameController,
         decoration: InputDecoration(
@@ -3021,16 +3144,17 @@ class _PricingRuleCardState extends State<_PricingRuleCard> {
             child: TextField(
               key: ValueKey<String>('rule-delta-${widget.index}'),
               controller: _deltaController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-                signed: true,
-              ),
+              focusNode: _deltaFocusNode,
+              readOnly: true,
+              showCursor: false,
+              enableInteractiveSelection: false,
+              keyboardType: TextInputType.none,
               decoration: InputDecoration(
                 labelText: 'Price delta',
                 helperText: 'Enter signed major units, for example -1.00.',
-                errorText: _deltaParseError ?? _deltaValidationError,
+                errorText: _deltaValidationError,
               ),
-              onChanged: _updateDelta,
+              onTap: _openDeltaKeypad,
             ),
           ),
           const SizedBox(width: AppSizes.spacingMd),
@@ -3038,17 +3162,18 @@ class _PricingRuleCardState extends State<_PricingRuleCard> {
             child: TextField(
               key: ValueKey<String>('rule-priority-${widget.index}'),
               controller: _priorityController,
-              keyboardType: TextInputType.number,
-              inputFormatters: <TextInputFormatter>[
-                FilteringTextInputFormatter.allow(RegExp(r'-?\d*')),
-              ],
+              focusNode: _priorityFocusNode,
+              readOnly: true,
+              showCursor: false,
+              enableInteractiveSelection: false,
+              keyboardType: TextInputType.none,
               decoration: InputDecoration(
                 labelText: 'Priority',
                 helperText:
                     'Higher priority wins when rules are equally specific.',
                 errorText: _priorityParseError,
               ),
-              onChanged: _updatePriority,
+              onTap: _openPriorityKeypad,
             ),
           ),
         ],
@@ -3164,29 +3289,62 @@ class _PricingRuleCardState extends State<_PricingRuleCard> {
     return widget.rule.conditions.isEmpty;
   }
 
-  void _updateDelta(String value) {
-    final String trimmed = value.trim();
-    if (trimmed.isEmpty || trimmed == '-') {
-      setState(() {
-        _deltaParseError = 'Enter a valid amount';
-      });
-      return;
-    }
-    final int? parsed = CurrencyFormatter.tryParseSignedEditableMajorInput(
-      trimmed,
+  Future<void> _openDeltaKeypad() async {
+    // Admin-only signed configuration. Normal POS money entry should stay on
+    // the shared positive-only money-safe path.
+    final String? normalized = await AppNumericKeypadDialog.showNormalizedText(
+      context,
+      title: 'Enter price delta',
+      previewLabel: 'Price delta',
+      initialValue: CurrencyFormatter.toEditableMajorInput(
+        widget.rule.priceDeltaMinor,
+      ),
+      prefixText: '£ ',
+      emptyPreview: '0.00',
+      confirmButtonLabel: 'Apply',
+      allowNegative: true,
+      restoreFocusNode: _deltaFocusNode,
     );
-    if (parsed == null) {
-      setState(() {
-        _deltaParseError = 'Enter a valid amount';
-      });
+    if (!mounted || normalized == null) {
       return;
     }
-    if (_deltaParseError != null) {
-      setState(() {
-        _deltaParseError = null;
-      });
+
+    final int? deltaMinor = CurrencyFormatter.tryParseSignedEditableMajorInput(
+      normalized,
+    );
+    if (deltaMinor == null) {
+      return;
     }
-    widget.onChanged(widget.rule.copyWith(priceDeltaMinor: parsed));
+
+    final String nextValue = CurrencyFormatter.toEditableMajorInput(deltaMinor);
+    _deltaController.value = TextEditingValue(
+      text: nextValue,
+      selection: TextSelection.collapsed(offset: nextValue.length),
+    );
+    widget.onChanged(widget.rule.copyWith(priceDeltaMinor: deltaMinor));
+  }
+
+  Future<void> _openPriorityKeypad() async {
+    final String? normalized = await AppNumericKeypadDialog.showNormalizedText(
+      context,
+      title: 'Enter rule priority',
+      previewLabel: 'Priority',
+      initialValue: _priorityController.text,
+      allowDecimal: false,
+      confirmButtonLabel: 'Apply',
+      allowEmpty: true,
+      allowNegative: true,
+      restoreFocusNode: _priorityFocusNode,
+    );
+    if (!mounted || normalized == null) {
+      return;
+    }
+
+    _priorityController.value = TextEditingValue(
+      text: normalized,
+      selection: TextSelection.collapsed(offset: normalized.length),
+    );
+    _updatePriority(normalized);
   }
 
   void _updatePriority(String value) {
@@ -3279,9 +3437,6 @@ class _PricingRuleCardState extends State<_PricingRuleCard> {
     }
     if (_deltaValidationError != null) {
       issues.add(_deltaValidationError!);
-    }
-    if (_deltaParseError != null) {
-      issues.add(_deltaParseError!);
     }
     if (_priorityParseError != null) {
       issues.add(_priorityParseError!);
@@ -3511,12 +3666,17 @@ class _PricingRuleConditionEditorRow extends StatefulWidget {
 class _PricingRuleConditionEditorRowState
     extends State<_PricingRuleConditionEditorRow> {
   late final TextEditingController _quantityController;
+  late final FocusNode _quantityFocusNode;
 
   @override
   void initState() {
     super.initState();
     _quantityController = TextEditingController(
       text: '${widget.condition.quantity}',
+    );
+    _quantityFocusNode = FocusNode(
+      debugLabel:
+          'rule-condition-qty-${widget.ruleIndex}-${widget.conditionIndex}',
     );
   }
 
@@ -3533,6 +3693,7 @@ class _PricingRuleConditionEditorRowState
   @override
   void dispose() {
     _quantityController.dispose();
+    _quantityFocusNode.dispose();
     super.dispose();
   }
 
@@ -3666,18 +3827,16 @@ class _PricingRuleConditionEditorRowState
               'rule-condition-qty-${widget.ruleIndex}-${widget.conditionIndex}',
             ),
             controller: _quantityController,
-            keyboardType: TextInputType.number,
-            inputFormatters: <TextInputFormatter>[
-              FilteringTextInputFormatter.digitsOnly,
-            ],
+            focusNode: _quantityFocusNode,
+            readOnly: true,
+            showCursor: false,
+            enableInteractiveSelection: false,
+            keyboardType: TextInputType.none,
             decoration: const InputDecoration(
               labelText: 'Quantity',
               helperText: 'Used for exact semantic matching.',
             ),
-            onChanged: (String value) {
-              final int nextValue = int.tryParse(value) ?? 0;
-              widget.onChanged(widget.condition.copyWith(quantity: nextValue));
-            },
+            onTap: _openQuantityKeypad,
           ),
         ],
       ),
@@ -3686,6 +3845,34 @@ class _PricingRuleConditionEditorRowState
 
   bool get _canEditConditionType =>
       widget.ruleType == MealAdjustmentPricingRuleType.combo;
+
+  Future<void> _openQuantityKeypad() async {
+    final String? normalized = await AppNumericKeypadDialog.showNormalizedText(
+      context,
+      title: 'Enter condition quantity',
+      previewLabel: 'Condition quantity',
+      initialValue: _quantityController.text,
+      allowDecimal: false,
+      confirmButtonLabel: 'Apply',
+      allowEmpty: true,
+      restoreFocusNode: _quantityFocusNode,
+    );
+    if (!mounted || normalized == null) {
+      return;
+    }
+
+    // Preserve legacy rule-condition semantics: empty Apply becomes `0` here,
+    // and the condition remains incomplete because structural validation still
+    // requires a positive quantity.
+    final String nextValue = normalized.isEmpty ? '0' : normalized;
+    _quantityController.value = TextEditingValue(
+      text: nextValue,
+      selection: TextSelection.collapsed(offset: nextValue.length),
+    );
+    widget.onChanged(
+      widget.condition.copyWith(quantity: int.tryParse(nextValue) ?? 0),
+    );
+  }
 
   bool get _requiresComponentSelection {
     return widget.condition.conditionType ==

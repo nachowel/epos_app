@@ -7,6 +7,7 @@ import '../../../core/constants/app_sizes.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../domain/models/category.dart';
 import '../../providers/admin_breakfast_sets_provider.dart';
+import '../../widgets/app_numeric_keypad_dialog.dart';
 import 'widgets/admin_scaffold.dart';
 
 const String _screenTitle = 'Breakfast / Set-style Products';
@@ -534,6 +535,7 @@ class _CreateBreakfastSetDialogState extends State<_CreateBreakfastSetDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _priceController;
+  late final FocusNode _priceFocusNode;
   int? _categoryId;
   bool _isActive = true;
   bool _isVisibleOnPos = true;
@@ -545,12 +547,14 @@ class _CreateBreakfastSetDialogState extends State<_CreateBreakfastSetDialog> {
     _priceController = TextEditingController(
       text: CurrencyFormatter.toEditableMajorInput(0),
     );
+    _priceFocusNode = FocusNode(debugLabel: 'breakfast-set-create-price');
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
+    _priceFocusNode.dispose();
     super.dispose();
   }
 
@@ -605,13 +609,17 @@ class _CreateBreakfastSetDialogState extends State<_CreateBreakfastSetDialog> {
               TextFormField(
                 key: const ValueKey<String>('breakfast-set-create-price'),
                 controller: _priceController,
+                focusNode: _priceFocusNode,
                 decoration: const InputDecoration(
                   labelText: 'Base Price',
                   hintText: '0.00',
+                  prefixText: '£ ',
                 ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                readOnly: true,
+                showCursor: false,
+                enableInteractiveSelection: false,
+                keyboardType: TextInputType.none,
+                onTap: _openPriceKeypad,
                 validator: (String? value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Base price is required.';
@@ -661,6 +669,30 @@ class _CreateBreakfastSetDialogState extends State<_CreateBreakfastSetDialog> {
           child: const Text('Create Product'),
         ),
       ],
+    );
+  }
+
+  Future<void> _openPriceKeypad() async {
+    final int? priceMinor = await AppNumericKeypadDialog.showCurrencyMinor(
+      context,
+      title: 'Enter base price',
+      previewLabel: 'Base price',
+      initialMinor: CurrencyFormatter.tryParseEditableMajorInput(
+        _priceController.text,
+      ),
+      prefixText: '£ ',
+      emptyPreview: '0.00',
+      confirmButtonLabel: 'Apply',
+      restoreFocusNode: _priceFocusNode,
+    );
+    if (!mounted || priceMinor == null) {
+      return;
+    }
+
+    final String value = CurrencyFormatter.toEditableMajorInput(priceMinor);
+    _priceController.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
     );
   }
 

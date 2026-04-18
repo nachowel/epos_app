@@ -9,6 +9,7 @@ import '../../../core/utils/report_category_display_formatter.dart';
 import '../../../domain/models/report_settings_policy.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../widgets/app_numeric_keypad_dialog.dart';
 import '../../widgets/language_selector_card.dart';
 import 'widgets/admin_scaffold.dart';
 
@@ -26,6 +27,8 @@ class _AdminReportSettingsScreenState
   late final TextEditingController _businessAddressController;
   late final TextEditingController _maxVisibleTotalController;
   late final TextEditingController _customSalesLimitController;
+  late final FocusNode _maxVisibleTotalFocusNode;
+  late final FocusNode _customSalesLimitFocusNode;
 
   @override
   void initState() {
@@ -34,6 +37,12 @@ class _AdminReportSettingsScreenState
     _businessAddressController = TextEditingController();
     _maxVisibleTotalController = TextEditingController();
     _customSalesLimitController = TextEditingController();
+    _maxVisibleTotalFocusNode = FocusNode(
+      debugLabel: 'max-visible-total-field',
+    );
+    _customSalesLimitFocusNode = FocusNode(
+      debugLabel: 'custom-sale-limit-field',
+    );
     Future<void>.microtask(
       () => ref.read(settingsNotifierProvider.notifier).load(),
     );
@@ -45,6 +54,8 @@ class _AdminReportSettingsScreenState
     _businessAddressController.dispose();
     _maxVisibleTotalController.dispose();
     _customSalesLimitController.dispose();
+    _maxVisibleTotalFocusNode.dispose();
+    _customSalesLimitFocusNode.dispose();
     super.dispose();
   }
 
@@ -56,6 +67,34 @@ class _AdminReportSettingsScreenState
       text: value,
       selection: TextSelection.collapsed(offset: value.length),
     );
+  }
+
+  Future<void> _openMoneyInput({
+    required FocusNode focusNode,
+    required TextEditingController controller,
+    required String title,
+    required String previewLabel,
+    required ValueChanged<String> onChanged,
+  }) async {
+    final int? amountMinor = await AppNumericKeypadDialog.showCurrencyMinor(
+      context,
+      title: title,
+      previewLabel: previewLabel,
+      initialMinor: CurrencyFormatter.tryParseEditableMajorInput(
+        controller.text,
+      ),
+      prefixText: '£ ',
+      emptyPreview: '0.00',
+      confirmButtonLabel: 'Apply',
+      restoreFocusNode: focusNode,
+    );
+    if (!mounted || amountMinor == null) {
+      return;
+    }
+
+    final String value = CurrencyFormatter.toEditableMajorInput(amountMinor);
+    _syncController(controller, value);
+    onChanged(value);
   }
 
   @override
@@ -163,10 +202,12 @@ class _AdminReportSettingsScreenState
                   TextField(
                     key: const Key('max-visible-total-field'),
                     controller: _maxVisibleTotalController,
+                    focusNode: _maxVisibleTotalFocusNode,
                     enabled: !isBusy,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
+                    readOnly: true,
+                    showCursor: false,
+                    enableInteractiveSelection: false,
+                    keyboardType: TextInputType.none,
                     decoration: InputDecoration(
                       labelText: AppStrings.cashierProjectionCapAmountLabel,
                       hintText: AppStrings.cashierProjectionCapAmountHint,
@@ -174,11 +215,20 @@ class _AdminReportSettingsScreenState
                       prefixText: '£',
                       border: const OutlineInputBorder(),
                     ),
-                    onChanged: (String value) {
-                      ref
-                          .read(settingsNotifierProvider.notifier)
-                          .setMaxVisibleTotalInput(value);
-                    },
+                    onTap: isBusy
+                        ? null
+                        : () => _openMoneyInput(
+                            focusNode: _maxVisibleTotalFocusNode,
+                            controller: _maxVisibleTotalController,
+                            title: AppStrings.cashierProjectionCapAmountLabel,
+                            previewLabel:
+                                AppStrings.cashierProjectionCapAmountLabel,
+                            onChanged: (String value) {
+                              ref
+                                  .read(settingsNotifierProvider.notifier)
+                                  .setMaxVisibleTotalInput(value);
+                            },
+                          ),
                   ),
                 if (state.errorMessage != null) ...<Widget>[
                   const SizedBox(height: AppSizes.spacingMd),
@@ -226,20 +276,30 @@ class _AdminReportSettingsScreenState
                 TextField(
                   key: const Key('custom-sale-limit-field'),
                   controller: _customSalesLimitController,
+                  focusNode: _customSalesLimitFocusNode,
                   enabled: !isBusy,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
+                  readOnly: true,
+                  showCursor: false,
+                  enableInteractiveSelection: false,
+                  keyboardType: TextInputType.none,
                   decoration: const InputDecoration(
                     labelText: 'Custom Sale Limit (£)',
                     hintText: '1000.00',
                     border: OutlineInputBorder(),
                   ),
-                  onChanged: (String value) {
-                    ref
-                        .read(settingsNotifierProvider.notifier)
-                        .setCustomSalesLimitInput(value);
-                  },
+                  onTap: isBusy
+                      ? null
+                      : () => _openMoneyInput(
+                          focusNode: _customSalesLimitFocusNode,
+                          controller: _customSalesLimitController,
+                          title: 'Enter custom sale limit',
+                          previewLabel: 'Custom Sale limit',
+                          onChanged: (String value) {
+                            ref
+                                .read(settingsNotifierProvider.notifier)
+                                .setCustomSalesLimitInput(value);
+                          },
+                        ),
                 ),
                 const SizedBox(height: AppSizes.spacingMd),
                 TextField(

@@ -492,6 +492,11 @@ void main() {
       expect(find.text('Product name is required.'), findsOneWidget);
       expect(find.text('Enter a valid base price.'), findsNothing);
 
+      final TextFormField priceField = tester.widget<TextFormField>(
+        find.byKey(const ValueKey<String>('breakfast-set-create-price')),
+      );
+      expect(priceField.readOnly, isTrue);
+
       await _selectDialogDropdownOption(
         tester,
         fieldKey: 'breakfast-set-create-category',
@@ -501,17 +506,18 @@ void main() {
         find.byKey(const ValueKey<String>('breakfast-set-create-name')),
         'Set New',
       );
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('breakfast-set-create-price')),
-        'abc',
+      await _enterMoneyFieldValue(
+        tester,
+        fieldKey: 'breakfast-set-create-price',
+        value: '8.50',
       );
       await tester.tap(
         find.byKey(const ValueKey<String>('breakfast-set-create-submit')),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Enter a valid base price.'), findsOneWidget);
-      expect(find.text('Create Breakfast / Set-style Product'), findsOneWidget);
+      expect(find.text('Enter a valid base price.'), findsNothing);
+      expect(find.byType(AdminBreakfastSetEditorScreen), findsOneWidget);
     },
   );
 
@@ -603,9 +609,10 @@ void main() {
         find.byKey(const ValueKey<String>('breakfast-set-create-name')),
         'Set Fresh',
       );
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('breakfast-set-create-price')),
-        '9.50',
+      await _enterMoneyFieldValue(
+        tester,
+        fieldKey: 'breakfast-set-create-price',
+        value: '9.50',
       );
       await tester.tap(
         find.byKey(const ValueKey<String>('breakfast-set-create-submit')),
@@ -754,9 +761,10 @@ void main() {
         find.byKey(const ValueKey<String>('breakfast-set-create-name')),
         'Set Missing Defaults',
       );
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('breakfast-set-create-price')),
-        '8.50',
+      await _enterMoneyFieldValue(
+        tester,
+        fieldKey: 'breakfast-set-create-price',
+        value: '8.50',
       );
       await tester.tap(
         find.byKey(const ValueKey<String>('breakfast-set-create-submit')),
@@ -846,9 +854,10 @@ void main() {
         find.byKey(const ValueKey<String>('breakfast-set-create-name')),
         'Set Empty Pool',
       );
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('breakfast-set-create-price')),
-        '8.50',
+      await _enterMoneyFieldValue(
+        tester,
+        fieldKey: 'breakfast-set-create-price',
+        value: '8.50',
       );
       await tester.tap(
         find.byKey(const ValueKey<String>('breakfast-set-create-submit')),
@@ -966,9 +975,10 @@ void main() {
         find.byKey(const ValueKey<String>('breakfast-set-create-name')),
         'Set Existing',
       );
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('breakfast-set-create-price')),
-        '10.00',
+      await _enterMoneyFieldValue(
+        tester,
+        fieldKey: 'breakfast-set-create-price',
+        value: '10.00',
       );
       await tester.tap(
         find.byKey(const ValueKey<String>('breakfast-set-create-submit')),
@@ -1197,6 +1207,27 @@ void _setLargeView(WidgetTester tester) {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Future<void> _enterMoneyFieldValue(
+  WidgetTester tester, {
+  required String fieldKey,
+  required String value,
+}) async {
+  await tester.tap(find.byKey(ValueKey<String>(fieldKey)));
+  await tester.pumpAndSettle();
+  for (final String character in value.split('')) {
+    final String key = switch (character) {
+      '.' => 'app-numeric-keypad-decimal',
+      _ => 'app-numeric-keypad-digit-$character',
+    };
+    await tester.tap(find.byKey(ValueKey<String>(key)));
+    await tester.pump();
+  }
+  await tester.tap(
+    find.byKey(const ValueKey<String>('app-numeric-keypad-apply')),
+  );
+  await tester.pumpAndSettle();
 }
 
 Future<_BreakfastSetFilterFixture> _seedBreakfastSetFilterData(

@@ -88,6 +88,9 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
         ),
       ),
       GoRoute(path: '/reports', builder: (_, __) => const ZReportScreen()),
+      // Keep `/settings` pointed at the production admin settings route.
+      // The legacy `SettingsScreen` remains compatibility-only and should not
+      // be used as a numeric-input migration target.
       GoRoute(path: '/settings', redirect: (_, __) => '/admin/settings'),
       GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardScreen()),
       GoRoute(

@@ -17,6 +17,8 @@ import '../../../domain/models/meal_insights.dart';
 import '../../../domain/services/meal_adjustment_profile_validation_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/admin_products_provider.dart';
+import '../../widgets/app_numeric_keypad_dialog.dart';
+import '../../widgets/selective_system_keyboard_field.dart';
 import 'widgets/admin_sort_mode_list.dart';
 import 'widgets/admin_scaffold.dart';
 import 'widgets/semantic_product_configuration_dialog.dart';
@@ -1369,6 +1371,7 @@ class _ProductDialogState extends State<_ProductDialog> {
   late final TextEditingController _priceController;
   late final TextEditingController _imageUrlController;
   late final TextEditingController _sortOrderController;
+  late final FocusNode _priceFocusNode;
   late int _categoryId;
   late bool _hasModifiers;
   late bool _isActive;
@@ -1379,7 +1382,9 @@ class _ProductDialogState extends State<_ProductDialog> {
     super.initState();
     _nameController = TextEditingController(text: widget.product?.name ?? '');
     _priceController = TextEditingController(
-      text: '${widget.product?.priceMinor ?? 0}',
+      text: CurrencyFormatter.toEditableMajorInput(
+        widget.product?.priceMinor ?? 0,
+      ),
     );
     _imageUrlController = TextEditingController(
       text: widget.product?.imageUrl ?? '',
@@ -1394,6 +1399,7 @@ class _ProductDialogState extends State<_ProductDialog> {
           items: widget.categories.map((Category category) => category.id),
         ) ??
         widget.categories.first.id;
+    _priceFocusNode = FocusNode(debugLabel: 'admin-product-price-field');
     _hasModifiers = widget.product?.hasModifiers ?? false;
     _isActive = widget.product?.isActive ?? true;
     _isVisibleOnPos = widget.product?.isVisibleOnPos ?? true;
@@ -1405,6 +1411,7 @@ class _ProductDialogState extends State<_ProductDialog> {
     _priceController.dispose();
     _imageUrlController.dispose();
     _sortOrderController.dispose();
+    _priceFocusNode.dispose();
     super.dispose();
   }
 
@@ -1442,7 +1449,7 @@ class _ProductDialogState extends State<_ProductDialog> {
                 },
               ),
               const SizedBox(height: AppSizes.spacingMd),
-              TextField(
+              SelectiveSystemKeyboardTextField(
                 controller: _nameController,
                 decoration: InputDecoration(
                   labelText: AppStrings.productNameLabel,
@@ -1451,10 +1458,17 @@ class _ProductDialogState extends State<_ProductDialog> {
               const SizedBox(height: AppSizes.spacingMd),
               TextField(
                 controller: _priceController,
+                focusNode: _priceFocusNode,
                 decoration: InputDecoration(
-                  labelText: AppStrings.priceMinorLabel,
+                  labelText: 'Price (£)',
+                  hintText: '0.00',
+                  prefixText: '£ ',
                 ),
-                keyboardType: TextInputType.number,
+                readOnly: true,
+                showCursor: false,
+                enableInteractiveSelection: false,
+                keyboardType: TextInputType.none,
+                onTap: _openPriceKeypad,
               ),
               const SizedBox(height: AppSizes.spacingMd),
               TextField(
@@ -1533,7 +1547,11 @@ class _ProductDialogState extends State<_ProductDialog> {
               _ProductFormResult(
                 categoryId: _categoryId,
                 name: _nameController.text,
-                priceMinor: int.tryParse(_priceController.text) ?? -1,
+                priceMinor:
+                    CurrencyFormatter.tryParseEditableMajorInput(
+                      _priceController.text,
+                    ) ??
+                    -1,
                 imageUrl: _normalizedImageUrl,
                 sortOrder: int.tryParse(_sortOrderController.text) ?? 0,
                 hasModifiers: _hasModifiers,
@@ -1545,6 +1563,30 @@ class _ProductDialogState extends State<_ProductDialog> {
           child: Text(AppStrings.saveSettings),
         ),
       ],
+    );
+  }
+
+  Future<void> _openPriceKeypad() async {
+    final int? priceMinor = await AppNumericKeypadDialog.showCurrencyMinor(
+      context,
+      title: 'Enter product price',
+      previewLabel: 'Product price',
+      initialMinor: CurrencyFormatter.tryParseEditableMajorInput(
+        _priceController.text,
+      ),
+      prefixText: '£ ',
+      emptyPreview: '0.00',
+      confirmButtonLabel: 'Apply',
+      restoreFocusNode: _priceFocusNode,
+    );
+    if (!mounted || priceMinor == null) {
+      return;
+    }
+
+    final String value = CurrencyFormatter.toEditableMajorInput(priceMinor);
+    _priceController.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
     );
   }
 
@@ -2499,7 +2541,7 @@ class _ProductModifierEditorDialogState
                               VoidCallback onFieldSubmitted,
                             ) {
                               _productSearchController = textEditingController;
-                              return TextField(
+                              return SelectiveSystemKeyboardTextField(
                                 key: const ValueKey<String>(
                                   'modifier-product-search',
                                 ),
@@ -2912,6 +2954,7 @@ class _QuickModifierProductDialogState
     extends State<_QuickModifierProductDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _priceController;
+  late final FocusNode _priceFocusNode;
   late int _categoryId;
   late bool _isActive;
   late bool _isVisibleOnPos;
@@ -2920,7 +2963,10 @@ class _QuickModifierProductDialogState
   void initState() {
     super.initState();
     _nameController = TextEditingController();
-    _priceController = TextEditingController(text: '0');
+    _priceController = TextEditingController(
+      text: CurrencyFormatter.toEditableMajorInput(0),
+    );
+    _priceFocusNode = FocusNode(debugLabel: 'quick-product-price-field');
     _categoryId = widget.categories.first.id;
     _isActive = true;
     _isVisibleOnPos = false;
@@ -2930,6 +2976,7 @@ class _QuickModifierProductDialogState
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
+    _priceFocusNode.dispose();
     super.dispose();
   }
 
@@ -2942,7 +2989,7 @@ class _QuickModifierProductDialogState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            TextField(
+            SelectiveSystemKeyboardTextField(
               key: const ValueKey<String>('quick-product-name'),
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Product name'),
@@ -2970,8 +3017,17 @@ class _QuickModifierProductDialogState
             TextField(
               key: const ValueKey<String>('quick-product-price'),
               controller: _priceController,
-              decoration: const InputDecoration(labelText: 'Price minor'),
-              keyboardType: TextInputType.number,
+              focusNode: _priceFocusNode,
+              decoration: const InputDecoration(
+                labelText: 'Price (£)',
+                hintText: '0.00',
+                prefixText: '£ ',
+              ),
+              readOnly: true,
+              showCursor: false,
+              enableInteractiveSelection: false,
+              keyboardType: TextInputType.none,
+              onTap: _openPriceKeypad,
             ),
             const SizedBox(height: AppSizes.spacingMd),
             SwitchListTile(
@@ -3001,7 +3057,11 @@ class _QuickModifierProductDialogState
               _QuickModifierProductResult(
                 name: _nameController.text,
                 categoryId: _categoryId,
-                priceMinor: int.tryParse(_priceController.text) ?? -1,
+                priceMinor:
+                    CurrencyFormatter.tryParseEditableMajorInput(
+                      _priceController.text,
+                    ) ??
+                    -1,
                 isActive: _isActive,
                 isVisibleOnPos: _isVisibleOnPos,
               ),
@@ -3010,6 +3070,30 @@ class _QuickModifierProductDialogState
           child: Text(AppStrings.saveSettings),
         ),
       ],
+    );
+  }
+
+  Future<void> _openPriceKeypad() async {
+    final int? priceMinor = await AppNumericKeypadDialog.showCurrencyMinor(
+      context,
+      title: 'Enter product price',
+      previewLabel: 'Product price',
+      initialMinor: CurrencyFormatter.tryParseEditableMajorInput(
+        _priceController.text,
+      ),
+      prefixText: '£ ',
+      emptyPreview: '0.00',
+      confirmButtonLabel: 'Apply',
+      restoreFocusNode: _priceFocusNode,
+    );
+    if (!mounted || priceMinor == null) {
+      return;
+    }
+
+    final String value = CurrencyFormatter.toEditableMajorInput(priceMinor);
+    _priceController.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
     );
   }
 }

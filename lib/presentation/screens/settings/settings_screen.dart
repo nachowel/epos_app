@@ -10,6 +10,16 @@ import '../../widgets/language_selector_card.dart';
 import '../../widgets/logout_confirmation.dart';
 import '../../widgets/section_app_bar.dart';
 
+/// Legacy settings screen kept for compatibility with older layouts.
+///
+/// The app router redirects `/settings` to `/admin/settings`, so this screen is
+/// not the production integration target for numeric-entry migrations.
+///
+/// DO NOT target numeric keypad migration work here. Prefer
+/// `AdminReportSettingsScreen` for production money-field integrations.
+@Deprecated(
+  'Legacy compatibility screen. Do not target numeric keypad migrations here; use AdminReportSettingsScreen.',
+)
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -116,6 +126,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         },
                 ),
                 const SizedBox(height: AppSizes.spacingMd),
+                // Legacy compatibility field. Keep behavior aligned with the
+                // notifier, but do not treat this screen as the product target
+                // for future keypad migrations.
                 TextField(
                   controller: _customSalesLimitController,
                   keyboardType: const TextInputType.numberWithOptions(

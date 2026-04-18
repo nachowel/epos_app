@@ -15,14 +15,30 @@ void main() {
         expect(CurrencyFormatter.tryParseEditableMajorInput('£12.50'), 1250);
         expect(CurrencyFormatter.tryParseEditableMajorInput('12,50'), 1250);
         expect(CurrencyFormatter.tryParseEditableMajorInput('12'), 1200);
+        expect(CurrencyFormatter.tryParseEditableMajorInput('.5'), 50);
+        expect(CurrencyFormatter.tryParseEditableMajorInput('12.'), 1200);
+        expect(CurrencyFormatter.tryParseEditableMajorInput('00'), 0);
       },
     );
 
     test('editable major input parsing rejects invalid values', () {
       expect(CurrencyFormatter.tryParseEditableMajorInput(''), isNull);
       expect(CurrencyFormatter.tryParseEditableMajorInput('12.345'), isNull);
+      expect(CurrencyFormatter.tryParseEditableMajorInput('1..2'), isNull);
       expect(CurrencyFormatter.tryParseEditableMajorInput('abc'), isNull);
       expect(CurrencyFormatter.tryParseEditableMajorInput('-1.00'), isNull);
+    });
+
+    test('editable major input round-trips through minor units', () {
+      const List<int> values = <int>[0, 50, 1250, 9999, 123456];
+      for (final int value in values) {
+        expect(
+          CurrencyFormatter.tryParseEditableMajorInput(
+            CurrencyFormatter.toEditableMajorInput(value),
+          ),
+          value,
+        );
+      }
     });
   });
 }

@@ -11,6 +11,8 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../domain/models/product.dart';
 import '../../../../domain/models/semantic_product_configuration.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../widgets/app_numeric_keypad_dialog.dart';
+import '../../../widgets/selective_system_keyboard_field.dart';
 
 class SemanticProductConfigurationDialog extends ConsumerStatefulWidget {
   const SemanticProductConfigurationDialog({
@@ -28,6 +30,9 @@ class SemanticProductConfigurationDialog extends ConsumerStatefulWidget {
 class _SemanticProductConfigurationDialogState
     extends ConsumerState<SemanticProductConfigurationDialog> {
   final TextEditingController _priceController = TextEditingController();
+  final FocusNode _priceFocusNode = FocusNode(
+    debugLabel: 'semantic-builder-price-field',
+  );
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -49,6 +54,7 @@ class _SemanticProductConfigurationDialogState
   @override
   void dispose() {
     _priceController.dispose();
+    _priceFocusNode.dispose();
     super.dispose();
   }
 
@@ -166,13 +172,16 @@ class _SemanticProductConfigurationDialogState
                         'semantic-builder-price-field',
                       ),
                       controller: _priceController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
+                      focusNode: _priceFocusNode,
+                      readOnly: true,
+                      showCursor: false,
+                      enableInteractiveSelection: false,
+                      keyboardType: TextInputType.none,
                       decoration: const InputDecoration(
                         labelText: 'Set Price',
                         prefixText: '£',
                       ),
+                      onTap: _openPriceKeypad,
                     ),
                   ),
                   const SizedBox(width: AppSizes.spacingMd),
@@ -1088,17 +1097,34 @@ class _SemanticProductConfigurationDialogState
   }
 
   String _formatPrice(int priceMinor) {
-    final int major = priceMinor ~/ 100;
-    final int minor = priceMinor % 100;
-    return '$major.${minor.toString().padLeft(2, '0')}';
+    return CurrencyFormatter.toEditableMajorInput(priceMinor);
   }
 
   int? _parsePrice(String value) {
-    final double? parsed = double.tryParse(value.replaceAll(',', '.').trim());
-    if (parsed == null || parsed.isNegative) {
-      return null;
+    return CurrencyFormatter.tryParseEditableMajorInput(value.trim());
+  }
+
+  Future<void> _openPriceKeypad() async {
+    final int? priceMinor = await AppNumericKeypadDialog.showCurrencyMinor(
+      context,
+      title: 'Enter set price',
+      previewLabel: 'Set price',
+      initialMinor: _parsePrice(_priceController.text),
+      prefixText: '£ ',
+      emptyPreview: '0.00',
+      confirmButtonLabel: 'Apply',
+      restoreFocusNode: _priceFocusNode,
+    );
+    if (!mounted || priceMinor == null) {
+      return;
     }
-    return (parsed * 100).round();
+
+    _priceController.value = TextEditingValue(
+      text: _formatPrice(priceMinor),
+      selection: TextSelection.collapsed(
+        offset: _formatPrice(priceMinor).length,
+      ),
+    );
   }
 
   Widget _tabFrame({
@@ -1357,7 +1383,7 @@ class _ProductPickerDialogState extends State<_ProductPickerDialog> {
         height: 520,
         child: Column(
           children: <Widget>[
-            TextField(
+            SelectiveSystemKeyboardTextField(
               key: const ValueKey<String>('semantic-product-picker-search'),
               decoration: const InputDecoration(
                 hintText: 'Search products',
@@ -1438,7 +1464,7 @@ class _ExtraProductPickerDialogState extends State<_ExtraProductPickerDialog> {
         height: 520,
         child: Column(
           children: <Widget>[
-            TextField(
+            SelectiveSystemKeyboardTextField(
               key: const ValueKey<String>('semantic-product-picker-search'),
               decoration: const InputDecoration(
                 hintText: 'Search products',

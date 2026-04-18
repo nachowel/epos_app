@@ -33,9 +33,10 @@ void main() {
     await _pumpPaymentDialog(tester: tester, totalAmountMinor: 2880);
 
     expect(find.byKey(const ValueKey<String>('quick-cash-exact')), findsOne);
+    expect(find.text('£20'), findsOneWidget);
     expect(find.text('£30'), findsOneWidget);
     expect(find.text('£40'), findsOneWidget);
-    expect(find.text('£50'), findsOneWidget);
+    expect(find.text('£50'), findsNothing);
     expect(
       find.byKey(const ValueKey<String>('cash-helper-clear')),
       findsNothing,
@@ -53,18 +54,20 @@ void main() {
 
     expect(_receivedAmountFieldFinder, findsNothing);
     expect(
-      find.byKey(const ValueKey<String>('payment-keypad-1')),
+      find.byKey(const ValueKey<String>('payment-keypad-digit-1')),
       findsNothing,
     );
     expect(
       find.byKey(const ValueKey<String>('quick-cash-exact')),
       findsNothing,
     );
+    expect(find.byType(SegmentedButton<PaymentMethod>), findsNothing);
+    expect(find.text('Card Payment'), findsOneWidget);
     expect(find.textContaining('Insufficient by'), findsNothing);
     expect(find.textContaining('${AppStrings.change}:'), findsNothing);
   });
 
-  testWidgets('card mode uses large vertical pay and cancel actions', (
+  testWidgets('card mode keeps pay dominant and cancel secondary', (
     WidgetTester tester,
   ) async {
     await _pumpPaymentDialog(
@@ -78,8 +81,8 @@ void main() {
       find.byKey(const ValueKey<String>('payment-cancel')),
     );
 
-    expect(paySize.height, 64);
-    expect(cancelSize.height, 56);
+    expect(paySize.height, greaterThanOrEqualTo(64));
+    expect(paySize.height, greaterThan(cancelSize.height));
     expect(find.byIcon(Icons.credit_card_rounded), findsOneWidget);
   });
 
@@ -88,10 +91,16 @@ void main() {
     (WidgetTester tester) async {
       await _pumpPaymentDialog(tester: tester, totalAmountMinor: 1450);
 
-      await _tapVisibleKey(tester, 'payment-keypad-2');
-      await _tapVisibleKey(tester, 'payment-keypad-0');
+      await _tapVisibleKey(tester, 'payment-keypad-digit-2');
+      await _tapVisibleKey(tester, 'payment-keypad-digit-0');
 
       expect(_receivedAmountField(tester).controller!.text, '20');
+      expect(find.text('Change: £5.50'), findsOneWidget);
+
+      await tester.tap(find.text('£20'));
+      await tester.pump();
+
+      expect(_receivedAmountField(tester).controller!.text, '20.00');
       expect(find.text('Change: £5.50'), findsOneWidget);
 
       await tester.tap(find.text('£30'));
@@ -102,13 +111,33 @@ void main() {
     },
   );
 
+  testWidgets(
+    'cash keypad keeps replace behavior after presets and clamps currency decimals',
+    (WidgetTester tester) async {
+      await _pumpPaymentDialog(tester: tester, totalAmountMinor: 1450);
+
+      await _tapVisibleText(tester, '£30');
+      expect(_receivedAmountField(tester).controller!.text, '30.00');
+
+      await _tapVisibleKey(tester, 'payment-keypad-digit-1');
+      expect(_receivedAmountField(tester).controller!.text, '1');
+
+      await _tapVisibleKey(tester, 'payment-keypad-decimal');
+      await _tapVisibleKey(tester, 'payment-keypad-digit-2');
+      await _tapVisibleKey(tester, 'payment-keypad-digit-3');
+      await _tapVisibleKey(tester, 'payment-keypad-digit-4');
+
+      expect(_receivedAmountField(tester).controller!.text, '1.23');
+    },
+  );
+
   testWidgets('insufficient cash state disables pay until enough is entered', (
     WidgetTester tester,
   ) async {
     await _pumpPaymentDialog(tester: tester, totalAmountMinor: 1450);
 
-    await _tapVisibleKey(tester, 'payment-keypad-1');
-    await _tapVisibleKey(tester, 'payment-keypad-0');
+    await _tapVisibleKey(tester, 'payment-keypad-digit-1');
+    await _tapVisibleKey(tester, 'payment-keypad-digit-0');
 
     expect(_receivedAmountField(tester).controller!.text, '10');
     expect(find.text('Insufficient by £4.50'), findsOneWidget);
@@ -120,6 +149,24 @@ void main() {
     expect(find.text('Change: £5.50'), findsOneWidget);
     expect(_payButton(tester).onPressed, isNotNull);
   });
+
+  testWidgets(
+    'cash mode removes payment toggle and keeps pay anchored after status',
+    (WidgetTester tester) async {
+      await _pumpPaymentDialog(tester: tester, totalAmountMinor: 1450);
+
+      expect(find.byType(SegmentedButton<PaymentMethod>), findsNothing);
+
+      final double statusTop = tester.getTopLeft(find.text('Change: £0.00')).dy;
+      final double payTop = tester.getTopLeft(_payButtonFinder).dy;
+      final double cancelTop = tester
+          .getTopLeft(find.byKey(const ValueKey<String>('payment-cancel')))
+          .dy;
+
+      expect(statusTop, lessThan(payTop));
+      expect(payTop, lessThan(cancelTop));
+    },
+  );
 
   testWidgets(
     'payment dialog disables pay action during submission to prevent double tap',

@@ -8,6 +8,8 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../domain/models/cash_movement.dart';
 import '../../providers/admin_cash_movements_provider.dart';
+import '../../widgets/app_numeric_keypad_dialog.dart';
+import '../../widgets/selective_system_keyboard_field.dart';
 import 'widgets/admin_scaffold.dart';
 
 const String _cashMovementsTitle = 'Cash Movements';
@@ -47,6 +49,7 @@ class _AdminCashMovementsScreenState
   late final TextEditingController _categoryController;
   late final TextEditingController _amountController;
   late final TextEditingController _noteController;
+  late final FocusNode _amountFocusNode;
 
   CashMovementType _type = CashMovementType.expense;
   CashMovementPaymentMethod _paymentMethod = CashMovementPaymentMethod.cash;
@@ -57,6 +60,7 @@ class _AdminCashMovementsScreenState
     _categoryController = TextEditingController();
     _amountController = TextEditingController();
     _noteController = TextEditingController();
+    _amountFocusNode = FocusNode(debugLabel: 'admin-cash-movement-amount');
     Future<void>.microtask(
       () => ref.read(adminCashMovementsNotifierProvider.notifier).load(),
     );
@@ -67,6 +71,7 @@ class _AdminCashMovementsScreenState
     _categoryController.dispose();
     _amountController.dispose();
     _noteController.dispose();
+    _amountFocusNode.dispose();
     super.dispose();
   }
 
@@ -160,7 +165,8 @@ class _AdminCashMovementsScreenState
                 ),
                 SizedBox(
                   width: 260,
-                  child: TextFormField(
+                  child: SelectiveSystemKeyboardTextFormField(
+                    key: const Key('admin-cash-movement-category-field'),
                     controller: _categoryController,
                     decoration: const InputDecoration(
                       labelText: _categoryLabel,
@@ -177,15 +183,19 @@ class _AdminCashMovementsScreenState
                 SizedBox(
                   width: 220,
                   child: TextFormField(
+                    key: const Key('admin-cash-movement-amount-field'),
                     controller: _amountController,
+                    focusNode: _amountFocusNode,
                     decoration: const InputDecoration(
                       labelText: _amountLabel,
                       hintText: _amountHint,
                     ),
                     enabled: !disabled,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
+                    readOnly: true,
+                    showCursor: false,
+                    enableInteractiveSelection: false,
+                    keyboardType: TextInputType.none,
+                    onTap: disabled ? null : _openAmountKeypad,
                     validator: (String? value) =>
                         parseCashMovementAmountMinor(value) == null
                         ? _amountInvalid
@@ -220,7 +230,7 @@ class _AdminCashMovementsScreenState
               ],
             ),
             const SizedBox(height: AppSizes.spacingMd),
-            TextFormField(
+            SelectiveSystemKeyboardTextFormField(
               controller: _noteController,
               decoration: const InputDecoration(labelText: _noteLabel),
               enabled: !disabled,
@@ -287,6 +297,28 @@ class _AdminCashMovementsScreenState
         _paymentMethod = CashMovementPaymentMethod.cash;
       });
     }
+  }
+
+  Future<void> _openAmountKeypad() async {
+    final int? amountMinor = await AppNumericKeypadDialog.showCurrencyMinor(
+      context,
+      title: 'Enter movement amount',
+      previewLabel: _amountLabel,
+      initialMinor: parseCashMovementAmountMinor(_amountController.text),
+      prefixText: '£ ',
+      emptyPreview: '0.00',
+      confirmButtonLabel: 'Apply',
+      restoreFocusNode: _amountFocusNode,
+    );
+    if (!mounted || amountMinor == null) {
+      return;
+    }
+
+    final String value = CurrencyFormatter.toEditableMajorInput(amountMinor);
+    _amountController.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
   }
 
   String _typeText(CashMovementType type) {
@@ -470,33 +502,16 @@ class _EmptyState extends StatelessWidget {
 }
 
 int? parseCashMovementAmountMinor(String? input) {
-  final String normalized = (input ?? '').trim().replaceAll(',', '.');
-  if (normalized.isEmpty) {
+  final String trimmed = (input ?? '').trim();
+  if (trimmed.isEmpty) {
     return null;
   }
-
-  final RegExpMatch? match = RegExp(
-    r'^([0-9]+)(?:\.([0-9]{1,2}))?$',
-  ).firstMatch(normalized);
-  if (match == null) {
-    return null;
-  }
-
-  final int? wholeUnits = int.tryParse(match.group(1)!);
-  if (wholeUnits == null) {
-    return null;
-  }
-
-  final String decimalGroup = match.group(2) ?? '';
-  final String minorDigits = decimalGroup.padRight(2, '0');
-  final int? minorUnits = int.tryParse(
-    minorDigits.isEmpty ? '00' : minorDigits,
+  final int? amountMinor = CurrencyFormatter.tryParseEditableMajorInput(
+    trimmed,
   );
-  if (minorUnits == null) {
+  if (amountMinor == null) {
     return null;
   }
-
-  final int amountMinor = (wholeUnits * 100) + minorUnits;
   return amountMinor > 0 ? amountMinor : null;
 }
 

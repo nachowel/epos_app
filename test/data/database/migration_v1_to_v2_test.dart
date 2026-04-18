@@ -333,13 +333,23 @@ void main() {
       final db = _createV1ThenMigrateToCurrent();
       addTearDown(db.close);
 
-      // Insert a product (required for addLine)
+      // Insert a product (required for addLine). The v34 invariant seeds the
+      // 'Archived Products' category + Custom Sale product first, so rowid=1
+      // is already taken — look the inserted ids up explicitly.
       await db.customStatement(
         "INSERT INTO categories (name) VALUES ('TestCat');",
       );
+      final dynamic categoryRow = await db.customSelect('''
+        SELECT id FROM categories WHERE name = 'TestCat'
+      ''').getSingle();
+      final int testCategoryId = categoryRow.read<int>('id');
       await db.customStatement(
-        "INSERT INTO products (category_id, name, price_minor) VALUES (1, 'Tea', 250);",
+        'INSERT INTO products (category_id, name, price_minor) VALUES ($testCategoryId, \'Tea\', 250);',
       );
+      final dynamic productRow = await db.customSelect('''
+        SELECT id FROM products WHERE name = 'Tea' AND category_id = $testCategoryId
+      ''').getSingle();
+      final int testProductId = productRow.read<int>('id');
 
       final TransactionRepository txRepo = TransactionRepository(db);
 
@@ -351,7 +361,7 @@ void main() {
       );
       await txRepo.addLine(
         transactionId: created.id,
-        productId: 1,
+        productId: testProductId,
         quantity: 2,
       );
       await txRepo.recalculateTotals(created.id);

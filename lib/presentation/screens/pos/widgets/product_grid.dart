@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../widgets/selective_system_keyboard_field.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../domain/models/product.dart';
 import '../pos_product_presentation_policy.dart';
@@ -156,7 +157,9 @@ class _ProductGridState extends State<ProductGrid> {
                           crossAxisAlignment: WrapCrossAlignment.center,
                           alignment: WrapAlignment.end,
                           children: <Widget>[
-                            _ProductCountBadge(productCount: widget.productCount),
+                            _ProductCountBadge(
+                              productCount: widget.productCount,
+                            ),
                             if (widget.isSortMode) ...<Widget>[
                               OutlinedButton(
                                 key: const ValueKey<String>(
@@ -182,9 +185,10 @@ class _ProductGridState extends State<ProductGrid> {
                                         height: 14,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                            Colors.white,
-                                          ),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
                                         ),
                                       )
                                     : const Icon(Icons.save_rounded),
@@ -205,7 +209,8 @@ class _ProductGridState extends State<ProductGrid> {
                     ),
                   ],
                 ),
-                if (widget.searchController != null && !widget.isSortMode) ...<Widget>[
+                if (widget.searchController != null &&
+                    !widget.isSortMode) ...<Widget>[
                   const SizedBox(height: 10),
                   _PosSearchBar(
                     controller: widget.searchController!,
@@ -742,7 +747,7 @@ class _PosSearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: 42,
-      child: TextField(
+      child: SelectiveSystemKeyboardTextField(
         key: const ValueKey<String>('pos-product-search'),
         controller: controller,
         onChanged: onChanged,

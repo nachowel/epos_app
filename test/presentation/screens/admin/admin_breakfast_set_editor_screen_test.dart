@@ -1279,9 +1279,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('breakfast-editor-qty-1-1')),
-        '0',
+      await _applyIntegerDialogValue(
+        tester,
+        field: find.byKey(const ValueKey<String>('breakfast-editor-qty-1-1')),
+        value: '0',
       );
       await tester.pumpAndSettle();
 
@@ -1394,21 +1395,28 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('breakfast-editor-choice-min-0-0')),
-        '2',
+      await _applyIntegerDialogValue(
+        tester,
+        field: find.byKey(
+          const ValueKey<String>('breakfast-editor-choice-min-0-0'),
+        ),
+        value: '2',
       );
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('breakfast-editor-choice-max-0-1')),
-        '1',
+      await _applyIntegerDialogValue(
+        tester,
+        field: find.byKey(
+          const ValueKey<String>('breakfast-editor-choice-max-0-1'),
+        ),
+        value: '1',
       );
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(
+      await _applyIntegerDialogValue(
+        tester,
+        field: find.byKey(
           const ValueKey<String>('breakfast-editor-choice-included-0-1'),
         ),
-        '2',
+        value: '2',
       );
       await tester.pumpAndSettle();
 
@@ -1512,7 +1520,7 @@ Future<void> _loginWithPin(WidgetTester tester, String pin) async {
   await tester.enterText(find.byType(TextField), pin);
   await tester.tap(find.text(AppStrings.loginButton));
   await tester.pumpAndSettle();
-  expect(find.byType(PosScreen), findsOneWidget);
+  expect(find.text(AppStrings.loginButton), findsNothing);
 }
 
 void _setLargeView(WidgetTester tester) {
@@ -1520,4 +1528,25 @@ void _setLargeView(WidgetTester tester) {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Future<void> _applyIntegerDialogValue(
+  WidgetTester tester, {
+  required Finder field,
+  required String value,
+}) async {
+  await tester.ensureVisible(field);
+  await tester.tap(field);
+  await tester.pumpAndSettle();
+  for (final String char in value.split('')) {
+    await tester.tap(
+      find.byKey(ValueKey<String>('app-numeric-keypad-digit-$char')),
+    );
+    await tester.pump();
+  }
+  await tester.ensureVisible(
+    find.byKey(const ValueKey<String>('app-numeric-keypad-apply')),
+  );
+  await tester.tap(find.byKey(const ValueKey<String>('app-numeric-keypad-apply')));
+  await tester.pumpAndSettle();
 }

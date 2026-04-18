@@ -240,12 +240,40 @@ void main() {
         query: 'salad',
         productId: saladId,
       );
+      await _applyNumericDialogValue(
+        tester,
+        field: find.byKey(const ValueKey<String>('component-swap-delta-0-0')),
+        value: '1.25',
+      );
 
       expect(
         find.text('Swap option cannot match default product'),
         findsNothing,
       );
       expect(find.text('Swap option duplicates existing item'), findsNothing);
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey<String>('component-swap-delta-0-0')),
+            )
+            .controller!
+            .text,
+        '1.25',
+      );
+
+      await _clearAndApplyNumericDialog(
+        tester,
+        field: find.byKey(const ValueKey<String>('component-swap-delta-0-0')),
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey<String>('component-swap-delta-0-0')),
+            )
+            .controller!
+            .text,
+        '',
+      );
 
       await tester.tap(
         find.byKey(const ValueKey<String>('component-swap-remove-0-0')),
@@ -374,9 +402,10 @@ void main() {
         query: 'egg',
         productId: eggId,
       );
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('extra-delta-0')),
-        '1.50',
+      await _applyNumericDialogValue(
+        tester,
+        field: find.byKey(const ValueKey<String>('extra-delta-0')),
+        value: '1.50',
       );
       await tester.tap(find.byKey(const ValueKey<String>('extra-active-0')));
       await tester.pumpAndSettle();
@@ -407,93 +436,82 @@ void main() {
     },
   );
 
-  testWidgets(
-    'duplicate or negative extra shows inline errors and disables save',
-    (WidgetTester tester) async {
-      _setLargeView(tester);
-      final AppDatabase db = createTestDatabase();
-      addTearDown(db.close);
+  testWidgets('duplicate extra shows inline errors and disables save', (
+    WidgetTester tester,
+  ) async {
+    _setLargeView(tester);
+    final AppDatabase db = createTestDatabase();
+    addTearDown(db.close);
 
-      final int extrasCategoryId = await insertCategory(db, name: 'Extras');
-      final int eggId = await insertProduct(
-        db,
-        categoryId: extrasCategoryId,
-        name: 'Egg',
-        priceMinor: 150,
-      );
+    final int extrasCategoryId = await insertCategory(db, name: 'Extras');
+    final int eggId = await insertProduct(
+      db,
+      categoryId: extrasCategoryId,
+      name: 'Egg',
+      priceMinor: 150,
+    );
 
-      final ProviderContainer container = _container(db);
-      addTearDown(container.dispose);
-      final int profileId = await container
-          .read(mealAdjustmentProfileRepositoryProvider)
-          .saveProfileDraft(
-            MealAdjustmentProfileDraft(
-              name: 'Omelette Profile',
-              freeSwapLimit: 0,
-              isActive: false,
-              extraOptions: <MealAdjustmentExtraOptionDraft>[
-                MealAdjustmentExtraOptionDraft(
-                  itemProductId: eggId,
-                  fixedPriceDeltaMinor: 150,
-                  sortOrder: 0,
-                  isActive: true,
-                ),
-              ],
-            ),
-          );
-
-      await tester.pumpWidget(_testApp(container, profileId));
-      await tester.pumpAndSettle();
-      await _openAddInsTab(tester);
-
-      await tester.tap(
-        find.byKey(const ValueKey<String>('meal-profile-add-extra')),
-      );
-      await tester.pumpAndSettle();
-
-      await _chooseProduct(
-        tester,
-        fieldKey: const ValueKey<String>('extra-product-1'),
-        query: 'egg',
-        productId: eggId,
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('extra-delta-1')),
-        '-1.00',
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text('Add-in product duplicates another entry'),
-        findsWidgets,
-      );
-      expect(find.text('Add-in price cannot be negative'), findsWidgets);
-
-      final ElevatedButton saveButton = tester.widget<ElevatedButton>(
-        find.byKey(const ValueKey<String>('meal-profile-editor-save')),
-      );
-      expect(saveButton.onPressed, isNull);
-
-      expect(
-        find.descendant(
-          of: find.byKey(
-            const ValueKey<String>('meal-profile-tab-badge-extras'),
+    final ProviderContainer container = _container(db);
+    addTearDown(container.dispose);
+    final int profileId = await container
+        .read(mealAdjustmentProfileRepositoryProvider)
+        .saveProfileDraft(
+          MealAdjustmentProfileDraft(
+            name: 'Omelette Profile',
+            freeSwapLimit: 0,
+            isActive: false,
+            extraOptions: <MealAdjustmentExtraOptionDraft>[
+              MealAdjustmentExtraOptionDraft(
+                itemProductId: eggId,
+                fixedPriceDeltaMinor: 150,
+                sortOrder: 0,
+                isActive: true,
+              ),
+            ],
           ),
-          matching: find.text('2'),
+        );
+
+    await tester.pumpWidget(_testApp(container, profileId));
+    await tester.pumpAndSettle();
+    await _openAddInsTab(tester);
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('meal-profile-add-extra')),
+    );
+    await tester.pumpAndSettle();
+
+    await _chooseProduct(
+      tester,
+      fieldKey: const ValueKey<String>('extra-product-1'),
+      query: 'egg',
+      productId: eggId,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add-in product duplicates another entry'), findsWidgets);
+
+    final ElevatedButton saveButton = tester.widget<ElevatedButton>(
+      find.byKey(const ValueKey<String>('meal-profile-editor-save')),
+    );
+    expect(saveButton.onPressed, isNull);
+
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey<String>('meal-profile-tab-badge-extras')),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(
+          const ValueKey<String>('meal-profile-tab-badge-validation'),
         ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(
-            const ValueKey<String>('meal-profile-tab-badge-validation'),
-          ),
-          matching: find.text('2'),
-        ),
-        findsOneWidget,
-      );
-    },
-  );
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
+  });
 
   testWidgets(
     'add-in chooser refreshes newly created products and excludes root meal products',
@@ -705,13 +723,15 @@ void main() {
         find.byKey(const ValueKey<String>('rule-name-0')),
         'No Beans',
       );
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('rule-delta-0')),
-        '-1.00',
+      await _applyNumericDialogValue(
+        tester,
+        field: find.byKey(const ValueKey<String>('rule-delta-0')),
+        value: '-1.00',
       );
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('rule-priority-0')),
-        '7',
+      await _applyNumericDialogValue(
+        tester,
+        field: find.byKey(const ValueKey<String>('rule-priority-0')),
+        value: '7',
       );
       await _selectDropdownOption(
         tester,
@@ -731,8 +751,13 @@ void main() {
         isFalse,
       );
       expect(
-        find.text('If Beans is removed, reduce price by £1.00.'),
-        findsWidgets,
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey<String>('rule-delta-0')),
+            )
+            .controller!
+            .text,
+        '-1.00',
       );
 
       final ElevatedButton saveButtonBefore = tester.widget<ElevatedButton>(
@@ -980,9 +1005,10 @@ void main() {
         find.byKey(const ValueKey<String>('rule-name-0')),
         '',
       );
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('rule-delta-0')),
-        '1.00',
+      await _applyNumericDialogValue(
+        tester,
+        field: find.byKey(const ValueKey<String>('rule-delta-0')),
+        value: '1.00',
       );
       await tester.pumpAndSettle();
 
@@ -1022,6 +1048,138 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('This rule is incomplete.'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'integer keypad fields preserve empty and invalid admin integer behavior',
+    (WidgetTester tester) async {
+      _setLargeView(tester);
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int breakfastItemsCategoryId = await insertCategory(
+        db,
+        name: 'Breakfast Items',
+      );
+      final int beansId = await insertProduct(
+        db,
+        categoryId: breakfastItemsCategoryId,
+        name: 'Beans',
+        priceMinor: 120,
+      );
+
+      final ProviderContainer container = _container(db);
+      addTearDown(container.dispose);
+      final int profileId = await container
+          .read(mealAdjustmentProfileRepositoryProvider)
+          .saveProfileDraft(
+            MealAdjustmentProfileDraft(
+              name: 'Omelette Profile',
+              freeSwapLimit: 2,
+              isActive: false,
+              components: <MealAdjustmentComponentDraft>[
+                MealAdjustmentComponentDraft(
+                  componentKey: 'beans',
+                  displayName: 'Beans',
+                  defaultItemProductId: beansId,
+                  quantity: 1,
+                  canRemove: true,
+                  sortOrder: 0,
+                  isActive: true,
+                ),
+              ],
+              pricingRules: <MealAdjustmentPricingRuleDraft>[
+                const MealAdjustmentPricingRuleDraft(
+                  name: 'Bean combo',
+                  ruleType: MealAdjustmentPricingRuleType.combo,
+                  priceDeltaMinor: 0,
+                  priority: 5,
+                  isActive: true,
+                  conditions: <MealAdjustmentPricingRuleConditionDraft>[
+                    MealAdjustmentPricingRuleConditionDraft(
+                      conditionType: MealAdjustmentPricingRuleConditionType
+                          .removedComponent,
+                      componentKey: 'beans',
+                      quantity: 1,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+
+      await tester.pumpWidget(_testApp(container, profileId));
+      await tester.pumpAndSettle();
+
+      await _clearAndApplyNumericDialog(
+        tester,
+        field: find.byKey(const ValueKey<String>('meal-profile-editor-swaps')),
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey<String>('meal-profile-editor-swaps')),
+            )
+            .controller!
+            .text,
+        '0',
+      );
+
+      await _openComponentsTab(tester);
+      await tester.tap(
+        find.byKey(const ValueKey<String>('component-expand-0')),
+      );
+      await tester.pumpAndSettle();
+      await _clearAndApplyNumericDialog(
+        tester,
+        field: find.byKey(const ValueKey<String>('component-qty-input-0')),
+      );
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey<String>('component-qty-input-0')),
+            )
+            .controller!
+            .text,
+        '0',
+      );
+      expect(find.text('Quantity must be greater than 0'), findsWidgets);
+
+      await _openPricingRulesTab(tester);
+      await tester.tap(find.byKey(const ValueKey<String>('rule-expand-0')));
+      await tester.pumpAndSettle();
+      await _clearAndApplyNumericDialog(
+        tester,
+        field: find.byKey(const ValueKey<String>('rule-priority-0')),
+      );
+      await _clearAndApplyNumericDialog(
+        tester,
+        field: find.byKey(const ValueKey<String>('rule-condition-qty-0-0')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey<String>('rule-condition-qty-0-0')),
+            )
+            .controller!
+            .text,
+        '0',
+      );
+      expect(find.text('Enter an integer priority'), findsWidgets);
+      expect(
+        find.text(
+          'Complete the condition fields required by this condition type.',
+        ),
+        findsWidgets,
+      );
+
+      final ElevatedButton saveButton = tester.widget<ElevatedButton>(
+        find.byKey(const ValueKey<String>('meal-profile-editor-save')),
+      );
+      expect(saveButton.onPressed, isNull);
     },
   );
 
@@ -1115,17 +1273,19 @@ void main() {
       expect(find.text('Roll'), findsOneWidget);
       expect(find.text('Base price'), findsOneWidget);
 
-      await tester.enterText(
-        find.byKey(
+      await _applyNumericDialogValue(
+        tester,
+        field: find.byKey(
           const ValueKey<String>('meal-profile-editor-sandwich-surcharge'),
         ),
-        '1.25',
+        value: '1.25',
       );
-      await tester.enterText(
-        find.byKey(
+      await _applyNumericDialogValue(
+        tester,
+        field: find.byKey(
           const ValueKey<String>('meal-profile-editor-baguette-surcharge'),
         ),
-        '2.20',
+        value: '2.20',
       );
       await tester.tap(
         find.byKey(ValueKey<String>('sandwich-profile-sauce-$ketchupSauceId')),
@@ -1246,4 +1406,63 @@ void _setLargeView(WidgetTester tester) {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Future<void> _applyNumericDialogValue(
+  WidgetTester tester, {
+  required Finder field,
+  required String value,
+}) async {
+  await tester.ensureVisible(field);
+  await tester.tap(field);
+  await tester.pumpAndSettle();
+  if (value.startsWith('-')) {
+    await tester.tap(
+      find.byKey(const ValueKey<String>('app-numeric-keypad-clear')),
+    );
+    await tester.pump();
+  }
+  for (final String char in value.split('')) {
+    if (char == '-') {
+      await tester.tap(
+        find.byKey(const ValueKey<String>('app-numeric-keypad-toggle-sign')),
+      );
+    } else if (char == '.') {
+      await tester.tap(
+        find.byKey(const ValueKey<String>('app-numeric-keypad-decimal')),
+      );
+    } else {
+      await tester.tap(
+        find.byKey(ValueKey<String>('app-numeric-keypad-digit-$char')),
+      );
+    }
+    await tester.pump();
+  }
+  await tester.ensureVisible(
+    find.byKey(const ValueKey<String>('app-numeric-keypad-apply')),
+  );
+  await tester.tap(
+    find.byKey(const ValueKey<String>('app-numeric-keypad-apply')),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _clearAndApplyNumericDialog(
+  WidgetTester tester, {
+  required Finder field,
+}) async {
+  await tester.ensureVisible(field);
+  await tester.tap(field);
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byKey(const ValueKey<String>('app-numeric-keypad-clear')),
+  );
+  await tester.pump();
+  await tester.ensureVisible(
+    find.byKey(const ValueKey<String>('app-numeric-keypad-apply')),
+  );
+  await tester.tap(
+    find.byKey(const ValueKey<String>('app-numeric-keypad-apply')),
+  );
+  await tester.pumpAndSettle();
 }

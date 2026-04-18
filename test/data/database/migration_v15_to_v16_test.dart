@@ -97,10 +97,13 @@ void main() {
 
         final List<Category> categories = await db.select(db.categories).get();
 
-        expect(categories, hasLength(1));
-        expect(categories.single.name, 'Breakfast');
-        expect(categories.single.removalDiscount1Minor, 0);
-        expect(categories.single.removalDiscount2Minor, 0);
+        final List<Category> nonArchivedCategories = categories
+            .where((Category category) => category.name != 'Archived Products')
+            .toList(growable: false);
+        expect(nonArchivedCategories, hasLength(1));
+        expect(nonArchivedCategories.single.name, 'Breakfast');
+        expect(nonArchivedCategories.single.removalDiscount1Minor, 0);
+        expect(nonArchivedCategories.single.removalDiscount2Minor, 0);
       },
     );
 
