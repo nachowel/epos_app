@@ -1,5 +1,7 @@
 enum TransactionStatus { draft, sent, paid, cancelled }
 
+enum TransactionDiscountType { amount, percent }
+
 class Transaction {
   const Transaction({
     required this.id,
@@ -10,6 +12,11 @@ class Transaction {
     required this.status,
     required this.subtotalMinor,
     required this.modifierTotalMinor,
+    this.discountType,
+    this.discountValueMinor = 0,
+    this.discountAmountMinor = 0,
+    this.discountReason,
+    this.discountAppliedBy,
     required this.totalAmountMinor,
     required this.createdAt,
     required this.paidAt,
@@ -29,6 +36,11 @@ class Transaction {
   final TransactionStatus status;
   final int subtotalMinor;
   final int modifierTotalMinor;
+  final TransactionDiscountType? discountType;
+  final int discountValueMinor;
+  final int discountAmountMinor;
+  final String? discountReason;
+  final int? discountAppliedBy;
   final int totalAmountMinor;
   final DateTime createdAt;
   final DateTime? paidAt;
@@ -47,6 +59,8 @@ class Transaction {
 
   bool get isCancelled => status == TransactionStatus.cancelled;
 
+  int get preDiscountTotalMinor => subtotalMinor + modifierTotalMinor;
+
   Transaction copyWith({
     int? id,
     String? uuid,
@@ -56,6 +70,11 @@ class Transaction {
     TransactionStatus? status,
     int? subtotalMinor,
     int? modifierTotalMinor,
+    Object? discountType = _unset,
+    int? discountValueMinor,
+    int? discountAmountMinor,
+    Object? discountReason = _unset,
+    Object? discountAppliedBy = _unset,
     int? totalAmountMinor,
     DateTime? createdAt,
     Object? paidAt = _unset,
@@ -77,6 +96,17 @@ class Transaction {
       status: status ?? this.status,
       subtotalMinor: subtotalMinor ?? this.subtotalMinor,
       modifierTotalMinor: modifierTotalMinor ?? this.modifierTotalMinor,
+      discountType: discountType == _unset
+          ? this.discountType
+          : discountType as TransactionDiscountType?,
+      discountValueMinor: discountValueMinor ?? this.discountValueMinor,
+      discountAmountMinor: discountAmountMinor ?? this.discountAmountMinor,
+      discountReason: discountReason == _unset
+          ? this.discountReason
+          : discountReason as String?,
+      discountAppliedBy: discountAppliedBy == _unset
+          ? this.discountAppliedBy
+          : discountAppliedBy as int?,
       totalAmountMinor: totalAmountMinor ?? this.totalAmountMinor,
       createdAt: createdAt ?? this.createdAt,
       paidAt: paidAt == _unset ? this.paidAt : paidAt as DateTime?,
@@ -107,6 +137,11 @@ class Transaction {
         other.status == status &&
         other.subtotalMinor == subtotalMinor &&
         other.modifierTotalMinor == modifierTotalMinor &&
+        other.discountType == discountType &&
+        other.discountValueMinor == discountValueMinor &&
+        other.discountAmountMinor == discountAmountMinor &&
+        other.discountReason == discountReason &&
+        other.discountAppliedBy == discountAppliedBy &&
         other.totalAmountMinor == totalAmountMinor &&
         other.createdAt == createdAt &&
         other.paidAt == paidAt &&
@@ -119,7 +154,7 @@ class Transaction {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll(<Object?>[
     id,
     uuid,
     shiftId,
@@ -128,6 +163,11 @@ class Transaction {
     status,
     subtotalMinor,
     modifierTotalMinor,
+    discountType,
+    discountValueMinor,
+    discountAmountMinor,
+    discountReason,
+    discountAppliedBy,
     totalAmountMinor,
     createdAt,
     paidAt,
@@ -137,7 +177,7 @@ class Transaction {
     idempotencyKey,
     kitchenPrinted,
     receiptPrinted,
-  );
+  ]);
 }
 
 const Object _unset = Object();

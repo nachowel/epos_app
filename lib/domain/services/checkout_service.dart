@@ -6,6 +6,7 @@ import '../../data/database/app_database.dart' as db;
 import '../../data/repositories/transaction_repository.dart';
 import '../models/checkout_item.dart';
 import '../models/payment.dart';
+import '../models/transaction_discount.dart';
 import '../models/transaction.dart';
 import '../models/user.dart';
 import 'order_service.dart';
@@ -30,10 +31,17 @@ class CheckoutService {
   final PrinterService _printerService;
   final AppLogger _logger;
 
+  /// Checkout persists the transaction only after the first successful item
+  /// add. The resulting lifecycle contract is:
+  /// - `draft` is the only editable state, including discounts
+  /// - payment can be taken only after `draft -> sent`
+  /// - print attempts happen after lifecycle transitions commit
+  /// - print failure is operational only and does not roll back state
   Future<Transaction> checkoutCart({
     required User currentUser,
     int? tableNumber,
     required List<CheckoutItem> cartItems,
+    TransactionDiscountInput? discount,
     required String idempotencyKey,
     PaymentMethod? immediatePaymentMethod,
   }) async {
@@ -53,6 +61,7 @@ class CheckoutService {
             currentUser: currentUser,
             tableNumber: tableNumber,
             cartItems: cartItems,
+            discount: discount,
             idempotencyKey: idempotencyKey,
             immediatePaymentMethod: immediatePaymentMethod,
           );
@@ -100,12 +109,25 @@ class CheckoutService {
     required TransactionStatus status,
     required String flow,
   }) async {
+    // Printing is post-commit operational work only. Any print error is logged
+    // and surfaced separately, but lifecycle state remains the committed state.
     debugPrint(
       '[KITCHEN_PRINT][$flow] _runPostCommitPrints'
       ' tx=$transactionId status=${status.name}',
     );
     if (status == TransactionStatus.cancelled) {
       debugPrint('[KITCHEN_PRINT][$flow] skipped — cancelled');
+      return;
+    }
+
+    final bool kitchenRequired = await _orderService.isKitchenRequired(
+      transactionId,
+    );
+    if (!kitchenRequired) {
+      debugPrint(
+        '[KITCHEN_PRINT][$flow] skipped — no kitchen-eligible lines'
+        ' tx=$transactionId',
+      );
       return;
     }
 

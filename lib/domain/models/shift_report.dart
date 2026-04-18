@@ -19,6 +19,9 @@ class ShiftReport {
     required this.cardCount,
     this.cardGrossTotalMinor = 0,
     required this.cardTotalMinor,
+    this.customSalesRevenueMinor = 0,
+    this.customSalesCount = 0,
+    this.customSalesAverageValueMinor = 0,
     this.categoryBreakdown = const <ShiftReportCategoryLine>[],
     this.semanticSalesAnalytics = const SemanticSalesAnalytics.empty(),
   });
@@ -39,6 +42,9 @@ class ShiftReport {
   final int cardCount;
   final int cardGrossTotalMinor;
   final int cardTotalMinor;
+  final int customSalesRevenueMinor;
+  final int customSalesCount;
+  final int customSalesAverageValueMinor;
   final List<ShiftReportCategoryLine> categoryBreakdown;
   final SemanticSalesAnalytics semanticSalesAnalytics;
 
@@ -59,6 +65,9 @@ class ShiftReport {
     int? cardCount,
     int? cardGrossTotalMinor,
     int? cardTotalMinor,
+    int? customSalesRevenueMinor,
+    int? customSalesCount,
+    int? customSalesAverageValueMinor,
     List<ShiftReportCategoryLine>? categoryBreakdown,
     SemanticSalesAnalytics? semanticSalesAnalytics,
   }) {
@@ -79,6 +88,11 @@ class ShiftReport {
       cardCount: cardCount ?? this.cardCount,
       cardGrossTotalMinor: cardGrossTotalMinor ?? this.cardGrossTotalMinor,
       cardTotalMinor: cardTotalMinor ?? this.cardTotalMinor,
+      customSalesRevenueMinor:
+          customSalesRevenueMinor ?? this.customSalesRevenueMinor,
+      customSalesCount: customSalesCount ?? this.customSalesCount,
+      customSalesAverageValueMinor:
+          customSalesAverageValueMinor ?? this.customSalesAverageValueMinor,
       categoryBreakdown: categoryBreakdown ?? this.categoryBreakdown,
       semanticSalesAnalytics:
           semanticSalesAnalytics ?? this.semanticSalesAnalytics,
@@ -107,12 +121,15 @@ class ShiftReport {
         other.cardCount == cardCount &&
         other.cardGrossTotalMinor == cardGrossTotalMinor &&
         other.cardTotalMinor == cardTotalMinor &&
+        other.customSalesRevenueMinor == customSalesRevenueMinor &&
+        other.customSalesCount == customSalesCount &&
+        other.customSalesAverageValueMinor == customSalesAverageValueMinor &&
         _listEquals(other.categoryBreakdown, categoryBreakdown) &&
         other.semanticSalesAnalytics == semanticSalesAnalytics;
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll(<Object?>[
     shiftId,
     paidCount,
     paidTotalMinor,
@@ -129,9 +146,12 @@ class ShiftReport {
     cardCount,
     cardGrossTotalMinor,
     cardTotalMinor,
+    customSalesRevenueMinor,
+    customSalesCount,
+    customSalesAverageValueMinor,
     Object.hashAll(categoryBreakdown),
     semanticSalesAnalytics,
-  );
+  ]);
 
   bool _listEquals(
     List<ShiftReportCategoryLine> a,

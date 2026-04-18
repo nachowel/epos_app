@@ -459,7 +459,7 @@ void main() {
           actorUserId: fixture.cashier.id,
         );
 
-        final Transaction secondOrder = await fixture.orderService.createOrder(
+        final Transaction secondOrder = await fixture.orderService.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashier,
         );
         await fixture.orderService.addProductToOrder(
@@ -725,7 +725,7 @@ Future<_OrderFixture> _createSentOrderFixture(
     paymentRepository: PaymentRepository(db),
     printJobRepository: PrintJobRepository(db),
   );
-  final Transaction transaction = await orderService.createOrder(
+  final Transaction transaction = await orderService.createPersistedEmptyDraftForTestingAccess(
     currentUser: cashier,
   );
   await orderService.addProductToOrder(

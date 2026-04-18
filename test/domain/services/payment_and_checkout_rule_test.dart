@@ -1,4 +1,5 @@
 import 'package:epos_app/core/errors/exceptions.dart';
+import 'package:epos_app/data/database/app_database.dart' show AppDatabase;
 import 'package:epos_app/data/repositories/payment_repository.dart';
 import 'package:epos_app/data/repositories/print_job_repository.dart';
 import 'package:epos_app/data/repositories/shift_repository.dart';
@@ -308,6 +309,306 @@ void main() {
       },
     );
 
+    test('empty cart checkout does not persist a transaction', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int userId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      await insertShift(db, openedBy: userId);
+
+      final shiftSessionService = ShiftSessionService(ShiftRepository(db));
+      final checkoutService = CheckoutService(
+        database: db,
+        shiftSessionService: shiftSessionService,
+        orderService: OrderService(
+          shiftSessionService: shiftSessionService,
+          transactionRepository: TransactionRepository(db),
+          transactionStateRepository: TransactionStateRepository(db),
+        ),
+        transactionRepository: TransactionRepository(db),
+        printerService: PrinterService(TransactionRepository(db)),
+      );
+
+      await expectLater(
+        checkoutService.checkoutCart(
+          currentUser: User(
+            id: userId,
+            name: 'Cashier',
+            pin: null,
+            password: null,
+            role: UserRole.cashier,
+            isActive: true,
+            createdAt: DateTime.now(),
+          ),
+          cartItems: const <CheckoutItem>[],
+          idempotencyKey: 'empty-cart-no-tx',
+        ),
+        throwsA(isA<EmptyCartException>()),
+      );
+
+      expect(await _countRows(db, 'transactions'), 0);
+      expect(await _countRows(db, 'transaction_lines'), 0);
+    });
+
+    test('old createOrder production path is rejected and persists nothing', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int userId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      await insertShift(db, openedBy: userId);
+
+      final OrderService orderService = OrderService(
+        shiftSessionService: ShiftSessionService(ShiftRepository(db)),
+        transactionRepository: TransactionRepository(db),
+        transactionStateRepository: TransactionStateRepository(db),
+      );
+
+      await expectLater(
+        orderService.createOrder(
+          currentUser: User(
+            id: userId,
+            name: 'Cashier',
+            pin: null,
+            password: null,
+            role: UserRole.cashier,
+            isActive: true,
+            createdAt: DateTime.now(),
+          ),
+        ),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(await _countRows(db, 'transactions'), 0);
+      expect(await _countRows(db, 'transaction_lines'), 0);
+    });
+
+    test('test-only empty draft helper is blocked without testing access', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int userId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      await insertShift(db, openedBy: userId);
+
+      final OrderService orderService = OrderService(
+        shiftSessionService: ShiftSessionService(ShiftRepository(db)),
+        transactionRepository: TransactionRepository(db),
+        transactionStateRepository: TransactionStateRepository(db),
+      );
+
+      await expectLater(
+        orderService.createPersistedEmptyDraftForTesting(
+          currentUser: User(
+            id: userId,
+            name: 'Cashier',
+            pin: null,
+            password: null,
+            role: UserRole.cashier,
+            isActive: true,
+            createdAt: DateTime.now(),
+          ),
+        ),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(await _countRows(db, 'transactions'), 0);
+    });
+
+    test('first successful checkout item creates transaction, line, and totals atomically', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      await insertShift(db, openedBy: cashierId);
+      final int categoryId = await insertCategory(db, name: 'Drinks');
+      final int productId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Latte',
+        priceMinor: 350,
+      );
+
+      final shiftSessionService = ShiftSessionService(ShiftRepository(db));
+      final TransactionRepository transactionRepository = TransactionRepository(
+        db,
+      );
+      final checkoutService = CheckoutService(
+        database: db,
+        shiftSessionService: shiftSessionService,
+        orderService: OrderService(
+          shiftSessionService: shiftSessionService,
+          transactionRepository: transactionRepository,
+          transactionStateRepository: TransactionStateRepository(db),
+          paymentRepository: PaymentRepository(db),
+        ),
+        transactionRepository: transactionRepository,
+        printerService: PrinterService(transactionRepository),
+      );
+
+      final Transaction transaction = await checkoutService.checkoutCart(
+        currentUser: User(
+          id: cashierId,
+          name: 'Cashier',
+          pin: null,
+          password: null,
+          role: UserRole.cashier,
+          isActive: true,
+          createdAt: DateTime.now(),
+        ),
+        cartItems: <CheckoutItem>[
+          CheckoutItem(
+            productId: productId,
+            quantity: 1,
+            modifiers: const <CheckoutModifier>[],
+          ),
+        ],
+        idempotencyKey: 'first-item-atomic',
+      );
+
+      final Transaction? persisted = await transactionRepository.getById(
+        transaction.id,
+      );
+
+      expect(await _countRows(db, 'transactions'), 1);
+      expect(await _countRows(db, 'transaction_lines'), 1);
+      expect(persisted, isNotNull);
+      expect(persisted!.subtotalMinor, 350);
+      expect(persisted.modifierTotalMinor, 0);
+      expect(persisted.totalAmountMinor, 350);
+      expect(persisted.status, TransactionStatus.sent);
+    });
+
+    test('failed first checkout item does not leave an abandoned empty draft', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      await insertShift(db, openedBy: cashierId);
+
+      final shiftSessionService = ShiftSessionService(ShiftRepository(db));
+      final checkoutService = CheckoutService(
+        database: db,
+        shiftSessionService: shiftSessionService,
+        orderService: OrderService(
+          shiftSessionService: shiftSessionService,
+          transactionRepository: TransactionRepository(db),
+          transactionStateRepository: TransactionStateRepository(db),
+          paymentRepository: PaymentRepository(db),
+        ),
+        transactionRepository: TransactionRepository(db),
+        printerService: PrinterService(TransactionRepository(db)),
+      );
+
+      await expectLater(
+        checkoutService.checkoutCart(
+          currentUser: User(
+            id: cashierId,
+            name: 'Cashier',
+            pin: null,
+            password: null,
+            role: UserRole.cashier,
+            isActive: true,
+            createdAt: DateTime.now(),
+          ),
+          cartItems: <CheckoutItem>[
+            const CheckoutItem(
+              productId: 999999,
+              quantity: 1,
+              modifiers: <CheckoutModifier>[],
+            ),
+          ],
+          idempotencyKey: 'invalid-first-item-no-draft',
+        ),
+        throwsA(isA<ValidationException>()),
+      );
+
+      expect(await _countRows(db, 'transactions'), 0);
+      expect(await _countRows(db, 'transaction_lines'), 0);
+    });
+
+    test('first item success plus later item failure rolls back the whole checkout', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      await insertShift(db, openedBy: cashierId);
+      final int categoryId = await insertCategory(db, name: 'Drinks');
+      final int validProductId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Coffee',
+        priceMinor: 300,
+      );
+
+      final shiftSessionService = ShiftSessionService(ShiftRepository(db));
+      final checkoutService = CheckoutService(
+        database: db,
+        shiftSessionService: shiftSessionService,
+        orderService: OrderService(
+          shiftSessionService: shiftSessionService,
+          transactionRepository: TransactionRepository(db),
+          transactionStateRepository: TransactionStateRepository(db),
+          paymentRepository: PaymentRepository(db),
+        ),
+        transactionRepository: TransactionRepository(db),
+        printerService: PrinterService(TransactionRepository(db)),
+      );
+
+      await expectLater(
+        checkoutService.checkoutCart(
+          currentUser: User(
+            id: cashierId,
+            name: 'Cashier',
+            pin: null,
+            password: null,
+            role: UserRole.cashier,
+            isActive: true,
+            createdAt: DateTime.now(),
+          ),
+          cartItems: <CheckoutItem>[
+            CheckoutItem(
+              productId: validProductId,
+              quantity: 1,
+              modifiers: const <CheckoutModifier>[],
+            ),
+            const CheckoutItem(
+              productId: 999999,
+              quantity: 1,
+              modifiers: <CheckoutModifier>[],
+            ),
+          ],
+          idempotencyKey: 'later-item-failure-rollback',
+        ),
+        throwsA(isA<ValidationException>()),
+      );
+
+      expect(await _countRows(db, 'transactions'), 0);
+      expect(await _countRows(db, 'transaction_lines'), 0);
+    });
+
     test('PAID and OPEN orders can coexist in the same active shift', () async {
       final db = createTestDatabase();
       addTearDown(db.close);
@@ -490,6 +791,13 @@ void main() {
       expect(persisted.receiptPrinted, isFalse);
     });
   });
+}
+
+Future<int> _countRows(AppDatabase db, String tableName) async {
+  final row = await db.customSelect(
+    'SELECT COUNT(*) AS cnt FROM $tableName',
+  ).getSingle();
+  return row.read<int>('cnt');
 }
 
 class _FailingPrinterService extends PrinterService {

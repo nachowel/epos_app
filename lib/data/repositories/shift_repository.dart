@@ -221,6 +221,11 @@ class ShiftRepository {
       status: _transactionStatusFromDb(row.status),
       subtotalMinor: row.subtotalMinor,
       modifierTotalMinor: row.modifierTotalMinor,
+      discountType: _discountTypeFromDb(row.discountType),
+      discountValueMinor: row.discountValueMinor,
+      discountAmountMinor: row.discountAmountMinor,
+      discountReason: row.discountReason,
+      discountAppliedBy: row.discountAppliedBy,
       totalAmountMinor: row.totalAmountMinor,
       createdAt: row.createdAt,
       paidAt: row.paidAt,
@@ -256,6 +261,19 @@ class ShiftRepository {
           'value',
           'Locked is an effective UI status and cannot be persisted.',
         );
+    }
+  }
+
+  TransactionDiscountType? _discountTypeFromDb(String? value) {
+    switch (value) {
+      case null:
+        return null;
+      case 'amount':
+        return TransactionDiscountType.amount;
+      case 'percent':
+        return TransactionDiscountType.percent;
+      default:
+        throw DatabaseException('Unknown transaction discount type: $value');
     }
   }
 

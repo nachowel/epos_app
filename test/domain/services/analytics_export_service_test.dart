@@ -74,6 +74,9 @@ void main() {
                 cashOrderCount: 4,
                 cardOrderCount: 8,
               ),
+              customSalesRevenueMinor: 3456,
+              customSalesCount: 3,
+              customSalesAverageValueMinor: 1152,
             ),
             revenueMetricsByStart: <DateTime, RevenueMetrics>{
               DateTime(2026, 4, 13): const RevenueMetrics(
@@ -136,6 +139,12 @@ void main() {
         expect(payload['summary']['selectedPreset']['key'], 'this_week');
         expect(payload['summary']['totalRevenue']['minor'], 123456);
         expect(payload['summary']['comparisonDeltaPercent'], 23);
+        expect(payload['summary']['customSales']['revenue']['minor'], 3456);
+        expect(payload['summary']['customSales']['count'], 3);
+        expect(
+          payload['summary']['customSales']['averageValue']['minor'],
+          1152,
+        );
         expect(payload['dailyRevenue'][0]['date'], '2026-04-13');
         expect(payload['topProducts'][0]['productName'], 'Flat White');
         expect(payload['topProducts'][0]['quantity'], 18);

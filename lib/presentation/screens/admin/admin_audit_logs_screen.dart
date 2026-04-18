@@ -16,6 +16,7 @@ const String _actionFilterLabel = 'Action';
 const String _entityTypeFilterLabel = 'Entity Type';
 const String _allFilterLabel = 'All';
 const String _noAuditLogs = 'No audit logs match the current filters.';
+const double _filterFieldMaxWidth = 220;
 
 class AdminAuditLogsScreen extends ConsumerStatefulWidget {
   const AdminAuditLogsScreen({super.key});
@@ -86,80 +87,119 @@ class _FilterBar extends ConsumerWidget {
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
         border: Border.all(color: AppColors.border),
       ),
-      child: Wrap(
-        spacing: AppSizes.spacingMd,
-        runSpacing: AppSizes.spacingMd,
-        children: <Widget>[
-          SizedBox(
-            width: 220,
-            child: DropdownButtonFormField<int?>(
-              value: state.actorFilter,
-              decoration: const InputDecoration(labelText: _actorFilterLabel),
-              items: <DropdownMenuItem<int?>>[
-                const DropdownMenuItem<int?>(
-                  value: null,
-                  child: Text(_allFilterLabel),
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final double fieldWidth = constraints.maxWidth < _filterFieldMaxWidth
+              ? constraints.maxWidth
+              : _filterFieldMaxWidth;
+          return Wrap(
+            spacing: AppSizes.spacingMd,
+            runSpacing: AppSizes.spacingMd,
+            children: <Widget>[
+              SizedBox(
+                width: fieldWidth,
+                child: _AuditFilterDropdown<int?>(
+                  value: state.actorFilter,
+                  label: _actorFilterLabel,
+                  items: <({int? value, String label})>[
+                    (value: null, label: _allFilterLabel),
+                    ...state.availableActorIds.map(
+                      (int actorUserId) =>
+                          (value: actorUserId, label: 'Actor #$actorUserId'),
+                    ),
+                  ],
+                  onChanged: notifier.setActorFilter,
                 ),
-                ...state.availableActorIds.map(
-                  (int actorUserId) => DropdownMenuItem<int?>(
-                    value: actorUserId,
-                    child: Text('Actor #$actorUserId'),
-                  ),
-                ),
-              ],
-              onChanged: (int? value) {
-                notifier.setActorFilter(value);
-              },
-            ),
-          ),
-          SizedBox(
-            width: 220,
-            child: DropdownButtonFormField<String?>(
-              value: state.actionFilter,
-              decoration: const InputDecoration(labelText: _actionFilterLabel),
-              items: <DropdownMenuItem<String?>>[
-                const DropdownMenuItem<String?>(
-                  value: null,
-                  child: Text(_allFilterLabel),
-                ),
-                ...state.availableActions.map(
-                  (String action) => DropdownMenuItem<String?>(
-                    value: action,
-                    child: Text(action),
-                  ),
-                ),
-              ],
-              onChanged: (String? value) {
-                notifier.setActionFilter(value);
-              },
-            ),
-          ),
-          SizedBox(
-            width: 220,
-            child: DropdownButtonFormField<String?>(
-              value: state.entityTypeFilter,
-              decoration: const InputDecoration(
-                labelText: _entityTypeFilterLabel,
               ),
-              items: <DropdownMenuItem<String?>>[
-                const DropdownMenuItem<String?>(
-                  value: null,
-                  child: Text(_allFilterLabel),
+              SizedBox(
+                width: fieldWidth,
+                child: _AuditFilterDropdown<String?>(
+                  value: state.actionFilter,
+                  label: _actionFilterLabel,
+                  items: <({String? value, String label})>[
+                    (value: null, label: _allFilterLabel),
+                    ...state.availableActions.map(
+                      (String action) => (value: action, label: action),
+                    ),
+                  ],
+                  onChanged: notifier.setActionFilter,
                 ),
-                ...state.availableEntityTypes.map(
-                  (String entityType) => DropdownMenuItem<String?>(
-                    value: entityType,
-                    child: Text(entityType),
-                  ),
+              ),
+              SizedBox(
+                width: fieldWidth,
+                child: _AuditFilterDropdown<String?>(
+                  value: state.entityTypeFilter,
+                  label: _entityTypeFilterLabel,
+                  items: <({String? value, String label})>[
+                    (value: null, label: _allFilterLabel),
+                    ...state.availableEntityTypes.map(
+                      (String entityType) =>
+                          (value: entityType, label: entityType),
+                    ),
+                  ],
+                  onChanged: notifier.setEntityTypeFilter,
                 ),
-              ],
-              onChanged: (String? value) {
-                notifier.setEntityTypeFilter(value);
-              },
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
+    );
+  }
+}
+
+class _AuditFilterDropdown<T> extends StatelessWidget {
+  const _AuditFilterDropdown({
+    required this.value,
+    required this.label,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final T value;
+  final String label;
+  final List<({T value, String label})> items;
+  final ValueChanged<T?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<T>(
+      value: value,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: label,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.spacingSm,
+          vertical: AppSizes.spacingSm,
+        ),
+      ),
+      selectedItemBuilder: (BuildContext context) {
+        return items
+            .map(
+              (({T value, String label}) item) => Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            )
+            .toList(growable: false);
+      },
+      items: items
+          .map(
+            (({T value, String label}) item) => DropdownMenuItem<T>(
+              value: item.value,
+              child: Text(
+                item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
+          .toList(growable: false),
+      onChanged: onChanged,
     );
   }
 }

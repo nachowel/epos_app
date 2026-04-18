@@ -51,6 +51,33 @@ void main() {
       expect(hydratedModifier, modifier.copyWith(id: persistedModifier.id));
     });
 
+    test('custom sale metadata round-trips line ownership fields', () async {
+      final _PersistenceFixture fixture = await _createFixture();
+      addTearDown(fixture.db.close);
+
+      final TransactionLine line = _line(
+        uuid: 'custom-sale-line',
+        transactionId: fixture.transactionId,
+        productId: fixture.productId,
+        lineTotalMinor: 875,
+        customNote: 'Manual sale',
+        createdByUserId: fixture.cashierId,
+        adminOverrideUserId: fixture.adminId,
+      );
+
+      final app_db.TransactionLine persistedLine = await _insertLine(
+        fixture,
+        line,
+      );
+      final TransactionLine hydrated = fixture.mapper.transactionLineFromRow(
+        persistedLine,
+      );
+
+      expect(hydrated.customNote, 'Manual sale');
+      expect(hydrated.createdByUserId, fixture.cashierId);
+      expect(hydrated.adminOverrideUserId, fixture.adminId);
+    });
+
     test('serializer_does_not_use_extra_price_minor_for_semantics', () {
       const TransactionPersistenceMapper mapper =
           TransactionPersistenceMapper();
@@ -446,6 +473,7 @@ Future<_PersistenceFixture> _createFixture() async {
     priceMinor: 100,
   );
   final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
+  final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
   final int shiftId = await insertShift(db, openedBy: cashierId);
   final int transactionId = await insertTransaction(
     db,
@@ -475,6 +503,8 @@ Future<_PersistenceFixture> _createFixture() async {
     productId: productId,
     transactionId: transactionId,
     groupId: groupId,
+    cashierId: cashierId,
+    adminId: adminId,
   );
 }
 
@@ -485,6 +515,9 @@ TransactionLine _line({
   TransactionLinePricingMode pricingMode = TransactionLinePricingMode.standard,
   int removalDiscountTotalMinor = 0,
   int lineTotalMinor = 400,
+  int? createdByUserId,
+  int? adminOverrideUserId,
+  String? customNote,
 }) {
   return TransactionLine(
     id: 0,
@@ -497,6 +530,9 @@ TransactionLine _line({
     lineTotalMinor: lineTotalMinor,
     pricingMode: pricingMode,
     removalDiscountTotalMinor: removalDiscountTotalMinor,
+    customNote: customNote,
+    createdByUserId: createdByUserId,
+    adminOverrideUserId: adminOverrideUserId,
   );
 }
 
@@ -583,6 +619,9 @@ Map<String, Object?> _transactionLineCompanionValues(
     'line_total_minor': companion.lineTotalMinor.value,
     'pricing_mode': companion.pricingMode.value,
     'removal_discount_total_minor': companion.removalDiscountTotalMinor.value,
+    'custom_note': companion.customNote.value,
+    'created_by_user_id': companion.createdByUserId.value,
+    'admin_override_user_id': companion.adminOverrideUserId.value,
   };
 }
 
@@ -613,6 +652,8 @@ class _PersistenceFixture {
     required this.productId,
     required this.transactionId,
     required this.groupId,
+    required this.cashierId,
+    required this.adminId,
   });
 
   final app_db.AppDatabase db;
@@ -621,4 +662,6 @@ class _PersistenceFixture {
   final int productId;
   final int transactionId;
   final int groupId;
+  final int cashierId;
+  final int adminId;
 }

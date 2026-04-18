@@ -8,6 +8,9 @@ class OverviewMetrics {
     required this.averageOrderValueMinor,
     required this.topProductsPreview,
     required this.paymentSplitSummary,
+    this.customSalesRevenueMinor = 0,
+    this.customSalesCount = 0,
+    this.customSalesAverageValueMinor = 0,
   });
 
   const OverviewMetrics.empty()
@@ -15,13 +18,19 @@ class OverviewMetrics {
       orderCount = 0,
       averageOrderValueMinor = 0,
       topProductsPreview = const <TopProductSummary>[],
-      paymentSplitSummary = const PaymentSplitSummary.empty();
+      paymentSplitSummary = const PaymentSplitSummary.empty(),
+      customSalesRevenueMinor = 0,
+      customSalesCount = 0,
+      customSalesAverageValueMinor = 0;
 
   final int totalRevenueMinor;
   final int orderCount;
   final int averageOrderValueMinor;
   final List<TopProductSummary> topProductsPreview;
   final PaymentSplitSummary paymentSplitSummary;
+  final int customSalesRevenueMinor;
+  final int customSalesCount;
+  final int customSalesAverageValueMinor;
 
   bool get hasData => totalRevenueMinor > 0 || orderCount > 0;
 
@@ -31,6 +40,9 @@ class OverviewMetrics {
     int? averageOrderValueMinor,
     List<TopProductSummary>? topProductsPreview,
     PaymentSplitSummary? paymentSplitSummary,
+    int? customSalesRevenueMinor,
+    int? customSalesCount,
+    int? customSalesAverageValueMinor,
   }) {
     return OverviewMetrics(
       totalRevenueMinor: totalRevenueMinor ?? this.totalRevenueMinor,
@@ -39,6 +51,11 @@ class OverviewMetrics {
           averageOrderValueMinor ?? this.averageOrderValueMinor,
       topProductsPreview: topProductsPreview ?? this.topProductsPreview,
       paymentSplitSummary: paymentSplitSummary ?? this.paymentSplitSummary,
+      customSalesRevenueMinor:
+          customSalesRevenueMinor ?? this.customSalesRevenueMinor,
+      customSalesCount: customSalesCount ?? this.customSalesCount,
+      customSalesAverageValueMinor:
+          customSalesAverageValueMinor ?? this.customSalesAverageValueMinor,
     );
   }
 
@@ -52,7 +69,10 @@ class OverviewMetrics {
         other.orderCount == orderCount &&
         other.averageOrderValueMinor == averageOrderValueMinor &&
         _listEquals(other.topProductsPreview, topProductsPreview) &&
-        other.paymentSplitSummary == paymentSplitSummary;
+        other.paymentSplitSummary == paymentSplitSummary &&
+        other.customSalesRevenueMinor == customSalesRevenueMinor &&
+        other.customSalesCount == customSalesCount &&
+        other.customSalesAverageValueMinor == customSalesAverageValueMinor;
   }
 
   @override
@@ -62,6 +82,9 @@ class OverviewMetrics {
     averageOrderValueMinor,
     Object.hashAll(topProductsPreview),
     paymentSplitSummary,
+    customSalesRevenueMinor,
+    customSalesCount,
+    customSalesAverageValueMinor,
   );
 
   bool _listEquals(

@@ -12,6 +12,9 @@ class TransactionLine {
     required this.lineTotalMinor,
     this.pricingMode = TransactionLinePricingMode.standard,
     this.removalDiscountTotalMinor = 0,
+    this.customNote,
+    this.createdByUserId,
+    this.adminOverrideUserId,
   });
 
   final int id;
@@ -24,6 +27,12 @@ class TransactionLine {
   final int lineTotalMinor;
   final TransactionLinePricingMode pricingMode;
   final int removalDiscountTotalMinor;
+  // Reserved for Custom Sale line persistence in Phase 1. Standard product
+  // flows are expected to leave this null unless a later feature expands its
+  // use explicitly.
+  final String? customNote;
+  final int? createdByUserId;
+  final int? adminOverrideUserId;
 
   TransactionLine copyWith({
     int? id,
@@ -36,6 +45,9 @@ class TransactionLine {
     int? lineTotalMinor,
     TransactionLinePricingMode? pricingMode,
     int? removalDiscountTotalMinor,
+    Object? customNote = _unset,
+    Object? createdByUserId = _unset,
+    Object? adminOverrideUserId = _unset,
   }) {
     return TransactionLine(
       id: id ?? this.id,
@@ -49,6 +61,15 @@ class TransactionLine {
       pricingMode: pricingMode ?? this.pricingMode,
       removalDiscountTotalMinor:
           removalDiscountTotalMinor ?? this.removalDiscountTotalMinor,
+      customNote: customNote == _unset
+          ? this.customNote
+          : customNote as String?,
+      createdByUserId: createdByUserId == _unset
+          ? this.createdByUserId
+          : createdByUserId as int?,
+      adminOverrideUserId: adminOverrideUserId == _unset
+          ? this.adminOverrideUserId
+          : adminOverrideUserId as int?,
     );
   }
 
@@ -67,7 +88,10 @@ class TransactionLine {
         other.quantity == quantity &&
         other.lineTotalMinor == lineTotalMinor &&
         other.pricingMode == pricingMode &&
-        other.removalDiscountTotalMinor == removalDiscountTotalMinor;
+        other.removalDiscountTotalMinor == removalDiscountTotalMinor &&
+        other.customNote == customNote &&
+        other.createdByUserId == createdByUserId &&
+        other.adminOverrideUserId == adminOverrideUserId;
   }
 
   @override
@@ -82,5 +106,10 @@ class TransactionLine {
     lineTotalMinor,
     pricingMode,
     removalDiscountTotalMinor,
+    customNote,
+    createdByUserId,
+    adminOverrideUserId,
   );
 }
+
+const Object _unset = Object();

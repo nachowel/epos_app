@@ -188,10 +188,7 @@ SyncTransactionGraph _paidGraph({
       const SyncGraphRecord(
         tableName: 'transactions',
         recordUuid: _paidTransactionUuid,
-        payload: <String, Object?>{
-          'uuid': _paidTransactionUuid,
-          'status': 'paid',
-        },
+        payload: _paidTransactionPayload,
         idempotencyKey: 'idem-1',
       ),
       const SyncGraphRecord(
@@ -210,6 +207,29 @@ SyncTransactionGraph _paidGraph({
     ],
   );
 }
+
+const Map<String, Object?> _paidTransactionPayload = <String, Object?>{
+  'uuid': _paidTransactionUuid,
+  'shift_local_id': 1,
+  'user_local_id': 2,
+  'table_number': 3,
+  'status': 'paid',
+  'subtotal_minor': 1200,
+  'modifier_total_minor': 0,
+  'discount_type': null,
+  'discount_value_minor': 0,
+  'discount_amount_minor': 0,
+  'discount_reason': null,
+  'discount_applied_by_local_id': null,
+  'total_amount_minor': 1200,
+  'created_at': '2026-04-18T09:50:00.000Z',
+  'paid_at': '2026-04-18T10:00:00.000Z',
+  'updated_at': '2026-04-18T10:00:00.000Z',
+  'cancelled_at': null,
+  'cancelled_by_local_id': null,
+  'kitchen_printed': true,
+  'receipt_printed': true,
+};
 
 class _MirrorWriteCall {
   const _MirrorWriteCall({

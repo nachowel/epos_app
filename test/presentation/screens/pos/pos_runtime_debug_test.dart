@@ -99,7 +99,7 @@ void main() {
       expect(firstCardSize.width, greaterThanOrEqualTo(140));
       expect(firstCardSize.height, lessThan(260));
       expect(firstCardOffset.dx, greaterThan(0));
-      expect(firstRowCount, 6);
+      expect(firstRowCount, 4);
       expect(rowStarts.length, greaterThanOrEqualTo(2));
     },
   );
@@ -214,6 +214,7 @@ void main() {
 
     expect(find.text('Visible Egg'), findsOneWidget);
     expect(find.text('Hidden Bacon'), findsNothing);
+    expect(find.byType(SectionAppBar), findsOneWidget);
   });
 }
 

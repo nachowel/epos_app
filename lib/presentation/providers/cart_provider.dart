@@ -3,17 +3,20 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/errors/exceptions.dart';
 import '../../domain/models/breakfast_cart_selection.dart';
+import '../../domain/models/custom_sale.dart';
 import '../../domain/models/meal_customization.dart';
 import '../../domain/models/order_modifier.dart';
 import '../../domain/models/product.dart';
+import '../../domain/models/transaction_discount.dart';
 import 'cart_models.dart';
 
 class CartState {
-  const CartState({required this.items});
+  const CartState({required this.items, this.discount});
 
-  const CartState.initial() : items = const <CartItem>[];
+  const CartState.initial() : items = const <CartItem>[], discount = null;
 
   final List<CartItem> items;
+  final TransactionDiscountInput? discount;
 
   int get subtotalMinor =>
       items.fold<int>(0, (int sum, CartItem item) => sum + item.subtotalMinor);
@@ -21,11 +24,30 @@ class CartState {
     0,
     (int sum, CartItem item) => sum + item.modifierTotalMinor,
   );
-  int get totalMinor => subtotalMinor + modifierTotalMinor;
+  int get discountAmountMinor => TransactionDiscountMath.compute(
+    subtotalMinor: subtotalMinor,
+    modifierTotalMinor: modifierTotalMinor,
+    discountType: discount?.type,
+    discountValueMinor: discount?.valueMinor ?? 0,
+  ).discountAmountMinor;
+  int get totalMinor => TransactionDiscountMath.compute(
+    subtotalMinor: subtotalMinor,
+    modifierTotalMinor: modifierTotalMinor,
+    discountType: discount?.type,
+    discountValueMinor: discount?.valueMinor ?? 0,
+  ).totalAmountMinor;
   bool get isEmpty => items.isEmpty;
 
-  CartState copyWith({List<CartItem>? items}) {
-    return CartState(items: items ?? this.items);
+  CartState copyWith({
+    List<CartItem>? items,
+    Object? discount = _unsetCartDiscount,
+  }) {
+    return CartState(
+      items: items ?? this.items,
+      discount: identical(discount, _unsetCartDiscount)
+          ? this.discount
+          : discount as TransactionDiscountInput?,
+    );
   }
 }
 
@@ -94,6 +116,45 @@ class CartNotifier extends StateNotifier<CartState> {
     state = state.copyWith(items: <CartItem>[...state.items, newItem]);
   }
 
+  void addCustomSale(CustomSaleWriteRequest request) {
+    state = state.copyWith(
+      items: <CartItem>[
+        ...state.items,
+        CartItem(
+          localId: _uuidGenerator.v4(),
+          productId: 0,
+          productName: '⚠ Custom Sale',
+          unitPriceMinor: request.amountMinor,
+          hasModifiers: false,
+          quantity: 1,
+          modifiers: const <CartModifier>[],
+          customSaleRequest: request,
+        ),
+      ],
+    );
+  }
+
+  void updateCustomSale(String localId, CustomSaleWriteRequest request) {
+    state = state.copyWith(
+      items: state.items
+          .map((CartItem item) {
+            if (item.localId != localId) {
+              return item;
+            }
+            return item.copyWith(
+              productName: '⚠ Custom Sale',
+              unitPriceMinor: request.amountMinor,
+              quantity: 1,
+              modifiers: const <CartModifier>[],
+              breakfastSelection: null,
+              mealCustomizationSelection: null,
+              customSaleRequest: request,
+            );
+          })
+          .toList(growable: false),
+    );
+  }
+
   void removeItem(String localId) {
     state = state.copyWith(
       items: state.items
@@ -108,6 +169,9 @@ class CartNotifier extends StateNotifier<CartState> {
         if (item.localId != localId) {
           return item;
         }
+        if (item.isCustomSale) {
+          return item;
+        }
         return item.copyWith(quantity: item.quantity + 1);
       }).toList(),
     );
@@ -118,6 +182,9 @@ class CartNotifier extends StateNotifier<CartState> {
     for (final CartItem item in state.items) {
       if (item.localId != localId) {
         updatedItems.add(item);
+        continue;
+      }
+      if (item.isCustomSale) {
         continue;
       }
       final int nextQuantity = item.quantity - 1;
@@ -164,6 +231,9 @@ class CartNotifier extends StateNotifier<CartState> {
             if (item.localId != localId) {
               return item;
             }
+            if (item.isCustomSale) {
+              return item;
+            }
             return item.copyWith(modifiers: modifiers);
           })
           .toList(growable: false),
@@ -172,6 +242,15 @@ class CartNotifier extends StateNotifier<CartState> {
 
   void clearCart() {
     state = const CartState.initial();
+  }
+
+  void applyDiscount(TransactionDiscountInput discount) {
+    discount.validate();
+    state = state.copyWith(discount: discount);
+  }
+
+  void removeDiscount() {
+    state = state.copyWith(discount: null);
   }
 
   void _ensureProductAvailableForSale(Product product) {
@@ -183,3 +262,5 @@ class CartNotifier extends StateNotifier<CartState> {
 
 final StateNotifierProvider<CartNotifier, CartState> cartNotifierProvider =
     StateNotifierProvider<CartNotifier, CartState>((_) => CartNotifier());
+
+const Object _unsetCartDiscount = Object();

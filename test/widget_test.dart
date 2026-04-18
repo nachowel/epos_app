@@ -1,5 +1,4 @@
 import 'package:drift/native.dart';
-import 'package:epos_app/core/constants/app_strings.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -26,6 +25,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text(AppStrings.loginTitle), findsOneWidget);
+    expect(find.text('HALFWAY CAFE'), findsOneWidget);
+    expect(find.text('Staff Login'), findsOneWidget);
   });
 }

@@ -57,6 +57,9 @@ void main() {
       expect(metrics.averageOrderValueMinor, 0);
       expect(metrics.topProductsPreview, isEmpty);
       expect(metrics.paymentSplitSummary, const PaymentSplitSummary.empty());
+      expect(metrics.customSalesRevenueMinor, 0);
+      expect(metrics.customSalesCount, 0);
+      expect(metrics.customSalesAverageValueMinor, 0);
     });
 
     test('computes a safe aov when repository order count is zero', () async {
@@ -161,6 +164,31 @@ void main() {
       expect(metrics.averageOrderValueMinor, 1500);
       expect(metrics.topProductsPreview, hasLength(3));
       expect(metrics.topProductsPreview.first.productName, 'Coffee');
+    });
+
+    test('normalizes dedicated custom sale metrics', () async {
+      final AnalyticsOverviewService service = AnalyticsOverviewService(
+        repository: _FakeAnalyticsRepository(
+          const OverviewMetrics(
+            totalRevenueMinor: 3000,
+            orderCount: 2,
+            averageOrderValueMinor: 1500,
+            topProductsPreview: <TopProductSummary>[],
+            paymentSplitSummary: PaymentSplitSummary.empty(),
+            customSalesRevenueMinor: -900,
+            customSalesCount: -2,
+            customSalesAverageValueMinor: -450,
+          ),
+        ),
+      );
+
+      final OverviewMetrics metrics = await service.getOverviewMetrics(
+        _range(),
+      );
+
+      expect(metrics.customSalesRevenueMinor, 0);
+      expect(metrics.customSalesCount, 0);
+      expect(metrics.customSalesAverageValueMinor, 0);
     });
   });
 }

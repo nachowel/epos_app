@@ -8,6 +8,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/errors/error_mapper.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../domain/models/category.dart';
+import '../../../domain/models/custom_sale.dart';
 import '../../../domain/models/payment.dart';
 import '../../../domain/models/product.dart';
 import '../../../domain/models/transaction.dart';
@@ -19,11 +20,14 @@ import '../../providers/orders_provider.dart';
 import '../../providers/pos_interaction_provider.dart';
 import '../../providers/products_provider.dart';
 import '../../providers/shift_provider.dart';
+import '../../utils/open_drawer_action.dart';
+import '../../widgets/logout_confirmation.dart';
 import '../../widgets/section_app_bar.dart';
 import 'pos_product_presentation_policy.dart';
 import 'widgets/cart_panel.dart';
 import 'widgets/category_bar.dart';
 import 'widgets/checkout_sheet.dart';
+import 'widgets/custom_sale_dialog.dart';
 import 'widgets/interaction_lock_shell.dart';
 import 'widgets/modifier_popup.dart';
 import 'widgets/payment_dialog.dart';
@@ -49,13 +53,24 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   static const String _productSortLockedMessage =
       'Ürün sıralamasını değiştirmeden önce Kaydet veya İptal seçin.';
   static const String _productSortSavedMessage = 'Ürün sırası kaydedildi.';
-  bool _shouldReturnToCategoryEntryAfterPayment = false;
-  bool _isCompletingSuccessfulPaymentTransition = false;
+  // Post-checkout tracking
+  String? _successfulCheckoutMessage;
+  bool _isCompletingCheckoutTransition = false;
+
+  // Global product search
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     Future<void>.microtask(_loadScreenState);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -160,14 +175,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             // Suggestions are optional — fail silently.
           }
           final MealCustomizationCartSelection? selection =
-              await showDialog<MealCustomizationCartSelection>(
-                context: context,
-                barrierDismissible: false,
-                builder: (_) => StandardMealCustomizationDialog(
-                  product: product,
-                  initialEditorData: editorData,
-                  suggestions: suggestions,
-                ),
+              await _showMealCustomizationDialog(
+                product: product,
+                editorData: editorData,
+                suggestions: suggestions,
               );
           if (!mounted || selection == null) {
             return;
@@ -217,14 +228,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           return;
         }
         final BreakfastCartSelection? selection =
-            await showDialog<BreakfastCartSelection>(
-              context: context,
-              barrierDismissible: false,
-              builder: (_) => SemanticBundleEditorDialog(
-                product: product,
-                initialEditorData: editorData,
-                choiceDefaults: _breakfastChoiceDefaults,
-              ),
+            await _showSemanticBundleDialog(
+              product: product,
+              editorData: editorData,
             );
         if (!mounted || selection == null) {
           return;
@@ -273,10 +279,60 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       return false;
     }
 
-    _showMessage(
-      '${AppStrings.orderCreated} ${AppStrings.orderNumber(createdTransaction.id)}',
-    );
+    _successfulCheckoutMessage =
+        '${AppStrings.orderCreated} ${AppStrings.orderNumber(createdTransaction.id)}';
     return true;
+  }
+
+  Future<void> _openCustomSaleDialog({CartItem? existingItem}) async {
+    final PosInteractionPolicy interactionPolicy = ref.read(
+      posInteractionProvider,
+    );
+    final PosInteractionController interactionController = ref.read(
+      posInteractionControllerProvider,
+    );
+    if (!interactionPolicy.canMutateCart) {
+      _showMessage(
+        interactionController.currentBlockMessage ?? AppStrings.accessDenied,
+      );
+      return;
+    }
+
+    final int customSalesLimitMinor = await ref
+        .read(settingsRepositoryProvider)
+        .getCustomSalesLimitMinor();
+    if (!mounted) {
+      return;
+    }
+    final CustomSaleWriteRequest? request =
+        await showDialog<CustomSaleWriteRequest>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => CustomSaleDialog(
+            customSalesLimitMinor: customSalesLimitMinor,
+            initialRequest: existingItem?.customSaleRequest,
+            onValidateRequest: (CustomSaleWriteRequest request) {
+              return ref
+                  .read(orderServiceProvider)
+                  .validateCustomSaleWriteRequest(request: request);
+            },
+          ),
+        );
+    if (!mounted || request == null) {
+      return;
+    }
+
+    final bool changed = existingItem == null
+        ? interactionController.addCustomSale(request)
+        : interactionController.updateCustomSale(
+            localId: existingItem.localId,
+            request: request,
+          );
+    if (!changed) {
+      _showMessage(
+        interactionController.currentBlockMessage ?? AppStrings.accessDenied,
+      );
+    }
   }
 
   Future<bool> _payNowFromCart(PaymentMethod method) async {
@@ -318,7 +374,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       return false;
     }
     if (paid) {
-      _shouldReturnToCategoryEntryAfterPayment = true;
+      _successfulCheckoutMessage = AppStrings.paymentCompleted;
     }
     return paid;
   }
@@ -328,16 +384,23 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     required PaymentMethod initialPaymentMethod,
     required Future<String?> Function(PaymentMethod paymentMethod) onSubmit,
   }) async {
+    // Capture these beforehand to prevent accessing ref/context if the dialog
+    // rebuilds during its closing animation after PosScreen is already deactivated.
+    final bool isSubmissionBlocked = !ref
+        .read(posInteractionProvider)
+        .canTakePayment;
+    final String? blockedMessage = ref.read(posInteractionProvider).lockMessage;
+
     final bool? result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) {
+      builder: (BuildContext dialogContext) {
         return PaymentDialog(
           totalAmountMinor: totalAmountMinor,
           initialPaymentMethod: initialPaymentMethod,
           onSubmit: onSubmit,
-          isSubmissionBlocked: !ref.read(posInteractionProvider).canTakePayment,
-          blockedMessage: ref.read(posInteractionProvider).lockMessage,
+          isSubmissionBlocked: isSubmissionBlocked,
+          blockedMessage: blockedMessage,
         );
       },
     );
@@ -371,12 +434,22 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           cartTotalMinor: cartState.totalMinor,
           subtotalMinor: cartState.subtotalMinor,
           modifierTotalMinor: cartState.modifierTotalMinor,
+          discount: cartState.discount,
           canPayNow: interactionPolicy.canTakePayment,
           canCreateOrder: interactionPolicy.canCreateOrder,
           canClearCart: interactionPolicy.canClearCart,
+          canEditDiscount:
+              interactionPolicy.canCreateOrder ||
+              interactionPolicy.canTakePayment,
           isBusy: interactionPolicy.isCheckoutBusy,
           onPay: _payNowFromCart,
           onCreateOrder: _createOrderFromCart,
+          onApplyDiscount: (discount) {
+            ref.read(cartNotifierProvider.notifier).applyDiscount(discount);
+          },
+          onRemoveDiscount: () {
+            ref.read(cartNotifierProvider.notifier).removeDiscount();
+          },
           onClearCart: () async {
             final bool cleared = ref
                 .read(posInteractionControllerProvider)
@@ -409,79 +482,96 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           },
     );
 
-    if (!mounted || !_shouldReturnToCategoryEntryAfterPayment) {
+    if (!mounted || _successfulCheckoutMessage == null) {
       return;
     }
 
-    await _completeSuccessfulPaymentTransition();
+    final String message = _successfulCheckoutMessage!;
+    _successfulCheckoutMessage = null;
+    await _completeCheckoutTransition(message);
   }
 
-  Future<void> _completeSuccessfulPaymentTransition() async {
-    if (_isCompletingSuccessfulPaymentTransition) {
+  Future<void> _completeCheckoutTransition(String message) async {
+    if (_isCompletingCheckoutTransition) {
       return;
     }
 
-    _isCompletingSuccessfulPaymentTransition = true;
-    _shouldReturnToCategoryEntryAfterPayment = false;
+    _isCompletingCheckoutTransition = true;
 
-    _navigateToCategoryEntryAfterReset(message: AppStrings.paymentCompleted);
+    try {
+      _resetPosSessionToPreOrder();
+
+      if (!mounted) {
+        return;
+      }
+
+      // Both Admin and Cashier unconditionally return to category entry.
+      _showMessage(message);
+      if (mounted) {
+        context.go('/pos');
+      }
+    } finally {
+      if (mounted) {
+        _isCompletingCheckoutTransition = false;
+      }
+    }
+  }
+
+  Future<MealCustomizationCartSelection?> _showMealCustomizationDialog({
+    required Product product,
+    required MealCustomizationPosEditorData editorData,
+    required List<MealQuickSuggestion> suggestions,
+  }) {
+    return showDialog<MealCustomizationCartSelection>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => StandardMealCustomizationDialog(
+        product: product,
+        initialEditorData: editorData,
+        suggestions: suggestions,
+      ),
+    );
+  }
+
+  Future<BreakfastCartSelection?> _showSemanticBundleDialog({
+    required Product product,
+    required BreakfastPosEditorData editorData,
+  }) {
+    return showDialog<BreakfastCartSelection>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => SemanticBundleEditorDialog(
+        product: product,
+        initialEditorData: editorData,
+        choiceDefaults: _breakfastChoiceDefaults,
+      ),
+    );
   }
 
   void _resetPosSessionToPreOrder() {
     ref.read(cartNotifierProvider.notifier).clearCart();
     ref.read(productsNotifierProvider.notifier).resetToPreOrder();
     ref.read(ordersNotifierProvider.notifier).resetPosSessionContext();
+    _clearSearch();
   }
 
-  void _navigateToCategoryEntryAfterReset({String? message}) {
-    _resetPosSessionToPreOrder();
-    if (message != null) {
-      _showMessage(message);
+  void _onSearchChanged(String query) {
+    final String trimmed = query.trim();
+    if (trimmed == _searchQuery) {
+      return;
     }
-    context.go('/pos/categories');
+    setState(() {
+      _searchQuery = trimmed;
+    });
   }
 
-  Future<void> _handleNavbarDestination(String route) async {
-    if (route != '/pos/categories') {
-      context.go(route);
-      return;
+  void _clearSearch() {
+    if (_searchQuery.isNotEmpty || _searchController.text.isNotEmpty) {
+      _searchController.clear();
+      setState(() {
+        _searchQuery = '';
+      });
     }
-
-    final CartState cartState = ref.read(cartNotifierProvider);
-    final OrdersState ordersState = ref.read(ordersNotifierProvider);
-    final bool hasActiveOrderContext =
-        !cartState.isEmpty || ordersState.selectedOrderId != null;
-
-    if (!hasActiveOrderContext) {
-      context.go(route);
-      return;
-    }
-
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Start new order?'),
-          content: const Text('Current order will be cleared.'),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text(AppStrings.cancel),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Confirm'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true || !mounted) {
-      return;
-    }
-
-    _navigateToCategoryEntryAfterReset();
   }
 
   @override
@@ -509,7 +599,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         PosProductPresentationPolicy.resolveDecisionForCategory(
           selectedCategory,
         ).mode;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: SectionAppBar(
@@ -517,12 +606,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         currentRoute: '/pos',
         currentUser: authState.currentUser,
         currentShift: shiftState.currentShift,
-        compactVisual: true,
-        onSelectDestination: _handleNavbarDestination,
-        onLogout: () {
-          ref.read(authNotifierProvider.notifier).logout();
-          context.go('/login');
-        },
+        onLogout: () => handleLogoutRequest(context, ref),
+        onOpenDrawer: () => triggerOpenDrawerAction(context, ref),
       ),
       body: SafeArea(
         child: Column(
@@ -575,123 +660,184 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                   return Padding(
                     padding: EdgeInsets.fromLTRB(
                       shellPadding,
-                      AppSizes.spacingMd,
+                      AppSizes.spacingSm,
                       shellPadding,
                       AppSizes.spacingMd,
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
-                        SizedBox(
-                          width: categoryPanelWidth,
-                          child: InteractionLockShell(
-                            isLocked: interactionPolicy.isInteractionLocked,
-                            message:
-                                interactionPolicy.lockMessage ??
-                                AppStrings.accessDenied,
-                            child: CategoryBar(
-                              categories: productsState.categories,
-                              categoryProductCounts:
-                                  productsState.categoryProductCounts,
-                              selectedCategoryId:
-                                  productsState.selectedCategoryId,
-                              isLoading: productsState.isLoading,
-                              onSelectCategory: (int? categoryId) async {
-                                if (productsState.isSortMode) {
-                                  _showMessage(_productSortLockedMessage);
-                                  return;
-                                }
-                                await ref
-                                    .read(productsNotifierProvider.notifier)
-                                    .selectCategory(categoryId);
-                                _prefetchMealSuggestionsForProducts(
-                                  ref.read(productsNotifierProvider).products,
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: columnGap),
                         Expanded(
                           child: InteractionLockShell(
                             isLocked: interactionPolicy.isInteractionLocked,
                             message:
                                 interactionPolicy.lockMessage ??
                                 AppStrings.accessDenied,
-                            child: ProductGrid(
-                              title: selectedCategoryTitle,
-                              productCount: productsState.products.length,
-                              products: productsState.products,
-                              sortDraft: productsState.sortDraft,
-                              isLoading: productsState.isLoading,
-                              viewportWidth: constraints.maxWidth,
-                              presentationMode: productPresentationMode,
-                              isSortMode: productsState.isSortMode,
-                              isSavingSortOrder:
-                                  productsState.isSavingSortOrder,
-                              hasSortChanges: productsState.hasSortChanges,
-                              onEnterSortMode:
-                                  interactionPolicy.isInteractionLocked ||
-                                      productsState.selectedCategoryId ==
-                                          null ||
-                                      productsState.products.isEmpty ||
-                                      productsState.isLoading
-                                  ? null
-                                  : () {
-                                      ref
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: <Widget>[
+                                SizedBox(
+                                  width: categoryPanelWidth,
+                                  child: CategoryBar(
+                                    categories: productsState.categories,
+                                    categoryProductCounts:
+                                        productsState.categoryProductCounts,
+                                    selectedCategoryId:
+                                        productsState.selectedCategoryId,
+                                    isLoading: productsState.isLoading,
+                                    onSelectCategory: (int? categoryId) async {
+                                      if (productsState.isSortMode) {
+                                        _showMessage(_productSortLockedMessage);
+                                        return;
+                                      }
+                                      _clearSearch();
+                                      await ref
                                           .read(
                                             productsNotifierProvider.notifier,
                                           )
-                                          .enterSortMode();
+                                          .selectCategory(categoryId);
+                                      _prefetchMealSuggestionsForProducts(
+                                        ref
+                                            .read(productsNotifierProvider)
+                                            .products,
+                                      );
                                     },
-                              onCancelSortMode: () {
-                                ref
-                                    .read(productsNotifierProvider.notifier)
-                                    .discardSortChanges();
-                              },
-                              onSaveSortOrder: () async {
-                                final bool success = await ref
-                                    .read(productsNotifierProvider.notifier)
-                                    .saveSortOrder();
-                                if (!mounted) {
-                                  return;
-                                }
-                                if (success) {
-                                  _showMessage(_productSortSavedMessage);
-                                  return;
-                                }
-                                final String? message = ref
-                                    .read(productsNotifierProvider)
-                                    .errorMessage;
-                                if (message != null) {
-                                  _showMessage(message);
-                                }
-                              },
-                              onMoveProductUp: (int index) {
-                                ref
-                                    .read(productsNotifierProvider.notifier)
-                                    .moveSortDraftUp(index);
-                              },
-                              onMoveProductDown: (int index) {
-                                ref
-                                    .read(productsNotifierProvider.notifier)
-                                    .moveSortDraftDown(index);
-                              },
-                              onMoveProductToTop: (int index) {
-                                ref
-                                    .read(productsNotifierProvider.notifier)
-                                    .moveSortDraftToTop(index);
-                              },
-                              onMoveProductToBottom: (int index) {
-                                ref
-                                    .read(productsNotifierProvider.notifier)
-                                    .moveSortDraftToBottom(index);
-                              },
-                              onTapProduct:
-                                  interactionPolicy.isInteractionLocked ||
-                                      productsState.isSortMode
-                                  ? null
-                                  : _onTapProduct,
+                                  ),
+                                ),
+                                SizedBox(width: columnGap),
+                                Expanded(
+                                  child: Builder(
+                                    builder: (BuildContext context) {
+                                      final bool isSearchActive =
+                                          _searchQuery.isNotEmpty;
+                                      final List<Product> searchResults =
+                                          isSearchActive
+                                          ? ref
+                                                .read(
+                                                  productsNotifierProvider
+                                                      .notifier,
+                                                )
+                                                .searchAllProducts(_searchQuery)
+                                          : const <Product>[];
+                                      final List<Product> visibleProducts =
+                                          isSearchActive
+                                          ? searchResults
+                                          : productsState.products;
+                                      final ProductCardPresentationMode
+                                      effectiveMode = isSearchActive
+                                          ? ProductCardPresentationMode.compact
+                                          : productPresentationMode;
+
+                                      return ProductGrid(
+                                        title: selectedCategoryTitle,
+                                        productCount: visibleProducts.length,
+                                        products: visibleProducts,
+                                        sortDraft: productsState.sortDraft,
+                                        isLoading: productsState.isLoading,
+                                        viewportWidth: constraints.maxWidth,
+                                        presentationMode: effectiveMode,
+                                        isSortMode: productsState.isSortMode,
+                                        isSavingSortOrder:
+                                            productsState.isSavingSortOrder,
+                                        hasSortChanges:
+                                            productsState.hasSortChanges,
+                                        searchController: _searchController,
+                                        onSearchChanged: _onSearchChanged,
+                                        isSearchActive: isSearchActive,
+                                        onEnterSortMode:
+                                            isSearchActive ||
+                                                interactionPolicy
+                                                    .isInteractionLocked ||
+                                                productsState
+                                                        .selectedCategoryId ==
+                                                    null ||
+                                                productsState
+                                                    .products
+                                                    .isEmpty ||
+                                                productsState.isLoading
+                                            ? null
+                                            : () {
+                                                ref
+                                                    .read(
+                                                      productsNotifierProvider
+                                                          .notifier,
+                                                    )
+                                                    .enterSortMode();
+                                              },
+                                        onCancelSortMode: () {
+                                          ref
+                                              .read(
+                                                productsNotifierProvider
+                                                    .notifier,
+                                              )
+                                              .discardSortChanges();
+                                        },
+                                        onSaveSortOrder: () async {
+                                          final bool success = await ref
+                                              .read(
+                                                productsNotifierProvider
+                                                    .notifier,
+                                              )
+                                              .saveSortOrder();
+                                          if (!mounted) {
+                                            return;
+                                          }
+                                          if (success) {
+                                            _showMessage(
+                                              _productSortSavedMessage,
+                                            );
+                                            return;
+                                          }
+                                          final String? message = ref
+                                              .read(productsNotifierProvider)
+                                              .errorMessage;
+                                          if (message != null) {
+                                            _showMessage(message);
+                                          }
+                                        },
+                                        onMoveProductUp: (int index) {
+                                          ref
+                                              .read(
+                                                productsNotifierProvider
+                                                    .notifier,
+                                              )
+                                              .moveSortDraftUp(index);
+                                        },
+                                        onMoveProductDown: (int index) {
+                                          ref
+                                              .read(
+                                                productsNotifierProvider
+                                                    .notifier,
+                                              )
+                                              .moveSortDraftDown(index);
+                                        },
+                                        onMoveProductToTop: (int index) {
+                                          ref
+                                              .read(
+                                                productsNotifierProvider
+                                                    .notifier,
+                                              )
+                                              .moveSortDraftToTop(index);
+                                        },
+                                        onMoveProductToBottom: (int index) {
+                                          ref
+                                              .read(
+                                                productsNotifierProvider
+                                                    .notifier,
+                                              )
+                                              .moveSortDraftToBottom(index);
+                                        },
+                                        onTapProduct:
+                                            interactionPolicy
+                                                    .isInteractionLocked ||
+                                                productsState.isSortMode
+                                            ? null
+                                            : _onTapProduct,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -713,6 +859,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                                       interactionPolicy.canClearCart),
                               isCheckoutLoading:
                                   interactionPolicy.isCheckoutBusy,
+                              onAddCustomSale: () {
+                                _openCustomSaleDialog();
+                              },
                               onIncreaseQuantity: (String localId) {
                                 interactionController.increaseQuantity(localId);
                               },
@@ -721,6 +870,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                               },
                               onRemoveLine: (String localId) {
                                 interactionController.removeItem(localId);
+                              },
+                              onEditCustomSale: (String localId) {
+                                final CartItem item = cartState.items
+                                    .firstWhere(
+                                      (CartItem item) =>
+                                          item.localId == localId,
+                                    );
+                                _openCustomSaleDialog(existingItem: item);
                               },
                               onCheckout: _openCheckoutSheet,
                             ),

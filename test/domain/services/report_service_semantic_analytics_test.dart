@@ -1046,7 +1046,7 @@ Future<_StandardMealReportFixture> _seedStandardMealReportFixture(
     mealAdjustmentProfileValidationService:
         MealAdjustmentProfileValidationService(repository: repository),
   );
-  final transaction = await orderService.createOrder(currentUser: cashierUser);
+  final transaction = await orderService.createPersistedEmptyDraftForTestingAccess(currentUser: cashierUser);
   final MealCustomizationRequest request = MealCustomizationRequest(
     productId: rootProductId,
     profileId: profileId,

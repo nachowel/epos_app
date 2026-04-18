@@ -25,6 +25,9 @@ class AnalyticsOverviewService {
       averageOrderValueMinor: metrics.averageOrderValueMinor,
       topProductsPreview: metrics.topProductsPreview,
       paymentSplitSummary: metrics.paymentSplitSummary,
+      customSalesRevenueMinor: metrics.customSalesRevenueMinor,
+      customSalesCount: metrics.customSalesCount,
+      customSalesAverageValueMinor: metrics.customSalesAverageValueMinor,
     );
   }
 
@@ -48,6 +51,17 @@ class AnalyticsOverviewService {
           .where((TopProductSummary summary) => summary.hasSales)
           .toList(growable: false),
       paymentSplitSummary: _normalizePaymentSplit(metrics.paymentSplitSummary),
+      customSalesRevenueMinor: _normalizeRevenueMinor(
+        metrics.customSalesRevenueMinor,
+      ),
+      customSalesCount: _normalizeOrderCount(metrics.customSalesCount),
+      customSalesAverageValueMinor: _normalizeAverageOrderValueMinor(
+        rawAverageOrderValueMinor: metrics.customSalesAverageValueMinor,
+        totalRevenueMinor: _normalizeRevenueMinor(
+          metrics.customSalesRevenueMinor,
+        ),
+        orderCount: _normalizeOrderCount(metrics.customSalesCount),
+      ),
     );
   }
 

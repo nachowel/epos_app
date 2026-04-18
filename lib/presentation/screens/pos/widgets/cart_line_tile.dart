@@ -18,6 +18,7 @@ class CartLineTile extends StatefulWidget {
     required this.onIncrease,
     required this.onDecrease,
     required this.onDelete,
+    this.onEdit,
     this.compactLayout = false,
     this.isSelected = false,
     this.onSelect,
@@ -28,6 +29,7 @@ class CartLineTile extends StatefulWidget {
   final VoidCallback onIncrease;
   final VoidCallback onDecrease;
   final VoidCallback onDelete;
+  final VoidCallback? onEdit;
   final bool compactLayout;
   final bool isSelected;
   final VoidCallback? onSelect;
@@ -86,21 +88,30 @@ class _CartLineTileState extends State<CartLineTile> {
     widget.onDelete();
   }
 
+  void _handleEdit() {
+    _handleSelect();
+    widget.onEdit?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final BreakfastCartSelection? breakfastSelection =
         widget.item.breakfastSelection;
     final MealCustomizationCartSelection? mealCustomizationSelection =
         widget.item.mealCustomizationSelection;
-    final List<_ModifierVisualEntry> modifierEntries = _buildModifierEntries(
-      breakfastSelection: breakfastSelection,
-      mealCustomizationSelection: mealCustomizationSelection,
-    );
+    final bool isCustomSale = widget.item.isCustomSale;
+    final List<_ModifierVisualEntry> modifierEntries = isCustomSale
+        ? _buildCustomSaleEntries()
+        : _buildModifierEntries(
+            breakfastSelection: breakfastSelection,
+            mealCustomizationSelection: mealCustomizationSelection,
+          );
     final _ModifierLineSet modifierLines = _buildModifierLineSet(
       modifierEntries,
     );
-    final String lineDisplayName =
-        mealCustomizationSelection?.displayName ?? widget.item.productName;
+    final String lineDisplayName = isCustomSale
+        ? '⚠ Custom Sale'
+        : (mealCustomizationSelection?.displayName ?? widget.item.productName);
     final bool hasChoiceLine =
         modifierLines.choiceLine != null &&
         modifierLines.choiceLine!.trim().isNotEmpty;
@@ -108,13 +119,17 @@ class _CartLineTileState extends State<CartLineTile> {
     final bool isActionActive = widget.isSelected || _isInteractionHighlighted;
 
     final Color backgroundColor = widget.isSelected
-        ? AppColors.primaryLight
+        ? (isCustomSale ? AppColors.warningLight : AppColors.primaryLight)
         : (_isInteractionHighlighted
-              ? AppColors.primaryLighter
+              ? (isCustomSale
+                    ? AppColors.warningLight
+                    : AppColors.primaryLighter)
               : Colors.transparent);
     final Color accentColor = widget.isSelected
-        ? AppColors.primaryStrong
-        : (_isInteractionHighlighted ? AppColors.primary : Colors.transparent);
+        ? (isCustomSale ? AppColors.warningStrong : AppColors.primaryStrong)
+        : (_isInteractionHighlighted
+              ? (isCustomSale ? AppColors.warning : AppColors.primary)
+              : Colors.transparent);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 110),
@@ -176,9 +191,11 @@ class _CartLineTileState extends State<CartLineTile> {
                             quantity: widget.item.quantity,
                             compactLayout: widget.compactLayout,
                             isActive: isActionActive,
+                            isCustomSale: isCustomSale,
                             onDecrease: _handleDecrease,
                             onIncrease: _handleIncrease,
                             onDelete: _handleDelete,
+                            onEdit: widget.onEdit == null ? null : _handleEdit,
                           ),
                         ],
                       ),
@@ -237,6 +254,25 @@ class _CartLineTileState extends State<CartLineTile> {
       return _buildMealCustomizationEntries(mealCustomizationSelection);
     }
     return _buildLegacyModifierEntries();
+  }
+
+  List<_ModifierVisualEntry> _buildCustomSaleEntries() {
+    final List<_ModifierVisualEntry> entries = <_ModifierVisualEntry>[
+      const _ModifierVisualEntry(
+        text: 'Manual price item',
+        kind: _ModifierVisualKind.neutral,
+      ),
+    ];
+    final String? note = widget.item.customSaleNote?.trim();
+    if (note != null && note.isNotEmpty) {
+      entries.add(
+        _ModifierVisualEntry(
+          text: 'Note: $note',
+          kind: _ModifierVisualKind.neutral,
+        ),
+      );
+    }
+    return entries;
   }
 
   List<_ModifierVisualEntry> _buildBreakfastEntries(
@@ -700,18 +736,22 @@ class _TopRowActions extends StatelessWidget {
     required this.quantity,
     required this.compactLayout,
     required this.isActive,
+    required this.isCustomSale,
     required this.onDecrease,
     required this.onIncrease,
     required this.onDelete,
+    this.onEdit,
   });
 
   final int totalMinor;
   final int quantity;
   final bool compactLayout;
   final bool isActive;
+  final bool isCustomSale;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
   final VoidCallback onDelete;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -723,7 +763,9 @@ class _TopRowActions extends StatelessWidget {
         color: isActive ? AppColors.surface : AppColors.surfaceAlt,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isActive ? AppColors.primary : AppColors.border,
+          color: isCustomSale
+              ? (isActive ? AppColors.warning : AppColors.warningLight)
+              : (isActive ? AppColors.primary : AppColors.border),
         ),
       ),
       child: Row(
@@ -736,18 +778,29 @@ class _TopRowActions extends StatelessWidget {
             style: TextStyle(
               fontSize: 13.4,
               fontWeight: FontWeight.w800,
-              color: isActive ? AppColors.primaryDarker : AppColors.textPrimary,
+              color: isCustomSale
+                  ? AppColors.warningStrong
+                  : (isActive
+                        ? AppColors.primaryDarker
+                        : AppColors.textPrimary),
               height: 1,
             ),
           ),
           const SizedBox(width: 5),
-          _QuantityControlGroup(
-            quantity: quantity,
-            compactLayout: compactLayout,
-            isActive: isActive,
-            onDecrease: onDecrease,
-            onIncrease: onIncrease,
-          ),
+          if (isCustomSale)
+            _EditButton(
+              compactLayout: compactLayout,
+              isActive: isActive,
+              onPressed: onEdit,
+            )
+          else
+            _QuantityControlGroup(
+              quantity: quantity,
+              compactLayout: compactLayout,
+              isActive: isActive,
+              onDecrease: onDecrease,
+              onIncrease: onIncrease,
+            ),
           const SizedBox(width: 2),
           _DeleteButton(
             onPressed: onDelete,
@@ -755,6 +808,44 @@ class _TopRowActions extends StatelessWidget {
             isActive: isActive,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _EditButton extends StatelessWidget {
+  const _EditButton({
+    required this.compactLayout,
+    required this.isActive,
+    required this.onPressed,
+  });
+
+  final bool compactLayout;
+  final bool isActive;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final double buttonSize = compactLayout ? 34 : 36;
+
+    return Material(
+      color: isActive ? AppColors.warningLight : AppColors.surfaceAlt,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        splashColor: AppColors.warningLight,
+        highlightColor: AppColors.warningLight,
+        hoverColor: AppColors.warningLight,
+        child: SizedBox(
+          width: buttonSize,
+          height: buttonSize,
+          child: const Icon(
+            Icons.edit_outlined,
+            color: AppColors.warningStrong,
+            size: 17,
+          ),
+        ),
       ),
     );
   }

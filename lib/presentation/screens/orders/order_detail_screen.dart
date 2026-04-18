@@ -27,6 +27,7 @@ import '../../../domain/models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/orders_provider.dart';
 import '../../providers/shift_provider.dart';
+import '../../widgets/logout_confirmation.dart';
 import '../../widgets/order_status_chip.dart';
 import '../../widgets/section_app_bar.dart';
 import '../pos/widgets/payment_dialog.dart';
@@ -763,6 +764,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         !isActionLocked;
     final bool canReprintKitchen =
         details != null &&
+        details.isKitchenRequired &&
         OrderLifecyclePolicy.canPrintKitchenTicket(
           details.transaction.status,
         ) &&
@@ -772,6 +774,12 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         OrderLifecyclePolicy.canPrintReceipt(details.transaction.status) &&
         !isActionLocked;
     final OrderPrintStatusView kitchenPrintStatus = details == null
+        ? const OrderPrintStatusView(
+            isVisible: false,
+            isFailure: false,
+            message: null,
+          )
+        : !details.isKitchenRequired
         ? const OrderPrintStatusView(
             isVisible: false,
             isFailure: false,
@@ -804,10 +812,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         currentRoute: '/orders',
         currentUser: authState.currentUser,
         currentShift: shiftState.currentShift,
-        onLogout: () {
-          ref.read(authNotifierProvider.notifier).logout();
-          context.go('/login');
-        },
+        onLogout: () => handleLogoutRequest(context, ref),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

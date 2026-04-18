@@ -135,6 +135,42 @@ void main() {
     });
 
     test(
+      'verifyAdminPin returns an admin without opening or transferring shift ownership',
+      () async {
+        final db = createTestDatabase();
+        addTearDown(db.close);
+
+        await insertUser(
+          db,
+          name: 'Cashier',
+          role: 'cashier',
+          pin: AuthSecurity.hashPin('1111'),
+        );
+        final int adminId = await insertUser(
+          db,
+          name: 'Approver',
+          role: 'admin',
+          pin: AuthSecurity.hashPin('9999'),
+        );
+
+        final ShiftRepository shiftRepository = ShiftRepository(db);
+        final service = AuthService(
+          UserRepository(db),
+          ShiftSessionService(shiftRepository),
+          config,
+        );
+
+        final User? admin = await service.verifyAdminPin('9999');
+        final Shift? openShift = await shiftRepository.getOpenShift();
+
+        expect(admin, isNotNull);
+        expect(admin!.id, adminId);
+        expect(admin.role, UserRole.admin);
+        expect(openShift, isNull);
+      },
+    );
+
+    test(
       'concurrent first-login race reuses the existing open shift instead of failing the second login',
       () async {
         final db = createTestDatabase();

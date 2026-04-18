@@ -240,7 +240,7 @@ class AdminService {
       );
     }
     final List<Product> categoryProducts = await _productRepository
-        .getByCategory(id, activeOnly: false);
+        .getByCategory(id, activeOnly: false, includeCustomProducts: true);
     final List<Product> archivedProducts = categoryProducts
         .where((Product product) => !product.isActive)
         .toList(growable: false);
@@ -474,6 +474,7 @@ class AdminService {
   }) async {
     _ensureAdmin(user);
     final Product before = await _requireExistingProduct(id);
+    _ensureProductIsOperatorManaged(before);
     await _ensureProductLifecycleGuardrails(
       product: before,
       nextIsActive: isActive,
@@ -530,6 +531,7 @@ class AdminService {
   }) async {
     _ensureAdmin(user);
     final Product before = await _requireExistingProduct(id);
+    _ensureProductIsOperatorManaged(before);
     await _ensureProductLifecycleGuardrails(
       product: before,
       nextIsActive: isActive,
@@ -553,6 +555,7 @@ class AdminService {
   }) async {
     _ensureAdmin(user);
     final Product before = await _requireExistingProduct(id);
+    _ensureProductIsOperatorManaged(before);
     final bool updated = await _productRepository.toggleVisibilityOnPos(
       id,
       isVisibleOnPos,
@@ -574,6 +577,7 @@ class AdminService {
   }) async {
     _ensureAdmin(user);
     final Product product = await _requireExistingProduct(id);
+    _ensureProductIsOperatorManaged(product);
     final ({int setConfigCount, int requiredChoiceCount, int extrasPoolCount})
     semanticReferences = await _productRepository.loadSemanticReferenceSummary(
       id,
@@ -1183,6 +1187,7 @@ class AdminService {
     if (product == null) {
       throw ValidationException('Product selection is required.');
     }
+    _ensureProductIsOperatorManaged(product);
   }
 
   Future<Product> _requireExistingProduct(int productId) async {
@@ -1209,6 +1214,15 @@ class AdminService {
 
     throw ValidationException(
       'This product is referenced by ${mealReferences.affectedProfileCount} active meal-adjustment profile(s). Archiving is blocked until those profiles are updated.',
+    );
+  }
+
+  void _ensureProductIsOperatorManaged(Product product) {
+    if (!product.isCustom) {
+      return;
+    }
+    throw ValidationException(
+      'The system Custom Sale product is internal and cannot be edited, archived, or deleted.',
     );
   }
 

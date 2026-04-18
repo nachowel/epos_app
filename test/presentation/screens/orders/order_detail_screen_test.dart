@@ -198,6 +198,106 @@ void main() {
   );
 
   testWidgets(
+    'custom-only paid order disables kitchen reprint and keeps receipt reprint available',
+    (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      final int shiftId = await insertShift(db, openedBy: cashierId);
+      final int categoryId = await insertCategory(db, name: 'Misc');
+      final int customProductId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Custom Sale',
+        priceMinor: 0,
+        isVisibleOnPos: false,
+        isCustom: true,
+      );
+      final int transactionId = await insertTransaction(
+        db,
+        uuid: 'paid-detail-custom-only',
+        shiftId: shiftId,
+        userId: cashierId,
+        status: 'paid',
+        totalAmountMinor: 700,
+      );
+      await db
+          .into(db.transactionLines)
+          .insert(
+            app_db.TransactionLinesCompanion.insert(
+              uuid: 'paid-detail-custom-line',
+              transactionId: transactionId,
+              productId: customProductId,
+              productName: 'Custom Sale',
+              unitPriceMinor: 700,
+              lineTotalMinor: 700,
+              customNote: const Value<String?>('Manual item'),
+              createdByUserId: Value<int?>(cashierId),
+            ),
+          );
+      await insertPayment(
+        db,
+        uuid: 'paid-detail-custom-payment',
+        transactionId: transactionId,
+        method: 'card',
+        amountMinor: 700,
+        paidAt: DateTime(2026, 4, 14, 9, 45),
+      );
+      await insertPrintJob(
+        db,
+        transactionId: transactionId,
+        target: PrintJobTarget.receipt,
+        status: 'printed',
+      );
+
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(authNotifierProvider.notifier)
+          .loadUserById(cashierId);
+      await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
+
+      await tester.pumpWidget(
+        _localizedTestApp(
+          container,
+          child: OrderDetailScreen(transactionId: transactionId),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final OutlinedButton kitchenButton = tester.widget<OutlinedButton>(
+        find.descendant(
+          of: find.byKey(const ValueKey<String>('detail-kitchen-print')),
+          matching: find.byType(OutlinedButton),
+        ),
+      );
+      final OutlinedButton receiptButton = tester.widget<OutlinedButton>(
+        find.descendant(
+          of: find.byKey(const ValueKey<String>('detail-receipt-print')),
+          matching: find.byType(OutlinedButton),
+        ),
+      );
+
+      expect(kitchenButton.onPressed, isNull);
+      expect(receiptButton.onPressed, isNotNull);
+      expect(find.text(AppStrings.kitchenPrintPending), findsNothing);
+    },
+  );
+
+  testWidgets(
     'missing operator user falls back to unknown user and empty modifiers stay stable',
     (WidgetTester tester) async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -205,7 +305,11 @@ void main() {
       final db = createTestDatabase();
       addTearDown(db.close);
 
-      final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
       final int missingUserId = await insertUser(
         db,
         name: 'Ghost Operator',
@@ -227,16 +331,18 @@ void main() {
         status: 'paid',
         totalAmountMinor: 250,
       );
-      await db.into(db.transactionLines).insert(
-        app_db.TransactionLinesCompanion.insert(
-          uuid: 'detail-missing-user-line',
-          transactionId: transactionId,
-          productId: productId,
-          productName: 'Americano',
-          unitPriceMinor: 250,
-          lineTotalMinor: 250,
-        ),
-      );
+      await db
+          .into(db.transactionLines)
+          .insert(
+            app_db.TransactionLinesCompanion.insert(
+              uuid: 'detail-missing-user-line',
+              transactionId: transactionId,
+              productId: productId,
+              productName: 'Americano',
+              unitPriceMinor: 250,
+              lineTotalMinor: 250,
+            ),
+          );
       await insertPayment(
         db,
         uuid: 'detail-missing-user-payment',
@@ -250,10 +356,9 @@ void main() {
         target: PrintJobTarget.receipt,
         status: 'printed',
       );
-      await db.customStatement(
-        'DELETE FROM users WHERE id = ?',
-        <Object?>[missingUserId],
-      );
+      await db.customStatement('DELETE FROM users WHERE id = ?', <Object?>[
+        missingUserId,
+      ]);
 
       final ProviderContainer container = ProviderContainer(
         overrides: <Override>[
@@ -289,67 +394,72 @@ void main() {
     },
   );
 
-  testWidgets('inactive operator user name still renders on paid order detail', (
-    WidgetTester tester,
-  ) async {
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final db = createTestDatabase();
-    addTearDown(db.close);
+  testWidgets(
+    'inactive operator user name still renders on paid order detail',
+    (WidgetTester tester) async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final db = createTestDatabase();
+      addTearDown(db.close);
 
-    final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
-    final int inactiveOperatorId = await insertUser(
-      db,
-      name: 'Former Cashier',
-      role: 'cashier',
-      isActive: false,
-    );
-    final int shiftId = await insertShift(db, openedBy: cashierId);
-    final int transactionId = await insertTransaction(
-      db,
-      uuid: 'detail-inactive-user',
-      shiftId: shiftId,
-      userId: inactiveOperatorId,
-      status: 'paid',
-      totalAmountMinor: 500,
-    );
-    await insertPayment(
-      db,
-      uuid: 'detail-inactive-user-payment',
-      transactionId: transactionId,
-      method: 'cash',
-      amountMinor: 500,
-    );
-    await insertPrintJob(
-      db,
-      transactionId: transactionId,
-      target: PrintJobTarget.receipt,
-      status: 'printed',
-    );
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      final int inactiveOperatorId = await insertUser(
+        db,
+        name: 'Former Cashier',
+        role: 'cashier',
+        isActive: false,
+      );
+      final int shiftId = await insertShift(db, openedBy: cashierId);
+      final int transactionId = await insertTransaction(
+        db,
+        uuid: 'detail-inactive-user',
+        shiftId: shiftId,
+        userId: inactiveOperatorId,
+        status: 'paid',
+        totalAmountMinor: 500,
+      );
+      await insertPayment(
+        db,
+        uuid: 'detail-inactive-user-payment',
+        transactionId: transactionId,
+        method: 'cash',
+        amountMinor: 500,
+      );
+      await insertPrintJob(
+        db,
+        transactionId: transactionId,
+        target: PrintJobTarget.receipt,
+        status: 'printed',
+      );
 
-    final ProviderContainer container = ProviderContainer(
-      overrides: <Override>[
-        appDatabaseProvider.overrideWithValue(db),
-        sharedPreferencesProvider.overrideWithValue(prefs),
-      ],
-    );
-    addTearDown(container.dispose);
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    await container
-        .read(authNotifierProvider.notifier)
-        .loadUserById(cashierId);
-    await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
+      await container
+          .read(authNotifierProvider.notifier)
+          .loadUserById(cashierId);
+      await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
 
-    await tester.pumpWidget(
-      _localizedTestApp(
-        container,
-        child: OrderDetailScreen(transactionId: transactionId),
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _localizedTestApp(
+          container,
+          child: OrderDetailScreen(transactionId: transactionId),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Former Cashier'), findsOneWidget);
-  });
+      expect(find.text('Former Cashier'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'sent order detail shows pay and cancel but blocks send and discard',

@@ -5,6 +5,7 @@ import '../../domain/models/meal_customization.dart';
 import '../../domain/models/payment.dart';
 import '../../domain/models/product.dart';
 import '../../domain/models/breakfast_cart_selection.dart';
+import '../../domain/models/custom_sale.dart';
 import '../../domain/models/shift.dart';
 import '../../domain/models/transaction.dart';
 import '../../domain/models/user.dart';
@@ -118,6 +119,27 @@ class PosInteractionController {
           breakfastSelection: breakfastSelection,
           mealCustomizationSelection: mealCustomizationSelection,
         );
+    return true;
+  }
+
+  bool addCustomSale(CustomSaleWriteRequest request) {
+    if (!_policy.canMutateCart) {
+      return false;
+    }
+
+    _ref.read(cartNotifierProvider.notifier).addCustomSale(request);
+    return true;
+  }
+
+  bool updateCustomSale({
+    required String localId,
+    required CustomSaleWriteRequest request,
+  }) {
+    if (!_policy.canMutateCart) {
+      return false;
+    }
+
+    _ref.read(cartNotifierProvider.notifier).updateCustomSale(localId, request);
     return true;
   }
 

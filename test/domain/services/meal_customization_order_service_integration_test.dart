@@ -33,7 +33,7 @@ void main() {
         final TransactionRepository transactionRepository =
             TransactionRepository(db);
         final User user = fixture.cashierUser;
-        final order = await service.createOrder(currentUser: user);
+        final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: user);
         final MealCustomizationRequest request = fixture.buildRequest(
           removeSide: true,
           swapTargetItemProductId: fixture.mainSwapId,
@@ -96,7 +96,7 @@ void main() {
 
       final _MealFixture fixture = await _seedMealFixture(db);
       final OrderService service = _buildService(db, fixture.repository);
-      final order = await service.createOrder(currentUser: fixture.cashierUser);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: fixture.cashierUser);
 
       final TransactionLine firstLine = await service.addProductToOrder(
         transactionId: order.id,
@@ -149,7 +149,7 @@ void main() {
 
         final _MealFixture fixture = await _seedMealFixture(db);
         final OrderService service = _buildService(db, fixture.repository);
-        final order = await service.createOrder(
+        final order = await service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashierUser,
         );
 
@@ -297,7 +297,7 @@ void main() {
           createdAt: DateTime.now(),
         );
 
-        final order = await service.createOrder(currentUser: user);
+        final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: user);
         final line = await service.addProductToOrder(
           transactionId: order.id,
           productId: mealProductId,
@@ -419,7 +419,7 @@ void main() {
         isActive: true,
         createdAt: DateTime.now(),
       );
-      final order = await service.createOrder(currentUser: user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: user);
 
       await expectLater(
         service.addProductToOrder(
@@ -514,7 +514,7 @@ void main() {
           isActive: true,
           createdAt: DateTime.now(),
         );
-        final Transaction order = await service.createOrder(currentUser: user);
+        final Transaction order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: user);
 
         await expectLater(
           service.addProductToOrder(
@@ -553,7 +553,7 @@ void main() {
               ),
               productRepository: ProductRepository(db),
             );
-        final order = await service.createOrder(
+        final order = await service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashierUser,
         );
         final MealCustomizationRequest request = fixture.buildRequest(
@@ -644,7 +644,7 @@ void main() {
         final OrderService service = _buildService(db, fixture.repository);
         final TransactionRepository transactionRepository =
             TransactionRepository(db);
-        final Transaction order = await service.createOrder(
+        final Transaction order = await service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashierUser,
         );
         final MealCustomizationRequest initialRequest = fixture.buildRequest(
@@ -711,7 +711,7 @@ void main() {
               ),
               productRepository: ProductRepository(db),
             );
-        final Transaction order = await service.createOrder(
+        final Transaction order = await service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashierUser,
         );
 
@@ -769,7 +769,7 @@ void main() {
         final OrderService service = _buildService(db, fixture.repository);
         final TransactionRepository transactionRepository =
             TransactionRepository(db);
-        final Transaction order = await service.createOrder(
+        final Transaction order = await service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashierUser,
         );
         final TransactionLine line = await service.addProductToOrder(
@@ -827,7 +827,7 @@ void main() {
         final OrderService service = _buildService(db, fixture.repository);
         final TransactionRepository transactionRepository =
             TransactionRepository(db);
-        final Transaction order = await service.createOrder(
+        final Transaction order = await service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashierUser,
         );
         final MealCustomizationRequest targetRequest = fixture.buildRequest(
@@ -891,7 +891,7 @@ void main() {
         final OrderService service = _buildService(db, fixture.repository);
         final TransactionRepository transactionRepository =
             TransactionRepository(db);
-        final Transaction order = await service.createOrder(
+        final Transaction order = await service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashierUser,
         );
         final TransactionLine line = await service.addProductToOrder(

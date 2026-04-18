@@ -10,7 +10,6 @@ import 'package:epos_app/presentation/providers/cart_provider.dart';
 import 'package:epos_app/presentation/providers/orders_provider.dart';
 import 'package:epos_app/presentation/providers/products_provider.dart';
 import 'package:epos_app/presentation/providers/shift_provider.dart';
-import 'package:epos_app/presentation/screens/pos/category_entry_screen.dart';
 import 'package:epos_app/presentation/screens/pos/pos_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -24,160 +23,7 @@ import '../../../support/test_database.dart';
 void main() {
   group('POS payment reset flow', () {
     testWidgets(
-      'navbar Categories entry navigates directly when no order is active',
-      (WidgetTester tester) async {
-        tester.view.devicePixelRatio = 1.0;
-        tester.view.physicalSize = const Size(1800, 1200);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        addTearDown(tester.view.resetPhysicalSize);
-
-        SharedPreferences.setMockInitialValues(<String, Object>{});
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
-        final db = createTestDatabase();
-        addTearDown(db.close);
-
-        final int cashierId = await insertUser(
-          db,
-          name: 'Cashier',
-          role: 'cashier',
-        );
-        final int categoryId = await insertCategory(
-          db,
-          name: 'Drinks',
-          sortOrder: 0,
-        );
-        await insertProduct(
-          db,
-          categoryId: categoryId,
-          name: 'Tea',
-          priceMinor: 250,
-        );
-        await insertShift(db, openedBy: cashierId);
-
-        final ProviderContainer container = ProviderContainer(
-          overrides: <Override>[
-            appDatabaseProvider.overrideWithValue(db),
-            sharedPreferencesProvider.overrideWithValue(prefs),
-          ],
-        );
-        addTearDown(container.dispose);
-
-        await container
-            .read(authNotifierProvider.notifier)
-            .loadUserById(cashierId);
-        await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
-
-        await tester.pumpWidget(
-          _routerApp(container, initialLocation: '/pos?categoryId=$categoryId'),
-        );
-        await tester.pumpAndSettle();
-
-        await tester.tap(
-          find.byKey(
-            const ValueKey<String>('section_app_bar_inline_nav_/pos/categories'),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        expect(find.byType(CategoryEntryScreen), findsOneWidget);
-        expect(find.text('Start new order?'), findsNothing);
-      },
-    );
-
-    testWidgets(
-      'navbar Categories entry confirms before clearing an active cart',
-      (WidgetTester tester) async {
-        tester.view.devicePixelRatio = 1.0;
-        tester.view.physicalSize = const Size(1800, 1200);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        addTearDown(tester.view.resetPhysicalSize);
-
-        SharedPreferences.setMockInitialValues(<String, Object>{});
-        final SharedPreferences prefs = await SharedPreferences.getInstance();
-        final db = createTestDatabase();
-        addTearDown(db.close);
-
-        final int cashierId = await insertUser(
-          db,
-          name: 'Cashier',
-          role: 'cashier',
-        );
-        final int categoryId = await insertCategory(
-          db,
-          name: 'Drinks',
-          sortOrder: 0,
-        );
-        final int productId = await insertProduct(
-          db,
-          categoryId: categoryId,
-          name: 'Tea',
-          priceMinor: 250,
-        );
-        await insertShift(db, openedBy: cashierId);
-
-        final ProviderContainer container = ProviderContainer(
-          overrides: <Override>[
-            appDatabaseProvider.overrideWithValue(db),
-            sharedPreferencesProvider.overrideWithValue(prefs),
-          ],
-        );
-        addTearDown(container.dispose);
-
-        await container
-            .read(authNotifierProvider.notifier)
-            .loadUserById(cashierId);
-        await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
-        container
-            .read(cartNotifierProvider.notifier)
-            .addProduct(_product(productId, categoryId));
-
-        await tester.pumpWidget(
-          _routerApp(container, initialLocation: '/pos?categoryId=$categoryId'),
-        );
-        await tester.pumpAndSettle();
-
-        await tester.tap(
-          find.byKey(
-            const ValueKey<String>('section_app_bar_inline_nav_/pos/categories'),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        expect(find.text('Start new order?'), findsOneWidget);
-        expect(find.text('Current order will be cleared.'), findsOneWidget);
-
-        await tester.tap(find.text(AppStrings.cancel));
-        await tester.pumpAndSettle();
-
-        expect(find.byType(PosScreen), findsOneWidget);
-        expect(container.read(cartNotifierProvider).items, hasLength(1));
-        expect(
-          container.read(productsNotifierProvider).selectedCategoryId,
-          categoryId,
-        );
-
-        await tester.tap(
-          find.byKey(
-            const ValueKey<String>('section_app_bar_inline_nav_/pos/categories'),
-          ),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Confirm'));
-        await tester.pumpAndSettle();
-
-        expect(find.byType(CategoryEntryScreen), findsOneWidget);
-        expect(container.read(cartNotifierProvider).items, isEmpty);
-        expect(
-          container.read(productsNotifierProvider).selectedCategoryId,
-          isNull,
-        );
-        expect(container.read(productsNotifierProvider).products, isEmpty);
-        expect(container.read(ordersNotifierProvider).selectedOrderId, isNull);
-      },
-    );
-
-    testWidgets(
-      'successful payment clears POS state and returns to Category Entry',
+      'successful payment clears POS state and keeps cashier on POS',
       (WidgetTester tester) async {
         tester.view.devicePixelRatio = 1.0;
         tester.view.physicalSize = const Size(1800, 1200);
@@ -249,13 +95,13 @@ void main() {
         await tester.tap(find.byKey(const ValueKey<String>('payment-submit')));
         await _pumpOverlayTransition(tester, steps: 16);
 
-        expect(find.byType(CategoryEntryScreen), findsOneWidget);
+        expect(find.byType(PosScreen), findsOneWidget);
         expect(container.read(cartNotifierProvider).items, isEmpty);
         expect(
           container.read(productsNotifierProvider).selectedCategoryId,
-          isNull,
+          categoryId,
         );
-        expect(container.read(productsNotifierProvider).products, isEmpty);
+        expect(container.read(productsNotifierProvider).products, isNotEmpty);
         expect(container.read(ordersNotifierProvider).selectedOrderId, isNull);
         expect(container.read(ordersNotifierProvider).errorMessage, isNull);
         expect(ordersNotifier.createOrderCalls, 1);
@@ -331,7 +177,6 @@ void main() {
       await _pumpOverlayTransition(tester);
 
       expect(find.byType(PosScreen), findsOneWidget);
-      expect(find.byType(CategoryEntryScreen), findsNothing);
       expect(container.read(cartNotifierProvider).items, hasLength(1));
       expect(
         container.read(productsNotifierProvider).selectedCategoryId,
@@ -409,7 +254,6 @@ void main() {
       await _pumpOverlayTransition(tester);
 
       expect(find.byType(PosScreen), findsOneWidget);
-      expect(find.byType(CategoryEntryScreen), findsNothing);
       expect(
         find.text(_FailedPayNowOrdersNotifier.failureMessage),
         findsOneWidget,
@@ -439,10 +283,6 @@ Widget _routerApp(
             state.uri.queryParameters['categoryId'] ?? '',
           ),
         ),
-      ),
-      GoRoute(
-        path: '/pos/categories',
-        builder: (_, __) => const CategoryEntryScreen(),
       ),
       GoRoute(
         path: '/login',

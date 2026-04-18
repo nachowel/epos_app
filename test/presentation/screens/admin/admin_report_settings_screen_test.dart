@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart';
 import 'package:epos_app/core/providers/app_providers.dart';
 import 'package:epos_app/data/database/app_database.dart';
 import 'package:epos_app/data/repositories/settings_repository.dart';
@@ -17,6 +16,44 @@ import '../../../support/test_database.dart';
 
 void main() {
   group('AdminReportSettingsScreen', () {
+    testWidgets(
+      'custom sale limit field is visible on the real admin settings screen',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(1440, 2200);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        final AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+
+        final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+        final SettingsRepository repository = SettingsRepository(db);
+        await repository.updateCustomSalesLimitMinor(250000, userId: adminId);
+
+        final ProviderContainer container = ProviderContainer(
+          overrides: <Override>[
+            appDatabaseProvider.overrideWithValue(db),
+            sharedPreferencesProvider.overrideWithValue(prefs),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container.read(authNotifierProvider.notifier).loadUserById(adminId);
+        await container.read(settingsNotifierProvider.notifier).load();
+
+        await tester.pumpWidget(_adminSettingsApp(container));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AdminReportSettingsScreen), findsOneWidget);
+        expect(find.byKey(const Key('custom-sale-limit-field')), findsOneWidget);
+        expect(find.text('Custom Sale Limit (£)'), findsOneWidget);
+        expect(find.widgetWithText(TextField, '2500.00'), findsOneWidget);
+      },
+    );
+
     testWidgets(
       'cap amount field shows editable currency value instead of raw minor units',
       (WidgetTester tester) async {

@@ -9,12 +9,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   const List<String> cashierNavLabels = <String>[
-    'Dashboard',
     'Categories',
     'POS',
     'Open Orders',
     'Reports',
-    'Shift Management',
   ];
   final User cashier = User(
     id: 1,
@@ -36,19 +34,7 @@ void main() {
     status: ShiftStatus.open,
   );
 
-  test('wide widths stay inline before any collapse', () {
-    expect(
-      SectionAppBar.debugNavigationStage(
-        viewportWidth: 1800,
-        compactVisual: false,
-        navLabels: cashierNavLabels,
-        logoutLabel: 'Logout',
-      ),
-      'wide',
-    );
-  });
-
-  test('medium widths now collapse into the structured navigation stage', () {
+  test('reduced cashier navigation stays inline at medium widths', () {
     expect(
       SectionAppBar.debugNavigationStage(
         viewportWidth: 1120,
@@ -56,12 +42,15 @@ void main() {
         navLabels: cashierNavLabels,
         logoutLabel: 'Logout',
       ),
-      'collapsed',
+      'compact',
     );
+  });
+
+  test('narrow widths still collapse into the structured navigation stage', () {
     expect(
       SectionAppBar.debugNavigationStage(
-        viewportWidth: 1080,
-        compactVisual: true,
+        viewportWidth: 360,
+        compactVisual: false,
         navLabels: cashierNavLabels,
         logoutLabel: 'Logout',
       ),
@@ -69,66 +58,70 @@ void main() {
     );
   });
 
-  testWidgets('narrow layouts collapse into the structured navigation sheet', (
-    WidgetTester tester,
-  ) async {
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.binding.setSurfaceSize(const Size(760, 900));
+  testWidgets(
+    'cashier header shows shared shell navigation without admin tabs',
+    (WidgetTester tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.binding.setSurfaceSize(const Size(760, 900));
 
-    await tester.pumpWidget(
-      _buildTestApp(
-        child: Scaffold(
-          appBar: SectionAppBar(
-            title: 'POS',
-            currentRoute: '/pos',
-            currentUser: cashier,
-            currentShift: openShift,
-            onLogout: () {},
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: Scaffold(
+            appBar: SectionAppBar(
+              title: 'POS',
+              currentRoute: '/pos',
+              currentUser: cashier,
+              currentShift: openShift,
+              onLogout: () {},
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey<String>('section_app_bar_nav_menu_button')),
-      findsOneWidget,
-    );
-    expect(find.text('EPOS'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('section_app_bar_nav_menu_button')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey<String>('section_app_bar_nav_menu_button')),
+      );
+      await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.byKey(const ValueKey<String>('section_app_bar_nav_menu_button')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(const ValueKey<String>('section_app_bar_nav_menu_sheet')),
-      findsOneWidget,
-    );
-    expect(find.text('Navigation'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey<String>('section_app_bar_menu_nav_/dashboard')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(
-        const ValueKey<String>('section_app_bar_menu_nav_/pos/categories'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('section_app_bar_menu_nav_/orders')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('section_app_bar_menu_nav_/shifts')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('section_app_bar_menu_logout')),
-      findsOneWidget,
-    );
-  });
+      expect(
+        find.byKey(
+          const ValueKey<String>('section_app_bar_menu_nav_/pos/categories'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('section_app_bar_menu_nav_/pos')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('section_app_bar_menu_nav_/orders')),
+        findsOneWidget,
+      );
+      expect(find.text('Halfway Cafe POS'), findsWidgets);
+      expect(find.text('POS · Cashier'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('section_app_bar_menu_nav_/reports')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('section_app_bar_menu_nav_/shifts')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('section_app_bar_menu_logout')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('section_app_bar_menu_nav_/admin')),
+        findsNothing,
+      );
+    },
+  );
 }
 
 Widget _buildTestApp({required Widget child}) {

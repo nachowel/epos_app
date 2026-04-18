@@ -68,6 +68,9 @@ class DriftAnalyticsRepository implements AnalyticsRepository {
     final PaymentSplitSummary paymentSplitSummary = await getPaymentSplit(
       range,
     );
+    final _CustomSalesMetrics customSalesMetrics = await _getCustomSalesMetrics(
+      range,
+    );
 
     return OverviewMetrics(
       totalRevenueMinor: revenueMetrics.totalRevenueMinor,
@@ -75,6 +78,9 @@ class DriftAnalyticsRepository implements AnalyticsRepository {
       averageOrderValueMinor: revenueMetrics.averageOrderValueMinor,
       topProductsPreview: topProductsPreview,
       paymentSplitSummary: paymentSplitSummary,
+      customSalesRevenueMinor: customSalesMetrics.revenueMinor,
+      customSalesCount: customSalesMetrics.count,
+      customSalesAverageValueMinor: customSalesMetrics.averageValueMinor,
     );
   }
 
@@ -166,7 +172,9 @@ class DriftAnalyticsRepository implements AnalyticsRepository {
             COALESCE(SUM(tl.quantity), 0) AS quantity_count
           FROM transaction_lines tl
           INNER JOIN transactions tx ON tx.id = tl.transaction_id
+          INNER JOIN products p ON p.id = tl.product_id
           WHERE ${_paidAtWindowWhereClause('tx')}
+            AND ${_nonCustomProductWhereClause('p')}
           GROUP BY tl.product_id, tl.product_name
           ORDER BY revenue_minor DESC,
                    quantity_count DESC,
@@ -181,6 +189,7 @@ class DriftAnalyticsRepository implements AnalyticsRepository {
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _database.transactionLines,
             _database.transactions,
+            _database.products,
           },
         )
         .get();
@@ -259,6 +268,7 @@ class DriftAnalyticsRepository implements AnalyticsRepository {
           INNER JOIN products p ON p.id = tl.product_id
           INNER JOIN categories c ON c.id = p.category_id
           WHERE ${_paidAtWindowWhereClause('tx')}
+            AND ${_nonCustomProductWhereClause('p')}
           GROUP BY c.id, c.name, tl.product_id, tl.product_name
           ORDER BY c.id ASC,
                    revenue_minor DESC,
@@ -327,6 +337,47 @@ class DriftAnalyticsRepository implements AnalyticsRepository {
       AND $transactionAlias.paid_at >= ?
       AND $transactionAlias.paid_at < ?
     ''';
+  }
+
+  String _nonCustomProductWhereClause(String productAlias) {
+    return '$productAlias.is_custom = 0';
+  }
+
+  String _customProductWhereClause(String productAlias) {
+    return '$productAlias.is_custom = 1';
+  }
+
+  Future<_CustomSalesMetrics> _getCustomSalesMetrics(
+    AnalyticsDateRange range,
+  ) async {
+    final QueryRow row = await _database
+        .customSelect(
+          '''
+          SELECT
+            COALESCE(SUM(tl.line_total_minor), 0) AS custom_sales_revenue_minor,
+            COUNT(*) AS custom_sales_count
+          FROM transaction_lines tl
+          INNER JOIN transactions tx ON tx.id = tl.transaction_id
+          INNER JOIN products p ON p.id = tl.product_id
+          WHERE ${_paidAtWindowWhereClause('tx')}
+            AND ${_customProductWhereClause('p')}
+          ''',
+          variables: _paidAtWindowVariables(range),
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _database.transactionLines,
+            _database.transactions,
+            _database.products,
+          },
+        )
+        .getSingle();
+
+    final int revenueMinor = row.read<int>('custom_sales_revenue_minor');
+    final int count = row.read<int>('custom_sales_count');
+    return _CustomSalesMetrics(
+      revenueMinor: revenueMinor,
+      count: count,
+      averageValueMinor: count <= 0 ? 0 : revenueMinor ~/ count,
+    );
   }
 
   List<Variable<Object>> _paidAtWindowVariables(AnalyticsDateRange range) {
@@ -409,4 +460,16 @@ class _DailyRevenueAccumulator {
       orderCount: orderCount,
     );
   }
+}
+
+class _CustomSalesMetrics {
+  const _CustomSalesMetrics({
+    required this.revenueMinor,
+    required this.count,
+    required this.averageValueMinor,
+  });
+
+  final int revenueMinor;
+  final int count;
+  final int averageValueMinor;
 }

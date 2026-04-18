@@ -19,6 +19,10 @@ void main() {
         final products = await db.select(db.products).get();
         final modifiers = await db.select(db.productModifiers).get();
         final reportSettings = await db.select(db.reportSettings).get();
+        final menuSettings = await db.select(db.menuSettings).getSingle();
+        final customProducts = products
+            .where((product) => product.isCustom)
+            .toList(growable: false);
 
         expect(users, hasLength(2));
         expect(
@@ -29,10 +33,14 @@ void main() {
           users.any((user) => user.pin == '1234' || user.pin == '0000'),
           isFalse,
         );
-        expect(categories.length, 4);
-        expect(products.length, greaterThanOrEqualTo(15));
+        expect(categories.length, 5);
+        expect(products.length, greaterThanOrEqualTo(16));
         expect(modifiers.length, greaterThanOrEqualTo(20));
         expect(reportSettings, hasLength(1));
+        expect(menuSettings.customSalesLimitMinor, 100000);
+        expect(customProducts, hasLength(1));
+        expect(customProducts.single.name, 'Custom Sale');
+        expect(customProducts.single.isVisibleOnPos, isFalse);
       },
     );
   });

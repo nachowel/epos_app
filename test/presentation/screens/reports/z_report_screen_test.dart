@@ -211,6 +211,14 @@ void main() {
 
       final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
       final int shiftId = await insertShift(db, openedBy: adminId);
+      final int categoryId = await insertCategory(db, name: 'Misc');
+      final int customSaleProductId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Custom Sale',
+        priceMinor: 2450,
+        isCustom: true,
+      );
       final int paidOrderId = await insertTransaction(
         db,
         uuid: 'admin-report-paid',
@@ -228,6 +236,18 @@ void main() {
         amountMinor: 2450,
         paidAt: DateTime(2026, 3, 28, 14, 15),
       );
+      await db
+          .into(db.transactionLines)
+          .insert(
+            TransactionLinesCompanion.insert(
+              uuid: 'admin-report-custom-line',
+              transactionId: paidOrderId,
+              productId: customSaleProductId,
+              productName: 'Custom Sale',
+              unitPriceMinor: 2450,
+              lineTotalMinor: 2450,
+            ),
+          );
 
       final ProviderContainer container = ProviderContainer(
         overrides: <Override>[
@@ -253,6 +273,11 @@ void main() {
       expect(find.text('Net Cash'), findsOneWidget);
       expect(find.text('Gross Card'), findsOneWidget);
       expect(find.text('Net Card'), findsOneWidget);
+      expect(find.text('Custom Sales'), findsOneWidget);
+      expect(find.text('Custom Sale Revenue'), findsOneWidget);
+      expect(find.text('Custom Sale Count'), findsOneWidget);
+      expect(find.text('Custom Sale Average Value'), findsOneWidget);
+      expect(find.text('1'), findsWidgets);
       expect(find.text('£24.50'), findsWidgets);
     });
 

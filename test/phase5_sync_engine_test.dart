@@ -754,7 +754,7 @@ Future<_SeededPaidOrder> _seedPaidOrder(
     createdAt: DateTime.now(),
   );
 
-  final Transaction createdTransaction = await orderService.createOrder(
+  final Transaction createdTransaction = await orderService.createPersistedEmptyDraftForTestingAccess(
     currentUser: adminUser,
   );
   final TransactionLine line = await orderService.addProductToOrder(

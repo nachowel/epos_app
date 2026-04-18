@@ -24,6 +24,9 @@ class TransactionPersistenceMapper {
       lineTotalMinor: Value<int>(line.lineTotalMinor),
       pricingMode: Value<String>(_pricingModeToDb(line.pricingMode)),
       removalDiscountTotalMinor: Value<int>(line.removalDiscountTotalMinor),
+      customNote: Value<String?>(line.customNote),
+      createdByUserId: Value<int?>(line.createdByUserId),
+      adminOverrideUserId: Value<int?>(line.adminOverrideUserId),
     );
   }
 
@@ -39,6 +42,9 @@ class TransactionPersistenceMapper {
       lineTotalMinor: row.lineTotalMinor,
       pricingMode: _pricingModeFromDb(row.pricingMode),
       removalDiscountTotalMinor: row.removalDiscountTotalMinor,
+      customNote: row.customNote,
+      createdByUserId: row.createdByUserId,
+      adminOverrideUserId: row.adminOverrideUserId,
     );
   }
 

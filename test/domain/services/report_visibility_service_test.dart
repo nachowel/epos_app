@@ -100,5 +100,38 @@ void main() {
         );
       },
     );
+
+    test(
+      'custom sale metrics are masked consistently while counts remain unchanged',
+      () {
+        const reportWithCustomSales = ShiftReport(
+          shiftId: 12,
+          paidCount: 2,
+          paidTotalMinor: 2000,
+          openCount: 0,
+          openTotalMinor: 0,
+          cancelledCount: 0,
+          cashCount: 1,
+          cashTotalMinor: 500,
+          cardCount: 1,
+          cardTotalMinor: 1500,
+          customSalesRevenueMinor: 800,
+          customSalesCount: 2,
+          customSalesAverageValueMinor: 400,
+        );
+
+        final visible = service.applyVisibilityToReport(
+          reportWithCustomSales,
+          cashier,
+          0.25,
+        );
+
+        expect(visible.paidTotalMinor, 500);
+        expect(visible.cashTotalMinor + visible.cardTotalMinor, 500);
+        expect(visible.customSalesRevenueMinor, 200);
+        expect(visible.customSalesCount, 2);
+        expect(visible.customSalesAverageValueMinor, 100);
+      },
+    );
   });
 }

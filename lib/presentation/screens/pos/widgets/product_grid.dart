@@ -37,6 +37,9 @@ class ProductGrid extends StatefulWidget {
     required this.onMoveProductDown,
     required this.onMoveProductToTop,
     required this.onMoveProductToBottom,
+    this.searchController,
+    this.onSearchChanged,
+    this.isSearchActive = false,
     this.imageProviderResolver = resolveCachedPosProductImageProvider,
     this.imagePrecache = _defaultProductGridImagePrecache,
     this.enableVisibleImagePreload = true,
@@ -64,6 +67,9 @@ class ProductGrid extends StatefulWidget {
   final void Function(int index) onMoveProductDown;
   final void Function(int index) onMoveProductToTop;
   final void Function(int index) onMoveProductToBottom;
+  final TextEditingController? searchController;
+  final ValueChanged<String>? onSearchChanged;
+  final bool isSearchActive;
   final ProductCardImageProviderResolver imageProviderResolver;
   final ProductGridImagePrecache imagePrecache;
   final bool enableVisibleImagePreload;
@@ -85,6 +91,10 @@ class _ProductGridState extends State<ProductGrid> {
 
   @override
   Widget build(BuildContext context) {
+    final String displayTitle = widget.isSearchActive
+        ? 'Arama Sonuçları'
+        : widget.title;
+
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -102,94 +112,107 @@ class _ProductGridState extends State<ProductGrid> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        AppStrings.products,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textSecondary,
-                          letterSpacing: 0.2,
-                        ),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            AppStrings.products,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            displayTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                              height: 1,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 5),
-                      Text(
-                        widget.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                          height: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      alignment: WrapAlignment.end,
-                      children: <Widget>[
-                        _ProductCountBadge(productCount: widget.productCount),
-                        if (widget.isSortMode) ...<Widget>[
-                          OutlinedButton(
-                            key: const ValueKey<String>(
-                              'pos-product-sort-cancel',
-                            ),
-                            onPressed: widget.isSavingSortOrder
-                                ? null
-                                : widget.onCancelSortMode,
-                            child: Text(AppStrings.cancel),
-                          ),
-                          ElevatedButton.icon(
-                            key: const ValueKey<String>(
-                              'pos-product-sort-save',
-                            ),
-                            onPressed:
-                                widget.isSavingSortOrder ||
-                                    !widget.hasSortChanges
-                                ? null
-                                : widget.onSaveSortOrder,
-                            icon: widget.isSavingSortOrder
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : const Icon(Icons.save_rounded),
-                            label: Text(AppStrings.saveSettings),
-                          ),
-                        ] else
-                          OutlinedButton.icon(
-                            key: const ValueKey<String>(
-                              'pos-product-enter-sort-mode',
-                            ),
-                            onPressed: widget.onEnterSortMode,
-                            icon: const Icon(Icons.swap_vert_rounded),
-                            label: const Text('Ürünleri Sırala'),
-                          ),
-                      ],
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          alignment: WrapAlignment.end,
+                          children: <Widget>[
+                            _ProductCountBadge(productCount: widget.productCount),
+                            if (widget.isSortMode) ...<Widget>[
+                              OutlinedButton(
+                                key: const ValueKey<String>(
+                                  'pos-product-sort-cancel',
+                                ),
+                                onPressed: widget.isSavingSortOrder
+                                    ? null
+                                    : widget.onCancelSortMode,
+                                child: Text(AppStrings.cancel),
+                              ),
+                              ElevatedButton.icon(
+                                key: const ValueKey<String>(
+                                  'pos-product-sort-save',
+                                ),
+                                onPressed:
+                                    widget.isSavingSortOrder ||
+                                        !widget.hasSortChanges
+                                    ? null
+                                    : widget.onSaveSortOrder,
+                                icon: widget.isSavingSortOrder
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                            Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    : const Icon(Icons.save_rounded),
+                                label: Text(AppStrings.saveSettings),
+                              ),
+                            ] else
+                              OutlinedButton.icon(
+                                key: const ValueKey<String>(
+                                  'pos-product-enter-sort-mode',
+                                ),
+                                onPressed: widget.onEnterSortMode,
+                                icon: const Icon(Icons.swap_vert_rounded),
+                                label: const Text('Ürünleri Sırala'),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+                if (widget.searchController != null && !widget.isSortMode) ...<Widget>[
+                  const SizedBox(height: 10),
+                  _PosSearchBar(
+                    controller: widget.searchController!,
+                    onChanged: widget.onSearchChanged ?? (_) {},
+                    isActive: widget.isSearchActive,
+                  ),
+                ],
               ],
             ),
           ),
@@ -213,16 +236,32 @@ class _ProductGridState extends State<ProductGrid> {
       return const Center(child: CircularProgressIndicator());
     }
     if (visibleProducts.isEmpty) {
+      final String emptyMessage = widget.isSearchActive
+          ? 'Sonuç bulunamadı'
+          : AppStrings.noProductsInCategory;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(AppSizes.spacingLg),
-          child: Text(
-            AppStrings.noProductsInCategory,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: AppSizes.fontSm,
-              color: AppColors.textSecondary,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(
+                widget.isSearchActive
+                    ? Icons.search_off_rounded
+                    : Icons.inventory_2_outlined,
+                size: 40,
+                color: AppColors.textSecondary.withValues(alpha: 0.5),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                emptyMessage,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: AppSizes.fontSm,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -681,6 +720,98 @@ class _MoveControlButton extends StatelessWidget {
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PosSearchBar extends StatelessWidget {
+  const _PosSearchBar({
+    required this.controller,
+    required this.onChanged,
+    required this.isActive,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 42,
+      child: TextField(
+        key: const ValueKey<String>('pos-product-search'),
+        controller: controller,
+        onChanged: onChanged,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Ürün ara...',
+          hintStyle: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary.withValues(alpha: 0.6),
+          ),
+          prefixIcon: Padding(
+            padding: const EdgeInsets.only(left: 12, right: 8),
+            child: Icon(
+              Icons.search_rounded,
+              size: 20,
+              color: isActive ? AppColors.primary : AppColors.textSecondary,
+            ),
+          ),
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 36,
+            minHeight: 20,
+          ),
+          suffixIcon: isActive
+              ? GestureDetector(
+                  onTap: () {
+                    controller.clear();
+                    onChanged('');
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                )
+              : null,
+          suffixIconConstraints: const BoxConstraints(
+            minWidth: 32,
+            minHeight: 20,
+          ),
+          filled: true,
+          fillColor: isActive
+              ? AppColors.primary.withValues(alpha: 0.05)
+              : AppColors.surfaceAlt,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 10,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: isActive
+                  ? AppColors.primary.withValues(alpha: 0.3)
+                  : AppColors.border,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: AppColors.primary.withValues(alpha: 0.6),
+              width: 1.5,
+            ),
           ),
         ),
       ),

@@ -3,7 +3,7 @@ import '../../domain/models/print_job.dart';
 import '../../domain/models/stale_final_close_recovery_details.dart';
 
 abstract class AppException implements Exception {
-  AppException(this.message);
+  const AppException(this.message);
 
   final String message;
 
@@ -16,11 +16,11 @@ enum PaymentBlockReason { alreadyPaid, cancelled, notSent }
 enum RefundBlockReason { notPaid, cancelled, alreadyAdjusted, missingPayment }
 
 class DatabaseException extends AppException {
-  DatabaseException(super.message);
+  const DatabaseException(super.message);
 }
 
 class ValidationException extends AppException {
-  ValidationException(super.message);
+  const ValidationException(super.message);
 }
 
 enum BreakfastEditBlockedReason { notDraft, sent, paid, cancelled }

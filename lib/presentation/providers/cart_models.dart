@@ -1,4 +1,5 @@
 import '../../domain/models/breakfast_cart_selection.dart';
+import '../../domain/models/custom_sale.dart';
 import '../../domain/models/meal_customization.dart';
 import '../../domain/models/order_modifier.dart';
 import '../../domain/models/product_modifier.dart';
@@ -50,6 +51,7 @@ class CartItem {
     required this.modifiers,
     this.breakfastSelection,
     this.mealCustomizationSelection,
+    this.customSaleRequest,
   });
 
   final String localId;
@@ -61,6 +63,10 @@ class CartItem {
   final List<CartModifier> modifiers;
   final BreakfastCartSelection? breakfastSelection;
   final MealCustomizationCartSelection? mealCustomizationSelection;
+  final CustomSaleWriteRequest? customSaleRequest;
+
+  bool get isCustomSale => customSaleRequest != null;
+  String? get customSaleNote => customSaleRequest?.note;
 
   int get subtotalMinor => unitPriceMinor * quantity;
   int get modifierTotalMinor {
@@ -103,6 +109,7 @@ class CartItem {
     List<CartModifier>? modifiers,
     Object? breakfastSelection = _unsetBreakfastSelection,
     Object? mealCustomizationSelection = _unsetMealCustomizationSelection,
+    Object? customSaleRequest = _unsetCustomSaleRequest,
   }) {
     return CartItem(
       localId: localId ?? this.localId,
@@ -123,10 +130,14 @@ class CartItem {
           )
           ? this.mealCustomizationSelection
           : mealCustomizationSelection as MealCustomizationCartSelection?,
+      customSaleRequest: identical(customSaleRequest, _unsetCustomSaleRequest)
+          ? this.customSaleRequest
+          : customSaleRequest as CustomSaleWriteRequest?,
     );
   }
 }
 
 const Object _unsetBreakfastSelection = Object();
 const Object _unsetMealCustomizationSelection = Object();
+const Object _unsetCustomSaleRequest = Object();
 const Object _unsetCartModifierField = Object();

@@ -13,6 +13,7 @@ import '../../domain/models/order_lifecycle_policy.dart';
 import '../../domain/models/order_modifier.dart';
 import '../../domain/models/product_modifier.dart';
 import '../../domain/models/shift_report_category_line.dart';
+import '../../domain/models/transaction_discount.dart';
 import '../../domain/models/transaction_line.dart';
 import '../../domain/services/meal_customization_persistence_mapper.dart';
 import 'sync_queue_repository.dart';
@@ -210,6 +211,7 @@ class TransactionRepository {
           ON categories.id = products.category_id
         WHERE transactions.shift_id = ?
           AND transactions.status = 'paid'
+          AND products.is_custom = 0
         GROUP BY categories.id, categories.name
         ORDER BY categories.name ASC, categories.id ASC
       ''',
@@ -225,6 +227,39 @@ class TransactionRepository {
           );
         })
         .toList(growable: false);
+  }
+
+  Future<({int revenueMinor, int count})> getPaidCustomSalesSummaryForShift(
+    int shiftId,
+  ) async {
+    final QueryRow row = await _database
+        .customSelect(
+          '''
+        SELECT
+          COALESCE(SUM(transaction_lines.line_total_minor), 0) AS revenue_minor,
+          COUNT(*) AS custom_sales_count
+        FROM transaction_lines
+        INNER JOIN transactions
+          ON transactions.id = transaction_lines.transaction_id
+        INNER JOIN products
+          ON products.id = transaction_lines.product_id
+        WHERE transactions.shift_id = ?
+          AND transactions.status = 'paid'
+          AND products.is_custom = 1
+      ''',
+          variables: <Variable<Object>>[Variable<int>(shiftId)],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _database.transactionLines,
+            _database.transactions,
+            _database.products,
+          },
+        )
+        .getSingle();
+
+    return (
+      revenueMinor: row.read<int>('revenue_minor'),
+      count: row.read<int>('custom_sales_count'),
+    );
   }
 
   Future<List<Transaction>> getPaidTransactionsBetween({
@@ -329,6 +364,12 @@ class TransactionRepository {
             unitPriceMinor: productRow.priceMinor,
             quantity: Value<int>(quantity),
             lineTotalMinor: productRow.priceMinor * quantity,
+            // Phase 1 contract: standard/catalog line creation keeps
+            // custom_note reserved and NULL. Later Custom Sale flow will opt
+            // into this field explicitly.
+            customNote: const Value<String?>(null),
+            createdByUserId: const Value<int?>(null),
+            adminOverrideUserId: const Value<int?>(null),
           ),
         );
 
@@ -398,6 +439,115 @@ class TransactionRepository {
             ))
             .getSingleOrNull();
     return row == null ? null : _mapLine(row);
+  }
+
+  Future<TransactionLine> addCustomSaleLine({
+    required int transactionId,
+    required int productId,
+    required int amountMinor,
+    required String? customNote,
+    required int createdByUserId,
+    int? adminOverrideUserId,
+  }) async {
+    if (amountMinor <= 0) {
+      throw ValidationException(
+        'Custom Sale amount must be greater than zero.',
+      );
+    }
+
+    await _ensureTransactionIsDraft(transactionId);
+
+    final db.Product? productRow =
+        await (_database.select(_database.products)
+              ..where((db.$ProductsTable t) {
+                return t.id.equals(productId) &
+                    t.isCustom.equals(true) &
+                    t.isActive.equals(true);
+              }))
+            .getSingleOrNull();
+    if (productRow == null) {
+      throw ValidationException('System Custom Sale product is unavailable.');
+    }
+
+    final int lineId = await _database
+        .into(_database.transactionLines)
+        .insert(
+          db.TransactionLinesCompanion.insert(
+            uuid: _uuidGenerator.v4(),
+            transactionId: transactionId,
+            productId: productId,
+            productName: productRow.name,
+            unitPriceMinor: amountMinor,
+            quantity: const Value<int>(1),
+            lineTotalMinor: amountMinor,
+            customNote: Value<String?>(customNote),
+            createdByUserId: Value<int?>(createdByUserId),
+            adminOverrideUserId: Value<int?>(adminOverrideUserId),
+          ),
+        );
+
+    final db.TransactionLine insertedLine = await _findLineByIdOrThrow(lineId);
+    return _mapLine(insertedLine);
+  }
+
+  Future<TransactionLine> updateCustomSaleLine({
+    required int transactionLineId,
+    required int productId,
+    required int amountMinor,
+    required String? customNote,
+    required int createdByUserId,
+    int? adminOverrideUserId,
+  }) async {
+    if (amountMinor <= 0) {
+      throw ValidationException(
+        'Custom Sale amount must be greater than zero.',
+      );
+    }
+
+    final db.TransactionLine existingLine = await _findLineByIdOrThrow(
+      transactionLineId,
+    );
+    if (existingLine.quantity != 1) {
+      throw ValidationException(
+        'Custom Sale lines must keep quantity fixed at one.',
+      );
+    }
+
+    await _ensureTransactionIsDraft(existingLine.transactionId);
+
+    final db.Product? productRow =
+        await (_database.select(_database.products)
+              ..where((db.$ProductsTable t) {
+                return t.id.equals(productId) &
+                    t.isCustom.equals(true) &
+                    t.isActive.equals(true);
+              }))
+            .getSingleOrNull();
+    if (productRow == null) {
+      throw ValidationException('System Custom Sale product is unavailable.');
+    }
+
+    final int updatedCount =
+        await (_database.update(_database.transactionLines)
+              ..where((db.$TransactionLinesTable t) {
+                return t.id.equals(transactionLineId);
+              }))
+            .write(
+              db.TransactionLinesCompanion(
+                productId: Value<int>(productRow.id),
+                productName: Value<String>(productRow.name),
+                unitPriceMinor: Value<int>(amountMinor),
+                lineTotalMinor: Value<int>(amountMinor),
+                customNote: Value<String?>(customNote),
+                createdByUserId: Value<int?>(createdByUserId),
+                adminOverrideUserId: Value<int?>(adminOverrideUserId),
+              ),
+            );
+    if (updatedCount != 1) {
+      throw NotFoundException('Transaction line not found: $transactionLineId');
+    }
+
+    return _mapLine(await _findLineByIdOrThrow(transactionLineId));
   }
 
   Future<Map<int, List<TransactionLine>>> getLinesByTransactionIds(
@@ -528,6 +678,9 @@ class TransactionRepository {
             removalDiscountTotalMinor: Value<int>(
               lineRow.removalDiscountTotalMinor,
             ),
+            customNote: Value<String?>(lineRow.customNote),
+            createdByUserId: Value<int?>(lineRow.createdByUserId),
+            adminOverrideUserId: Value<int?>(lineRow.adminOverrideUserId),
           ),
         );
 
@@ -933,6 +1086,9 @@ class TransactionRepository {
         removalDiscountTotalMinor: row.read<int>(
           'removal_discount_total_minor',
         ),
+        customNote: row.readNullable<String>('custom_note'),
+        createdByUserId: row.readNullable<int>('created_by_user_id'),
+        adminOverrideUserId: row.readNullable<int>('admin_override_user_id'),
       ),
     );
   }
@@ -1161,15 +1317,32 @@ class TransactionRepository {
     };
   }
 
-  Future<({int subtotalMinor, int modifierTotalMinor, int totalAmountMinor})>
+  Future<
+    ({
+      int subtotalMinor,
+      int modifierTotalMinor,
+      int discountAmountMinor,
+      int totalAmountMinor,
+    })
+  >
   calculateTotals(int transactionId) async {
-    await _findTransactionByIdOrThrow(transactionId);
+    final db.Transaction transactionRow = await _findTransactionByIdOrThrow(
+      transactionId,
+    );
     final int subtotalMinor = await _sumProductTotals(transactionId);
     final int modifierTotalMinor = await _sumModifierTotals(transactionId);
+    final TransactionDiscountComputation discountComputation =
+        TransactionDiscountMath.compute(
+          subtotalMinor: subtotalMinor,
+          modifierTotalMinor: modifierTotalMinor,
+          discountType: _discountTypeFromDb(transactionRow.discountType),
+          discountValueMinor: transactionRow.discountValueMinor,
+        );
     return (
       subtotalMinor: subtotalMinor,
       modifierTotalMinor: modifierTotalMinor,
-      totalAmountMinor: subtotalMinor + modifierTotalMinor,
+      discountAmountMinor: discountComputation.discountAmountMinor,
+      totalAmountMinor: discountComputation.totalAmountMinor,
     );
   }
 
@@ -1177,6 +1350,7 @@ class TransactionRepository {
     required int transactionId,
     required int subtotalMinor,
     required int modifierTotalMinor,
+    required int discountAmountMinor,
     required int totalAmountMinor,
   }) async {
     if (subtotalMinor < 0 || totalAmountMinor < 0) {
@@ -1190,6 +1364,7 @@ class TransactionRepository {
               db.TransactionsCompanion(
                 subtotalMinor: Value<int>(subtotalMinor),
                 modifierTotalMinor: Value<int>(modifierTotalMinor),
+                discountAmountMinor: Value<int>(discountAmountMinor),
                 totalAmountMinor: Value<int>(totalAmountMinor),
                 updatedAt: Value<DateTime>(DateTime.now()),
               ),
@@ -1207,7 +1382,7 @@ class TransactionRepository {
     final db.Transaction row = await _findTransactionByIdOrThrow(transactionId);
     if (!OrderLifecyclePolicy.canUpdateTableNumber(_statusFromDb(row.status))) {
       throw InvalidStateTransitionException(
-        'Table number can be updated only for draft or sent transactions.',
+        'Table number can be updated only for draft transactions.',
       );
     }
 
@@ -1230,6 +1405,59 @@ class TransactionRepository {
     await runInTransaction(() async {
       await _recalculateTotalsInCurrentTransaction(transactionId);
     });
+  }
+
+  Future<void> updateDiscount({
+    required int transactionId,
+    required TransactionDiscountType discountType,
+    required int discountValueMinor,
+    required int discountAmountMinor,
+    required String? discountReason,
+    required int discountAppliedBy,
+    required int totalAmountMinor,
+  }) async {
+    final int updatedCount =
+        await (_database.update(_database.transactions)
+              ..where((db.$TransactionsTable t) => t.id.equals(transactionId)))
+            .write(
+              db.TransactionsCompanion(
+                discountType: Value<String>(_discountTypeToDb(discountType)),
+                discountValueMinor: Value<int>(discountValueMinor),
+                discountAmountMinor: Value<int>(discountAmountMinor),
+                discountReason: Value<String?>(discountReason),
+                discountAppliedBy: Value<int?>(discountAppliedBy),
+                totalAmountMinor: Value<int>(totalAmountMinor),
+                updatedAt: Value<DateTime>(DateTime.now()),
+              ),
+            );
+
+    if (updatedCount == 0) {
+      throw NotFoundException('Transaction not found: $transactionId');
+    }
+  }
+
+  Future<void> clearDiscount({
+    required int transactionId,
+    required int totalAmountMinor,
+  }) async {
+    final int updatedCount =
+        await (_database.update(_database.transactions)
+              ..where((db.$TransactionsTable t) => t.id.equals(transactionId)))
+            .write(
+              db.TransactionsCompanion(
+                discountType: const Value<String?>(null),
+                discountValueMinor: const Value<int>(0),
+                discountAmountMinor: const Value<int>(0),
+                discountReason: const Value<String?>(null),
+                discountAppliedBy: const Value<int?>(null),
+                totalAmountMinor: Value<int>(totalAmountMinor),
+                updatedAt: Value<DateTime>(DateTime.now()),
+              ),
+            );
+
+    if (updatedCount == 0) {
+      throw NotFoundException('Transaction not found: $transactionId');
+    }
   }
 
   Future<void> deleteDraft(int transactionId) async {
@@ -1415,7 +1643,12 @@ class TransactionRepository {
   }
 
   Future<void> _recalculateTotalsInCurrentTransaction(int transactionId) async {
-    final ({int subtotalMinor, int modifierTotalMinor, int totalAmountMinor})
+    final ({
+      int subtotalMinor,
+      int modifierTotalMinor,
+      int discountAmountMinor,
+      int totalAmountMinor,
+    })
     totals = await calculateTotals(transactionId);
 
     final int updatedCount =
@@ -1425,6 +1658,7 @@ class TransactionRepository {
               db.TransactionsCompanion(
                 subtotalMinor: Value<int>(totals.subtotalMinor),
                 modifierTotalMinor: Value<int>(totals.modifierTotalMinor),
+                discountAmountMinor: Value<int>(totals.discountAmountMinor),
                 totalAmountMinor: Value<int>(totals.totalAmountMinor),
                 updatedAt: Value<DateTime>(DateTime.now()),
               ),
@@ -1615,7 +1849,12 @@ class TransactionRepository {
 
     await _recalculateTotalsInCurrentTransaction(lineRow.transactionId);
 
-    final ({int subtotalMinor, int modifierTotalMinor, int totalAmountMinor})
+    final ({
+      int subtotalMinor,
+      int modifierTotalMinor,
+      int discountAmountMinor,
+      int totalAmountMinor,
+    })
     persistedTotals = await calculateTotals(lineRow.transactionId);
     final db.Transaction transactionRow = await _findTransactionByIdOrThrow(
       lineRow.transactionId,
@@ -1623,6 +1862,8 @@ class TransactionRepository {
     if (transactionRow.subtotalMinor != persistedTotals.subtotalMinor ||
         transactionRow.modifierTotalMinor !=
             persistedTotals.modifierTotalMinor ||
+        transactionRow.discountAmountMinor !=
+            persistedTotals.discountAmountMinor ||
         transactionRow.totalAmountMinor != persistedTotals.totalAmountMinor) {
       throw DatabaseException(
         'Breakfast snapshot recompute mismatch between recomputed totals and persisted transaction state for transaction ${lineRow.transactionId}.',
@@ -1802,6 +2043,11 @@ class TransactionRepository {
       status: _statusFromDb(row.status),
       subtotalMinor: row.subtotalMinor,
       modifierTotalMinor: row.modifierTotalMinor,
+      discountType: _discountTypeFromDb(row.discountType),
+      discountValueMinor: row.discountValueMinor,
+      discountAmountMinor: row.discountAmountMinor,
+      discountReason: row.discountReason,
+      discountAppliedBy: row.discountAppliedBy,
       totalAmountMinor: row.totalAmountMinor,
       createdAt: row.createdAt,
       paidAt: row.paidAt,
@@ -1867,6 +2113,28 @@ class TransactionRepository {
         return 'paid';
       case TransactionStatus.cancelled:
         return 'cancelled';
+    }
+  }
+
+  TransactionDiscountType? _discountTypeFromDb(String? value) {
+    switch (value) {
+      case null:
+        return null;
+      case 'amount':
+        return TransactionDiscountType.amount;
+      case 'percent':
+        return TransactionDiscountType.percent;
+      default:
+        throw DatabaseException('Unknown transaction discount type: $value');
+    }
+  }
+
+  String _discountTypeToDb(TransactionDiscountType value) {
+    switch (value) {
+      case TransactionDiscountType.amount:
+        return 'amount';
+      case TransactionDiscountType.percent:
+        return 'percent';
     }
   }
 

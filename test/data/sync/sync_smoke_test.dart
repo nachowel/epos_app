@@ -854,7 +854,7 @@ Future<_FixtureContext> _createFixtureContext(
     logger: logger,
   );
 
-  final Transaction createdTransaction = await orderService.createOrder(
+  final Transaction createdTransaction = await orderService.createPersistedEmptyDraftForTestingAccess(
     currentUser: cashierUser,
   );
   final List<TransactionLine> lines = <TransactionLine>[];

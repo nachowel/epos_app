@@ -35,6 +35,7 @@ class PaymentService {
              transactionRepository: transactionRepository!,
              transactionStateRepository: transactionStateRepository!,
              paymentRepository: paymentRepository,
+             printerService: printerService,
              logger: logger,
            ),
        _paymentRepository = paymentRepository,

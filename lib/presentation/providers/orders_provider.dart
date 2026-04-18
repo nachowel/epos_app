@@ -60,6 +60,7 @@ class OrderDetails {
     required this.payment,
     required this.paymentAdjustment,
     required this.lines,
+    required this.isKitchenRequired,
     required this.kitchenPrintJob,
     required this.receiptPrintJob,
   });
@@ -69,6 +70,7 @@ class OrderDetails {
   final Payment? payment;
   final PaymentAdjustment? paymentAdjustment;
   final List<OrderDetailLine> lines;
+  final bool isKitchenRequired;
   final PrintJob? kitchenPrintJob;
   final PrintJob? receiptPrintJob;
 }
@@ -129,6 +131,7 @@ class OrdersState {
   const OrdersState({
     required this.orderSummaries,
     required this.lineCountByOrderId,
+    required this.kitchenRequiredByOrderId,
     required this.selectedOrderId,
     required this.selectedFilter,
     required this.selectedDateFilter,
@@ -147,6 +150,7 @@ class OrdersState {
   const OrdersState.initial()
     : orderSummaries = const <OpenOrderSummary>[],
       lineCountByOrderId = const <int, int>{},
+      kitchenRequiredByOrderId = const <int, bool>{},
       selectedOrderId = null,
       selectedFilter = OrdersFilter.all,
       selectedDateFilter = OrdersDateFilter.today,
@@ -163,6 +167,7 @@ class OrdersState {
 
   final List<OpenOrderSummary> orderSummaries;
   final Map<int, int> lineCountByOrderId;
+  final Map<int, bool> kitchenRequiredByOrderId;
   final int? selectedOrderId;
   final OrdersFilter selectedFilter;
   final OrdersDateFilter selectedDateFilter;
@@ -189,6 +194,7 @@ class OrdersState {
   OrdersState copyWith({
     List<OpenOrderSummary>? orderSummaries,
     Map<int, int>? lineCountByOrderId,
+    Map<int, bool>? kitchenRequiredByOrderId,
     Object? selectedOrderId = _unset,
     OrdersFilter? selectedFilter,
     OrdersDateFilter? selectedDateFilter,
@@ -206,6 +212,8 @@ class OrdersState {
     return OrdersState(
       orderSummaries: orderSummaries ?? this.orderSummaries,
       lineCountByOrderId: lineCountByOrderId ?? this.lineCountByOrderId,
+      kitchenRequiredByOrderId:
+          kitchenRequiredByOrderId ?? this.kitchenRequiredByOrderId,
       selectedOrderId: selectedOrderId == _unset
           ? this.selectedOrderId
           : selectedOrderId as int?,
@@ -229,6 +237,7 @@ class OrdersState {
 
 class OrdersNotifier extends StateNotifier<OrdersState> {
   static const int _pageSize = 50;
+  static const int _cashierRecentPaidLimit = 5;
 
   OrdersNotifier(this._ref, {Uuid? uuidGenerator})
     : _uuidGenerator = uuidGenerator ?? const Uuid(),
@@ -244,6 +253,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     if (!mounted) {
       return;
     }
+    final bool isCashierRestrictedView = _isCashierRestrictedView;
     state = state.copyWith(isRefreshing: true, errorMessage: null);
     try {
       final OrderSummariesPage page = await _loadOrderPage();
@@ -255,12 +265,22 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         for (final OpenOrderSummary summary in orderSummaries)
           summary.transaction.id: summary.itemCount,
       };
+      final Map<int, bool> kitchenRequiredByOrderId =
+          await _loadKitchenRequiredByOrderId(orderSummaries);
 
       final int? selected = state.selectedOrderId;
       state = state.copyWith(
         orderSummaries: orderSummaries,
         lineCountByOrderId: lineCountByOrderId,
-        hasMore: page.hasMore,
+        kitchenRequiredByOrderId: kitchenRequiredByOrderId,
+        selectedFilter: isCashierRestrictedView
+            ? OrdersFilter.paid
+            : state.selectedFilter,
+        selectedDateFilter: isCashierRestrictedView
+            ? OrdersDateFilter.today
+            : state.selectedDateFilter,
+        searchQuery: isCashierRestrictedView ? '' : state.searchQuery,
+        hasMore: isCashierRestrictedView ? false : page.hasMore,
         selectedOrderId:
             selected == null ||
                 !orderSummaries.any(
@@ -301,6 +321,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }
 
   Future<void> setFilter(OrdersFilter filter) async {
+    if (_isCashierRestrictedView) {
+      return;
+    }
     if (state.selectedFilter == filter) {
       return;
     }
@@ -309,6 +332,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }
 
   Future<void> setDateFilter(OrdersDateFilter filter) async {
+    if (_isCashierRestrictedView) {
+      return;
+    }
     if (state.selectedDateFilter == filter) {
       return;
     }
@@ -317,6 +343,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }
 
   Future<void> setSearchQuery(String value) async {
+    if (_isCashierRestrictedView) {
+      return;
+    }
     final String normalized = _normalizeSearchQuery(value);
     if (state.searchQuery == normalized) {
       return;
@@ -326,6 +355,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   }
 
   Future<void> loadMoreOrders() async {
+    if (_isCashierRestrictedView) {
+      return;
+    }
     if (state.isRefreshing || state.isLoadingMore || !state.hasMore) {
       return;
     }
@@ -346,9 +378,14 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         for (final OpenOrderSummary summary in page.orderSummaries)
           summary.transaction.id: summary.itemCount,
       };
+      final Map<int, bool> nextKitchenRequiredByOrderId = <int, bool>{
+        ...state.kitchenRequiredByOrderId,
+        ...await _loadKitchenRequiredByOrderId(page.orderSummaries),
+      };
       state = state.copyWith(
         orderSummaries: combined,
         lineCountByOrderId: combinedLineCounts,
+        kitchenRequiredByOrderId: nextKitchenRequiredByOrderId,
         hasMore: page.hasMore,
         isLoadingMore: false,
         errorMessage: null,
@@ -378,7 +415,8 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       return null;
     }
 
-    final List<CartItem> cartItems = _ref.read(cartNotifierProvider).items;
+    final CartState cartState = _ref.read(cartNotifierProvider);
+    final List<CartItem> cartItems = cartState.items;
     if (cartItems.isEmpty) {
       state = state.copyWith(
         errorMessage: ErrorMapper.toUserMessage(EmptyCartException()),
@@ -400,6 +438,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             currentUser: currentUser,
             tableNumber: tableNumber,
             cartItems: _toCheckoutItems(cartItems),
+            discount: cartState.discount,
             idempotencyKey: _pendingIdempotencyKey!,
             immediatePaymentMethod: immediatePaymentMethod,
           );
@@ -487,37 +526,47 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
           .sendOrder(transactionId: transactionId, currentUser: currentUser);
       debugPrint('[KITCHEN_PRINT][SEND_ORDER] order sent ok tx=$transactionId');
       String? printWarning;
+      final bool kitchenRequired = await _ref
+          .read(orderServiceProvider)
+          .isKitchenRequired(transactionId);
 
       // Execute the queued kitchen print job. Failure must not block the
       // send-order success path — the print job stays queued for manual
       // reprint and the user sees the snackbar for the send itself.
-      try {
+      if (kitchenRequired) {
+        try {
+          debugPrint(
+            '[KITCHEN_PRINT][SEND_ORDER] calling printKitchenTicket'
+            ' tx=$transactionId',
+          );
+          await _ref
+              .read(printerServiceProvider)
+              .printKitchenTicket(transactionId);
+          debugPrint(
+            '[KITCHEN_PRINT][SEND_ORDER] printKitchenTicket returned ok'
+            ' tx=$transactionId',
+          );
+        } catch (error, stackTrace) {
+          debugPrint(
+            '[KITCHEN_PRINT][SEND_ORDER] printKitchenTicket FAILED'
+            ' tx=$transactionId error=$error',
+          );
+          _ref
+              .read(appLoggerProvider)
+              .warn(
+                eventType: 'send_order_kitchen_print_failed',
+                entityId: '$transactionId',
+                message: 'Kitchen print after send-order failed.',
+                error: error,
+                stackTrace: stackTrace,
+              );
+          printWarning = AppStrings.kitchenPrintRetryRequired;
+        }
+      } else {
         debugPrint(
-          '[KITCHEN_PRINT][SEND_ORDER] calling printKitchenTicket'
+          '[KITCHEN_PRINT][SEND_ORDER] skipped — no kitchen-eligible lines'
           ' tx=$transactionId',
         );
-        await _ref
-            .read(printerServiceProvider)
-            .printKitchenTicket(transactionId);
-        debugPrint(
-          '[KITCHEN_PRINT][SEND_ORDER] printKitchenTicket returned ok'
-          ' tx=$transactionId',
-        );
-      } catch (error, stackTrace) {
-        debugPrint(
-          '[KITCHEN_PRINT][SEND_ORDER] printKitchenTicket FAILED'
-          ' tx=$transactionId error=$error',
-        );
-        _ref
-            .read(appLoggerProvider)
-            .warn(
-              eventType: 'send_order_kitchen_print_failed',
-              entityId: '$transactionId',
-              message: 'Kitchen print after send-order failed.',
-              error: error,
-              stackTrace: stackTrace,
-            );
-        printWarning = AppStrings.kitchenPrintRetryRequired;
       }
 
       await refreshOpenOrders();
@@ -705,6 +754,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       final List<TransactionLine> lines = await _ref
           .read(orderServiceProvider)
           .getOrderLines(transactionId);
+      final bool isKitchenRequired = await _ref
+          .read(orderServiceProvider)
+          .isKitchenRequired(transactionId);
       final transactionRepository = _ref.read(transactionRepositoryProvider);
       final User? operatorUser = await _ref
           .read(userRepositoryProvider)
@@ -775,6 +827,7 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         payment: payment,
         paymentAdjustment: paymentAdjustment,
         lines: detailLines,
+        isKitchenRequired: isKitchenRequired,
         kitchenPrintJob: kitchenPrintJob,
         receiptPrintJob: receiptPrintJob,
       );
@@ -1147,7 +1200,12 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
             .toList(growable: false),
         breakfastSelection: item.breakfastSelection,
         mealCustomizationRequest: item.mealCustomizationSelection?.request,
+        customSaleRequest: item.customSaleRequest,
       );
+      if (item.customSaleRequest != null) {
+        checkoutItems.add(baseItem);
+        continue;
+      }
       if (item.breakfastSelection != null) {
         for (int index = 0; index < item.quantity; index += 1) {
           checkoutItems.add(baseItem);
@@ -1173,6 +1231,18 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
       return AppStrings.kitchenPrintInProgress;
     }
     return AppStrings.kitchenPrintRetryRequired;
+  }
+
+  Future<Map<int, bool>> _loadKitchenRequiredByOrderId(
+    List<OpenOrderSummary> orderSummaries,
+  ) {
+    return _ref
+        .read(orderServiceProvider)
+        .getKitchenRequiredByTransactionIds(
+          orderSummaries.map((OpenOrderSummary summary) {
+            return summary.transaction.id;
+          }),
+        );
   }
 
   Future<BreakfastEditorData> _buildBreakfastEditorData({
@@ -1329,7 +1399,32 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
     return products;
   }
 
-  Future<OrderSummariesPage> _loadOrderPage({int offset = 0}) {
+  Future<OrderSummariesPage> _loadOrderPage({int offset = 0}) async {
+    if (_isCashierRestrictedView) {
+      final OrderService orderService = _ref.read(orderServiceProvider);
+      // Active (draft + sent) orders use the exact same query path as the
+      // exit-safety guard, so anything that blocks exit is always visible.
+      final List<OpenOrderSummary> activeOrders = await orderService
+          .getActiveOrderSummaries();
+      final List<OpenOrderSummary> recentPaid = await orderService
+          .getRecentPaidOrdersForToday(limit: _cashierRecentPaidLimit);
+
+      // Merge: active orders first, then recent paid (skip duplicates).
+      final Set<int> activeIds = <int>{
+        for (final OpenOrderSummary summary in activeOrders)
+          summary.transaction.id,
+      };
+      final List<OpenOrderSummary> merged = <OpenOrderSummary>[
+        ...activeOrders,
+        ...recentPaid.where(
+          (OpenOrderSummary summary) =>
+              !activeIds.contains(summary.transaction.id),
+        ),
+      ];
+
+      return OrderSummariesPage(orderSummaries: merged, hasMore: false);
+    }
+
     final String searchQuery = state.searchQuery.trim();
     final int? transactionId = _parseOrderNumberSearch(searchQuery);
     if (searchQuery.isNotEmpty && transactionId == null) {
@@ -1411,6 +1506,9 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
         return <TransactionStatus>[TransactionStatus.cancelled];
     }
   }
+
+  bool get _isCashierRestrictedView =>
+      _ref.read(authNotifierProvider).currentUser?.role == UserRole.cashier;
 }
 
 final StateNotifierProvider<OrdersNotifier, OrdersState>

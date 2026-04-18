@@ -17,22 +17,70 @@ type MirrorWriteRequest = {
   payments: Array<Record<string, unknown>>;
 };
 
-const orderModifierAllowedColumns = [
-  "uuid",
-  "transaction_line_uuid",
-  "action",
-  "item_name",
-  "extra_price_minor",
-  "quantity",
-  "item_product_id",
-  "charge_reason",
-  "unit_price_minor",
-  "price_effect_minor",
-  "sort_key",
-  "price_behavior",
-  "ui_section",
-] as const;
-const orderModifierAllowedColumnSet = new Set<string>(orderModifierAllowedColumns);
+const tableAllowedColumns = {
+  transactions: [
+    "uuid",
+    "shift_local_id",
+    "user_local_id",
+    "table_number",
+    "status",
+    "subtotal_minor",
+    "modifier_total_minor",
+    "discount_type",
+    "discount_value_minor",
+    "discount_amount_minor",
+    "discount_reason",
+    "discount_applied_by_local_id",
+    "total_amount_minor",
+    "created_at",
+    "paid_at",
+    "updated_at",
+    "cancelled_at",
+    "cancelled_by_local_id",
+    "kitchen_printed",
+    "receipt_printed",
+  ],
+  transaction_lines: [
+    "uuid",
+    "transaction_uuid",
+    "product_local_id",
+    "product_name",
+    "unit_price_minor",
+    "quantity",
+    "pricing_mode",
+    "removal_discount_total_minor",
+    "line_total_minor",
+  ],
+  order_modifiers: [
+    "uuid",
+    "transaction_line_uuid",
+    "action",
+    "item_name",
+    "extra_price_minor",
+    "quantity",
+    "item_product_id",
+    "charge_reason",
+    "unit_price_minor",
+    "price_effect_minor",
+    "sort_key",
+    "price_behavior",
+    "ui_section",
+  ],
+  payments: [
+    "uuid",
+    "transaction_uuid",
+    "method",
+    "amount_minor",
+    "paid_at",
+  ],
+} as const;
+type MirrorTableName = keyof typeof tableAllowedColumns;
+const tableAllowedColumnSets = {
+  transactions: new Set<string>(tableAllowedColumns.transactions),
+  transaction_lines: new Set<string>(tableAllowedColumns.transaction_lines),
+  order_modifiers: new Set<string>(tableAllowedColumns.order_modifiers),
+  payments: new Set<string>(tableAllowedColumns.payments),
+} as const;
 
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
@@ -190,6 +238,17 @@ function setIfDefined(
   }
 }
 
+export function findUnexpectedPayloadKeys(
+  table: MirrorTableName,
+  row: Record<string, unknown> | null,
+): string[] {
+  if (row === null) {
+    return [];
+  }
+  const allowedColumnSet = tableAllowedColumnSets[table];
+  return Object.keys(row).filter((key) => !allowedColumnSet.has(key));
+}
+
 export function sanitizeOrderModifierRow(
   row: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -223,10 +282,7 @@ export function sanitizeOrderModifierRows(
 function findUnexpectedOrderModifierKeys(
   row: Record<string, unknown> | null,
 ): string[] {
-  if (row === null) {
-    return [];
-  }
-  return Object.keys(row).filter((key) => !orderModifierAllowedColumnSet.has(key));
+  return findUnexpectedPayloadKeys("order_modifiers", row);
 }
 
 function serializeSupabaseError(error: {
@@ -260,7 +316,23 @@ export function buildOrderModifierAuditContext(
   };
 }
 
-function validateRequest(payload: unknown):
+function collectUnexpectedPayloadIssues(
+  table: MirrorTableName,
+  rows: Array<Record<string, unknown>>,
+  issues: string[],
+) {
+  rows.forEach((row, index) => {
+    const unexpectedColumns = findUnexpectedPayloadKeys(table, row);
+    if (unexpectedColumns.length === 0) {
+      return;
+    }
+    issues.push(
+      `${table}[${index}] contains unexpected columns: ${unexpectedColumns.join(", ")}`,
+    );
+  });
+}
+
+export function validateRequest(payload: unknown):
   | { ok: true; value: MirrorWriteRequest }
   | { ok: false; issues: string[] } {
   const issues: string[] = [];
@@ -297,6 +369,15 @@ function validateRequest(payload: unknown):
 
   const transactionRecordUuid = readUuid(transaction, "uuid", issues);
   const transactionStatus = readString(transaction, "status", issues);
+  const unexpectedTransactionColumns = findUnexpectedPayloadKeys(
+    "transactions",
+    transaction,
+  );
+  if (unexpectedTransactionColumns.length > 0) {
+    issues.push(
+      `transactions contains unexpected columns: ${unexpectedTransactionColumns.join(", ")}`,
+    );
+  }
   if (transactionRecordUuid && transactionRecordUuid !== transactionUuid) {
     issues.push("transaction.uuid must match transaction_uuid");
   }
@@ -305,6 +386,7 @@ function validateRequest(payload: unknown):
   }
 
   const lineUuids = new Set<string>();
+  collectUnexpectedPayloadIssues("transaction_lines", transactionLines, issues);
   for (const line of transactionLines) {
     const lineUuid = readUuid(line, "uuid", issues);
     const lineTransactionUuid = readUuid(line, "transaction_uuid", issues);
@@ -316,6 +398,7 @@ function validateRequest(payload: unknown):
     }
   }
 
+  collectUnexpectedPayloadIssues("order_modifiers", orderModifiers, issues);
   for (const modifier of orderModifiers) {
     readUuid(modifier, "uuid", issues);
     const lineUuid = readUuid(modifier, "transaction_line_uuid", issues);
@@ -326,6 +409,7 @@ function validateRequest(payload: unknown):
     }
   }
 
+  collectUnexpectedPayloadIssues("payments", payments, issues);
   for (const payment of payments) {
     readUuid(payment, "uuid", issues);
     const paymentTransactionUuid = readUuid(payment, "transaction_uuid", issues);
@@ -417,7 +501,11 @@ export async function handleMirrorTransactionGraphRequest(
     if (auth.status === 500) {
       return serverConfigurationFailure(auth.message);
     }
-    return unauthorizedFailure(auth.message, auth.failure, auth.status);
+    return unauthorizedFailure(
+      auth.message ?? "Unauthorized edge function request.",
+      auth.failure ?? "unauthorized",
+      auth.status,
+    );
   }
 
   const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -460,9 +548,7 @@ export async function handleMirrorTransactionGraphRequest(
     }
   }
 
-  const sanitizedOrderModifiers = sanitizeOrderModifierRows(
-    payload.order_modifiers,
-  );
+  const sanitizedOrderModifiers = sanitizeOrderModifierRows(payload.order_modifiers);
   const orderModifierAuditContext = buildOrderModifierAuditContext(
     payload.order_modifiers,
     sanitizedOrderModifiers,

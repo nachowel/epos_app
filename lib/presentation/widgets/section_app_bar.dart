@@ -11,6 +11,9 @@ import '../../domain/models/user.dart';
 
 enum _HeaderNavLayout { wide, compact, collapsed }
 
+const String _brandTitle = 'Halfway Cafe POS';
+const String _brandLogoAsset = 'assets/images/logo.png';
+
 class SectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   const SectionAppBar({
     required this.title,
@@ -20,6 +23,7 @@ class SectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onLogout,
     this.compactVisual = false,
     this.onSelectDestination,
+    this.onOpenDrawer,
     super.key,
   });
 
@@ -30,10 +34,11 @@ class SectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onLogout;
   final bool compactVisual;
   final FutureOr<void> Function(String route)? onSelectDestination;
+  final VoidCallback? onOpenDrawer;
 
   @override
   Size get preferredSize =>
-      Size.fromHeight((compactVisual ? 60 : AppSizes.topBarHeight) + 1);
+      Size.fromHeight((compactVisual ? 68 : AppSizes.topBarHeight) + 1);
 
   @visibleForTesting
   static String debugNavigationStage({
@@ -55,7 +60,16 @@ class SectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final bool isAdmin = currentUser?.role == UserRole.admin;
-    final List<_NavDestination> destinations = _buildDestinations(isAdmin);
+    final bool isCashier = currentUser?.role == UserRole.cashier;
+    final String contextLabel = currentUser == null
+        ? title
+        : '$title · ${currentUser!.name}';
+    final VoidCallback? onShiftTap = isCashier
+        ? null
+        : () => context.go('/shifts');
+    final List<_NavDestination> destinations = _buildDestinations(
+      isAdmin: isAdmin,
+    );
     final ({Color color, String label}) shiftIndicator = _resolveShiftIndicator(
       currentShift,
     );
@@ -67,7 +81,7 @@ class SectionAppBar extends StatelessWidget implements PreferredSizeWidget {
       logoutLabel: AppStrings.navLogout,
     );
     return AppBar(
-      toolbarHeight: compactVisual ? 60 : AppSizes.topBarHeight,
+      toolbarHeight: compactVisual ? 68 : AppSizes.topBarHeight,
       backgroundColor: AppColors.surface,
       titleSpacing: layoutConfig.useCompactTitle ? 14 : AppSizes.spacingMd,
       surfaceTintColor: Colors.transparent,
@@ -83,37 +97,17 @@ class SectionAppBar extends StatelessWidget implements PreferredSizeWidget {
       title: layoutConfig.useCompactTitle
           ? _CompactHeaderTitle(
               key: const ValueKey<String>('section_app_bar_compact_title'),
+              contextLabel: contextLabel,
               shiftIndicator: shiftIndicator,
-              onOpenShifts: () => context.go('/shifts'),
+              onOpenShifts: onShiftTap,
             )
           : Row(
               key: const ValueKey<String>('section_app_bar_standard_title'),
               children: <Widget>[
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      Text(
-                        AppStrings.appName,
-                        style: const TextStyle(
-                          fontSize: AppSizes.fontMd,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      Text(
-                        currentUser == null
-                            ? title
-                            : '$title · ${currentUser!.name}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: AppSizes.fontSm,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
+                  child: _BrandBlock(
+                    contextLabel: contextLabel,
+                    compactVisual: false,
                   ),
                 ),
                 if (layoutConfig.layout !=
@@ -122,7 +116,7 @@ class SectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                   _ShiftIndicator(
                     shiftIndicator: shiftIndicator,
                     compactVisual: false,
-                    onTap: () => context.go('/shifts'),
+                    onTap: onShiftTap,
                   ),
                 ],
               ],
@@ -147,6 +141,7 @@ class SectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 destinations: destinations,
                 onLogout: onLogout,
+                onOpenDrawer: onOpenDrawer,
                 compactVisual: layoutConfig.useCompactInlineNav,
                 onSelectDestination: (_NavDestination destination) =>
                     _handleDestinationTap(context, destination.route),
@@ -155,14 +150,8 @@ class SectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  List<_NavDestination> _buildDestinations(bool isAdmin) {
+  List<_NavDestination> _buildDestinations({required bool isAdmin}) {
     return <_NavDestination>[
-      if (!isAdmin)
-        _NavDestination(
-          label: AppStrings.dashboard,
-          route: '/dashboard',
-          isActive: currentRoute == '/dashboard',
-        ),
       _NavDestination(
         label: AppStrings.categories,
         route: '/pos/categories',
@@ -183,11 +172,12 @@ class SectionAppBar extends StatelessWidget implements PreferredSizeWidget {
         route: '/reports',
         isActive: currentRoute == '/reports',
       ),
-      _NavDestination(
-        label: AppStrings.navShifts,
-        route: '/shifts',
-        isActive: currentRoute == '/shifts',
-      ),
+      if (isAdmin)
+        _NavDestination(
+          label: AppStrings.navShifts,
+          route: '/shifts',
+          isActive: currentRoute == '/shifts',
+        ),
       if (isAdmin)
         _NavDestination(
           label: AppStrings.navAdmin,
@@ -297,26 +287,26 @@ class _HeaderLayoutConfig {
     final double labelWidth = _measureTextWidth(
       shiftLabel,
       const TextStyle(
-        fontSize: 11.5,
-        fontWeight: FontWeight.w600,
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
         letterSpacing: -0.1,
       ),
     );
 
-    return 56 + 10 + labelWidth + 34;
+    return 184 + 12 + labelWidth + 44;
   }
 
   static double _estimateStandardTitleWidth(String shiftLabel) {
     final double labelWidth = _measureTextWidth(
       shiftLabel,
       const TextStyle(
-        fontSize: AppSizes.fontSm,
-        fontWeight: FontWeight.w600,
+        fontSize: 13.5,
+        fontWeight: FontWeight.w700,
         letterSpacing: -0.1,
       ),
     );
 
-    return 212 + 16 + labelWidth + 48;
+    return 234 + 16 + labelWidth + 96;
   }
 
   static double _estimateActionsWidth({
@@ -325,13 +315,13 @@ class _HeaderLayoutConfig {
     required String logoutLabel,
   }) {
     final TextStyle buttonStyle = TextStyle(
-      fontSize: compactNav ? 11.5 : AppSizes.fontSm,
+      fontSize: compactNav ? 12 : 13.5,
       fontWeight: FontWeight.w600,
       letterSpacing: compactNav ? -0.1 : -0.2,
     );
-    final double navHorizontalPadding = compactNav ? 20 : 32;
-    final double navGap = compactNav ? 4 : 8;
-    double totalWidth = compactNav ? 8 : 16;
+    final double navHorizontalPadding = compactNav ? 22 : 30;
+    final double navGap = compactNav ? 4 : 6;
+    double totalWidth = compactNav ? 24 : 34;
 
     for (final String label in navLabels) {
       totalWidth +=
@@ -339,15 +329,15 @@ class _HeaderLayoutConfig {
     }
 
     final TextStyle logoutStyle = TextStyle(
-      fontSize: compactNav ? 11.5 : AppSizes.fontSm,
+      fontSize: compactNav ? 12 : 13.5,
       fontWeight: FontWeight.w600,
       letterSpacing: compactNav ? -0.1 : -0.2,
     );
 
-    totalWidth += compactNav ? 8 : 12;
+    totalWidth += compactNav ? 10 : 14;
     totalWidth += _measureTextWidth(logoutLabel, logoutStyle);
-    totalWidth += compactNav ? 28 : 44;
-    totalWidth += compactNav ? 16 : 20;
+    totalWidth += compactNav ? 48 : 54;
+    totalWidth += compactNav ? 14 : 18;
 
     return totalWidth;
   }
@@ -375,37 +365,114 @@ class _NavDestination {
   final bool isActive;
 }
 
+class _BrandBlock extends StatelessWidget {
+  const _BrandBlock({required this.contextLabel, required this.compactVisual});
+
+  final String contextLabel;
+  final bool compactVisual;
+
+  @override
+  Widget build(BuildContext context) {
+    final double logoShellSize = compactVisual ? 40 : 46;
+    final double logoSize = compactVisual ? 26 : 30;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Container(
+          width: logoShellSize,
+          height: logoShellSize,
+          decoration: BoxDecoration(
+            color: compactVisual
+                ? AppColors.primary.withValues(alpha: 0.08)
+                : AppColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(compactVisual ? 12 : 14),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.95)),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: AppColors.primaryDarker.withValues(alpha: 0.08),
+                blurRadius: compactVisual ? 12 : 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(compactVisual ? 7 : 8),
+            child: Image.asset(
+              _brandLogoAsset,
+              width: logoSize,
+              height: logoSize,
+              fit: BoxFit.contain,
+              errorBuilder:
+                  (BuildContext context, Object error, StackTrace? stackTrace) {
+                    return Icon(
+                      Icons.storefront_rounded,
+                      size: logoSize,
+                      color: AppColors.primaryStrong,
+                    );
+                  },
+            ),
+          ),
+        ),
+        SizedBox(width: compactVisual ? 10 : 14),
+        Flexible(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                _brandTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: compactVisual ? 15 : 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.3,
+                  height: 1,
+                ),
+              ),
+              SizedBox(height: compactVisual ? 3 : 4),
+              Text(
+                contextLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: compactVisual ? 11.5 : 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                  letterSpacing: compactVisual ? -0.05 : -0.1,
+                  height: 1.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _CompactHeaderTitle extends StatelessWidget {
   const _CompactHeaderTitle({
     super.key,
+    required this.contextLabel,
     required this.shiftIndicator,
     required this.onOpenShifts,
   });
 
+  final String contextLabel;
   final ({Color color, String label}) shiftIndicator;
-  final VoidCallback onOpenShifts;
+  final VoidCallback? onOpenShifts;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: <Widget>[
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Text(
-            'EPOS',
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w800,
-              color: AppColors.primary,
-              letterSpacing: -0.2,
-            ),
-          ),
+        Flexible(
+          child: _BrandBlock(contextLabel: contextLabel, compactVisual: true),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Flexible(
           child: _ShiftIndicator(
             shiftIndicator: shiftIndicator,
@@ -425,63 +492,106 @@ class _InlineHeaderActions extends StatelessWidget {
     required this.onLogout,
     required this.compactVisual,
     required this.onSelectDestination,
+    this.onOpenDrawer,
   });
 
   final List<_NavDestination> destinations;
   final VoidCallback onLogout;
   final bool compactVisual;
-  final FutureOr<void> Function(_NavDestination destination) onSelectDestination;
+  final FutureOr<void> Function(_NavDestination destination)
+  onSelectDestination;
+  final VoidCallback? onOpenDrawer;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(right: compactVisual ? 12 : AppSizes.spacingMd),
+      padding: EdgeInsets.only(right: compactVisual ? 10 : AppSizes.spacingMd),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          for (final _NavDestination destination in destinations)
-            _NavButton(
-              key: ValueKey<String>(
-                'section_app_bar_inline_nav_${destination.route}',
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surfaceAlt,
+              borderRadius: BorderRadius.circular(compactVisual ? 14 : 18),
+              border: Border.all(
+                color: AppColors.border.withValues(alpha: 0.95),
               ),
-              label: destination.label,
-              isActive: destination.isActive,
-              onTap: () => onSelectDestination(destination),
-              compactVisual: compactVisual,
             ),
-          SizedBox(width: compactVisual ? 2 : AppSizes.spacingSm),
-          compactVisual
-              ? OutlinedButton(
-                  key: const ValueKey<String>('section_app_bar_inline_logout'),
-                  onPressed: onLogout,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textSecondary,
-                    side: BorderSide(
-                      color: AppColors.border.withValues(alpha: 0.85),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: compactVisual ? 4 : 6,
+                vertical: compactVisual ? 4 : 6,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  for (final _NavDestination destination in destinations)
+                    _NavButton(
+                      key: ValueKey<String>(
+                        'section_app_bar_inline_nav_${destination.route}',
+                      ),
+                      label: destination.label,
+                      isActive: destination.isActive,
+                      onTap: () => onSelectDestination(destination),
+                      compactVisual: compactVisual,
                     ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.1,
-                    ),
-                  ),
-                  child: Text(AppStrings.navLogout),
-                )
-              : OutlinedButton(
-                  key: const ValueKey<String>('section_app_bar_inline_logout'),
-                  onPressed: onLogout,
-                  child: Text(
-                    AppStrings.navLogout,
-                    style: const TextStyle(fontSize: AppSizes.fontSm),
-                  ),
+                ],
+              ),
+            ),
+          ),
+          if (onOpenDrawer != null) ...<Widget>[
+            SizedBox(width: compactVisual ? 8 : 10),
+            OutlinedButton.icon(
+              key: const ValueKey<String>('section_app_bar_inline_open_drawer'),
+              onPressed: onOpenDrawer,
+              icon: Icon(
+                Icons.point_of_sale_rounded,
+                size: compactVisual ? 16 : 18,
+              ),
+              label: const Text('Open Drawer'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.textPrimary,
+                backgroundColor: AppColors.surface,
+                side: BorderSide(color: AppColors.border.withValues(alpha: 0.92)),
+                padding: EdgeInsets.symmetric(
+                  horizontal: compactVisual ? 12 : 14,
+                  vertical: compactVisual ? 10 : 12,
                 ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(compactVisual ? 13 : 16),
+                ),
+                textStyle: TextStyle(
+                  fontSize: compactVisual ? 12 : 13.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: compactVisual ? -0.1 : -0.2,
+                ),
+              ),
+            ),
+          ],
+          SizedBox(width: compactVisual ? 8 : 10),
+          OutlinedButton.icon(
+            key: const ValueKey<String>('section_app_bar_inline_logout'),
+            onPressed: onLogout,
+            icon: Icon(Icons.logout_rounded, size: compactVisual ? 16 : 18),
+            label: Text(AppStrings.navLogout),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textPrimary,
+              backgroundColor: AppColors.surface,
+              side: BorderSide(color: AppColors.border.withValues(alpha: 0.92)),
+              padding: EdgeInsets.symmetric(
+                horizontal: compactVisual ? 12 : 14,
+                vertical: compactVisual ? 10 : 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(compactVisual ? 13 : 16),
+              ),
+              textStyle: TextStyle(
+                fontSize: compactVisual ? 12 : 13.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: compactVisual ? -0.1 : -0.2,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -497,57 +607,106 @@ class _ShiftIndicator extends StatelessWidget {
 
   final ({Color color, String label}) shiftIndicator;
   final bool compactVisual;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final BorderRadius borderRadius = BorderRadius.circular(
+      compactVisual ? 15 : 18,
+    );
+
     return InkWell(
-      borderRadius: BorderRadius.circular(
-        compactVisual ? 999 : AppSizes.radiusSm,
-      ),
+      borderRadius: borderRadius,
       onTap: onTap,
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: compactVisual ? 10 : 12,
-          vertical: compactVisual ? 7 : 6,
+          vertical: compactVisual ? 8 : 9,
         ),
         decoration: BoxDecoration(
-          color: shiftIndicator.color.withValues(
-            alpha: compactVisual ? 0.08 : 0.12,
-          ),
-          borderRadius: BorderRadius.circular(
-            compactVisual ? 999 : AppSizes.radiusSm,
-          ),
+          color: compactVisual ? AppColors.surfaceAlt : AppColors.surface,
+          borderRadius: borderRadius,
           border: Border.all(
             color: shiftIndicator.color.withValues(
-              alpha: compactVisual ? 0.16 : 0,
+              alpha: compactVisual ? 0.22 : 0.14,
             ),
           ),
+          boxShadow: compactVisual
+              ? const <BoxShadow>[]
+              : <BoxShadow>[
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Container(
-              width: compactVisual ? 6 : 10,
-              height: compactVisual ? 6 : 10,
+              width: compactVisual ? 20 : 28,
+              height: compactVisual ? 20 : 28,
               decoration: BoxDecoration(
-                color: shiftIndicator.color,
+                color: shiftIndicator.color.withValues(
+                  alpha: compactVisual ? 0.14 : 0.12,
+                ),
                 shape: BoxShape.circle,
               ),
-            ),
-            SizedBox(width: compactVisual ? 5 : AppSizes.spacingSm),
-            Flexible(
-              child: Text(
-                shiftIndicator.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: compactVisual ? 12 : AppSizes.fontSm,
-                  color: shiftIndicator.color,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.1,
+              child: Center(
+                child: Container(
+                  width: compactVisual ? 7 : 9,
+                  height: compactVisual ? 7 : 9,
+                  decoration: BoxDecoration(
+                    color: shiftIndicator.color,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
+            ),
+            SizedBox(width: compactVisual ? 7 : 10),
+            Flexible(
+              child: compactVisual
+                  ? Text(
+                      shiftIndicator.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: shiftIndicator.color,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.1,
+                      ),
+                    )
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        const Text(
+                          'Shift',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textMuted,
+                            letterSpacing: 0.2,
+                            height: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          shiftIndicator.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.1,
+                            height: 1,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ],
         ),
@@ -567,7 +726,8 @@ class _CollapsedNavigationButton extends StatelessWidget {
   final List<_NavDestination> destinations;
   final VoidCallback onLogout;
   final bool compactVisual;
-  final FutureOr<void> Function(_NavDestination destination) onSelectDestination;
+  final FutureOr<void> Function(_NavDestination destination)
+  onSelectDestination;
 
   Future<void> _openNavigationMenu(BuildContext context) async {
     await showGeneralDialog<void>(
@@ -644,9 +804,9 @@ class _CollapsedNavigationButton extends StatelessWidget {
         visualDensity: VisualDensity.compact,
         style: IconButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
-          backgroundColor: AppColors.surface,
-          minimumSize: const Size(40, 40),
-          side: BorderSide(color: AppColors.border.withValues(alpha: 0.8)),
+          backgroundColor: AppColors.surfaceAlt,
+          minimumSize: const Size(42, 42),
+          side: BorderSide(color: AppColors.border.withValues(alpha: 0.9)),
         ),
         icon: const Icon(Icons.menu_rounded),
       ),
@@ -691,16 +851,31 @@ class _CollapsedNavigationSheet extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(6, 2, 6, 8),
-                  child: Text(
-                    'Navigation',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textSecondary,
-                      letterSpacing: 0.2,
-                    ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const <Widget>[
+                      Text(
+                        _brandTitle,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                          letterSpacing: -0.1,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Navigation',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 for (final _NavDestination destination in destinations)
@@ -728,11 +903,11 @@ class _CollapsedNavigationSheet extends StatelessWidget {
                       vertical: 10,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     textStyle: const TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   child: Text(AppStrings.navLogout),
@@ -765,12 +940,12 @@ class _CollapsedNavigationItem extends StatelessWidget {
       style: TextButton.styleFrom(
         foregroundColor: isActive ? AppColors.primary : AppColors.textPrimary,
         backgroundColor: isActive
-            ? AppColors.primary.withValues(alpha: 0.08)
+            ? AppColors.primary.withValues(alpha: 0.09)
             : Colors.transparent,
         alignment: Alignment.centerLeft,
         minimumSize: const Size.fromHeight(46),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         textStyle: TextStyle(
           fontSize: 14,
           fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
@@ -798,35 +973,50 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: compactVisual ? 2 : AppSizes.spacingXs,
-      ),
-      child: TextButton(
-        onPressed: isActive ? null : onTap,
-        style: TextButton.styleFrom(
-          foregroundColor: isActive
-              ? AppColors.primary
-              : (compactVisual
-                    ? AppColors.textSecondary
-                    : AppColors.textPrimary),
-          backgroundColor: isActive
-              ? AppColors.primary.withValues(alpha: compactVisual ? 0.08 : 0.10)
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOutCubic,
+      margin: EdgeInsets.symmetric(horizontal: compactVisual ? 2 : 3),
+      decoration: BoxDecoration(
+        color: isActive ? AppColors.surface : Colors.transparent,
+        borderRadius: BorderRadius.circular(compactVisual ? 12 : 14),
+        border: Border.all(
+          color: isActive
+              ? AppColors.primary.withValues(alpha: 0.18)
               : Colors.transparent,
+        ),
+        boxShadow: isActive
+            ? <BoxShadow>[
+                BoxShadow(
+                  color: AppColors.primaryDarker.withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 5),
+                ),
+              ]
+            : const <BoxShadow>[],
+      ),
+      child: InkWell(
+        onTap: isActive ? null : onTap,
+        borderRadius: BorderRadius.circular(compactVisual ? 12 : 14),
+        child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: compactVisual ? 10 : 16,
-            vertical: compactVisual ? 8 : 12,
+            horizontal: compactVisual ? 10 : 14,
+            vertical: compactVisual ? 8 : 10,
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(compactVisual ? 12 : 16),
-          ),
-          textStyle: TextStyle(
-            fontSize: compactVisual ? 12 : AppSizes.fontSm,
-            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-            letterSpacing: compactVisual ? -0.1 : -0.2,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: compactVisual ? 12 : 13.5,
+              fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+              letterSpacing: compactVisual ? -0.1 : -0.15,
+              color: isActive
+                  ? AppColors.primaryStrong
+                  : (compactVisual
+                        ? AppColors.textSecondary
+                        : AppColors.textPrimary),
+            ),
           ),
         ),
-        child: Text(label),
       ),
     );
   }

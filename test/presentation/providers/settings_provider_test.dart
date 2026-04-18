@@ -79,6 +79,7 @@ void main() {
         );
         expect(state.cashierReportMode, CashierReportMode.percentage);
         expect(state.visibilityRatio, 0.4);
+        expect(state.customSalesLimitInput, '1000.00');
         expect(state.businessName, 'Cafe Rialto');
         expect(state.businessAddress, '123 Market Street');
       },
@@ -103,6 +104,9 @@ void main() {
       await container.read(settingsNotifierProvider.notifier).load();
       container
           .read(settingsNotifierProvider.notifier)
+          .setCustomSalesLimitInput('250.50');
+      container
+          .read(settingsNotifierProvider.notifier)
           .setDraftMode(CashierReportMode.capAmount);
       container
           .read(settingsNotifierProvider.notifier)
@@ -116,6 +120,7 @@ void main() {
       final settings = await SettingsRepository(db).getCashierZReportSettings();
       expect(settings.policy.cashierReportMode, CashierReportMode.capAmount);
       expect(settings.policy.maxVisibleTotalMinor, 1200);
+      expect(await SettingsRepository(db).getCustomSalesLimitMinor(), 25050);
     });
 
     test('cap amount currency input parses pounds into minor units', () async {
@@ -137,6 +142,9 @@ void main() {
       await container.read(settingsNotifierProvider.notifier).load();
       container
           .read(settingsNotifierProvider.notifier)
+          .setCustomSalesLimitInput('500.00');
+      container
+          .read(settingsNotifierProvider.notifier)
           .setDraftMode(CashierReportMode.capAmount);
       container
           .read(settingsNotifierProvider.notifier)
@@ -149,7 +157,50 @@ void main() {
       expect(saved, isTrue);
       final settings = await SettingsRepository(db).getCashierZReportSettings();
       expect(settings.policy.maxVisibleTotalMinor, 1250);
+      expect(await SettingsRepository(db).getCustomSalesLimitMinor(), 50000);
     });
+
+    test(
+      'loads and saves custom sale limit in pounds while persisting minor units',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        final AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+
+        final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+        final ProviderContainer container = ProviderContainer(
+          overrides: <Override>[
+            appDatabaseProvider.overrideWithValue(db),
+            sharedPreferencesProvider.overrideWithValue(prefs),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await container
+            .read(authNotifierProvider.notifier)
+            .loadUserById(adminId);
+        await container.read(settingsNotifierProvider.notifier).load();
+
+        expect(
+          container.read(settingsNotifierProvider).customSalesLimitInput,
+          '1000.00',
+        );
+
+        container
+            .read(settingsNotifierProvider.notifier)
+            .setCustomSalesLimitInput('123.45');
+
+        final bool saved = await container
+            .read(settingsNotifierProvider.notifier)
+            .save(
+              currentUser: container.read(authNotifierProvider).currentUser!,
+            );
+
+        expect(saved, isTrue);
+        expect(await SettingsRepository(db).getCustomSalesLimitMinor(), 12345);
+      },
+    );
 
     test(
       'invalid cap amount combinations are rejected and not persisted',
@@ -246,5 +297,38 @@ void main() {
         expect(settings.policy.maxVisibleTotalMinor, isNull);
       },
     );
+
+    test('invalid custom sale limit is rejected and not persisted', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(authNotifierProvider.notifier).loadUserById(adminId);
+      await container.read(settingsNotifierProvider.notifier).load();
+      container
+          .read(settingsNotifierProvider.notifier)
+          .setCustomSalesLimitInput('0');
+
+      final bool saved = await container
+          .read(settingsNotifierProvider.notifier)
+          .save(currentUser: container.read(authNotifierProvider).currentUser!);
+
+      expect(saved, isFalse);
+      expect(
+        container.read(settingsNotifierProvider).errorMessage,
+        'Custom sale limit must be greater than 0.',
+      );
+      expect(await SettingsRepository(db).getCustomSalesLimitMinor(), 100000);
+    });
   });
 }

@@ -8,8 +8,12 @@ import '../../../core/constants/app_strings.dart';
 import '../../../domain/models/category.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/category_catalog_provider.dart';
+import '../../providers/products_provider.dart';
 import '../../providers/shift_provider.dart';
+import '../../utils/open_drawer_action.dart';
+import '../../widgets/logout_confirmation.dart';
 import '../../widgets/section_app_bar.dart';
+import 'widgets/pos_product_image_cache.dart';
 
 class CategoryEntryScreen extends ConsumerStatefulWidget {
   const CategoryEntryScreen({super.key});
@@ -23,8 +27,6 @@ class _CategoryEntryScreenState extends ConsumerState<CategoryEntryScreen> {
   static const Key _emptyStateKey = Key('category-entry-empty-state');
   static const Key _featuredGridKey = Key('category-entry-featured-grid');
   static const Key _remainingGridKey = Key('category-entry-remaining-grid');
-  static const double _featuredCardHeight = 156;
-  static const double _remainingCardHeight = 116;
 
   @override
   void initState() {
@@ -51,14 +53,42 @@ class _CategoryEntryScreenState extends ConsumerState<CategoryEntryScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: SectionAppBar(
-        title: 'Categories',
+        title: AppStrings.categories,
         currentRoute: '/pos/categories',
         currentUser: authState.currentUser,
         currentShift: shiftState.currentShift,
-        compactVisual: true,
-        onLogout: () {
-          ref.read(authNotifierProvider.notifier).logout();
-          context.go('/login');
+        onLogout: () => handleLogoutRequest(context, ref),
+        onOpenDrawer: () => triggerOpenDrawerAction(context, ref),
+        onSelectDestination: (String route) {
+          if (route != '/pos') {
+            context.go(route);
+            return;
+          }
+          // Resolve a deterministic categoryId for the POS nav action:
+          // 1. Last-selected category from the shared products state (persists
+          //    across category-entry ↔ POS transitions within the same session).
+          // 2. First active category from the already-loaded category list.
+          // 3. First category from the async provider if it has data.
+          // 4. Stay on category entry with a snackbar (graceful fallback).
+          final int? lastSelected = ref
+              .read(productsNotifierProvider)
+              .selectedCategoryId;
+          if (lastSelected != null) {
+            context.go(_buildPosLocation(lastSelected));
+            return;
+          }
+          final List<Category>? loadedCategories = categoriesAsync.valueOrNull;
+          final Category? firstCategory =
+              (loadedCategories != null && loadedCategories.isNotEmpty)
+              ? loadedCategories.first
+              : null;
+          if (firstCategory != null) {
+            context.go(_buildPosLocation(firstCategory.id));
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Select a category first')),
+          );
         },
       ),
       body: SafeArea(
@@ -145,7 +175,7 @@ class _CategoryEntryScreenState extends ConsumerState<CategoryEntryScreen> {
                       SliverPadding(
                         padding: EdgeInsets.fromLTRB(
                           horizontalPadding,
-                          AppSizes.spacingMd,
+                          AppSizes.spacingSm,
                           horizontalPadding,
                           AppSizes.spacingLg,
                         ),
@@ -168,7 +198,7 @@ class _CategoryEntryScreenState extends ConsumerState<CategoryEntryScreen> {
                           key: _featuredGridKey,
                           categories: featuredCategories,
                           columns: featuredColumns,
-                          cardHeight: _featuredCardHeight,
+                          childAspectRatio: 2.25,
                         ),
                       ),
                       if (remainingCategories.isNotEmpty)
@@ -183,7 +213,7 @@ class _CategoryEntryScreenState extends ConsumerState<CategoryEntryScreen> {
                             key: _remainingGridKey,
                             categories: remainingCategories,
                             columns: remainingColumns,
-                            cardHeight: _remainingCardHeight,
+                            childAspectRatio: 2.2,
                           ),
                         ),
                     ],
@@ -214,7 +244,10 @@ class _CategoryEntryScreenState extends ConsumerState<CategoryEntryScreen> {
     if (width < 1024) {
       return 3;
     }
-    return 4;
+    if (width < 1600) {
+      return 4;
+    }
+    return 5;
   }
 }
 
@@ -310,13 +343,13 @@ class _FeaturedCategoryGrid extends StatelessWidget {
   const _FeaturedCategoryGrid({
     required this.categories,
     required this.columns,
-    required this.cardHeight,
+    required this.childAspectRatio,
     super.key,
   });
 
   final List<Category> categories;
   final int columns;
-  final double cardHeight;
+  final double childAspectRatio;
 
   @override
   Widget build(BuildContext context) {
@@ -326,9 +359,9 @@ class _FeaturedCategoryGrid extends StatelessWidget {
       }, childCount: categories.length),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: columns,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        mainAxisExtent: cardHeight,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: childAspectRatio,
       ),
     );
   }
@@ -338,13 +371,13 @@ class _RemainingCategoryGrid extends StatelessWidget {
   const _RemainingCategoryGrid({
     required this.categories,
     required this.columns,
-    required this.cardHeight,
+    required this.childAspectRatio,
     super.key,
   });
 
   final List<Category> categories;
   final int columns;
-  final double cardHeight;
+  final double childAspectRatio;
 
   @override
   Widget build(BuildContext context) {
@@ -354,9 +387,9 @@ class _RemainingCategoryGrid extends StatelessWidget {
       }, childCount: categories.length),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: columns,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        mainAxisExtent: cardHeight,
+        mainAxisSpacing: 6,
+        crossAxisSpacing: 6,
+        childAspectRatio: childAspectRatio,
       ),
     );
   }
@@ -371,9 +404,9 @@ class _CategoryEntryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final BorderRadius borderRadius = BorderRadius.circular(AppSizes.radiusLg);
-    final double titleFontSize = isLarge ? 17 : 12.5;
+    final double titleFontSize = isLarge ? 16.5 : 12;
     final FontWeight titleWeight = isLarge ? FontWeight.w800 : FontWeight.w700;
-    final double titleInset = isLarge ? 12 : 9;
+    final double titleInset = isLarge ? 11 : 8;
 
     return Material(
       key: ValueKey<String>('category-entry-card-${category.id}'),
@@ -458,8 +491,8 @@ class _CategoryEntryImage extends StatelessWidget {
       children: <Widget>[
         _CategoryEntryPlaceholder(categoryId: category.id),
         Positioned.fill(
-          child: Image.network(
-            imageUrl,
+          child: Image(
+            image: resolveCachedPosCategoryImageProvider(imageUrl),
             key: ValueKey<String>('category-entry-image-${category.id}'),
             fit: BoxFit.cover,
             filterQuality: FilterQuality.low,

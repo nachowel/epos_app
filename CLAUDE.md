@@ -202,7 +202,7 @@ draft / sent / paid / cancelled
 Definitions:
 
 * `draft` = first product has already been added, transaction exists, order is still editable
-* `sent` = draft order has been submitted, order is no longer line-editable, payment/cancellation may proceed
+* `sent` = an explicit submit/send-order action completed successfully, editable order-building is closed, the pre-payment snapshot is frozen, and payment/cancellation may proceed
 * `paid` = payment completed; terminal
 * `cancelled` = sent order cancelled without payment; terminal
 
@@ -218,7 +218,7 @@ sent -> cancelled
 Legacy terminology rule:
 
 * `open` is deprecated legacy wording only
-* `open` may be used informally for active/open-order lists
+* if a UI or report still uses the label `open orders`, that label means the combined active set `draft + sent`
 * `open` is NOT a canonical stored `transactions.status`
 
 ### POS entry and transaction timing
@@ -232,7 +232,10 @@ Legacy terminology rule:
 * no action other than successful first-product add may exit pre-order state
 * first product added creates the cart together with the transaction, and the cart is always tied to `transaction_id`
 * first-product add must atomically create the transaction, set `status = 'draft'`, insert the first line, compute totals, and set `updated_at`
+* persisted `draft` creation happens only on the first successful product add
+* minimum persisted draft condition is: transaction row + first line + computed totals in the same successful atomic flow
 * do NOT create empty transactions from login, category taps, or screen entry
+* do NOT create empty-cart transactions under any lifecycle shortcut
 * do NOT create temporary transactions or persist cart state before transaction creation
 * do NOT keep a parallel in-memory cart before transaction creation
 * do NOT simulate cart behavior without a real transaction
@@ -244,18 +247,94 @@ Legacy terminology rule:
 * payment is allowed only from `sent`
 * cancellation is allowed only from `sent`
 * discarding a `draft` deletes it; discard is not a `cancelled` transition
-* kitchen print is queued on `draft -> sent`
-* receipt print is queued on `sent -> paid`
-* active/open-order lists consist of `draft` and `sent`
+* abandoned draft cleanup is manual discard/delete in the current model
+* automatic abandoned-draft cleanup is future scope
+* `draft` never syncs to the remote mirror
+* `draft -> sent` happens only on the explicit send/submit-order action
+* `sent -> paid` happens only on successful payment completion
+* `sent -> cancelled` happens only on an explicit cancel action against an unpaid sent transaction
+* entering `sent` atomically freezes the pre-payment snapshot and queues kitchen print exactly once
+* `sent` is not editable because order-building must stop before payment/cancellation and before kitchen execution is treated as actionable
+* `sent` does not require print success; it is the frozen commercial snapshot before payment
+* kitchen print attempt happens only after successful `draft -> sent` and must never be triggered from pre-order or `draft` alone
+* receipt print attempt happens only after successful `sent -> paid`
+* active transaction lists consist of `draft` and `sent`
+* if a UI/report surface still shows `open orders`, that label refers only to the combined active set `draft + sent`
 * `paid` and `cancelled` are terminal persisted states
+
+### Mutability matrix
+
+| State       | lines | modifiers | discounts | table_number | notes / metadata |
+| ----------- | ----- | --------- | --------- | ------------ | ---------------- |
+| `draft`     | mutable | mutable | mutable | mutable | mutable |
+| `sent`      | immutable | immutable | immutable | immutable | immutable |
+| `paid`      | immutable | immutable | immutable | immutable | immutable |
+| `cancelled` | immutable | immutable | immutable | immutable | immutable |
+
+### Hard lifecycle guards
+
+* each transition has exactly one allowed source state
+* the same action must not resolve to multiple target states
+* duplicate send requests must not create a second `draft -> sent` transition or duplicate kitchen-print side effects
+* duplicate payment attempts must re-check persisted status and must not create a second payment row or duplicate `sent -> paid` transition
+* duplicate cancel attempts must re-check persisted status and must not create a second `sent -> cancelled` transition
+* terminal states must reject further lifecycle transitions
+
+---
+
+## 🏷 DISCOUNT RULES
+
+* phase 1 supports transaction-level discount only
+* line-item discount is out of scope
+* tax, VAT, and service charge remain out of scope
+* discount is part of the transaction snapshot, not a payment-side adjustment
+* discount may be added, changed, or removed only while the transaction is in `draft`
+* for discount mutability, `draft` is the only editable persisted transaction state in the canonical status model
+* `sent`, `paid`, and `cancelled` transactions must not accept discount changes
+* discount must be finalized before checkout/payment starts; payment uses the frozen post-discount total
+* both `cashier` and `admin` may apply, change, or remove discount in phase 1
+* no admin override or role-based limit exists in phase 1
+
+### Discount storage contract
+
+* `discount_type` = `amount | percent | null`
+* `discount_value_minor` = raw integer input value
+* `discount_amount_minor` = computed monetary discount actually deducted
+* for `amount`, `discount_value_minor` stores currency minor units
+* for `percent`, `discount_value_minor` stores whole-number percent integer `0..100` where `10 = 10%`
+* do NOT use float/double, decimal percentages, or basis points
+* `discount_reason` is nullable in phase 1
+* `discount_applied_by` stores the acting `users.id` when a discount is present
+
+### Discount pricing formula
+
+```text
+pre_discount_total_minor = subtotal_minor + modifier_total_minor
+total_amount_minor = max(0, pre_discount_total_minor - discount_amount_minor)
+```
+
+Rules:
+
+* fixed discount must not exceed `pre_discount_total_minor`
+* for `discount_type = 'amount'`, `discount_amount_minor` equals the validated `discount_value_minor`
+* percent discount must compute `discount_amount_minor` with integer-only round-half-up arithmetic against `pre_discount_total_minor`
+* final total must never be negative
+* removing discount resets `discount_type = null`, `discount_value_minor = 0`, `discount_amount_minor = 0`, `discount_reason = null`, and `discount_applied_by = null`
+* receipt output must show discount as a separate line
+* synced transaction snapshots must include the discount fields
+* reporting in phase 1 must reconcile from net transaction total; separate discount analytics is future scope
 
 ---
 
 ## 💳 PAYMENT RULES
 
 * EXACTLY ONE payment per transaction
-* amount MUST equal total
+* payment entry is allowed only when persisted `transactions.status = 'sent'`
+* payment attempt must re-check persisted status immediately before inserting the payment row or finalizing payment
+* if persisted status is not `sent`, payment must be rejected without payment-side effects
+* `payments.amount_minor` MUST equal `transactions.total_amount_minor`
 * atomic DB transaction required
+* payment table must NOT store duplicate discount fields
 
 ---
 
@@ -272,6 +351,12 @@ Legacy terminology rule:
 * print does NOT affect state
 * failures do NOT rollback payment
 * flags are informational only
+* kitchen print eligibility begins only after successful `draft -> sent`
+* receipt print eligibility begins only after successful `sent -> paid`
+* kitchen print attempt occurs after successful `draft -> sent`; print success is not required to keep `sent`
+* receipt print attempt occurs after successful `sent -> paid`; print success is not required to keep `paid`
+* kitchen/receipt print flags are operational state only; they are not lifecycle state
+* print retry must not create duplicate lifecycle transitions or duplicate payment records
 
 ---
 
@@ -310,7 +395,7 @@ Rules:
 
 * ONLY `paid` / `cancelled`
 * NEVER `draft` / `sent`
-* NEVER treat `open` as a syncable stored status
+* NEVER treat `open` as a syncable or stored status
 
 ### Write path:
 
@@ -371,6 +456,10 @@ local → sync queue → edge function → supabase
 14. ❌ Simulate cart behavior without a real transaction
 15. ❌ Create a transaction without its first line in the same atomic flow
 16. ❌ Insert the first line without the transaction in the same atomic flow
+17. ❌ Calculate discount only in payment UI without persisting it on the transaction
+18. ❌ Add discount fields to `payments`
+19. ❌ Change discount on `sent`, `paid`, or `cancelled` transactions
+20. ❌ Use float/double for discount amount or percent math
 
 ---
 

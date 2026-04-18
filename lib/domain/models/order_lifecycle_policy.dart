@@ -56,8 +56,7 @@ class OrderLifecyclePolicy {
   }
 
   static bool canUpdateTableNumber(TransactionStatus status) {
-    return status == TransactionStatus.draft ||
-        status == TransactionStatus.sent;
+    return status == TransactionStatus.draft;
   }
 
   static bool canDiscardDraft(TransactionStatus status) {

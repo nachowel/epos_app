@@ -39,7 +39,7 @@ void main() {
       );
 
       // Create an order with meal customization to have data.
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
       await service.addProductToOrder(
         transactionId: order.id,
         productId: f.mealProductId,
@@ -84,7 +84,7 @@ void main() {
         productRepository: ProductRepository(db),
       );
 
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
       await service.addProductToOrder(
         transactionId: order.id,
         productId: f.mealProductId,
@@ -115,7 +115,7 @@ void main() {
         suggestionCacheTtl: const Duration(milliseconds: 1),
       );
 
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
       await service.addProductToOrder(
         transactionId: order.id,
         productId: f.mealProductId,
@@ -143,7 +143,7 @@ void main() {
         productRepository: ProductRepository(db),
       );
 
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
       await service.addProductToOrder(
         transactionId: order.id,
         productId: f.mealProductId,
@@ -172,7 +172,7 @@ void main() {
         productRepository: ProductRepository(db),
       );
 
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
       await service.addProductToOrder(
         transactionId: order.id,
         productId: f.mealProductId,
@@ -217,7 +217,7 @@ void main() {
       final _Fixture f = await _seedFixture(db);
       final OrderService service = _buildService(db, f.repository);
       final TransactionRepository txRepo = TransactionRepository(db);
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
       final request = f.buildRequest(removeSide: true);
 
       for (int i = 0; i < 3; i++) {
@@ -246,7 +246,7 @@ void main() {
       final _Fixture f = await _seedFixture(db);
       final OrderService service = _buildService(db, f.repository);
       final TransactionRepository txRepo = TransactionRepository(db);
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
 
       final TransactionLine line = await service.addProductToOrder(
         transactionId: order.id,
@@ -280,7 +280,7 @@ void main() {
       final _Fixture f = await _seedFixture(db);
       final OrderService service = _buildService(db, f.repository);
       final TransactionRepository txRepo = TransactionRepository(db);
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
 
       final TransactionLine line = await service.addProductToOrder(
         transactionId: order.id,
@@ -320,7 +320,7 @@ void main() {
 
       final _Fixture f = await _seedFixture(db);
       final OrderService service = _buildService(db, f.repository);
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
 
       await service.addProductToOrder(
         transactionId: order.id,
@@ -351,7 +351,7 @@ void main() {
       final _Fixture f = await _seedFixture(db);
       final OrderService service = _buildService(db, f.repository);
       final TransactionRepository txRepo = TransactionRepository(db);
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
 
       await service.addProductToOrder(
         transactionId: order.id,
@@ -395,7 +395,7 @@ void main() {
       final _Fixture f = await _seedFixture(db);
       final OrderService service = _buildService(db, f.repository);
       final TransactionRepository txRepo = TransactionRepository(db);
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
 
       // Create 3 legacy lines for the meal product.
       for (int i = 0; i < 3; i++) {
@@ -421,7 +421,7 @@ void main() {
       final _Fixture f = await _seedFixture(db);
       final OrderService service = _buildService(db, f.repository);
       final TransactionRepository txRepo = TransactionRepository(db);
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
 
       // Second product.
       final int otherProductId = await insertProduct(
@@ -461,7 +461,7 @@ void main() {
       final _Fixture f = await _seedFixture(db);
       final OrderService service = _buildService(db, f.repository);
       final TransactionRepository txRepo = TransactionRepository(db);
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
 
       // Add a snapshot-backed line.
       await service.addProductToOrder(
@@ -544,7 +544,7 @@ void main() {
 
       final _Fixture f = await _seedFixture(db);
       final OrderService service = _buildService(db, f.repository);
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
 
       final int plainProductId = await insertProduct(
         db,
@@ -566,7 +566,7 @@ void main() {
 
       final _Fixture f = await _seedFixture(db);
       final OrderService service = _buildService(db, f.repository);
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
       final request = f.buildRequest(removeSide: true);
 
       final TransactionLine first = await service.addProductToOrder(
@@ -592,7 +592,7 @@ void main() {
 
       final _Fixture f = await _seedFixture(db);
       final OrderService service = _buildService(db, f.repository);
-      final order = await service.createOrder(currentUser: f.user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(currentUser: f.user);
 
       await service.addProductToOrder(
         transactionId: order.id,

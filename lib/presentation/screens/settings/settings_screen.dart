@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
@@ -9,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../widgets/language_selector_card.dart';
+import '../../widgets/logout_confirmation.dart';
 import '../../widgets/section_app_bar.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -19,12 +18,21 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  late final TextEditingController _customSalesLimitController;
+
   @override
   void initState() {
     super.initState();
+    _customSalesLimitController = TextEditingController();
     Future<void>.microtask(
       () => ref.read(settingsNotifierProvider.notifier).load(),
     );
+  }
+
+  @override
+  void dispose() {
+    _customSalesLimitController.dispose();
+    super.dispose();
   }
 
   void _showMessage(String message) {
@@ -39,6 +47,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final shiftState = ref.watch(shiftNotifierProvider);
     final settingsState = ref.watch(settingsNotifierProvider);
     final currentUser = authState.currentUser;
+    if (_customSalesLimitController.text !=
+        settingsState.customSalesLimitInput) {
+      _customSalesLimitController.value = TextEditingValue(
+        text: settingsState.customSalesLimitInput,
+        selection: TextSelection.collapsed(
+          offset: settingsState.customSalesLimitInput.length,
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -47,10 +64,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         currentRoute: '/admin/settings',
         currentUser: currentUser,
         currentShift: shiftState.currentShift,
-        onLogout: () {
-          ref.read(authNotifierProvider.notifier).logout();
-          context.go('/login');
-        },
+        onLogout: () => handleLogoutRequest(context, ref),
       ),
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.spacingMd),
@@ -100,6 +114,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               .read(settingsNotifierProvider.notifier)
                               .setDraftRatio(value);
                         },
+                ),
+                const SizedBox(height: AppSizes.spacingMd),
+                TextField(
+                  controller: _customSalesLimitController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  enabled: !settingsState.isLoading && !settingsState.isSaving,
+                  onChanged: (String value) {
+                    ref
+                        .read(settingsNotifierProvider.notifier)
+                        .setCustomSalesLimitInput(value);
+                  },
+                  decoration: const InputDecoration(
+                    labelText: 'Custom Sale Limit (£)',
+                    hintText: '1000.00',
+                  ),
                 ),
                 if (settingsState.errorMessage != null)
                   Padding(

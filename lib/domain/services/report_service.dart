@@ -146,6 +146,8 @@ class ReportService {
     final int netSalesMinor = grossSalesMinor - refundTotalMinor;
     final categoryBreakdown = await _transactionRepository
         .getPaidCategoryTotalsForShift(shiftId);
+    final ({int revenueMinor, int count}) customSalesSummary =
+        await _transactionRepository.getPaidCustomSalesSummaryForShift(shiftId);
     final SemanticSalesAnalytics semanticSalesAnalytics =
         await _buildSemanticSalesAnalytics(paidTransactions);
 
@@ -166,6 +168,11 @@ class ReportService {
       cardCount: cardCount,
       cardGrossTotalMinor: cardGrossTotalMinor,
       cardTotalMinor: cardTotalMinor,
+      customSalesRevenueMinor: customSalesSummary.revenueMinor,
+      customSalesCount: customSalesSummary.count,
+      customSalesAverageValueMinor: customSalesSummary.count <= 0
+          ? 0
+          : customSalesSummary.revenueMinor ~/ customSalesSummary.count,
       categoryBreakdown: categoryBreakdown,
       semanticSalesAnalytics: semanticSalesAnalytics,
     );
@@ -405,20 +412,22 @@ class ReportService {
 
     // Best-effort orphan snapshot cleanup on shift close.
     try {
-      final int orphansRemoved =
-          await _transactionRepository.cleanupOrphanMealCustomizationSnapshots();
+      final int orphansRemoved = await _transactionRepository
+          .cleanupOrphanMealCustomizationSnapshots();
       if (orphansRemoved > 0) {
         _logger.info(
           eventType: 'meal_snapshot_orphan_cleanup',
           entityId: '${finalized.openShift.id}',
-          message: 'Cleaned up $orphansRemoved orphan meal customization snapshot(s) on shift close.',
+          message:
+              'Cleaned up $orphansRemoved orphan meal customization snapshot(s) on shift close.',
         );
       }
     } catch (error, stackTrace) {
       _logger.warn(
         eventType: 'meal_snapshot_orphan_cleanup_failed',
         entityId: '${finalized.openShift.id}',
-        message: 'Failed to clean up orphan meal customization snapshots on shift close.',
+        message:
+            'Failed to clean up orphan meal customization snapshots on shift close.',
         error: error,
         stackTrace: stackTrace,
       );
@@ -611,6 +620,10 @@ class ReportService {
     return _settingsRepository.getCashierZReportSettings();
   }
 
+  Future<int> getCustomSalesLimitMinor() {
+    return _settingsRepository.getCustomSalesLimitMinor();
+  }
+
   Future<ShiftReport?> getOpenShiftReportForAdmin({required User user}) async {
     AuthorizationPolicy.ensureAllowed(user, OperatorPermission.viewFullReports);
     final Shift? openShift = await _shiftSessionService.getBackendOpenShift();
@@ -635,6 +648,17 @@ class ReportService {
     AuthorizationPolicy.ensureAllowed(user, OperatorPermission.viewFullReports);
     await _settingsRepository.updateCashierZReportSettings(
       settings,
+      userId: user.id,
+    );
+  }
+
+  Future<void> updateCustomSalesLimitMinor({
+    required User user,
+    required int limitMinor,
+  }) async {
+    AuthorizationPolicy.ensureAllowed(user, OperatorPermission.viewFullReports);
+    await _settingsRepository.updateCustomSalesLimitMinor(
+      limitMinor,
       userId: user.id,
     );
   }
@@ -767,7 +791,8 @@ class ReportService {
         for (final OrderModifier modifier in modifiers) {
           final ModifierChargeReason? reason = modifier.chargeReason;
           final int? itemProductId = modifier.itemProductId;
-          if (reason != null && reason != ModifierChargeReason.removalDiscount) {
+          if (reason != null &&
+              reason != ModifierChargeReason.removalDiscount) {
             final _ChargeReasonAccumulator accumulator = reasonBuckets
                 .putIfAbsent(reason, _ChargeReasonAccumulator.new);
             accumulator.eventCount += 1;
@@ -880,7 +905,8 @@ class ReportService {
           choiceBuckets: choiceBuckets,
           dataQualityNotes: dataQualityNotes,
           fallbackItemNames: fallbackItemNames,
-          fallbackExplicitNoneLabelsByGroupId: fallbackExplicitNoneLabelsByGroupId,
+          fallbackExplicitNoneLabelsByGroupId:
+              fallbackExplicitNoneLabelsByGroupId,
           itemProductIds: itemProductIds,
         );
         _accumulateBundleVariant(
@@ -889,7 +915,8 @@ class ReportService {
           lineRevenueMinor: line.lineTotalMinor,
           requestedState: requestedState,
           configuration: configuration,
-          fallbackExplicitNoneLabelsByGroupId: fallbackExplicitNoneLabelsByGroupId,
+          fallbackExplicitNoneLabelsByGroupId:
+              fallbackExplicitNoneLabelsByGroupId,
           variantBuckets: variantBuckets,
         );
       }
@@ -1005,7 +1032,7 @@ class ReportService {
             (
               SemanticChargeReasonAnalytics a,
               SemanticChargeReasonAnalytics b,
-          ) => b.revenueMinor.compareTo(a.revenueMinor),
+            ) => b.revenueMinor.compareTo(a.revenueMinor),
           );
 
     final List<SemanticMealRevenueAnalytics> mealRevenueBreakdown =
@@ -1030,10 +1057,8 @@ class ReportService {
             )
             .toList(growable: true)
           ..sort(
-            (
-              SemanticMealRevenueAnalytics a,
-              SemanticMealRevenueAnalytics b,
-            ) => b.netRevenueMinor.compareTo(a.netRevenueMinor),
+            (SemanticMealRevenueAnalytics a, SemanticMealRevenueAnalytics b) =>
+                b.netRevenueMinor.compareTo(a.netRevenueMinor),
           );
 
     final List<SemanticMealAppliedRuleAnalytics> appliedMealRules =
@@ -1048,20 +1073,18 @@ class ReportService {
                   ),
             )
             .toList(growable: true)
-          ..sort(
-            (
-              SemanticMealAppliedRuleAnalytics a,
-              SemanticMealAppliedRuleAnalytics b,
-            ) {
-              final int impactCompare = b.totalImpactMinor.abs().compareTo(
-                a.totalImpactMinor.abs(),
-              );
-              if (impactCompare != 0) {
-                return impactCompare;
-              }
-              return b.applicationCount.compareTo(a.applicationCount);
-            },
-          );
+          ..sort((
+            SemanticMealAppliedRuleAnalytics a,
+            SemanticMealAppliedRuleAnalytics b,
+          ) {
+            final int impactCompare = b.totalImpactMinor.abs().compareTo(
+              a.totalImpactMinor.abs(),
+            );
+            if (impactCompare != 0) {
+              return impactCompare;
+            }
+            return b.applicationCount.compareTo(a.applicationCount);
+          });
 
     final List<SemanticBundleVariantAnalytics> bundleVariants =
         variantBuckets.entries
@@ -1197,7 +1220,8 @@ class ReportService {
                   rootProductId: line.productId,
                   itemProductId: itemProductId,
                 ),
-                () => _ItemBehaviorAccumulator(rootProductName: line.productName),
+                () =>
+                    _ItemBehaviorAccumulator(rootProductName: line.productName),
               );
           accumulator.occurrenceCount += lineQuantity;
           accumulator.totalQuantity += expandedQuantity;
@@ -1217,8 +1241,9 @@ class ReportService {
                     rootProductId: line.productId,
                     itemProductId: sourceItemProductId,
                   ),
-                  () =>
-                      _ItemBehaviorAccumulator(rootProductName: line.productName),
+                  () => _ItemBehaviorAccumulator(
+                    rootProductName: line.productName,
+                  ),
                 );
             removedAccumulator.occurrenceCount += lineQuantity;
             removedAccumulator.totalQuantity += expandedQuantity;
@@ -1232,7 +1257,8 @@ class ReportService {
                   rootProductId: line.productId,
                   itemProductId: itemProductId,
                 ),
-                () => _ItemBehaviorAccumulator(rootProductName: line.productName),
+                () =>
+                    _ItemBehaviorAccumulator(rootProductName: line.productName),
               );
           addedAccumulator.occurrenceCount += lineQuantity;
           addedAccumulator.totalQuantity += expandedQuantity;
@@ -1262,21 +1288,26 @@ class ReportService {
       }
     }
 
-    final List<int> chosenItemProductIds = snapshot.resolvedComponentActions
-        .where((MealCustomizationSemanticAction action) {
-          return action.action == MealCustomizationAction.swap &&
-              action.itemProductId != null;
-        })
-        .map((MealCustomizationSemanticAction action) => action.itemProductId!)
-        .toList(growable: false)
-      ..sort();
+    final List<int> chosenItemProductIds =
+        snapshot.resolvedComponentActions
+            .where((MealCustomizationSemanticAction action) {
+              return action.action == MealCustomizationAction.swap &&
+                  action.itemProductId != null;
+            })
+            .map(
+              (MealCustomizationSemanticAction action) => action.itemProductId!,
+            )
+            .toList(growable: false)
+          ..sort();
     final List<int> removedItemProductIds = <int>[
       ...snapshot.resolvedComponentActions
           .where((MealCustomizationSemanticAction action) {
             return action.action == MealCustomizationAction.remove &&
                 action.itemProductId != null;
           })
-          .map((MealCustomizationSemanticAction action) => action.itemProductId!),
+          .map(
+            (MealCustomizationSemanticAction action) => action.itemProductId!,
+          ),
       ...snapshot.resolvedComponentActions
           .where((MealCustomizationSemanticAction action) {
             return action.action == MealCustomizationAction.swap &&
@@ -1293,7 +1324,9 @@ class ReportService {
           .where((MealCustomizationSemanticAction action) {
             return action.itemProductId != null;
           })
-          .map((MealCustomizationSemanticAction action) => action.itemProductId!),
+          .map(
+            (MealCustomizationSemanticAction action) => action.itemProductId!,
+          ),
     ]..sort();
 
     final _VariantAccumulator accumulator = variantBuckets.putIfAbsent(
@@ -1385,8 +1418,8 @@ class ReportService {
       final BreakfastChoiceGroupConfig? group = configuration?.findGroup(
         choice.groupId,
       );
-      final BreakfastChoiceGroupMemberConfig? member = selectedItemProductId ==
-              null
+      final BreakfastChoiceGroupMemberConfig? member =
+          selectedItemProductId == null
           ? null
           : group?.findMember(selectedItemProductId);
       if (group == null) {
@@ -1442,35 +1475,33 @@ class ReportService {
     final List<_VariantChoiceAnswer> chosenItems =
         requestedState.chosenGroups
             .where(
-              (BreakfastChosenGroupRequest choice) => choice.requestedQuantity > 0,
+              (BreakfastChosenGroupRequest choice) =>
+                  choice.requestedQuantity > 0,
             )
-            .map(
-              (BreakfastChosenGroupRequest choice) {
-                final BreakfastChoiceGroupConfig? group = configuration?.findGroup(
-                  choice.groupId,
-                );
-                final int? selectedItemProductId = choice.selectedItemProductId;
-                final BreakfastChoiceGroupMemberConfig? member =
-                    selectedItemProductId == null
-                    ? null
-                    : group?.findMember(selectedItemProductId);
-                final String displayName = selectedItemProductId == null
-                    ? group?.explicitNoneDisplayLabel ??
-                          fallbackExplicitNoneLabelsByGroupId[choice.groupId] ??
-                          breakfastNoneChoiceDisplayName
-                    : member?.displayName ?? 'Product $selectedItemProductId';
-                final String stableKey = selectedItemProductId == null
-                    ? 'g${choice.groupId}=none:${choice.requestedQuantity}'
-                    : 'p${selectedItemProductId}x${choice.requestedQuantity}';
-                return _VariantChoiceAnswer(
-                  groupId: choice.groupId,
-                  productId: selectedItemProductId,
-                  quantity: choice.requestedQuantity,
-                  displayName: displayName,
-                  stableKey: stableKey,
-                );
-              },
-            )
+            .map((BreakfastChosenGroupRequest choice) {
+              final BreakfastChoiceGroupConfig? group = configuration
+                  ?.findGroup(choice.groupId);
+              final int? selectedItemProductId = choice.selectedItemProductId;
+              final BreakfastChoiceGroupMemberConfig? member =
+                  selectedItemProductId == null
+                  ? null
+                  : group?.findMember(selectedItemProductId);
+              final String displayName = selectedItemProductId == null
+                  ? group?.explicitNoneDisplayLabel ??
+                        fallbackExplicitNoneLabelsByGroupId[choice.groupId] ??
+                        breakfastNoneChoiceDisplayName
+                  : member?.displayName ?? 'Product $selectedItemProductId';
+              final String stableKey = selectedItemProductId == null
+                  ? 'g${choice.groupId}=none:${choice.requestedQuantity}'
+                  : 'p${selectedItemProductId}x${choice.requestedQuantity}';
+              return _VariantChoiceAnswer(
+                groupId: choice.groupId,
+                productId: selectedItemProductId,
+                quantity: choice.requestedQuantity,
+                displayName: displayName,
+                stableKey: stableKey,
+              );
+            })
             .toList(growable: true)
           ..sort(_compareVariantChoiceAnswers);
     final List<_VariantItem> removedItems =
@@ -1631,9 +1662,7 @@ class ReportService {
       if (items.isEmpty) {
         return '-';
       }
-      return items
-          .map((_VariantChoiceAnswer item) => item.stableKey)
-          .join('|');
+      return items.map((_VariantChoiceAnswer item) => item.stableKey).join('|');
     }
 
     String serializeItems(List<_VariantItem> items) {

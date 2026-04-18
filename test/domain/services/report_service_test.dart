@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart' show Variable;
+import 'package:drift/drift.dart' show Value, Variable;
 import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/core/logging/app_logger.dart';
 import 'package:epos_app/data/database/app_database.dart'
@@ -12,6 +12,8 @@ import 'package:epos_app/data/repositories/transaction_repository.dart';
 import 'package:epos_app/data/repositories/transaction_state_repository.dart';
 import 'package:epos_app/domain/models/payment.dart';
 import 'package:epos_app/domain/models/shift_close_readiness.dart';
+import 'package:epos_app/domain/models/shift_report.dart';
+import 'package:epos_app/domain/models/shift_report_category_line.dart';
 import 'package:epos_app/domain/models/shift_reconciliation.dart';
 import 'package:epos_app/domain/models/stale_final_close_recovery_details.dart';
 import 'package:epos_app/domain/models/user.dart';
@@ -277,6 +279,226 @@ void main() {
         expect(result.finalCloseCompleted, isTrue);
         expect(result.report.paidTotalMinor, 1600);
         expect(openShiftAfterClose, isNull);
+      },
+    );
+
+    test(
+      'shift report keeps custom sale in financial totals while excluding it from category breakdown',
+      () async {
+        final db = createTestDatabase();
+        addTearDown(db.close);
+
+        final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+        final int shiftId = await insertShift(db, openedBy: adminId);
+        final int drinksId = await insertCategory(db, name: 'Drinks');
+        final int foodId = await insertCategory(db, name: 'Food');
+        final int coffeeId = await insertProduct(
+          db,
+          categoryId: drinksId,
+          name: 'Coffee',
+          priceMinor: 900,
+        );
+        final int customSaleProductId = await insertProduct(
+          db,
+          categoryId: foodId,
+          name: 'Custom Sale',
+          priceMinor: 0,
+          isCustom: true,
+        );
+        final int paidOrderId = await insertTransaction(
+          db,
+          uuid: 'shift-report-custom-mixed',
+          shiftId: shiftId,
+          userId: adminId,
+          status: 'paid',
+          totalAmountMinor: 2100,
+          paidAt: DateTime(2026, 4, 10, 12, 0),
+        );
+        await db
+            .into(db.transactionLines)
+            .insert(
+              TransactionLinesCompanion.insert(
+                uuid: 'shift-report-custom-normal-line',
+                transactionId: paidOrderId,
+                productId: coffeeId,
+                productName: 'Coffee',
+                unitPriceMinor: 900,
+                lineTotalMinor: 900,
+              ),
+            );
+        await db
+            .into(db.transactionLines)
+            .insert(
+              TransactionLinesCompanion.insert(
+                uuid: 'shift-report-custom-line',
+                transactionId: paidOrderId,
+                productId: customSaleProductId,
+                productName: 'Custom Sale',
+                unitPriceMinor: 1200,
+                lineTotalMinor: 1200,
+              ),
+            );
+        await insertPayment(
+          db,
+          uuid: 'shift-report-custom-payment',
+          transactionId: paidOrderId,
+          method: 'card',
+          amountMinor: 2100,
+          paidAt: DateTime(2026, 4, 10, 12, 0),
+        );
+
+        final ShiftRepository shiftRepository = ShiftRepository(db);
+        final ReportService reportService = ReportService(
+          shiftRepository: shiftRepository,
+          shiftSessionService: ShiftSessionService(shiftRepository),
+          transactionRepository: TransactionRepository(db),
+          paymentRepository: PaymentRepository(db),
+          settingsRepository: SettingsRepository(db),
+          reportVisibilityService: const ReportVisibilityService(),
+        );
+
+        final ShiftReport report = await reportService.getShiftReport(shiftId);
+
+        expect(report.paidTotalMinor, 2100);
+        expect(report.cardTotalMinor, 2100);
+        expect(report.customSalesRevenueMinor, 1200);
+        expect(report.customSalesCount, 1);
+        expect(report.customSalesAverageValueMinor, 1200);
+        expect(report.categoryBreakdown, const <ShiftReportCategoryLine>[
+          ShiftReportCategoryLine(categoryName: 'Drinks', totalMinor: 900),
+        ]);
+      },
+    );
+
+    test(
+      'custom-only shift report still includes z-report totals with empty category breakdown',
+      () async {
+        final db = createTestDatabase();
+        addTearDown(db.close);
+
+        final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+        final int shiftId = await insertShift(db, openedBy: adminId);
+        final int miscId = await insertCategory(db, name: 'Misc');
+        final int customSaleProductId = await insertProduct(
+          db,
+          categoryId: miscId,
+          name: 'Custom Sale',
+          priceMinor: 0,
+          isCustom: true,
+        );
+        final int paidOrderId = await insertTransaction(
+          db,
+          uuid: 'shift-report-custom-only',
+          shiftId: shiftId,
+          userId: adminId,
+          status: 'paid',
+          totalAmountMinor: 1500,
+          paidAt: DateTime(2026, 4, 10, 13, 0),
+        );
+        await db
+            .into(db.transactionLines)
+            .insert(
+              TransactionLinesCompanion.insert(
+                uuid: 'shift-report-custom-only-line',
+                transactionId: paidOrderId,
+                productId: customSaleProductId,
+                productName: 'Custom Sale',
+                unitPriceMinor: 1500,
+                lineTotalMinor: 1500,
+              ),
+            );
+        await insertPayment(
+          db,
+          uuid: 'shift-report-custom-only-payment',
+          transactionId: paidOrderId,
+          method: 'cash',
+          amountMinor: 1500,
+          paidAt: DateTime(2026, 4, 10, 13, 0),
+        );
+
+        final ShiftRepository shiftRepository = ShiftRepository(db);
+        final ReportService reportService = ReportService(
+          shiftRepository: shiftRepository,
+          shiftSessionService: ShiftSessionService(shiftRepository),
+          transactionRepository: TransactionRepository(db),
+          paymentRepository: PaymentRepository(db),
+          settingsRepository: SettingsRepository(db),
+          reportVisibilityService: const ReportVisibilityService(),
+        );
+
+        final ShiftReport report = await reportService.getShiftReport(shiftId);
+
+        expect(report.paidTotalMinor, 1500);
+        expect(report.cashTotalMinor, 1500);
+        expect(report.categoryBreakdown, isEmpty);
+        expect(report.customSalesRevenueMinor, 1500);
+        expect(report.customSalesCount, 1);
+        expect(report.customSalesAverageValueMinor, 1500);
+      },
+    );
+
+    test(
+      'shift report custom sales count is line-count rather than quantity-sum',
+      () async {
+        final db = createTestDatabase();
+        addTearDown(db.close);
+
+        final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+        final int shiftId = await insertShift(db, openedBy: adminId);
+        final int miscId = await insertCategory(db, name: 'Misc');
+        final int customSaleProductId = await insertProduct(
+          db,
+          categoryId: miscId,
+          name: 'Custom Sale',
+          priceMinor: 0,
+          isCustom: true,
+        );
+        final int paidOrderId = await insertTransaction(
+          db,
+          uuid: 'shift-report-custom-line-count',
+          shiftId: shiftId,
+          userId: adminId,
+          status: 'paid',
+          totalAmountMinor: 1800,
+          paidAt: DateTime(2026, 4, 10, 14, 0),
+        );
+        await db
+            .into(db.transactionLines)
+            .insert(
+              TransactionLinesCompanion.insert(
+                uuid: 'shift-report-custom-line-count-line',
+                transactionId: paidOrderId,
+                productId: customSaleProductId,
+                productName: 'Custom Sale',
+                unitPriceMinor: 600,
+                quantity: const Value<int>(3),
+                lineTotalMinor: 1800,
+              ),
+            );
+        await insertPayment(
+          db,
+          uuid: 'shift-report-custom-line-count-payment',
+          transactionId: paidOrderId,
+          method: 'cash',
+          amountMinor: 1800,
+          paidAt: DateTime(2026, 4, 10, 14, 0),
+        );
+
+        final ShiftRepository shiftRepository = ShiftRepository(db);
+        final ReportService reportService = ReportService(
+          shiftRepository: shiftRepository,
+          shiftSessionService: ShiftSessionService(shiftRepository),
+          transactionRepository: TransactionRepository(db),
+          paymentRepository: PaymentRepository(db),
+          settingsRepository: SettingsRepository(db),
+          reportVisibilityService: const ReportVisibilityService(),
+        );
+
+        final ShiftReport report = await reportService.getShiftReport(shiftId);
+
+        expect(report.customSalesRevenueMinor, 1800);
+        expect(report.customSalesCount, 1);
+        expect(report.customSalesAverageValueMinor, 1800);
       },
     );
 

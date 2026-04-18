@@ -10,10 +10,59 @@ import '../database/app_database.dart' as db;
 class SettingsRepository {
   const SettingsRepository(this._database);
 
+  static const int maxCustomSalesLimitMinor = 1000000;
+
   final db.AppDatabase _database;
 
   Future<ReportSettingsPolicy> getReportSettingsPolicy() async {
     return (await getCashierZReportSettings()).policy;
+  }
+
+  Future<int> getCustomSalesLimitMinor() async {
+    final db.MenuSetting? row = await _getOrCreateMenuSettingsRow();
+    return row?.customSalesLimitMinor ?? db.kDefaultCustomSalesLimitMinor;
+  }
+
+  Future<void> updateCustomSalesLimitMinor(
+    int limitMinor, {
+    required int userId,
+  }) async {
+    if (limitMinor <= 0) {
+      throw ValidationException('Custom sale limit must be greater than 0.');
+    }
+    if (limitMinor > maxCustomSalesLimitMinor) {
+      throw ValidationException(
+        'Custom sale limit is too large. Maximum is £10,000.00.',
+      );
+    }
+
+    await _database.transaction(() async {
+      final db.MenuSetting? row = await _getOrCreateMenuSettingsRow();
+      final DateTime now = DateTime.now();
+
+      if (row == null) {
+        await _database
+            .into(_database.menuSettings)
+            .insert(
+              db.MenuSettingsCompanion.insert(
+                customSalesLimitMinor: Value<int>(limitMinor),
+                updatedBy: Value<int?>(userId),
+                updatedAt: Value<DateTime>(now),
+              ),
+            );
+        return;
+      }
+
+      await (_database.update(
+        _database.menuSettings,
+      )..where((db.$MenuSettingsTable t) => t.id.equals(row.id))).write(
+        db.MenuSettingsCompanion(
+          customSalesLimitMinor: Value<int>(limitMinor),
+          updatedBy: Value<int?>(userId),
+          updatedAt: Value<DateTime>(now),
+        ),
+      );
+    });
   }
 
   Future<BusinessIdentitySettings> getBusinessIdentitySettings() async {
@@ -276,6 +325,26 @@ class SettingsRepository {
     return (_database.select(
       _database.reportSettings,
     )..where((db.$ReportSettingsTable t) => t.id.equals(id))).getSingleOrNull();
+  }
+
+  Future<db.MenuSetting?> _getOrCreateMenuSettingsRow() async {
+    final db.MenuSetting? row =
+        await (_database.select(_database.menuSettings)
+              ..orderBy(<OrderingTerm Function(db.$MenuSettingsTable)>[
+                (db.$MenuSettingsTable t) => OrderingTerm.asc(t.id),
+              ])
+              ..limit(1))
+            .getSingleOrNull();
+    if (row != null) {
+      return row;
+    }
+
+    final int id = await _database
+        .into(_database.menuSettings)
+        .insert(db.MenuSettingsCompanion.insert());
+    return (_database.select(
+      _database.menuSettings,
+    )..where((db.$MenuSettingsTable t) => t.id.equals(id))).getSingleOrNull();
   }
 
   ReportSettingsPolicy _mapReportSettings(db.ReportSetting row) {

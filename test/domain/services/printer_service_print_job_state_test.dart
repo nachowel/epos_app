@@ -1,19 +1,21 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:drift/drift.dart' show Variable;
+import 'package:drift/drift.dart' show Value, Variable;
 import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/core/logging/app_logger.dart';
 import 'package:epos_app/data/database/app_database.dart' as db;
 import 'package:epos_app/data/repositories/audit_log_repository.dart';
 import 'package:epos_app/data/repositories/payment_repository.dart';
 import 'package:epos_app/data/repositories/print_job_repository.dart';
+import 'package:epos_app/data/repositories/product_repository.dart';
 import 'package:epos_app/data/repositories/settings_repository.dart';
 import 'package:epos_app/data/repositories/shift_repository.dart';
 import 'package:epos_app/data/repositories/transaction_repository.dart';
 import 'package:epos_app/data/repositories/transaction_state_repository.dart';
 import 'package:epos_app/domain/models/checkout_item.dart';
 import 'package:epos_app/domain/models/checkout_modifier.dart';
+import 'package:epos_app/domain/models/custom_sale.dart';
 import 'package:epos_app/domain/models/payment.dart';
 import 'package:epos_app/domain/models/print_job.dart';
 import 'package:epos_app/domain/models/printer_settings.dart';
@@ -207,7 +209,10 @@ void main() {
     test('manual receipt reprint requires actor user id', () async {
       final db.AppDatabase database = createTestDatabase();
       addTearDown(database.close);
-      final int transactionId = await _seedTransaction(database, status: 'paid');
+      final int transactionId = await _seedTransaction(
+        database,
+        status: 'paid',
+      );
       await insertPayment(
         database,
         uuid: 'payment-manual-actor-$transactionId',
@@ -236,7 +241,10 @@ void main() {
 
       final db.AppDatabase database = createTestDatabase();
       addTearDown(database.close);
-      final int transactionId = await _seedTransaction(database, status: 'paid');
+      final int transactionId = await _seedTransaction(
+        database,
+        status: 'paid',
+      );
       await _saveEthernetPrinter(database, port: server.port);
       await insertPrintJob(
         database,
@@ -248,11 +256,7 @@ void main() {
       final PrinterService service = _createPrinterService(database);
 
       await expectLater(
-        service.printReceipt(
-          transactionId,
-          allowReprint: true,
-          actorUserId: 1,
-        ),
+        service.printReceipt(transactionId, allowReprint: true, actorUserId: 1),
         throwsA(isA<NotFoundException>()),
       );
     });
@@ -281,11 +285,7 @@ void main() {
       final PrinterService service = _createPrinterService(database);
 
       await expectLater(
-        service.printReceipt(
-          transactionId,
-          allowReprint: true,
-          actorUserId: 1,
-        ),
+        service.printReceipt(transactionId, allowReprint: true, actorUserId: 1),
         throwsA(isA<InvalidStateTransitionException>()),
       );
     });
@@ -301,7 +301,10 @@ void main() {
         name: 'Supervisor',
         role: 'cashier',
       );
-      final int transactionId = await _seedTransaction(database, status: 'sent');
+      final int transactionId = await _seedTransaction(
+        database,
+        status: 'sent',
+      );
       await _saveEthernetPrinter(database, port: server.port);
       await insertPrintJob(
         database,
@@ -309,7 +312,9 @@ void main() {
         target: PrintJobTarget.kitchen,
         status: 'printed',
       );
-      final AuditLogRepository auditLogRepository = AuditLogRepository(database);
+      final AuditLogRepository auditLogRepository = AuditLogRepository(
+        database,
+      );
       final AuditLogService auditLogService = PersistedAuditLogService(
         auditLogRepository: auditLogRepository,
         logger: const NoopAppLogger(),
@@ -453,6 +458,407 @@ void main() {
           0,
         );
         expect(server.connectionCount, 1);
+      },
+    );
+
+    test(
+      'service-level kitchen print skips cleanly for custom-only sent order',
+      () async {
+        final db.AppDatabase database = createTestDatabase();
+        addTearDown(database.close);
+        final int cashierId = await insertUser(
+          database,
+          name: 'Cashier',
+          role: 'cashier',
+        );
+        final int shiftId = await insertShift(database, openedBy: cashierId);
+        final int categoryId = await insertCategory(database, name: 'Misc');
+        final int customProductId = await insertProduct(
+          database,
+          categoryId: categoryId,
+          name: 'Custom Sale',
+          priceMinor: 0,
+          isVisibleOnPos: false,
+          isCustom: true,
+        );
+        final int transactionId = await insertTransaction(
+          database,
+          uuid: 'print-job-custom-only-sent-skip',
+          shiftId: shiftId,
+          userId: cashierId,
+          status: 'sent',
+          totalAmountMinor: 700,
+        );
+        await database
+            .into(database.transactionLines)
+            .insert(
+              db.TransactionLinesCompanion.insert(
+                uuid: 'print-job-custom-only-sent-line',
+                transactionId: transactionId,
+                productId: customProductId,
+                productName: 'Custom Sale',
+                unitPriceMinor: 700,
+                lineTotalMinor: 700,
+                customNote: const Value<String?>('Manual item'),
+                createdByUserId: Value<int?>(cashierId),
+              ),
+            );
+
+        final PrinterService service = PrinterService(
+          TransactionRepository(database),
+          printJobRepository: PrintJobRepository(database),
+          productRepository: ProductRepository(database),
+        );
+
+        final PrintJob job = await service.printKitchenTicket(transactionId);
+        final PrintJob? persistedJob = await PrintJobRepository(database)
+            .getByTransactionIdAndTarget(
+              transactionId: transactionId,
+              target: PrintJobTarget.kitchen,
+            );
+
+        expect(job.target, PrintJobTarget.kitchen);
+        expect(job.isPrinted, isTrue);
+        expect(job.id, 0);
+        expect(persistedJob, isNull);
+      },
+    );
+
+    test(
+      'service-level kitchen reprint skips cleanly for custom-only paid order',
+      () async {
+        final db.AppDatabase database = createTestDatabase();
+        addTearDown(database.close);
+        final int cashierId = await insertUser(
+          database,
+          name: 'Cashier',
+          role: 'cashier',
+        );
+        final int shiftId = await insertShift(database, openedBy: cashierId);
+        final int categoryId = await insertCategory(database, name: 'Misc');
+        final int customProductId = await insertProduct(
+          database,
+          categoryId: categoryId,
+          name: 'Custom Sale',
+          priceMinor: 0,
+          isVisibleOnPos: false,
+          isCustom: true,
+        );
+        final int transactionId = await insertTransaction(
+          database,
+          uuid: 'print-job-custom-only-paid-reprint-skip',
+          shiftId: shiftId,
+          userId: cashierId,
+          status: 'paid',
+          totalAmountMinor: 700,
+          paidAt: DateTime(2026, 4, 14, 10, 15),
+        );
+        await database
+            .into(database.transactionLines)
+            .insert(
+              db.TransactionLinesCompanion.insert(
+                uuid: 'print-job-custom-only-paid-line',
+                transactionId: transactionId,
+                productId: customProductId,
+                productName: 'Custom Sale',
+                unitPriceMinor: 700,
+                lineTotalMinor: 700,
+                customNote: const Value<String?>('Manual item'),
+                createdByUserId: Value<int?>(cashierId),
+              ),
+            );
+        await insertPayment(
+          database,
+          uuid: 'print-job-custom-only-paid-payment',
+          transactionId: transactionId,
+          method: 'card',
+          amountMinor: 700,
+          paidAt: DateTime(2026, 4, 14, 10, 15),
+        );
+
+        final PrinterService service = PrinterService(
+          TransactionRepository(database),
+          paymentRepository: PaymentRepository(database),
+          printJobRepository: PrintJobRepository(database),
+          productRepository: ProductRepository(database),
+        );
+
+        final PrintJob job = await service.printKitchenTicket(
+          transactionId,
+          allowReprint: true,
+          actorUserId: cashierId,
+        );
+        final PrintJob? persistedJob = await PrintJobRepository(database)
+            .getByTransactionIdAndTarget(
+              transactionId: transactionId,
+              target: PrintJobTarget.kitchen,
+            );
+
+        expect(job.target, PrintJobTarget.kitchen);
+        expect(job.isPrinted, isTrue);
+        expect(job.id, 0);
+        expect(persistedJob, isNull);
+      },
+    );
+
+    test(
+      'manual kitchen reprint excludes custom sale lines from mixed orders',
+      () async {
+        final _TcpCaptureServer server = await _TcpCaptureServer.start();
+        addTearDown(server.close);
+
+        final db.AppDatabase database = createTestDatabase();
+        addTearDown(database.close);
+        final int cashierId = await insertUser(
+          database,
+          name: 'Cashier',
+          role: 'cashier',
+        );
+        final int shiftId = await insertShift(database, openedBy: cashierId);
+        final int categoryId = await insertCategory(database, name: 'Food');
+        final int normalProductId = await insertProduct(
+          database,
+          categoryId: categoryId,
+          name: 'Soup',
+          priceMinor: 550,
+        );
+        final int customProductId = await insertProduct(
+          database,
+          categoryId: categoryId,
+          name: 'Custom Sale',
+          priceMinor: 0,
+          isVisibleOnPos: false,
+          isCustom: true,
+        );
+        final int transactionId = await insertTransaction(
+          database,
+          uuid: 'print-job-kitchen-custom-mixed',
+          shiftId: shiftId,
+          userId: cashierId,
+          status: 'sent',
+          totalAmountMinor: 1250,
+        );
+        await database
+            .into(database.transactionLines)
+            .insert(
+              db.TransactionLinesCompanion.insert(
+                uuid: 'print-job-kitchen-normal-line',
+                transactionId: transactionId,
+                productId: normalProductId,
+                productName: 'Soup',
+                unitPriceMinor: 550,
+                lineTotalMinor: 550,
+              ),
+            );
+        await database
+            .into(database.transactionLines)
+            .insert(
+              db.TransactionLinesCompanion.insert(
+                uuid: 'print-job-kitchen-custom-line',
+                transactionId: transactionId,
+                productId: customProductId,
+                productName: 'Custom Sale',
+                unitPriceMinor: 700,
+                lineTotalMinor: 700,
+                customNote: const Value<String?>('Manual item'),
+                createdByUserId: Value<int?>(cashierId),
+              ),
+            );
+        await _saveEthernetPrinter(database, port: server.port);
+        await insertPrintJob(
+          database,
+          transactionId: transactionId,
+          target: PrintJobTarget.kitchen,
+          status: 'printed',
+        );
+
+        final PrinterService service = PrinterService(
+          TransactionRepository(database),
+          paymentRepository: PaymentRepository(database),
+          printJobRepository: PrintJobRepository(database),
+          productRepository: ProductRepository(database),
+          settingsRepository: SettingsRepository(database),
+        );
+
+        await service.printKitchenTicket(
+          transactionId,
+          allowReprint: true,
+          actorUserId: cashierId,
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+
+        expect(server.connectionCount, 1);
+        expect(server.capturedText, contains('SOUP'));
+        expect(server.capturedText, isNot(contains('CUSTOM SALE')));
+        expect(server.capturedText, isNot(contains('MANUAL ITEM')));
+      },
+    );
+
+    test('manual receipt reprint includes custom sale lines', () async {
+      final _TcpCaptureServer server = await _TcpCaptureServer.start();
+      addTearDown(server.close);
+
+      final db.AppDatabase database = createTestDatabase();
+      addTearDown(database.close);
+      final int cashierId = await insertUser(
+        database,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      final int shiftId = await insertShift(database, openedBy: cashierId);
+      final int categoryId = await insertCategory(database, name: 'Misc');
+      final int customProductId = await insertProduct(
+        database,
+        categoryId: categoryId,
+        name: 'Custom Sale',
+        priceMinor: 0,
+        isVisibleOnPos: false,
+        isCustom: true,
+      );
+      final int transactionId = await insertTransaction(
+        database,
+        uuid: 'print-job-receipt-custom-only',
+        shiftId: shiftId,
+        userId: cashierId,
+        status: 'paid',
+        totalAmountMinor: 700,
+        paidAt: DateTime(2026, 4, 14, 10, 15),
+      );
+      await database
+          .into(database.transactionLines)
+          .insert(
+            db.TransactionLinesCompanion.insert(
+              uuid: 'print-job-receipt-custom-line',
+              transactionId: transactionId,
+              productId: customProductId,
+              productName: 'Custom Sale',
+              unitPriceMinor: 700,
+              lineTotalMinor: 700,
+              customNote: const Value<String?>('Manual item'),
+              createdByUserId: Value<int?>(cashierId),
+            ),
+          );
+      await insertPayment(
+        database,
+        uuid: 'print-job-receipt-custom-payment',
+        transactionId: transactionId,
+        method: 'card',
+        amountMinor: 700,
+        paidAt: DateTime(2026, 4, 14, 10, 15),
+      );
+      await _saveEthernetPrinter(database, port: server.port);
+      await insertPrintJob(
+        database,
+        transactionId: transactionId,
+        target: PrintJobTarget.receipt,
+        status: 'printed',
+      );
+
+      final PrinterService service = PrinterService(
+        TransactionRepository(database),
+        paymentRepository: PaymentRepository(database),
+        printJobRepository: PrintJobRepository(database),
+        productRepository: ProductRepository(database),
+        settingsRepository: SettingsRepository(database),
+      );
+
+      await service.printReceipt(
+        transactionId,
+        allowReprint: true,
+        actorUserId: cashierId,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(server.connectionCount, 1);
+      expect(server.capturedText, contains('Custom Sale'));
+      expect(server.capturedText, contains('TOTAL'));
+      expect(server.capturedText, contains('£7.00'));
+    });
+
+    test(
+      'pay-now custom sale checkout skips kitchen printing and creates no kitchen job',
+      () async {
+        final _TcpCaptureServer server = await _TcpCaptureServer.start();
+        addTearDown(server.close);
+
+        final db.AppDatabase database = createTestDatabase();
+        addTearDown(database.close);
+        await _saveEthernetPrinter(database, port: server.port);
+
+        final int cashierId = await insertUser(
+          database,
+          name: 'Cashier',
+          role: 'cashier',
+        );
+        await insertShift(database, openedBy: cashierId);
+        final int categoryId = await insertCategory(database, name: 'Misc');
+        await insertProduct(
+          database,
+          categoryId: categoryId,
+          name: 'Custom Sale',
+          priceMinor: 0,
+          isVisibleOnPos: false,
+          isCustom: true,
+        );
+
+        final User cashier = User(
+          id: cashierId,
+          name: 'Cashier',
+          pin: null,
+          password: null,
+          role: UserRole.cashier,
+          isActive: true,
+          createdAt: DateTime.now(),
+        );
+        final ShiftRepository shiftRepository = ShiftRepository(database);
+        final ShiftSessionService shiftSessionService = ShiftSessionService(
+          shiftRepository,
+        );
+        final OrderService orderService = OrderService(
+          shiftSessionService: shiftSessionService,
+          transactionRepository: TransactionRepository(database),
+          transactionStateRepository: TransactionStateRepository(database),
+          productRepository: ProductRepository(database),
+          settingsRepository: SettingsRepository(database),
+          paymentRepository: PaymentRepository(database),
+          printJobRepository: PrintJobRepository(database),
+        );
+        final PrinterService printerService = PrinterService(
+          TransactionRepository(database),
+          paymentRepository: PaymentRepository(database),
+          printJobRepository: PrintJobRepository(database),
+          productRepository: ProductRepository(database),
+          settingsRepository: SettingsRepository(database),
+        );
+        final CheckoutService checkoutService = CheckoutService(
+          shiftSessionService: shiftSessionService,
+          orderService: orderService,
+          printerService: printerService,
+        );
+
+        final Transaction transaction = await checkoutService.checkoutCart(
+          currentUser: cashier,
+          cartItems: const <CheckoutItem>[
+            CheckoutItem(
+              productId: 0,
+              quantity: 1,
+              modifiers: const <CheckoutModifier>[],
+              customSaleRequest: CustomSaleWriteRequest(amountMinor: 700),
+            ),
+          ],
+          idempotencyKey: 'checkout-custom-only-no-kitchen-print',
+          immediatePaymentMethod: PaymentMethod.card,
+        );
+
+        final PrintJob? kitchenJob = await PrintJobRepository(database)
+            .getByTransactionIdAndTarget(
+              transactionId: transaction.id,
+              target: PrintJobTarget.kitchen,
+            );
+
+        expect(transaction.status, TransactionStatus.paid);
+        expect(kitchenJob, isNull);
+        expect(server.connectionCount, 0);
       },
     );
 
@@ -619,7 +1025,7 @@ class _TcpCaptureServer {
       _server.listen((Socket client) {
         _connectionCount += 1;
         client.listen(
-          (_) {},
+          (List<int> chunk) => _capturedBytes.addAll(chunk),
           onDone: () => client.destroy(),
           onError: (_, __) => client.destroy(),
           cancelOnError: true,
@@ -630,10 +1036,13 @@ class _TcpCaptureServer {
 
   final ServerSocket _server;
   int _connectionCount = 0;
+  final List<int> _capturedBytes = <int>[];
 
   int get connectionCount => _connectionCount;
 
   int get port => _server.port;
+
+  String get capturedText => String.fromCharCodes(_capturedBytes);
 
   static Future<_TcpCaptureServer> start() async {
     final ServerSocket server = await ServerSocket.bind(

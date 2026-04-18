@@ -1,7 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:epos_app/core/constants/app_strings.dart';
 import 'package:epos_app/core/providers/app_providers.dart';
 import 'package:epos_app/l10n/app_localizations.dart';
+import 'package:epos_app/presentation/providers/auth_provider.dart';
 import 'package:epos_app/presentation/screens/pos/category_entry_screen.dart';
+import 'package:epos_app/presentation/widgets/section_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,10 +54,20 @@ void main() {
           ],
         );
         addTearDown(container.dispose);
+        await _loadCashierSession(container, db);
 
         await tester.pumpWidget(_routerApp(container));
         await tester.pumpAndSettle();
 
+        expect(find.byType(SectionAppBar), findsOneWidget);
+        expect(
+          find.byKey(
+            const ValueKey<String>(
+              'section_app_bar_inline_nav_/pos/categories',
+            ),
+          ),
+          findsOneWidget,
+        );
         expect(
           find.byKey(const Key('category-entry-featured-grid')),
           findsOneWidget,
@@ -128,6 +141,7 @@ void main() {
           ],
         );
         addTearDown(container.dispose);
+        await _loadCashierSession(container, db);
 
         await tester.pumpWidget(_routerApp(container));
         await tester.pumpAndSettle();
@@ -169,6 +183,7 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
+      await _loadCashierSession(container, db);
 
       await tester.pumpWidget(_routerApp(container));
       await tester.pump();
@@ -179,8 +194,10 @@ void main() {
       expect(imageFinder, findsOneWidget);
 
       final Image image = tester.widget<Image>(imageFinder);
-      expect((image.image as NetworkImage).url,
-          'https://cdn.example.com/categories/bakery.png');
+      expect(
+        (image.image as CachedNetworkImageProvider).url,
+        'https://cdn.example.com/categories/bakery.png',
+      );
     });
 
     testWidgets('empty catalog shows a stable empty state', (
@@ -198,6 +215,7 @@ void main() {
         ],
       );
       addTearDown(container.dispose);
+      await _loadCashierSession(container, db);
 
       await tester.pumpWidget(_routerApp(container));
       await tester.pumpAndSettle();
@@ -209,6 +227,14 @@ void main() {
       expect(find.text(AppStrings.noCategories), findsOneWidget);
     });
   });
+}
+
+Future<void> _loadCashierSession(
+  ProviderContainer container,
+  dynamic db,
+) async {
+  final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
+  await container.read(authNotifierProvider.notifier).loadUserById(cashierId);
 }
 
 Widget _routerApp(ProviderContainer container) {

@@ -20,9 +20,11 @@ class CartPanel extends StatefulWidget {
     required this.panelWidth,
     required this.canCheckout,
     required this.isCheckoutLoading,
+    required this.onAddCustomSale,
     required this.onIncreaseQuantity,
     required this.onDecreaseQuantity,
     required this.onRemoveLine,
+    required this.onEditCustomSale,
     required this.onCheckout,
     super.key,
   });
@@ -31,9 +33,11 @@ class CartPanel extends StatefulWidget {
   final double panelWidth;
   final bool canCheckout;
   final bool isCheckoutLoading;
+  final VoidCallback onAddCustomSale;
   final ValueChanged<String> onIncreaseQuantity;
   final ValueChanged<String> onDecreaseQuantity;
   final ValueChanged<String> onRemoveLine;
+  final ValueChanged<String> onEditCustomSale;
   final VoidCallback onCheckout;
 
   @override
@@ -174,12 +178,13 @@ class _CartPanelState extends State<CartPanel> {
               isEmpty: isEmpty,
               horizontalPadding: horizontalPadding,
               isCompact: isCompact,
+              onAddCustomSale: widget.onAddCustomSale,
             ),
             Expanded(
               child: Container(
                 color: AppColors.surface,
                 child: isEmpty
-                    ? const _EmptyCartState()
+                    ? _EmptyCartState(onAddCustomSale: widget.onAddCustomSale)
                     : ListView.builder(
                         padding: EdgeInsets.fromLTRB(
                           listHorizontalPadding,
@@ -242,6 +247,9 @@ class _CartPanelState extends State<CartPanel> {
                               );
                               widget.onRemoveLine(item.localId);
                             },
+                            onEdit: item.isCustomSale
+                                ? () => widget.onEditCustomSale(item.localId)
+                                : null,
                           );
                         },
                       ),
@@ -253,6 +261,16 @@ class _CartPanelState extends State<CartPanel> {
                   (CartItem item) =>
                       item.localId == _editContext.selectedLocalId,
                 ),
+                onEdit: () {
+                  final CartItem item = widget.cartState.items.firstWhere(
+                    (CartItem item) =>
+                        item.localId == _editContext.selectedLocalId,
+                  );
+                  if (!item.isCustomSale) {
+                    return;
+                  }
+                  widget.onEditCustomSale(item.localId);
+                },
                 onDecrease: () {
                   final CartItem item = widget.cartState.items.firstWhere(
                     (CartItem item) =>
@@ -312,12 +330,14 @@ class _CartHeader extends StatelessWidget {
     required this.isEmpty,
     required this.horizontalPadding,
     required this.isCompact,
+    required this.onAddCustomSale,
   });
 
   final int itemCount;
   final bool isEmpty;
   final double horizontalPadding;
   final bool isCompact;
+  final VoidCallback onAddCustomSale;
 
   @override
   Widget build(BuildContext context) {
@@ -376,20 +396,58 @@ class _CartHeader extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.primaryStrong,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              '$itemCount',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textOnPrimary,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Tooltip(
+                message: 'Custom Sale',
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    key: const ValueKey<String>(
+                      'cart-custom-sale-header-button',
+                    ),
+                    onTap: onAddCustomSale,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Ink(
+                      width: isCompact ? 38 : 40,
+                      height: isCompact ? 38 : 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.warningLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.28),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.add_circle_outline_rounded,
+                        size: 21,
+                        color: AppColors.warningStrong,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryStrong,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$itemCount',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textOnPrimary,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -398,7 +456,9 @@ class _CartHeader extends StatelessWidget {
 }
 
 class _EmptyCartState extends StatelessWidget {
-  const _EmptyCartState();
+  const _EmptyCartState({required this.onAddCustomSale});
+
+  final VoidCallback onAddCustomSale;
 
   @override
   Widget build(BuildContext context) {
@@ -443,6 +503,50 @@ class _EmptyCartState extends StatelessWidget {
                 color: AppColors.textSecondary,
               ),
             ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const ValueKey<String>('cart-custom-sale-empty-button'),
+                onPressed: onAddCustomSale,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  backgroundColor: AppColors.warningLight,
+                  foregroundColor: AppColors.warningStrong,
+                  side: BorderSide(
+                    color: AppColors.warning.withValues(alpha: 0.28),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
+                label: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      '+ Custom Sale',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Manual price item',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -453,6 +557,7 @@ class _EmptyCartState extends StatelessWidget {
 class _ActiveCartEditBar extends StatelessWidget {
   const _ActiveCartEditBar({
     required this.item,
+    required this.onEdit,
     required this.onDecrease,
     required this.onIncrease,
     required this.canMovePrevious,
@@ -465,6 +570,7 @@ class _ActiveCartEditBar extends StatelessWidget {
   });
 
   final CartItem item;
+  final VoidCallback onEdit;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
   final bool canMovePrevious;
@@ -531,7 +637,9 @@ class _ActiveCartEditBar extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${CurrencyFormatter.fromMinor(item.unitPriceMinor)} x${item.quantity}',
+                      item.isCustomSale
+                          ? 'Manual price item'
+                          : '${CurrencyFormatter.fromMinor(item.unitPriceMinor)} x${item.quantity}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -550,24 +658,36 @@ class _ActiveCartEditBar extends StatelessWidget {
                 onPressed: canMoveNext ? onMoveNext : null,
               ),
               const SizedBox(width: 10),
-              _StickyEditButton(
-                icon: Icons.remove_rounded,
-                onPressed: onDecrease,
-              ),
-              Container(
-                width: 26,
-                alignment: Alignment.center,
-                child: Text(
-                  '${item.quantity}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primaryDarker,
-                    height: 1,
+              if (item.isCustomSale) ...<Widget>[
+                _StickyEditButton(
+                  icon: Icons.edit_outlined,
+                  onPressed: onEdit,
+                  backgroundColor: AppColors.warningLight,
+                  foregroundColor: AppColors.warningStrong,
+                ),
+              ] else ...<Widget>[
+                _StickyEditButton(
+                  icon: Icons.remove_rounded,
+                  onPressed: onDecrease,
+                ),
+                Container(
+                  width: 26,
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${item.quantity}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primaryDarker,
+                      height: 1,
+                    ),
                   ),
                 ),
-              ),
-              _StickyEditButton(icon: Icons.add_rounded, onPressed: onIncrease),
+                _StickyEditButton(
+                  icon: Icons.add_rounded,
+                  onPressed: onIncrease,
+                ),
+              ],
             ],
           ),
           if (debugRating != null && debugAckMs != null) ...<Widget>[
@@ -588,10 +708,17 @@ class _ActiveCartEditBar extends StatelessWidget {
 }
 
 class _StickyEditButton extends StatelessWidget {
-  const _StickyEditButton({required this.icon, required this.onPressed});
+  const _StickyEditButton({
+    required this.icon,
+    required this.onPressed,
+    this.backgroundColor,
+    this.foregroundColor,
+  });
 
   final IconData icon;
   final VoidCallback? onPressed;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -600,7 +727,9 @@ class _StickyEditButton extends StatelessWidget {
       width: 36,
       height: 36,
       child: Material(
-        color: isEnabled ? AppColors.surface : AppColors.surfaceMuted,
+        color: isEnabled
+            ? (backgroundColor ?? AppColors.surface)
+            : AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           onTap: onPressed,
@@ -608,7 +737,9 @@ class _StickyEditButton extends StatelessWidget {
           child: Icon(
             icon,
             size: 18,
-            color: isEnabled ? AppColors.primaryDarker : AppColors.textMuted,
+            color: isEnabled
+                ? (foregroundColor ?? AppColors.primaryDarker)
+                : AppColors.textMuted,
           ),
         ),
       ),
@@ -658,6 +789,14 @@ class _CartFooter extends StatelessWidget {
               cartState.modifierTotalMinor,
             ),
           ),
+          if (cartState.discount != null) ...<Widget>[
+            const SizedBox(height: 4),
+            _TotalRow(
+              label: 'Discount',
+              value:
+                  '-${CurrencyFormatter.fromMinor(cartState.discountAmountMinor)}',
+            ),
+          ],
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 5),
             child: Divider(

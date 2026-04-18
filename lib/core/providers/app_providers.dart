@@ -55,6 +55,7 @@ import '../../domain/services/cashier_report_service.dart';
 import '../../domain/services/breakfast_pos_service.dart';
 import '../../domain/services/catalog_service.dart';
 import '../../domain/services/checkout_service.dart';
+import '../../domain/services/exit_safety_service.dart';
 import '../../domain/services/meal_adjustment_admin_service.dart';
 import '../../domain/services/meal_adjustment_profile_validation_service.dart';
 import '../../domain/services/meal_customization_engine.dart';
@@ -70,6 +71,7 @@ import '../../domain/services/revenue_analytics_service.dart';
 import '../../domain/services/semantic_menu_admin_service.dart';
 import '../../domain/services/semantic_menu_policy_service.dart';
 import '../../domain/services/shift_session_service.dart';
+import '../../domain/services/user_management_service.dart';
 import '../../presentation/providers/app_locale_provider.dart';
 
 final Provider<AppDatabase> appDatabaseProvider = Provider<AppDatabase>((_) {
@@ -565,9 +567,12 @@ final Provider<OrderService> orderServiceProvider = Provider<OrderService>(
       mealAdjustmentProfileValidationServiceProvider,
     ),
     mealCustomizationEngine: ref.watch(mealCustomizationEngineProvider),
+    settingsRepository: ref.watch(settingsRepositoryProvider),
     paymentRepository: ref.watch(paymentRepositoryProvider),
     printJobRepository: ref.watch(printJobRepositoryProvider),
     syncQueueRepository: ref.watch(syncQueueRepositoryProvider),
+    printerService: ref.watch(printerServiceProvider),
+    authService: ref.watch(authServiceProvider),
     auditLogService: ref.watch(auditLogServiceProvider),
     logger: ref.watch(appLoggerProvider),
   ),
@@ -579,6 +584,7 @@ final Provider<PrinterService> printerServiceProvider =
         ref.watch(transactionRepositoryProvider),
         paymentRepository: ref.watch(paymentRepositoryProvider),
         printJobRepository: ref.watch(printJobRepositoryProvider),
+        productRepository: ref.watch(productRepositoryProvider),
         settingsRepository: ref.watch(settingsRepositoryProvider),
         auditLogService: ref.watch(auditLogServiceProvider),
         logger: ref.watch(appLoggerProvider),
@@ -596,6 +602,14 @@ final Provider<PaymentService> paymentServiceProvider =
         transactionRepository: ref.watch(transactionRepositoryProvider),
         printerService: ref.watch(printerServiceProvider),
         logger: ref.watch(appLoggerProvider),
+      ),
+    );
+
+final Provider<ExitSafetyService> exitSafetyServiceProvider =
+    Provider<ExitSafetyService>(
+      (Ref ref) => DefaultExitSafetyService(
+        shiftSessionService: ref.watch(shiftSessionServiceProvider),
+        orderService: ref.watch(orderServiceProvider),
       ),
     );
 
@@ -631,3 +645,12 @@ final Provider<ReportService> reportServiceProvider = Provider<ReportService>(
 
 final Provider<ReportVisibilityService> reportVisibilityServiceProvider =
     Provider<ReportVisibilityService>((_) => const ReportVisibilityService());
+
+final Provider<UserManagementService> userManagementServiceProvider =
+    Provider<UserManagementService>(
+      (Ref ref) => UserManagementService(
+        userRepository: ref.watch(userRepositoryProvider),
+        auditLogService: ref.watch(auditLogServiceProvider),
+        logger: ref.watch(appLoggerProvider),
+      ),
+    );

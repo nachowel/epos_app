@@ -7,6 +7,7 @@ import '../../core/errors/error_mapper.dart';
 import '../../core/errors/exceptions.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../data/repositories/settings_repository.dart';
 import '../../domain/models/business_identity_settings.dart';
 import '../../domain/models/cashier_projection_preview.dart';
 import '../../domain/models/cashier_z_report_settings.dart';
@@ -20,6 +21,7 @@ class SettingsState {
     required this.cashierReportMode,
     required this.visibilityRatio,
     required this.maxVisibleTotalInput,
+    required this.customSalesLimitInput,
     required this.businessName,
     required this.businessAddress,
     required this.projectionPreview,
@@ -32,6 +34,7 @@ class SettingsState {
     : cashierReportMode = CashierReportMode.percentage,
       visibilityRatio = 1.0,
       maxVisibleTotalInput = '',
+      customSalesLimitInput = '',
       businessName = '',
       businessAddress = '',
       projectionPreview = const CashierProjectionPreview.unavailable(),
@@ -42,6 +45,7 @@ class SettingsState {
   final CashierReportMode cashierReportMode;
   final double visibilityRatio;
   final String maxVisibleTotalInput;
+  final String customSalesLimitInput;
   final String businessName;
   final String businessAddress;
   final CashierProjectionPreview projectionPreview;
@@ -57,6 +61,7 @@ class SettingsState {
     CashierReportMode? cashierReportMode,
     double? visibilityRatio,
     String? maxVisibleTotalInput,
+    String? customSalesLimitInput,
     String? businessName,
     String? businessAddress,
     CashierProjectionPreview? projectionPreview,
@@ -68,6 +73,8 @@ class SettingsState {
       cashierReportMode: cashierReportMode ?? this.cashierReportMode,
       visibilityRatio: visibilityRatio ?? this.visibilityRatio,
       maxVisibleTotalInput: maxVisibleTotalInput ?? this.maxVisibleTotalInput,
+      customSalesLimitInput:
+          customSalesLimitInput ?? this.customSalesLimitInput,
       businessName: businessName ?? this.businessName,
       businessAddress: businessAddress ?? this.businessAddress,
       projectionPreview: projectionPreview ?? this.projectionPreview,
@@ -91,6 +98,9 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
       final CashierZReportSettings settings = await _ref
           .read(reportServiceProvider)
           .getCashierZReportSettings();
+      final int customSalesLimitMinor = await _ref
+          .read(reportServiceProvider)
+          .getCustomSalesLimitMinor();
       final User? currentUser = _ref.read(authNotifierProvider).currentUser;
       final CashierProjectionPreview preview =
           await _buildProjectionPreviewOrUnavailable(
@@ -105,6 +115,9 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
             : CurrencyFormatter.toEditableMajorInput(
                 settings.policy.maxVisibleTotalMinor!,
               ),
+        customSalesLimitInput: CurrencyFormatter.toEditableMajorInput(
+          customSalesLimitMinor,
+        ),
         businessName: settings.businessIdentity.businessName ?? '',
         businessAddress: settings.businessIdentity.businessAddress ?? '',
         projectionPreview: preview,
@@ -139,6 +152,10 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     unawaited(_refreshProjectionPreview());
   }
 
+  void setCustomSalesLimitInput(String value) {
+    state = state.copyWith(customSalesLimitInput: value, errorMessage: null);
+  }
+
   void setBusinessName(String value) {
     state = state.copyWith(businessName: value, errorMessage: null);
   }
@@ -155,9 +172,16 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     state = state.copyWith(isSaving: true, errorMessage: null);
     try {
       final CashierZReportSettings settings = _buildDraftSettings();
+      final int customSalesLimitMinor = _parseCustomSalesLimitMinor();
       await _ref
           .read(reportServiceProvider)
           .updateCashierZReportSettings(user: currentUser, settings: settings);
+      await _ref
+          .read(reportServiceProvider)
+          .updateCustomSalesLimitMinor(
+            user: currentUser,
+            limitMinor: customSalesLimitMinor,
+          );
       final CashierProjectionPreview preview =
           await _buildProjectionPreviewOrUnavailable(
             user: currentUser,
@@ -281,6 +305,30 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
     if (parsed == null) {
       throw ValidationException(AppStrings.maxVisibleTotalInvalid);
     }
+    return parsed;
+  }
+
+  int _parseCustomSalesLimitMinor() {
+    final String trimmed = state.customSalesLimitInput.trim();
+    if (trimmed.isEmpty) {
+      throw ValidationException('Custom sale limit is required.');
+    }
+
+    final int? parsed = CurrencyFormatter.tryParseEditableMajorInput(trimmed);
+    if (parsed == null) {
+      throw ValidationException(
+        'Enter a valid custom sale limit with up to 2 decimal places.',
+      );
+    }
+    if (parsed <= 0) {
+      throw ValidationException('Custom sale limit must be greater than 0.');
+    }
+    if (parsed > SettingsRepository.maxCustomSalesLimitMinor) {
+      throw ValidationException(
+        'Custom sale limit is too large. Maximum is £10,000.00.',
+      );
+    }
+
     return parsed;
   }
 

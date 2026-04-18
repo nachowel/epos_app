@@ -9,6 +9,7 @@ class Product {
     required this.hasModifiers,
     required this.isActive,
     this.isVisibleOnPos = true,
+    this.isCustom = false,
     required this.sortOrder,
   });
 
@@ -21,6 +22,7 @@ class Product {
   final bool hasModifiers;
   final bool isActive;
   final bool isVisibleOnPos;
+  final bool isCustom;
   final int sortOrder;
 
   Product copyWith({
@@ -33,6 +35,7 @@ class Product {
     bool? hasModifiers,
     bool? isActive,
     bool? isVisibleOnPos,
+    bool? isCustom,
     int? sortOrder,
   }) {
     return Product(
@@ -47,6 +50,7 @@ class Product {
       hasModifiers: hasModifiers ?? this.hasModifiers,
       isActive: isActive ?? this.isActive,
       isVisibleOnPos: isVisibleOnPos ?? this.isVisibleOnPos,
+      isCustom: isCustom ?? this.isCustom,
       sortOrder: sortOrder ?? this.sortOrder,
     );
   }
@@ -66,6 +70,7 @@ class Product {
         other.hasModifiers == hasModifiers &&
         other.isActive == isActive &&
         other.isVisibleOnPos == isVisibleOnPos &&
+        other.isCustom == isCustom &&
         other.sortOrder == sortOrder;
   }
 
@@ -80,6 +85,7 @@ class Product {
     hasModifiers,
     isActive,
     isVisibleOnPos,
+    isCustom,
     sortOrder,
   );
 }

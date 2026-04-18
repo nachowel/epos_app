@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/logging/app_logger.dart';
+import 'mirror_schema_contract.dart';
 import 'supabase_edge_function_invoker.dart';
 import 'supabase_mirror_writer.dart';
 import 'sync_transaction_graph.dart';
@@ -26,9 +27,10 @@ class SupabaseTrustedMirrorBoundaryInvoker
            SupabaseEdgeFunctionInvoker(
              config: config,
              accessTokenProvider: () => _readAccessToken(client),
-             diagnosticsSink: (SupabaseEdgeFunctionAuthDiagnostics diagnostics) {
-               _logSyncAuthDiagnostics(logger, diagnostics);
-             },
+             diagnosticsSink:
+                 (SupabaseEdgeFunctionAuthDiagnostics diagnostics) {
+                   _logSyncAuthDiagnostics(logger, diagnostics);
+                 },
            );
 
   final AppLogger _logger;
@@ -288,8 +290,19 @@ class TrustedSupabaseMirrorWriter implements SupabaseMirrorWriter {
 
   @override
   Future<void> writeTransactionGraph(SyncTransactionGraph graph) async {
-    final TrustedMirrorWriteRequest request =
-        TrustedMirrorWriteRequest.fromGraph(graph);
+    final TrustedMirrorWriteRequest request;
+    try {
+      request = TrustedMirrorWriteRequest.fromGraph(graph);
+    } on MirrorSchemaContractViolation catch (error) {
+      throw MirrorWriteFailure(
+        type: MirrorWriteFailureType.validationFailure,
+        message: error.message,
+        retryable: false,
+        tableName: error.tableName,
+        recordUuid: error.recordUuid,
+        issues: error.issues,
+      );
+    }
     await _invoker.invoke(request);
   }
 }

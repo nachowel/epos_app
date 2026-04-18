@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'core/bootstrap/bootstrap_policy.dart';
@@ -19,6 +21,10 @@ Future<void> main() async {
     logger: () => logger,
     body: () async {
       WidgetsFlutterBinding.ensureInitialized();
+
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+        await windowManager.ensureInitialized();
+      }
       tz_data.initializeTimeZones();
       config = await AppConfig.load();
       debugPrint(

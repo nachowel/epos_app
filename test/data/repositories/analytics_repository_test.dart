@@ -184,15 +184,15 @@ void main() {
 
         expect(metrics.totalRevenueMinor, 800);
         expect(metrics.orderCount, 1);
-      expect(metrics.topProductsPreview, const <TopProductSummary>[
-        TopProductSummary(
-          productId: 1,
-          productName: 'Coffee',
-          revenueMinor: 800,
-          quantityCount: 1,
-        ),
-      ]);
-    },
+        expect(metrics.topProductsPreview, const <TopProductSummary>[
+          TopProductSummary(
+            productId: 1,
+            productName: 'Coffee',
+            revenueMinor: 800,
+            quantityCount: 1,
+          ),
+        ]);
+      },
     );
 
     test('returns paid-only revenue metrics from transaction totals', () async {
@@ -254,93 +254,96 @@ void main() {
       );
     });
 
-    test('returns ordered daily paid revenue series grouped by paid_at', () async {
-      await fixture.addOrder(
-        uuid: 'series-day-1a',
-        status: 'paid',
-        totalAmountMinor: 1000,
-        paidAt: DateTime(2026, 4, 10, 9),
-        paymentMethod: 'cash',
-        lines: <_SoldLine>[
-          fixture.line(
-            productId: fixture.coffeeId,
-            productName: 'Coffee',
-            lineTotalMinor: 1000,
-            quantity: 1,
-            unitPriceMinor: 1000,
-          ),
-        ],
-      );
-      await fixture.addOrder(
-        uuid: 'series-day-1b',
-        status: 'paid',
-        totalAmountMinor: 500,
-        paidAt: DateTime(2026, 4, 10, 14),
-        paymentMethod: 'card',
-        lines: <_SoldLine>[
-          fixture.line(
-            productId: fixture.teaId,
-            productName: 'Tea',
-            lineTotalMinor: 500,
-            quantity: 1,
-            unitPriceMinor: 500,
-          ),
-        ],
-      );
-      await fixture.addOrder(
-        uuid: 'series-day-3',
-        status: 'paid',
-        totalAmountMinor: 2200,
-        paidAt: DateTime(2026, 4, 12, 10),
-        paymentMethod: 'cash',
-        lines: <_SoldLine>[
-          fixture.line(
-            productId: fixture.burgerId,
-            productName: 'Burger',
-            lineTotalMinor: 2200,
-            quantity: 2,
-            unitPriceMinor: 1100,
-          ),
-        ],
-      );
-      await fixture.addOrder(
-        uuid: 'series-outside-window',
-        status: 'paid',
-        totalAmountMinor: 999,
-        paidAt: DateTime(2026, 4, 13, 9),
-        paymentMethod: 'cash',
-        lines: <_SoldLine>[
-          fixture.line(
-            productId: fixture.saladId,
-            productName: 'Salad',
-            lineTotalMinor: 999,
-            quantity: 1,
-            unitPriceMinor: 999,
-          ),
-        ],
-      );
+    test(
+      'returns ordered daily paid revenue series grouped by paid_at',
+      () async {
+        await fixture.addOrder(
+          uuid: 'series-day-1a',
+          status: 'paid',
+          totalAmountMinor: 1000,
+          paidAt: DateTime(2026, 4, 10, 9),
+          paymentMethod: 'cash',
+          lines: <_SoldLine>[
+            fixture.line(
+              productId: fixture.coffeeId,
+              productName: 'Coffee',
+              lineTotalMinor: 1000,
+              quantity: 1,
+              unitPriceMinor: 1000,
+            ),
+          ],
+        );
+        await fixture.addOrder(
+          uuid: 'series-day-1b',
+          status: 'paid',
+          totalAmountMinor: 500,
+          paidAt: DateTime(2026, 4, 10, 14),
+          paymentMethod: 'card',
+          lines: <_SoldLine>[
+            fixture.line(
+              productId: fixture.teaId,
+              productName: 'Tea',
+              lineTotalMinor: 500,
+              quantity: 1,
+              unitPriceMinor: 500,
+            ),
+          ],
+        );
+        await fixture.addOrder(
+          uuid: 'series-day-3',
+          status: 'paid',
+          totalAmountMinor: 2200,
+          paidAt: DateTime(2026, 4, 12, 10),
+          paymentMethod: 'cash',
+          lines: <_SoldLine>[
+            fixture.line(
+              productId: fixture.burgerId,
+              productName: 'Burger',
+              lineTotalMinor: 2200,
+              quantity: 2,
+              unitPriceMinor: 1100,
+            ),
+          ],
+        );
+        await fixture.addOrder(
+          uuid: 'series-outside-window',
+          status: 'paid',
+          totalAmountMinor: 999,
+          paidAt: DateTime(2026, 4, 13, 9),
+          paymentMethod: 'cash',
+          lines: <_SoldLine>[
+            fixture.line(
+              productId: fixture.saladId,
+              productName: 'Salad',
+              lineTotalMinor: 999,
+              quantity: 1,
+              unitPriceMinor: 999,
+            ),
+          ],
+        );
 
-      expect(
-        await repository.getDailyRevenueSeries(
-          AnalyticsDateRange.explicit(
-            startInclusive: DateTime(2026, 4, 10),
-            endExclusive: DateTime(2026, 4, 13),
+        expect(
+          await repository.getDailyRevenueSeries(
+            AnalyticsDateRange.explicit(
+              startInclusive: DateTime(2026, 4, 10),
+              endExclusive: DateTime(2026, 4, 13),
+            ),
           ),
-        ),
-        <DailyRevenuePoint>[
-          DailyRevenuePoint(
-            date: DateTime(2026, 4, 10),
-            revenueMinor: 1500,
-            orderCount: 2,
-          ),
-          DailyRevenuePoint(
-            date: DateTime(2026, 4, 12),
-            revenueMinor: 2200,
-            orderCount: 1,
-          ),
-        ],
-      );
-    });
+          <DailyRevenuePoint>[
+            DailyRevenuePoint(
+              date: DateTime(2026, 4, 10),
+              revenueMinor: 1500,
+              orderCount: 2,
+            ),
+            DailyRevenuePoint(
+              date: DateTime(2026, 4, 12),
+              revenueMinor: 2200,
+              orderCount: 1,
+            ),
+          ],
+        );
+      },
+    );
 
     test('returns payment split for cash-only datasets', () async {
       await fixture.addOrder(
@@ -479,6 +482,268 @@ void main() {
         ),
       );
     });
+
+    test(
+      'includes custom sale in financial totals and payment split but excludes it from analytics rollups',
+      () async {
+        await fixture.addOrder(
+          uuid: 'custom-financial-cash',
+          status: 'paid',
+          totalAmountMinor: 1100,
+          paidAt: DateTime(2026, 4, 10, 9),
+          paymentMethod: 'cash',
+          lines: <_SoldLine>[
+            fixture.line(
+              productId: fixture.customSaleProductId,
+              productName: 'Custom Sale',
+              lineTotalMinor: 1100,
+              quantity: 1,
+              unitPriceMinor: 1100,
+            ),
+          ],
+        );
+        await fixture.addOrder(
+          uuid: 'custom-financial-card',
+          status: 'paid',
+          totalAmountMinor: 2000,
+          paidAt: DateTime(2026, 4, 10, 10),
+          paymentMethod: 'card',
+          lines: <_SoldLine>[
+            fixture.line(
+              productId: fixture.burgerId,
+              productName: 'Burger',
+              lineTotalMinor: 2000,
+              quantity: 1,
+              unitPriceMinor: 2000,
+            ),
+          ],
+        );
+
+        final OverviewMetrics metrics = await repository.getOverviewMetrics(
+          _dayRange(2026, 4, 10),
+        );
+        final List<CategoryProductAnalyticsSection> categories =
+            await repository.getCategoryProductSections(_dayRange(2026, 4, 10));
+
+        expect(metrics.totalRevenueMinor, 3100);
+        expect(
+          metrics.paymentSplitSummary,
+          const PaymentSplitSummary(
+            cashRevenueMinor: 1100,
+            cardRevenueMinor: 2000,
+            totalRevenueMinor: 3100,
+            cashOrderCount: 1,
+            cardOrderCount: 1,
+          ),
+        );
+        expect(metrics.customSalesRevenueMinor, 1100);
+        expect(metrics.customSalesCount, 1);
+        expect(metrics.customSalesAverageValueMinor, 1100);
+        expect(metrics.topProductsPreview, const <TopProductSummary>[
+          TopProductSummary(
+            productId: 3,
+            productName: 'Burger',
+            revenueMinor: 2000,
+            quantityCount: 1,
+          ),
+        ]);
+        expect(categories, const <CategoryProductAnalyticsSection>[
+          CategoryProductAnalyticsSection(
+            categoryId: 2,
+            categoryName: 'Food',
+            totalRevenueMinor: 2000,
+            products: <ProductAnalyticsItem>[
+              ProductAnalyticsItem(
+                productId: 3,
+                productName: 'Burger',
+                revenueMinor: 2000,
+                quantityCount: 1,
+              ),
+            ],
+          ),
+        ]);
+      },
+    );
+
+    test(
+      'excludes only the real custom product even when a normal product is named Custom Sale',
+      () async {
+        await fixture.addOrder(
+          uuid: 'custom-name-real',
+          status: 'paid',
+          totalAmountMinor: 950,
+          paidAt: DateTime(2026, 4, 10, 9),
+          paymentMethod: 'cash',
+          lines: <_SoldLine>[
+            fixture.line(
+              productId: fixture.customSaleProductId,
+              productName: 'Custom Sale',
+              lineTotalMinor: 950,
+              quantity: 1,
+              unitPriceMinor: 950,
+            ),
+          ],
+        );
+        await fixture.addOrder(
+          uuid: 'custom-name-normal',
+          status: 'paid',
+          totalAmountMinor: 1250,
+          paidAt: DateTime(2026, 4, 10, 11),
+          paymentMethod: 'card',
+          lines: <_SoldLine>[
+            fixture.line(
+              productId: fixture.namedLikeCustomProductId,
+              productName: 'Custom Sale',
+              lineTotalMinor: 1250,
+              quantity: 1,
+              unitPriceMinor: 1250,
+            ),
+          ],
+        );
+
+        expect(
+          await repository.getTopProductsOverall(_dayRange(2026, 4, 10)),
+          <TopProductSummary>[
+            TopProductSummary(
+              productId: fixture.namedLikeCustomProductId,
+              productName: 'Custom Sale',
+              revenueMinor: 1250,
+              quantityCount: 1,
+            ),
+          ],
+        );
+
+        final OverviewMetrics metrics = await repository.getOverviewMetrics(
+          _dayRange(2026, 4, 10),
+        );
+        expect(metrics.totalRevenueMinor, 2200);
+        expect(metrics.customSalesRevenueMinor, 950);
+        expect(metrics.customSalesCount, 1);
+      },
+    );
+
+    test(
+      'custom-only periods stay in revenue series while product analytics remain empty',
+      () async {
+        await fixture.addOrder(
+          uuid: 'custom-only-day-1',
+          status: 'paid',
+          totalAmountMinor: 500,
+          paidAt: DateTime(2026, 4, 10, 9),
+          paymentMethod: 'cash',
+          lines: <_SoldLine>[
+            fixture.line(
+              productId: fixture.customSaleProductId,
+              productName: 'Custom Sale',
+              lineTotalMinor: 500,
+              quantity: 1,
+              unitPriceMinor: 500,
+            ),
+          ],
+        );
+        await fixture.addOrder(
+          uuid: 'custom-only-day-2',
+          status: 'paid',
+          totalAmountMinor: 700,
+          paidAt: DateTime(2026, 4, 11, 9),
+          paymentMethod: 'card',
+          lines: <_SoldLine>[
+            fixture.line(
+              productId: fixture.customSaleProductId,
+              productName: 'Custom Sale',
+              lineTotalMinor: 700,
+              quantity: 1,
+              unitPriceMinor: 700,
+            ),
+          ],
+        );
+
+        expect(
+          await repository.getRevenueMetrics(
+            AnalyticsDateRange.explicit(
+              startInclusive: DateTime(2026, 4, 10),
+              endExclusive: DateTime(2026, 4, 12),
+            ),
+          ),
+          const RevenueMetrics(
+            totalRevenueMinor: 1200,
+            orderCount: 2,
+            averageOrderValueMinor: 600,
+          ),
+        );
+        expect(
+          await repository.getDailyRevenueSeries(
+            AnalyticsDateRange.explicit(
+              startInclusive: DateTime(2026, 4, 10),
+              endExclusive: DateTime(2026, 4, 12),
+            ),
+          ),
+          <DailyRevenuePoint>[
+            DailyRevenuePoint(
+              date: DateTime(2026, 4, 10),
+              revenueMinor: 500,
+              orderCount: 1,
+            ),
+            DailyRevenuePoint(
+              date: DateTime(2026, 4, 11),
+              revenueMinor: 700,
+              orderCount: 1,
+            ),
+          ],
+        );
+        expect(
+          await repository.getTopProductsOverall(
+            AnalyticsDateRange.explicit(
+              startInclusive: DateTime(2026, 4, 10),
+              endExclusive: DateTime(2026, 4, 12),
+            ),
+          ),
+          isEmpty,
+        );
+        expect(
+          await repository.getCategoryProductSections(
+            AnalyticsDateRange.explicit(
+              startInclusive: DateTime(2026, 4, 10),
+              endExclusive: DateTime(2026, 4, 12),
+            ),
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'custom sales count is based on line count rather than quantity sum',
+      () async {
+        final int transactionId = await fixture.addOrder(
+          uuid: 'custom-line-count',
+          status: 'paid',
+          totalAmountMinor: 1800,
+          paidAt: DateTime(2026, 4, 10, 15),
+          paymentMethod: 'cash',
+          lines: <_SoldLine>[
+            fixture.line(
+              productId: fixture.customSaleProductId,
+              productName: 'Custom Sale',
+              lineTotalMinor: 1800,
+              quantity: 3,
+              unitPriceMinor: 600,
+            ),
+          ],
+        );
+        await (db.update(db.transactionLines)
+              ..where((tbl) => tbl.transactionId.equals(transactionId)))
+            .write(const TransactionLinesCompanion(quantity: Value<int>(3)));
+
+        final OverviewMetrics metrics = await repository.getOverviewMetrics(
+          _dayRange(2026, 4, 10),
+        );
+
+        expect(metrics.customSalesRevenueMinor, 1800);
+        expect(metrics.customSalesCount, 1);
+        expect(metrics.customSalesAverageValueMinor, 1800);
+      },
+    );
 
     test('sorts top products by revenue desc and applies limit', () async {
       await fixture.addOrder(
@@ -814,6 +1079,8 @@ class _CatalogFixture {
     required this.burgerId,
     required this.friesId,
     required this.saladId,
+    required this.customSaleProductId,
+    required this.namedLikeCustomProductId,
   });
 
   final AppDatabase db;
@@ -826,6 +1093,8 @@ class _CatalogFixture {
   final int burgerId;
   final int friesId;
   final int saladId;
+  final int customSaleProductId;
+  final int namedLikeCustomProductId;
 
   static Future<_CatalogFixture> create(AppDatabase db) async {
     final int userId = await insertUser(db, name: 'Admin', role: 'admin');
@@ -868,6 +1137,19 @@ class _CatalogFixture {
         categoryId: foodCategoryId,
         name: 'Salad',
         priceMinor: 300,
+      ),
+      customSaleProductId: await insertProduct(
+        db,
+        categoryId: foodCategoryId,
+        name: 'Custom Sale',
+        priceMinor: 0,
+        isCustom: true,
+      ),
+      namedLikeCustomProductId: await insertProduct(
+        db,
+        categoryId: beveragesCategoryId,
+        name: 'Custom Sale',
+        priceMinor: 1250,
       ),
     );
   }

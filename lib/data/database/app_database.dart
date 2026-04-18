@@ -15,6 +15,9 @@ import '../../domain/models/sandwich.dart';
 part 'app_database.g.dart';
 
 const String _defaultSandwichSauceOptionsJson = '[]';
+const String kArchivedProductsCategoryName = 'Archived Products';
+const String kCustomSaleProductName = 'Custom Sale';
+const int kDefaultCustomSalesLimitMinor = 100000;
 
 class Users extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -85,6 +88,8 @@ class Products extends Table {
 
   BoolColumn get isVisibleOnPos =>
       boolean().withDefault(const Constant(true))();
+
+  BoolColumn get isCustom => boolean().withDefault(const Constant(false))();
 
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
 
@@ -394,6 +399,10 @@ class MenuSettings extends Table {
 
   IntColumn get maxSwaps => integer().withDefault(const Constant(4))();
 
+  IntColumn get customSalesLimitMinor => integer()
+      .named('custom_sales_limit_minor')
+      .withDefault(const Constant(kDefaultCustomSalesLimitMinor))();
+
   IntColumn get updatedBy =>
       integer().nullable().customConstraint('REFERENCES "users" ("id")')();
 
@@ -403,6 +412,7 @@ class MenuSettings extends Table {
   List<String> get customConstraints => <String>[
     'CHECK (free_swap_limit >= 0)',
     'CHECK (max_swaps >= 0)',
+    'CHECK (custom_sales_limit_minor >= 0)',
   ];
 }
 
@@ -506,6 +516,20 @@ class Transactions extends Table {
   IntColumn get modifierTotalMinor =>
       integer().withDefault(const Constant(0))();
 
+  TextColumn get discountType => text().nullable()();
+
+  IntColumn get discountValueMinor =>
+      integer().withDefault(const Constant(0))();
+
+  IntColumn get discountAmountMinor =>
+      integer().withDefault(const Constant(0))();
+
+  TextColumn get discountReason => text().nullable()();
+
+  @ReferenceName('appliedDiscountTransactions')
+  IntColumn get discountAppliedBy =>
+      integer().nullable().customConstraint('REFERENCES "users" ("id")')();
+
   IntColumn get totalAmountMinor => integer().withDefault(const Constant(0))();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
@@ -532,6 +556,12 @@ class Transactions extends Table {
   List<String> get customConstraints => <String>[
     "CHECK (status IN ('draft','sent','paid','cancelled'))",
     'CHECK (subtotal_minor >= 0)',
+    "CHECK (discount_type IS NULL OR discount_type IN ('amount','percent'))",
+    'CHECK (discount_value_minor >= 0)',
+    'CHECK (discount_amount_minor >= 0)',
+    "CHECK (discount_type != 'percent' OR discount_value_minor <= 100)",
+    'CHECK (discount_amount_minor <= subtotal_minor + modifier_total_minor)',
+    "CHECK (discount_type IS NOT NULL OR (discount_value_minor = 0 AND discount_amount_minor = 0 AND discount_reason IS NULL AND discount_applied_by IS NULL))",
     'CHECK (total_amount_minor >= 0)',
   ];
 }
@@ -560,6 +590,21 @@ class TransactionLines extends Table {
 
   IntColumn get removalDiscountTotalMinor =>
       integer().withDefault(const Constant(0))();
+
+  // Reserved for future Custom Sale line persistence. Standard/catalog line
+  // flows should leave this NULL unless a later phase explicitly expands the
+  // contract beyond Custom Sale usage.
+  TextColumn get customNote => text().named('custom_note').nullable()();
+
+  IntColumn get createdByUserId => integer()
+      .named('created_by_user_id')
+      .nullable()
+      .customConstraint('REFERENCES "users" ("id")')();
+
+  IntColumn get adminOverrideUserId => integer()
+      .named('admin_override_user_id')
+      .nullable()
+      .customConstraint('REFERENCES "users" ("id")')();
 
   @override
   List<String> get customConstraints => <String>[
@@ -956,7 +1001,7 @@ class AppDatabase extends _$AppDatabase {
     return AppDatabase(NativeDatabase(file));
   }
 
-  static const int currentSchemaVersion = 32;
+  static const int currentSchemaVersion = 35;
   final List<MigrationLogEntry> _migrationHistory = <MigrationLogEntry>[];
   MigrationLogEntry? _lastMigrationFailure;
 
@@ -993,6 +1038,9 @@ class AppDatabase extends _$AppDatabase {
           await _createMealCustomizationSnapshotIndexes();
           await _createMealCustomizationSnapshotFkEmulation();
           await _migrateToV32();
+          await _migrateToV33();
+          await _migrateToV34();
+          await _migrateToV35();
         },
       );
     },
@@ -1245,9 +1293,39 @@ class AppDatabase extends _$AppDatabase {
           action: _migrateToV32,
         );
       }
+      if (from < 33) {
+        await _runMigrationStep(
+          step: 'migrate_v33',
+          fromVersion: from < 32 ? 32 : from,
+          toVersion: 33,
+          action: _migrateToV33,
+        );
+      }
+      if (from < 34) {
+        await _runMigrationStep(
+          step: 'migrate_v34',
+          fromVersion: from < 33 ? 33 : from,
+          toVersion: 34,
+          action: _migrateToV34,
+        );
+      }
+      if (from < 35) {
+        await _runMigrationStep(
+          step: 'migrate_v35',
+          fromVersion: from < 34 ? 34 : from,
+          toVersion: 35,
+          action: _migrateToV35,
+        );
+      }
     },
     beforeOpen: (OpeningDetails details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
+      if (details.versionNow >= 33) {
+        await _repairLegacyTransactionReferencesV33();
+      }
+      if (details.versionNow >= 34 && !details.wasCreated) {
+        await _ensureCustomSaleProductStartupInvariant();
+      }
       _migrationHistory.add(
         MigrationLogEntry(
           timestamp: DateTime.now().toUtc(),
@@ -1299,6 +1377,7 @@ class AppDatabase extends _$AppDatabase {
         has_modifiers INTEGER NOT NULL DEFAULT 0 CHECK (has_modifiers IN (0, 1)),
         is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
         is_visible_on_pos INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_on_pos IN (0, 1)),
+        is_custom INTEGER NOT NULL DEFAULT 0 CHECK (is_custom IN (0, 1)),
         sort_order INTEGER NOT NULL DEFAULT 0
       );
     ''');
@@ -1429,6 +1508,7 @@ class AppDatabase extends _$AppDatabase {
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         free_swap_limit INTEGER NOT NULL DEFAULT 2 CHECK (free_swap_limit >= 0),
         max_swaps INTEGER NOT NULL DEFAULT 4 CHECK (max_swaps >= 0),
+        custom_sales_limit_minor INTEGER NOT NULL DEFAULT 100000 CHECK (custom_sales_limit_minor >= 0),
         updated_by INTEGER NULL,
         updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
@@ -1494,6 +1574,11 @@ class AppDatabase extends _$AppDatabase {
         status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid','cancelled')),
         subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
         modifier_total_minor INTEGER NOT NULL DEFAULT 0,
+        discount_type TEXT NULL CHECK (discount_type IS NULL OR discount_type IN ('amount','percent')),
+        discount_value_minor INTEGER NOT NULL DEFAULT 0 CHECK (discount_value_minor >= 0),
+        discount_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (discount_amount_minor >= 0 AND discount_amount_minor <= subtotal_minor + modifier_total_minor),
+        discount_reason TEXT NULL,
+        discount_applied_by INTEGER NULL,
         total_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_amount_minor >= 0),
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         paid_at INTEGER NULL,
@@ -1502,7 +1587,9 @@ class AppDatabase extends _$AppDatabase {
         cancelled_by INTEGER NULL,
         idempotency_key TEXT NOT NULL UNIQUE,
         kitchen_printed INTEGER NOT NULL DEFAULT 0 CHECK (kitchen_printed IN (0, 1)),
-        receipt_printed INTEGER NOT NULL DEFAULT 0 CHECK (receipt_printed IN (0, 1))
+        receipt_printed INTEGER NOT NULL DEFAULT 0 CHECK (receipt_printed IN (0, 1)),
+        CHECK (discount_type IS NOT NULL OR (discount_value_minor = 0 AND discount_amount_minor = 0 AND discount_reason IS NULL AND discount_applied_by IS NULL)),
+        CHECK (discount_type != 'percent' OR discount_value_minor <= 100)
       );
     ''');
     await customStatement('''
@@ -1516,7 +1603,10 @@ class AppDatabase extends _$AppDatabase {
         quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
         line_total_minor INTEGER NOT NULL CHECK (line_total_minor >= 0),
         pricing_mode TEXT NOT NULL DEFAULT 'standard' CHECK (pricing_mode IN ('standard','set')),
-        removal_discount_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_total_minor >= 0)
+        removal_discount_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_total_minor >= 0),
+        custom_note TEXT NULL,
+        created_by_user_id INTEGER NULL,
+        admin_override_user_id INTEGER NULL
       );
     ''');
     await customStatement('''
@@ -1837,6 +1927,18 @@ class AppDatabase extends _$AppDatabase {
       referencedTable: 'products',
     );
     await _createMigrationFkTrigger(
+      table: 'transaction_lines',
+      column: 'created_by_user_id',
+      referencedTable: 'users',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'transaction_lines',
+      column: 'admin_override_user_id',
+      referencedTable: 'users',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
       table: 'meal_customization_line_snapshots',
       column: 'transaction_line_id',
       referencedTable: 'transaction_lines',
@@ -1948,6 +2050,9 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id, is_active, is_visible_on_pos, sort_order);',
+    );
+    await customStatement(
+      'CREATE UNIQUE INDEX IF NOT EXISTS ux_products_single_custom_product ON products(is_custom) WHERE is_custom = 1;',
     );
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_products_meal_adjustment_profile ON products(meal_adjustment_profile_id);',
@@ -2154,7 +2259,7 @@ class AppDatabase extends _$AppDatabase {
           table_number INTEGER NULL,
           status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid','cancelled')),
           subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
-          modifier_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (modifier_total_minor >= 0),
+          modifier_total_minor INTEGER NOT NULL DEFAULT 0,
           total_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_amount_minor >= 0),
           created_at INTEGER NOT NULL DEFAULT (unixepoch()),
           paid_at INTEGER NULL,
@@ -2631,6 +2736,7 @@ class AppDatabase extends _$AppDatabase {
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         free_swap_limit INTEGER NOT NULL DEFAULT 2 CHECK (free_swap_limit >= 0),
         max_swaps INTEGER NOT NULL DEFAULT 4 CHECK (max_swaps >= 0),
+        custom_sales_limit_minor INTEGER NOT NULL DEFAULT 100000 CHECK (custom_sales_limit_minor >= 0),
         updated_by INTEGER NULL,
         updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
@@ -3622,6 +3728,84 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  // Developer note:
+  // v33 rebuilt the transactions table to add discount snapshot columns.
+  // On some SQLite runtimes, renaming the parent table during that rebuild can
+  // rewrite child REFERENCES SQL to the temporary legacy table name
+  // (transactions_legacy_v33). beforeOpen runs this repair automatically for
+  // already-migrated databases. If the physical legacy table still exists, we
+  // fail fast on purpose instead of guessing at recovery.
+  Future<void> _repairLegacyTransactionReferencesV33() async {
+    final List<QueryRow> legacyReferences = await customSelect('''
+      SELECT type, name, tbl_name, sql
+      FROM sqlite_master
+      WHERE sql LIKE '%transactions_legacy_v33%'
+      ''').get();
+    if (legacyReferences.isEmpty) {
+      return;
+    }
+
+    debugPrint(
+      '[AppDatabase] Repairing lingering v33 legacy transaction references (${legacyReferences.length} schema object(s)).',
+    );
+
+    final bool legacyTableExists = await _tableExists(
+      'transactions_legacy_v33',
+    );
+    if (legacyTableExists) {
+      throw StateError(
+        'Legacy table transactions_legacy_v33 still exists. Manual recovery or a dev reset is required before repair can continue.',
+      );
+    }
+
+    final int legacyAlterTable = await _pragmaIntValue('legacy_alter_table');
+    await customStatement('PRAGMA foreign_keys = OFF;');
+    await customStatement('PRAGMA legacy_alter_table = OFF;');
+    try {
+      // SQLite can rewrite child-table REFERENCES clauses to the temporary
+      // legacy table name during a parent-table rebuild. Renaming the live
+      // transactions table through that legacy name forces those clauses back
+      // to transactions without rebuilding every dependent table.
+      await customStatement(
+        'ALTER TABLE transactions RENAME TO transactions_legacy_v33;',
+      );
+      await customStatement(
+        'ALTER TABLE transactions_legacy_v33 RENAME TO transactions;',
+      );
+
+      final List<QueryRow> remainingLegacyReferences = await customSelect('''
+        SELECT type, name
+        FROM sqlite_master
+        WHERE sql LIKE '%transactions_legacy_v33%'
+        ''').get();
+      for (final QueryRow row in remainingLegacyReferences) {
+        final String type = row.read<String>('type');
+        final String name = row.read<String>('name');
+        if (type == 'trigger') {
+          await customStatement('DROP TRIGGER IF EXISTS "$name";');
+        } else if (type == 'view') {
+          await customStatement('DROP VIEW IF EXISTS "$name";');
+        }
+      }
+
+      final List<QueryRow> blockingLegacyReferences = await customSelect('''
+        SELECT type, name
+        FROM sqlite_master
+        WHERE sql LIKE '%transactions_legacy_v33%'
+        ''').get();
+      if (blockingLegacyReferences.isNotEmpty) {
+        throw StateError(
+          'Schema still contains transactions_legacy_v33 references after v33 repair.',
+        );
+      }
+    } finally {
+      await customStatement(
+        'PRAGMA legacy_alter_table = ${legacyAlterTable == 0 ? 'OFF' : 'ON'};',
+      );
+      await customStatement('PRAGMA foreign_keys = ON;');
+    }
+  }
+
   Future<void> _migrateToV29() async {
     final bool hasProductModifiersTable = await _tableExists(
       'product_modifiers',
@@ -3945,6 +4129,252 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  Future<void> _migrateToV33() async {
+    final bool hasDiscountType = await _tableHasColumn(
+      tableName: 'transactions',
+      columnName: 'discount_type',
+    );
+    final bool hasDiscountValueMinor = await _tableHasColumn(
+      tableName: 'transactions',
+      columnName: 'discount_value_minor',
+    );
+    final bool hasDiscountAmountMinor = await _tableHasColumn(
+      tableName: 'transactions',
+      columnName: 'discount_amount_minor',
+    );
+    final bool hasDiscountReason = await _tableHasColumn(
+      tableName: 'transactions',
+      columnName: 'discount_reason',
+    );
+    final bool hasDiscountAppliedBy = await _tableHasColumn(
+      tableName: 'transactions',
+      columnName: 'discount_applied_by',
+    );
+    if (hasDiscountType &&
+        hasDiscountValueMinor &&
+        hasDiscountAmountMinor &&
+        hasDiscountReason &&
+        hasDiscountAppliedBy) {
+      await _repairLegacyTransactionReferencesV33();
+      await _createMigrationFkTrigger(
+        table: 'transactions',
+        column: 'discount_applied_by',
+        referencedTable: 'users',
+        nullable: true,
+      );
+      return;
+    }
+
+    final int legacyAlterTable = await _pragmaIntValue('legacy_alter_table');
+    await customStatement('PRAGMA foreign_keys = OFF;');
+    await customStatement('PRAGMA legacy_alter_table = OFF;');
+    try {
+      await customStatement('DROP INDEX IF EXISTS idx_transactions_shift;');
+      await customStatement('DROP INDEX IF EXISTS idx_transactions_user;');
+      await customStatement(
+        'ALTER TABLE transactions RENAME TO transactions_legacy_v33;',
+      );
+      await customStatement('''
+        CREATE TABLE transactions (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT NOT NULL UNIQUE,
+          shift_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          table_number INTEGER NULL,
+          status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid','cancelled')),
+          subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
+          modifier_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (modifier_total_minor >= 0),
+          discount_type TEXT NULL CHECK (discount_type IS NULL OR discount_type IN ('amount','percent')),
+          discount_value_minor INTEGER NOT NULL DEFAULT 0 CHECK (discount_value_minor >= 0),
+          discount_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (discount_amount_minor >= 0 AND discount_amount_minor <= subtotal_minor + modifier_total_minor),
+          discount_reason TEXT NULL,
+          discount_applied_by INTEGER NULL,
+          total_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_amount_minor >= 0),
+          created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          paid_at INTEGER NULL,
+          updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+          cancelled_at INTEGER NULL,
+          cancelled_by INTEGER NULL,
+          idempotency_key TEXT NOT NULL UNIQUE,
+          kitchen_printed INTEGER NOT NULL DEFAULT 0 CHECK (kitchen_printed IN (0, 1)),
+          receipt_printed INTEGER NOT NULL DEFAULT 0 CHECK (receipt_printed IN (0, 1)),
+          CHECK (discount_type IS NOT NULL OR (discount_value_minor = 0 AND discount_amount_minor = 0 AND discount_reason IS NULL AND discount_applied_by IS NULL)),
+          CHECK (discount_type != 'percent' OR discount_value_minor <= 100)
+        );
+      ''');
+      await customStatement('''
+        INSERT INTO transactions (
+          id,
+          uuid,
+          shift_id,
+          user_id,
+          table_number,
+          status,
+          subtotal_minor,
+          modifier_total_minor,
+          discount_type,
+          discount_value_minor,
+          discount_amount_minor,
+          discount_reason,
+          discount_applied_by,
+          total_amount_minor,
+          created_at,
+          paid_at,
+          updated_at,
+          cancelled_at,
+          cancelled_by,
+          idempotency_key,
+          kitchen_printed,
+          receipt_printed
+        )
+        SELECT
+          id,
+          uuid,
+          shift_id,
+          user_id,
+          table_number,
+          status,
+          subtotal_minor,
+          modifier_total_minor,
+          NULL,
+          0,
+          0,
+          NULL,
+          NULL,
+          total_amount_minor,
+          created_at,
+          paid_at,
+          updated_at,
+          cancelled_at,
+          cancelled_by,
+          idempotency_key,
+          kitchen_printed,
+          receipt_printed
+        FROM transactions_legacy_v33;
+      ''');
+      await customStatement('DROP TABLE transactions_legacy_v33;');
+    } finally {
+      await customStatement(
+        'PRAGMA legacy_alter_table = ${legacyAlterTable == 0 ? 'OFF' : 'ON'};',
+      );
+      await customStatement('PRAGMA foreign_keys = ON;');
+    }
+
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_shift ON transactions(shift_id, status, created_at);',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_transactions_user ON transactions(user_id, created_at);',
+    );
+    await _createMigrationFkTrigger(
+      table: 'transactions',
+      column: 'shift_id',
+      referencedTable: 'shifts',
+    );
+    await _createMigrationFkTrigger(
+      table: 'transactions',
+      column: 'user_id',
+      referencedTable: 'users',
+    );
+    await _createMigrationFkTrigger(
+      table: 'transactions',
+      column: 'cancelled_by',
+      referencedTable: 'users',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'transactions',
+      column: 'discount_applied_by',
+      referencedTable: 'users',
+      nullable: true,
+    );
+    await _repairLegacyTransactionReferencesV33();
+  }
+
+  Future<void> _migrateToV34() async {
+    final bool hasProductsIsCustom = await _tableHasColumn(
+      tableName: 'products',
+      columnName: 'is_custom',
+    );
+    if (!hasProductsIsCustom) {
+      await customStatement('''
+        ALTER TABLE products
+        ADD COLUMN is_custom INTEGER NOT NULL DEFAULT 0
+        CHECK (is_custom IN (0, 1));
+        ''');
+    }
+
+    final bool hasTransactionLinesCustomNote = await _tableHasColumn(
+      tableName: 'transaction_lines',
+      columnName: 'custom_note',
+    );
+    if (!hasTransactionLinesCustomNote) {
+      await customStatement(
+        'ALTER TABLE transaction_lines ADD COLUMN custom_note TEXT NULL;',
+      );
+    }
+
+    final bool hasCustomSalesLimitMinor = await _tableHasColumn(
+      tableName: 'menu_settings',
+      columnName: 'custom_sales_limit_minor',
+    );
+    if (!hasCustomSalesLimitMinor) {
+      await customStatement('''
+        ALTER TABLE menu_settings
+        ADD COLUMN custom_sales_limit_minor INTEGER NOT NULL DEFAULT 100000
+        CHECK (custom_sales_limit_minor >= 0);
+        ''');
+    }
+
+    await customStatement(
+      'CREATE UNIQUE INDEX IF NOT EXISTS ux_products_single_custom_product ON products(is_custom) WHERE is_custom = 1;',
+    );
+    await _seedDefaultMenuSettings();
+    if (await _tableHasAnyRows('users')) {
+      await _ensureCustomSaleProduct();
+    }
+  }
+
+  Future<void> _migrateToV35() async {
+    if (!await _tableExists('transaction_lines') ||
+        !await _tableExists('users')) {
+      return;
+    }
+
+    final bool hasCreatedByUserId = await _tableHasColumn(
+      tableName: 'transaction_lines',
+      columnName: 'created_by_user_id',
+    );
+    if (!hasCreatedByUserId) {
+      await customStatement(
+        'ALTER TABLE transaction_lines ADD COLUMN created_by_user_id INTEGER NULL;',
+      );
+    }
+
+    final bool hasAdminOverrideUserId = await _tableHasColumn(
+      tableName: 'transaction_lines',
+      columnName: 'admin_override_user_id',
+    );
+    if (!hasAdminOverrideUserId) {
+      await customStatement(
+        'ALTER TABLE transaction_lines ADD COLUMN admin_override_user_id INTEGER NULL;',
+      );
+    }
+
+    await _createMigrationFkTrigger(
+      table: 'transaction_lines',
+      column: 'created_by_user_id',
+      referencedTable: 'users',
+      nullable: true,
+    );
+    await _createMigrationFkTrigger(
+      table: 'transaction_lines',
+      column: 'admin_override_user_id',
+      referencedTable: 'users',
+      nullable: true,
+    );
+  }
+
   Future<void> _upgradeSeedBurgerModifiersToStructured() async {
     final List<QueryRow> burgerRows = await customSelect('''
       SELECT id
@@ -4108,6 +4538,25 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> _seedDefaultMenuSettings() async {
+    final bool hasCustomSalesLimitMinor = await _tableHasColumn(
+      tableName: 'menu_settings',
+      columnName: 'custom_sales_limit_minor',
+    );
+    if (hasCustomSalesLimitMinor) {
+      await customStatement('''
+        INSERT INTO menu_settings (
+          free_swap_limit,
+          max_swaps,
+          custom_sales_limit_minor,
+          updated_by,
+          updated_at
+        )
+        SELECT 2, 4, 100000, NULL, unixepoch()
+        WHERE NOT EXISTS (SELECT 1 FROM menu_settings);
+      ''');
+      return;
+    }
+
     await customStatement('''
       INSERT INTO menu_settings (
         free_swap_limit,
@@ -4118,6 +4567,175 @@ class AppDatabase extends _$AppDatabase {
       SELECT 2, 4, NULL, unixepoch()
       WHERE NOT EXISTS (SELECT 1 FROM menu_settings);
     ''');
+  }
+
+  Future<void> _ensureCustomSaleProduct() async {
+    if (!await _tableExists('products') || !await _tableExists('categories')) {
+      return;
+    }
+    if (!await _tableHasColumn(
+      tableName: 'products',
+      columnName: 'is_custom',
+    )) {
+      return;
+    }
+
+    final int categoryId = await _ensureArchivedProductsCategory();
+    final List<QueryRow> customRows = await customSelect(
+      '''
+      SELECT id
+      FROM products
+      WHERE is_custom = 1
+      ORDER BY id ASC
+      ''',
+      readsFrom: <ResultSetImplementation<dynamic, dynamic>>{products},
+    ).get();
+
+    if (customRows.length > 1) {
+      final List<int> duplicateIds = customRows
+          .skip(1)
+          .map((QueryRow row) => row.read<int>('id'))
+          .toList(growable: false);
+      for (final int duplicateId in duplicateIds) {
+        await customUpdate(
+          'UPDATE products SET is_custom = 0 WHERE id = ?',
+          variables: <Variable<Object>>[Variable<int>(duplicateId)],
+          updates: <ResultSetImplementation<dynamic, dynamic>>{products},
+        );
+      }
+    }
+
+    final int? existingId = customRows.isEmpty
+        ? null
+        : customRows.first.read<int>('id');
+    if (existingId == null) {
+      await into(products).insert(
+        ProductsCompanion.insert(
+          categoryId: categoryId,
+          mealAdjustmentProfileId: const Value<int?>(null),
+          name: kCustomSaleProductName,
+          priceMinor: 0,
+          imageUrl: const Value<String?>(null),
+          hasModifiers: const Value<bool>(false),
+          isActive: const Value<bool>(true),
+          isVisibleOnPos: const Value<bool>(false),
+          isCustom: const Value<bool>(true),
+          sortOrder: const Value<int>(0),
+        ),
+      );
+      return;
+    }
+
+    await customUpdate(
+      '''
+      UPDATE products
+      SET
+        category_id = ?,
+        meal_adjustment_profile_id = NULL,
+        name = ?,
+        price_minor = 0,
+        image_url = NULL,
+        has_modifiers = 0,
+        is_active = 1,
+        is_visible_on_pos = 0,
+        is_custom = 1,
+        sort_order = 0
+      WHERE id = ?
+      ''',
+      variables: <Variable<Object>>[
+        Variable<int>(categoryId),
+        Variable<String>(kCustomSaleProductName),
+        Variable<int>(existingId),
+      ],
+      updates: <ResultSetImplementation<dynamic, dynamic>>{products},
+    );
+  }
+
+  Future<void> _ensureCustomSaleProductStartupInvariant() async {
+    if (!await _tableExists('products') || !await _tableExists('categories')) {
+      return;
+    }
+    if (!await _tableHasColumn(
+      tableName: 'products',
+      columnName: 'is_custom',
+    )) {
+      return;
+    }
+
+    final List<QueryRow> customRows = await customSelect(
+      '''
+      SELECT id
+      FROM products
+      WHERE is_custom = 1
+      ORDER BY id ASC
+      ''',
+      readsFrom: <ResultSetImplementation<dynamic, dynamic>>{products},
+    ).get();
+
+    if (customRows.length > 1) {
+      final List<int> duplicateIds = customRows
+          .skip(1)
+          .map((QueryRow row) => row.read<int>('id'))
+          .toList(growable: false);
+      for (final int duplicateId in duplicateIds) {
+        await customUpdate(
+          'UPDATE products SET is_custom = 0 WHERE id = ?',
+          variables: <Variable<Object>>[Variable<int>(duplicateId)],
+          updates: <ResultSetImplementation<dynamic, dynamic>>{products},
+        );
+      }
+    }
+
+    await customStatement(
+      'CREATE UNIQUE INDEX IF NOT EXISTS ux_products_single_custom_product ON products(is_custom) WHERE is_custom = 1;',
+    );
+
+    if (customRows.isNotEmpty) {
+      return;
+    }
+
+    final int categoryId = await _ensureArchivedProductsCategory();
+    await into(products).insert(
+      ProductsCompanion.insert(
+        categoryId: categoryId,
+        mealAdjustmentProfileId: const Value<int?>(null),
+        name: kCustomSaleProductName,
+        priceMinor: 0,
+        imageUrl: const Value<String?>(null),
+        hasModifiers: const Value<bool>(false),
+        isActive: const Value<bool>(true),
+        isVisibleOnPos: const Value<bool>(false),
+        isCustom: const Value<bool>(true),
+        sortOrder: const Value<int>(0),
+      ),
+    );
+  }
+
+  Future<int> _ensureArchivedProductsCategory() async {
+    final QueryRow? existing = await customSelect(
+      '''
+      SELECT id
+      FROM categories
+      WHERE lower(trim(name)) = lower(trim(?))
+      ORDER BY id ASC
+      LIMIT 1
+      ''',
+      variables: <Variable<Object>>[
+        Variable<String>(kArchivedProductsCategoryName),
+      ],
+      readsFrom: <ResultSetImplementation<dynamic, dynamic>>{categories},
+    ).getSingleOrNull();
+    if (existing != null) {
+      return existing.read<int>('id');
+    }
+
+    return into(categories).insert(
+      CategoriesCompanion.insert(
+        name: kArchivedProductsCategoryName,
+        sortOrder: const Value<int>(9999),
+        isActive: const Value<bool>(true),
+      ),
+    );
   }
 
   Future<bool> _tableHasColumn({
@@ -4138,6 +4756,13 @@ class AppDatabase extends _$AppDatabase {
       WHERE type = 'table' AND name = ?
       ''',
       variables: <Variable<Object>>[Variable<String>(tableName)],
+    ).getSingleOrNull();
+    return row != null;
+  }
+
+  Future<bool> _tableHasAnyRows(String tableName) async {
+    final QueryRow? row = await customSelect(
+      'SELECT 1 AS has_row FROM $tableName LIMIT 1',
     ).getSingleOrNull();
     return row != null;
   }

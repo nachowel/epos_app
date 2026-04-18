@@ -502,7 +502,7 @@ void main() {
 
       await expectLater(
         () =>
-            _makeOrderService(db).createOrder(currentUser: _adminUser(adminId)),
+            _makeOrderService(db).createPersistedEmptyDraftForTestingAccess(currentUser: _adminUser(adminId)),
         throwsA(isA<ShiftNotActiveException>()),
       );
 
@@ -1488,7 +1488,6 @@ Future<void> _loginWithPin(WidgetTester tester, String pin) async {
   await tester.enterText(find.byType(TextField), pin);
   await tester.tap(find.text(AppStrings.loginButton));
   await tester.pumpAndSettle();
-  expect(find.byType(CategoryEntryScreen), findsOneWidget);
 }
 
 User _adminUser(int id) {

@@ -56,6 +56,11 @@ class SeedData {
         name: 'Tatlılar',
         sortOrder: 3,
       );
+      final archivedProductsId = await _insertCategory(
+        db,
+        name: kArchivedProductsCategoryName,
+        sortOrder: 9999,
+      );
 
       final se5BreakfastId = await _insertProduct(
         db,
@@ -187,6 +192,16 @@ class SeedData {
         priceMinor: 350,
         hasModifiers: true,
         sortOrder: 2,
+      );
+      await _insertProduct(
+        db,
+        categoryId: archivedProductsId,
+        name: kCustomSaleProductName,
+        priceMinor: 0,
+        hasModifiers: false,
+        isVisibleOnPos: false,
+        isCustom: true,
+        sortOrder: 0,
       );
 
       await _insertModifier(
@@ -656,6 +671,8 @@ class SeedData {
     required String name,
     required int priceMinor,
     required bool hasModifiers,
+    bool isVisibleOnPos = true,
+    bool isCustom = false,
     required int sortOrder,
   }) {
     return db
@@ -666,6 +683,8 @@ class SeedData {
             name: name,
             priceMinor: priceMinor,
             hasModifiers: Value<bool>(hasModifiers),
+            isVisibleOnPos: Value<bool>(isVisibleOnPos),
+            isCustom: Value<bool>(isCustom),
             sortOrder: Value<int>(sortOrder),
           ),
         );

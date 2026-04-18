@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Agent runtime artifacts (keep structure, ignore generated content)
+.agent/knowledge/*.md
+!.agent/knowledge/INDEX.md
+.agent/incidents/
+.agent/audits/
+.agent/reviews/
+.agent/SCOPE-*.md
+.agent/CURRENT_TASK.md
+.agent/OPEN_QUESTIONS.md
+
+# Kilo plans (generated)
+.kilo/plans/*.md

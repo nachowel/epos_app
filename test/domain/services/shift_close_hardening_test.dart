@@ -167,7 +167,7 @@ void main() {
       );
       final OrderService orderService = _makeOrderService(db);
 
-      final paidDraft = await orderService.createOrder(
+      final paidDraft = await orderService.createPersistedEmptyDraftForTestingAccess(
         currentUser: _admin(adminId),
       );
       await orderService.addProductToOrder(
@@ -184,7 +184,7 @@ void main() {
         currentUser: _admin(adminId),
       );
 
-      final discardedDraft = await orderService.createOrder(
+      final discardedDraft = await orderService.createPersistedEmptyDraftForTestingAccess(
         currentUser: _admin(adminId),
       );
       await orderService.addProductToOrder(
@@ -196,7 +196,7 @@ void main() {
         currentUser: _admin(adminId),
       );
 
-      final cancelledDraft = await orderService.createOrder(
+      final cancelledDraft = await orderService.createPersistedEmptyDraftForTestingAccess(
         currentUser: _admin(adminId),
       );
       await orderService.addProductToOrder(
@@ -241,7 +241,7 @@ void main() {
         final TransactionRepository transactionRepository =
             TransactionRepository(db);
 
-        final saleDraft = await orderService.createOrder(currentUser: admin);
+        final saleDraft = await orderService.createPersistedEmptyDraftForTestingAccess(currentUser: admin);
         await orderService.addProductToOrder(
           transactionId: saleDraft.id,
           productId: productId,
@@ -256,7 +256,7 @@ void main() {
           currentUser: admin,
         );
 
-        final abandonedDraft = await orderService.createOrder(
+        final abandonedDraft = await orderService.createPersistedEmptyDraftForTestingAccess(
           currentUser: admin,
         );
         await orderService.addProductToOrder(

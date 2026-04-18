@@ -103,6 +103,11 @@ class AnalyticsExportService {
         baselineMinor: revenue.comparisonRevenueMinor,
       ),
       'comparisonLabel': revenue.comparisonLabel,
+      'customSales': <String, Object>{
+        'revenue': _money(overview.customSalesRevenueMinor),
+        'count': overview.customSalesCount,
+        'averageValue': _money(overview.customSalesAverageValueMinor),
+      },
     };
   }
 

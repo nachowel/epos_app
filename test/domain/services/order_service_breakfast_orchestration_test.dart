@@ -31,7 +31,7 @@ void main() {
         transactionRepository: repository,
       );
 
-      final Transaction order = await fixture.service.createOrder(
+      final Transaction order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine line = await fixture.service.addProductToOrder(
@@ -57,7 +57,7 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final Transaction draftOrder = await fixture.service.createOrder(
+      final Transaction draftOrder = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine draftLine = await fixture.service.addProductToOrder(
@@ -75,7 +75,7 @@ void main() {
           );
       expect(editedDraftLine.pricingMode, TransactionLinePricingMode.set);
 
-      final Transaction sentOrder = await fixture.service.createOrder(
+      final Transaction sentOrder = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine sentLine = await fixture.service.addProductToOrder(
@@ -102,7 +102,7 @@ void main() {
         ),
       );
 
-      final Transaction paidOrder = await fixture.service.createOrder(
+      final Transaction paidOrder = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine paidLine = await fixture.service.addProductToOrder(
@@ -129,7 +129,7 @@ void main() {
         ),
       );
 
-      final Transaction cancelledOrder = await fixture.service.createOrder(
+      final Transaction cancelledOrder = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine cancelledLine = await fixture.service
@@ -167,7 +167,7 @@ void main() {
         addTearDown(db.close);
         final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-        final Transaction order = await fixture.service.createOrder(
+        final Transaction order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashier,
         );
         final TransactionLine line = await fixture.service.addProductToOrder(
@@ -211,7 +211,7 @@ void main() {
         addTearDown(db.close);
         final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-        final Transaction order = await fixture.service.createOrder(
+        final Transaction order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashier,
         );
         final TransactionLine line = await fixture.service.addProductToOrder(
@@ -256,7 +256,7 @@ void main() {
         transactionRepository: repository,
       );
 
-      final Transaction order = await fixture.service.createOrder(
+      final Transaction order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine line = await fixture.service.addProductToOrder(
@@ -314,7 +314,7 @@ void main() {
         breakfastRebuildEngine: rebuildEngine,
       );
 
-      final Transaction order = await fixture.service.createOrder(
+      final Transaction order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine line = await fixture.service.addProductToOrder(
@@ -352,7 +352,7 @@ void main() {
         breakfastRebuildEngine: rebuildEngine,
       );
 
-      final Transaction order = await fixture.service.createOrder(
+      final Transaction order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine line = await fixture.service.addProductToOrder(
@@ -403,7 +403,7 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final Transaction order = await fixture.service.createOrder(
+      final Transaction order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine line = await fixture.service.addProductToOrder(
@@ -437,7 +437,7 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final Transaction successOrder = await fixture.service.createOrder(
+      final Transaction successOrder = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine successLine = await fixture.service
@@ -470,7 +470,7 @@ void main() {
         isTrue,
       );
 
-      final Transaction failedOrder = await fixture.service.createOrder(
+      final Transaction failedOrder = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine failedLine = await fixture.service
@@ -508,7 +508,7 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final Transaction order = await fixture.service.createOrder(
+      final Transaction order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine line = await fixture.service.addProductToOrder(
@@ -569,7 +569,7 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final Transaction order = await fixture.service.createOrder(
+      final Transaction order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine line = await fixture.service.addProductToOrder(
@@ -614,7 +614,7 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final Transaction order = await fixture.service.createOrder(
+      final Transaction order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final TransactionLine line = await fixture.service.addProductToOrder(

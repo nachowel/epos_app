@@ -51,6 +51,11 @@ It does NOT:
 * override domain contracts
 * guarantee full alignment with live schema without checking higher authority
 
+Approved-forward note:
+
+* when this document marks a schema addition as an approved phase-1 direction, that means the authority/spec decision is settled even if the live migration has not landed yet
+* until migration lands, `app_database.dart` and embedded migrations remain the physical schema truth
+
 ---
 
 ## 🧠 SYSTEM MODEL OVERVIEW
@@ -209,6 +214,11 @@ status (draft | sent | paid | cancelled)
 subtotal_minor
 modifier_total_minor
 total_amount_minor
+discount_type (nullable: amount | percent)
+discount_value_minor
+discount_amount_minor
+discount_reason (nullable)
+discount_applied_by (nullable -> users.id)
 created_at
 paid_at
 updated_at
@@ -265,10 +275,71 @@ Lifecycle notes:
 * only `sent` transactions are payable
 * only `sent` transactions are cancellable
 * discarding a `draft` deletes it; discard is not a persisted status transition
-* active/open-order lists are the combined set `draft + sent`
-* `open` may remain as a legacy umbrella label for active orders, but it is not a stored `transactions.status`
+* active transaction lists are the combined set `draft + sent`
+* if a UI/report surface still shows `open orders`, that label refers only to the combined active set `draft + sent`
+* `open` may remain as a legacy UI/report label, but it is not a stored `transactions.status`
 * migration compatibility may still encounter older `open` language, but canonical persisted status truth is `draft / sent / paid / cancelled`
 * remote mirror sync accepts terminal states only: `paid` and `cancelled`
+
+### Phase-1 transaction discount extension
+
+Approved direction for the next schema/application change:
+
+* discount is transaction-level only
+* line-item discount is out of scope
+* tax, VAT, and service charge remain out of scope
+* discount belongs on `transactions`; it does NOT belong on `payments`, `transaction_lines`, or `order_modifiers`
+* discount may be added, changed, or removed only while `status = 'draft'`
+* for discount mutability, `draft` is the only editable persisted transaction state in the canonical status model
+* `sent`, `paid`, and `cancelled` transactions must keep the stored discount snapshot unchanged
+* discount is finalized before checkout/payment starts
+
+Field semantics:
+
+* `discount_type` chooses how the raw input is interpreted: `amount | percent | null`
+* `discount_value_minor` stores the raw entered integer value
+* `discount_amount_minor` stores the computed monetary discount actually deducted from the transaction total
+* for `discount_type = 'amount'`, `discount_value_minor` is currency minor units
+* for `discount_type = 'percent'`, `discount_value_minor` is whole-number percent integer `0..100` where `10 = 10%`
+* phase 1 intentionally uses one typed integer input column instead of adding a separate percent column; the canonical money result remains `discount_amount_minor`
+* `discount_reason` is nullable in phase 1
+* `discount_applied_by` records the acting `users.id` when a discount is present
+
+Calculation contract:
+
+```text id="discount_txn_formula"
+pre_discount_total_minor = subtotal_minor + modifier_total_minor
+amount_discount_amount_minor = discount_value_minor
+percent_discount_amount_minor = round_half_up(pre_discount_total_minor * discount_value_minor / 100)
+total_amount_minor = max(0, pre_discount_total_minor - discount_amount_minor)
+```
+
+Rules:
+
+* fixed discount must not exceed `pre_discount_total_minor`
+* when `discount_type = 'amount'`, `discount_amount_minor` equals the validated `discount_value_minor`
+* percent discount must be an integer in the closed range `0..100`
+* when `discount_type = 'percent'`, `discount_amount_minor` must equal `round_half_up(pre_discount_total_minor * discount_value_minor / 100)` using integer arithmetic only
+* final total must never be negative
+* removing discount resets `discount_type = null`, `discount_value_minor = 0`, `discount_amount_minor = 0`, `discount_reason = null`, and `discount_applied_by = null`
+* receipt output must show discount as a separate line
+* synced transaction snapshots must include the discount fields
+* phase-1 reports must reconcile from net `total_amount_minor`; separate discount analytics is future scope
+
+Suggested CHECK constraint summary for the upcoming migration:
+
+* `discount_type IS NULL OR discount_type IN ('amount','percent')`
+* `discount_value_minor >= 0`
+* `discount_amount_minor >= 0`
+* `discount_type = 'percent' -> discount_value_minor BETWEEN 0 AND 100`
+* `discount_type IS NULL -> discount_value_minor = 0 AND discount_amount_minor = 0 AND discount_reason IS NULL AND discount_applied_by IS NULL`
+* `discount_type = 'amount' -> discount_amount_minor <= subtotal_minor + modifier_total_minor`
+* `total_amount_minor >= 0`
+
+Index guidance:
+
+* no dedicated discount index is required in phase 1
+* existing transaction/payment access paths remain the primary query paths
 
 ---
 
@@ -341,6 +412,12 @@ method (cash | card)
 amount_minor
 paid_at
 ```
+
+Notes:
+
+* `payments.amount_minor` must always equal `transactions.total_amount_minor`
+* payment amount is the final post-discount transaction amount
+* payment table does NOT store discount fields
 
 ---
 
@@ -613,6 +690,22 @@ All money stored as INTEGER (minor units):
 
 NEVER use float/double.
 
+Additional discount note:
+
+* `discount_amount_minor` is a money field and must use integer minor units
+* `discount_value_minor` is also integer-only, but when `discount_type = 'percent'` it stores whole-number percent input rather than currency
+
+---
+
+# 🚫 PHASE-1 OUT OF SCOPE
+
+* line-item discount
+* tax
+* VAT
+* service charge
+* admin discount override/approval workflow
+* discount analytics beyond correct net-total reporting
+
 ---
 
 # 🔁 SYNC MODEL
@@ -654,6 +747,7 @@ payments
 * only terminal transaction states sync: `paid`, `cancelled`
 * local editable states such as `draft` and `sent` stay local
 * local DB is never overwritten by mirror sync
+* when transaction discount fields land in schema, they are part of the synced terminal transaction snapshot
 * `sync_queue_root_graph_snapshots` is a local checksum helper, not a remote authority
 
 ---

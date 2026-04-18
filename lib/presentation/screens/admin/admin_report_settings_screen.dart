@@ -25,6 +25,7 @@ class _AdminReportSettingsScreenState
   late final TextEditingController _businessNameController;
   late final TextEditingController _businessAddressController;
   late final TextEditingController _maxVisibleTotalController;
+  late final TextEditingController _customSalesLimitController;
 
   @override
   void initState() {
@@ -32,6 +33,7 @@ class _AdminReportSettingsScreenState
     _businessNameController = TextEditingController();
     _businessAddressController = TextEditingController();
     _maxVisibleTotalController = TextEditingController();
+    _customSalesLimitController = TextEditingController();
     Future<void>.microtask(
       () => ref.read(settingsNotifierProvider.notifier).load(),
     );
@@ -42,6 +44,7 @@ class _AdminReportSettingsScreenState
     _businessNameController.dispose();
     _businessAddressController.dispose();
     _maxVisibleTotalController.dispose();
+    _customSalesLimitController.dispose();
     super.dispose();
   }
 
@@ -64,6 +67,7 @@ class _AdminReportSettingsScreenState
       _syncController(_businessNameController, next.businessName);
       _syncController(_businessAddressController, next.businessAddress);
       _syncController(_maxVisibleTotalController, next.maxVisibleTotalInput);
+      _syncController(_customSalesLimitController, next.customSalesLimitInput);
     });
 
     final authState = ref.watch(authNotifierProvider);
@@ -216,6 +220,25 @@ class _AdminReportSettingsScreenState
                     ref
                         .read(settingsNotifierProvider.notifier)
                         .setBusinessName(value);
+                  },
+                ),
+                const SizedBox(height: AppSizes.spacingMd),
+                TextField(
+                  key: const Key('custom-sale-limit-field'),
+                  controller: _customSalesLimitController,
+                  enabled: !isBusy,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Custom Sale Limit (£)',
+                    hintText: '1000.00',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (String value) {
+                    ref
+                        .read(settingsNotifierProvider.notifier)
+                        .setCustomSalesLimitInput(value);
                   },
                 ),
                 const SizedBox(height: AppSizes.spacingMd),

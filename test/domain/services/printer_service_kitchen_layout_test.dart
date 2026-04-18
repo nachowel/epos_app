@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' show Value, Variable;
 import 'package:epos_app/data/database/app_database.dart' as db;
+import 'package:epos_app/data/repositories/product_repository.dart';
 import 'package:epos_app/data/repositories/transaction_repository.dart';
 import 'package:epos_app/domain/services/printer_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -225,30 +226,29 @@ void main() {
         expect(printable, contains('HALFWAY CAFE'));
         expect(lines.first, '                  HALFWAY CAFE');
         expect(lines[1], '------------------------------------------------');
-        expect(
-          lines[2],
-          matches(RegExp(r'^KITCHEN TICKET\s+Order #1  09:05$')),
-        );
-        expect(lines[3], '                                      13/04/2026');
-        expect(lines[4], '------------------------------------------------');
+        expect(lines[2], 'KITCHEN TICKET');
+        expect(lines[3], 'Order #1');
+        expect(lines[4], '                                           09:05');
+        expect(lines[5], '                                      13/04/2026');
+        expect(lines[6], '------------------------------------------------');
         expect(printable, contains('1x BIG BREAKFAST'));
         expect(printable, contains('£10.95'));
-        expect(printable, contains('CAPPUCCINO | TOAST'));
-        expect(printable, contains('  CAPPUCCINO | TOAST\n\n  - BACON'));
-        expect(printable, contains('+ SAUSAGE'));
-        expect(printable, contains('  >>> BACON - EXTRA CRISPY <<<'));
         expect(
           printable,
           contains(
-            '  >>> BACON - EXTRA CRISPY <<<\n\n  EXTRAS:\n    + HASH BROWN',
+            '  CAPPUCCINO | TOAST\n\nREMOVE:\n  - BACON\n\nADD:\n  + SAUSAGE\n  + HASH BROWN\n\nNOTE:\n  BACON: EXTRA CRISPY',
           ),
         );
+        expect(printable, isNot(contains('>>>')));
+        expect(printable, isNot(contains('<<<')));
         expect(printable, isNot(contains('—')));
         expect(printable, isNot(contains('x2 - EXTRA CRISPY')));
         expect(printable, isNot(contains('TOTAL')));
         expect(printable, isNot(contains('TABLE')));
         expect(printable, isNot(contains('DRINK:')));
         expect(printable, isNot(contains('BREAD:')));
+        expect(printable, isNot(contains('EXTRAS:')));
+        expect(printable, isNot(contains('SAUCE:')));
       },
     );
 
@@ -274,7 +274,7 @@ void main() {
         final int baguetteProductId = await insertProduct(
           database,
           categoryId: categoryId,
-          name: 'Bacon Baguette',
+          name: 'Sausage & Egg',
           priceMinor: 480,
         );
         final int potatoProductId = await insertProduct(
@@ -366,7 +366,7 @@ void main() {
                 uuid: 'line-bacon-baguette',
                 transactionId: transactionId,
                 productId: baguetteProductId,
-                productName: 'Bacon Baguette',
+                productName: 'Sausage & Egg',
                 unitPriceMinor: 480,
                 quantity: const Value<int>(1),
                 lineTotalMinor: 480,
@@ -376,12 +376,26 @@ void main() {
             .into(database.orderModifiers)
             .insert(
               db.OrderModifiersCompanion.insert(
+                uuid: 'baguette-bread-choice',
+                transactionLineId: baguetteLineId,
+                action: 'choice',
+                itemName: 'Baguette',
+                quantity: const Value<int>(1),
+                chargeReason: const Value<String?>('included_choice'),
+                sortKey: const Value<int>(35),
+              ),
+            );
+        await database
+            .into(database.orderModifiers)
+            .insert(
+              db.OrderModifiersCompanion.insert(
                 uuid: 'baguette-sauce-brown',
                 transactionLineId: baguetteLineId,
-                action: 'add',
+                action: 'choice',
                 itemName: 'Brown Sauce',
                 quantity: const Value<int>(1),
                 extraPriceMinor: const Value<int>(0),
+                chargeReason: const Value<String?>('included_choice'),
                 uiSection: const Value<String?>('sauces'),
                 sortKey: const Value<int>(40),
               ),
@@ -392,10 +406,11 @@ void main() {
               db.OrderModifiersCompanion.insert(
                 uuid: 'baguette-sauce-burger',
                 transactionLineId: baguetteLineId,
-                action: 'add',
+                action: 'choice',
                 itemName: 'Burger Sauce',
                 quantity: const Value<int>(1),
                 extraPriceMinor: const Value<int>(0),
+                chargeReason: const Value<String?>('included_choice'),
                 uiSection: const Value<String?>('sauces'),
                 sortKey: const Value<int>(50),
               ),
@@ -425,21 +440,102 @@ void main() {
         expect(
           printable,
           contains(
-            '  EXTRAS:\n    + FRIED ONION\n    + CHIPS\n\n  SAUCE:\n    + BURGER SAUCE',
+            'ADD:\n  + FRIED ONION\n  + CHIPS\n\nSAUCE:\n  + BURGER SAUCE',
           ),
         );
-        expect(printable, contains('1x BACON BAGUETTE'));
-        expect(printable, contains('1x BACON BAGUETTE'));
+        expect(printable, contains('1x SAUSAGE & EGG BAGUETTE'));
+        expect(printable, isNot(contains('1x SAUSAGE & EGG\nBAGUETTE')));
+        expect(printable, isNot(contains('\n  BAGUETTE\n')));
         expect(
           printable,
-          contains('  SAUCE:\n    + BROWN SAUCE\n    + BURGER SAUCE'),
+          contains('SAUCE:\n  + BROWN SAUCE\n  + BURGER SAUCE'),
         );
-        expect(printable, isNot(contains('1x BACON\nBAGUETTE')));
         expect(printable, contains('1x JACKET POTATO TUNA SWEETCORN'));
+        expect(printable, contains('-------------------------'));
         expect(printable, isNot(contains('...')));
         expect(printable, contains('£8.50'));
         expect(printable, isNot(contains('TOTAL')));
         expect(printable, isNot(contains('—')));
+        expect(printable, isNot(contains('EXTRAS:')));
+        expect(printable, isNot(contains('>>>')));
+      },
+    );
+
+    test(
+      'kitchen ticket excludes custom sale lines while keeping normal lines',
+      () async {
+        final db.AppDatabase database = createTestDatabase();
+        addTearDown(database.close);
+
+        final int cashierId = await insertUser(
+          database,
+          name: 'Cashier',
+          role: 'cashier',
+        );
+        final int shiftId = await insertShift(database, openedBy: cashierId);
+        final int categoryId = await insertCategory(database, name: 'Lunch');
+        final int normalProductId = await insertProduct(
+          database,
+          categoryId: categoryId,
+          name: 'Soup',
+          priceMinor: 550,
+        );
+        final int customProductId = await insertProduct(
+          database,
+          categoryId: categoryId,
+          name: 'Custom Sale',
+          priceMinor: 0,
+          isVisibleOnPos: false,
+          isCustom: true,
+        );
+        final int transactionId = await insertTransaction(
+          database,
+          uuid: 'kitchen-layout-custom-filter',
+          shiftId: shiftId,
+          userId: cashierId,
+          status: 'sent',
+          totalAmountMinor: 1250,
+        );
+
+        await database
+            .into(database.transactionLines)
+            .insert(
+              db.TransactionLinesCompanion.insert(
+                uuid: 'kitchen-layout-normal-line',
+                transactionId: transactionId,
+                productId: normalProductId,
+                productName: 'Soup',
+                unitPriceMinor: 550,
+                quantity: const Value<int>(1),
+                lineTotalMinor: 550,
+              ),
+            );
+        await database
+            .into(database.transactionLines)
+            .insert(
+              db.TransactionLinesCompanion.insert(
+                uuid: 'kitchen-layout-custom-line',
+                transactionId: transactionId,
+                productId: customProductId,
+                productName: 'Custom Sale',
+                unitPriceMinor: 700,
+                quantity: const Value<int>(1),
+                lineTotalMinor: 700,
+                customNote: const Value<String?>('Manual item'),
+                createdByUserId: Value<int?>(cashierId),
+              ),
+            );
+
+        final PrinterService service = PrinterService(
+          TransactionRepository(database),
+          productRepository: ProductRepository(database),
+        );
+        final String printable = await service
+            .buildKitchenTicketPreviewForTesting(transactionId: transactionId);
+
+        expect(printable, contains('1x SOUP'));
+        expect(printable, isNot(contains('CUSTOM SALE')));
+        expect(printable, isNot(contains('MANUAL ITEM')));
       },
     );
   });

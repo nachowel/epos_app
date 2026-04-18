@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:uuid/uuid.dart';
 import 'package:flutter/foundation.dart';
 
@@ -8,12 +10,14 @@ import '../../data/repositories/product_repository.dart';
 import '../../data/repositories/payment_repository.dart';
 import '../../data/repositories/print_job_repository.dart';
 import '../../data/repositories/sync_queue_repository.dart';
+import '../../data/repositories/settings_repository.dart';
 import '../../data/repositories/transaction_repository.dart';
 import '../../data/repositories/transaction_state_repository.dart';
 import '../models/breakfast_line_edit.dart';
 import '../models/breakfast_cooking_instruction.dart';
 import '../models/breakfast_cart_selection.dart';
 import '../models/breakfast_rebuild.dart';
+import '../models/custom_sale.dart';
 import '../models/meal_adjustment_profile.dart';
 import '../models/meal_customization.dart';
 import '../models/open_order_summary.dart';
@@ -25,17 +29,22 @@ import '../models/payment.dart';
 import '../models/print_job.dart';
 import '../models/product.dart';
 import '../models/product_modifier.dart';
+import '../models/shift.dart';
+import '../models/transaction_discount.dart';
 import '../models/transaction.dart';
 import '../models/transaction_line.dart';
 import '../models/user.dart';
 import '../repositories/meal_adjustment_profile_repository.dart';
 import 'audit_log_service.dart';
+import 'auth_service.dart';
 import 'breakfast_cooking_instruction_service.dart';
 import 'breakfast_rebuild_engine.dart';
 import 'breakfast_requested_state_mapper.dart';
 import 'breakfast_requested_state_transformer.dart';
+import 'custom_sale_policy_service.dart';
 import 'meal_adjustment_profile_validation_service.dart';
 import 'meal_customization_engine.dart';
+import 'printer_service.dart';
 import 'shift_session_service.dart';
 
 class OrderSummariesPage {
@@ -48,6 +57,8 @@ class OrderSummariesPage {
   final bool hasMore;
 }
 
+const Symbol _emptyDraftTestingZoneKey = #orderServiceEmptyDraftTestingAccess;
+
 class OrderService {
   OrderService({
     required ShiftSessionService shiftSessionService,
@@ -58,9 +69,14 @@ class OrderService {
     MealAdjustmentProfileRepository? mealAdjustmentProfileRepository,
     MealAdjustmentProfileValidationService?
     mealAdjustmentProfileValidationService,
+    SettingsRepository? settingsRepository,
     PaymentRepository? paymentRepository,
     PrintJobRepository? printJobRepository,
     SyncQueueRepository? syncQueueRepository,
+    PrinterService? printerService,
+    AuthService? authService,
+    CustomSalePolicyService customSalePolicyService =
+        const CustomSalePolicyService(),
     BreakfastRebuildEngine breakfastRebuildEngine =
         const BreakfastRebuildEngine(),
     MealCustomizationEngine mealCustomizationEngine =
@@ -78,9 +94,13 @@ class OrderService {
        _mealAdjustmentProfileRepository = mealAdjustmentProfileRepository,
        _mealAdjustmentProfileValidationService =
            mealAdjustmentProfileValidationService,
+       _settingsRepository = settingsRepository,
        _paymentRepository = paymentRepository,
        _printJobRepository = printJobRepository,
        _syncQueueRepository = syncQueueRepository,
+       _printerService = printerService,
+       _authService = authService,
+       _customSalePolicyService = customSalePolicyService,
        _breakfastRebuildEngine = breakfastRebuildEngine,
        _mealCustomizationEngine = mealCustomizationEngine,
        _breakfastCookingInstructionService = breakfastCookingInstructionService,
@@ -96,9 +116,13 @@ class OrderService {
   final MealAdjustmentProfileRepository? _mealAdjustmentProfileRepository;
   final MealAdjustmentProfileValidationService?
   _mealAdjustmentProfileValidationService;
+  final SettingsRepository? _settingsRepository;
   final PaymentRepository? _paymentRepository;
   final PrintJobRepository? _printJobRepository;
   final SyncQueueRepository? _syncQueueRepository;
+  final PrinterService? _printerService;
+  final AuthService? _authService;
+  final CustomSalePolicyService _customSalePolicyService;
   final BreakfastRebuildEngine _breakfastRebuildEngine;
   final MealCustomizationEngine _mealCustomizationEngine;
   final BreakfastCookingInstructionService _breakfastCookingInstructionService;
@@ -106,36 +130,62 @@ class OrderService {
   final AuditLogService _auditLogService;
   final AppLogger _logger;
 
+  /// Production code must not create a persisted empty draft.
+  ///
+  /// Lifecycle contract:
+  /// - persisted draft is created only on first successful item add
+  /// - payment is allowed only from `sent`
+  /// - transaction-level discount is editable only while `draft`
+  /// - print failures never roll back lifecycle state
   Future<Transaction> createOrder({
     required User currentUser,
     int? tableNumber,
     String? requestIdempotencyKey,
   }) async {
+    throw StateError(
+      'Persisted draft creation requires a first successful product add. '
+      'Use checkout/item-seeded draft flows instead of createOrder().',
+    );
+  }
+
+  /// Test-only affordance for legacy integration scenarios that still need a
+  /// persisted empty draft fixture.
+  ///
+  /// This path is forbidden for production flows and is zone-gated so normal
+  /// runtime call graphs cannot use it accidentally.
+  ///
+  /// TODO(nacho): Move this behind a stricter test-only boundary so empty
+  /// draft creation is unavailable outside dedicated test support.
+  @visibleForTesting
+  Future<Transaction> createPersistedEmptyDraftForTesting({
+    required User currentUser,
+    int? tableNumber,
+    String? requestIdempotencyKey,
+  }) async {
+    if (Zone.current[_emptyDraftTestingZoneKey] != true) {
+      throw StateError(
+        'createPersistedEmptyDraftForTesting() is test-only and requires '
+        'OrderService.runWithEmptyDraftTestingAccess().',
+      );
+    }
     await _shiftSessionService.ensureOrderCreationAllowed(currentUser);
     final openShift = await _shiftSessionService.requireBackendOpenShift();
-
-    final String orderUuid = _uuidGenerator.v4();
-    final String idempotencyKey = requestIdempotencyKey ?? _uuidGenerator.v4();
-
-    final Transaction transaction = await _transactionRepository
-        .createTransaction(
-          shiftId: openShift.id,
-          userId: currentUser.id,
-          tableNumber: tableNumber,
-          uuid: orderUuid,
-          idempotencyKey: idempotencyKey,
-        );
-    _logger.audit(
-      eventType: 'order_created',
-      entityId: transaction.uuid,
-      message: 'Order created.',
-      metadata: <String, Object?>{
-        'shift_id': transaction.shiftId,
-        'user_id': currentUser.id,
-        'table_number': transaction.tableNumber,
-      },
+    return _createPersistedDraft(
+      shiftId: openShift.id,
+      currentUser: currentUser,
+      tableNumber: tableNumber,
+      idempotencyKey: requestIdempotencyKey,
     );
-    return transaction;
+  }
+
+  @visibleForTesting
+  static Future<T> runWithEmptyDraftTestingAccess<T>(
+    Future<T> Function() action,
+  ) {
+    return runZoned(
+      action,
+      zoneValues: <Object?, Object?>{_emptyDraftTestingZoneKey: true},
+    );
   }
 
   Future<TransactionLine> addProductToOrder({
@@ -166,6 +216,54 @@ class OrderService {
     );
     await recalculateOrderTotals(transactionId);
     return line;
+  }
+
+  Future<TransactionLine> addCustomSaleToOrder({
+    required int transactionId,
+    required User currentUser,
+    required CustomSaleWriteRequest request,
+  }) async {
+    final Product customSaleProduct = await _requireSystemCustomSaleProduct();
+    final int customSalesLimitMinor = await _requiredSettingsRepository
+        .getCustomSalesLimitMinor();
+    final CustomSaleValidationResult validation = _customSalePolicyService
+        .validateWriteRequest(
+          request: request,
+          limitMinor: customSalesLimitMinor,
+        );
+    final User? approvingAdmin = await _resolveCustomSaleApprovingAdmin(
+      validation: validation,
+      overrideRequest: request.overrideRequest,
+    );
+
+    final TransactionLine line = await _transactionRepository.addCustomSaleLine(
+      transactionId: transactionId,
+      productId: customSaleProduct.id,
+      amountMinor: validation.amountMinor,
+      customNote: validation.note,
+      createdByUserId: currentUser.id,
+      adminOverrideUserId: approvingAdmin?.id,
+    );
+    await recalculateOrderTotals(transactionId);
+    return line;
+  }
+
+  Future<CustomSaleValidationResult> validateCustomSaleWriteRequest({
+    required CustomSaleWriteRequest request,
+  }) async {
+    await _requireSystemCustomSaleProduct();
+    final int customSalesLimitMinor = await _requiredSettingsRepository
+        .getCustomSalesLimitMinor();
+    final CustomSaleValidationResult validation = _customSalePolicyService
+        .validateWriteRequest(
+          request: request,
+          limitMinor: customSalesLimitMinor,
+        );
+    await _resolveCustomSaleApprovingAdmin(
+      validation: validation,
+      overrideRequest: request.overrideRequest,
+    );
+    return validation;
   }
 
   Future<TransactionLine> addBreakfastSelectionToOrder({
@@ -245,6 +343,70 @@ class OrderService {
         .getTransactionIdByLine(transactionLineId);
     await recalculateOrderTotals(transactionId);
     return modifier;
+  }
+
+  Future<TransactionLine> editCustomSaleLine({
+    required int transactionLineId,
+    required User currentUser,
+    required CustomSaleWriteRequest request,
+  }) async {
+    final ({
+      TransactionLine line,
+      TransactionStatus status,
+      DateTime transactionUpdatedAt,
+    })?
+    context = await _transactionRepository.getLineContext(transactionLineId);
+    if (context == null) {
+      throw NotFoundException('Transaction line not found: $transactionLineId');
+    }
+    if (!OrderLifecyclePolicy.canMutateLineItems(context.status)) {
+      throw InvalidStateTransitionException(
+        'Cannot mutate non-draft transaction: ${context.line.transactionId}',
+      );
+    }
+
+    final Product customSaleProduct = await _requireSystemCustomSaleProduct();
+    if (!_customSalePolicyService.isCustomSaleLine(
+      context.line,
+      customSaleProductId: customSaleProduct.id,
+    )) {
+      throw ValidationException(
+        'Transaction line $transactionLineId is not a Custom Sale line.',
+      );
+    }
+    if (context.line.quantity != 1) {
+      throw ValidationException(
+        'Custom Sale lines must keep quantity fixed at one.',
+      );
+    }
+
+    final int customSalesLimitMinor = await _requiredSettingsRepository
+        .getCustomSalesLimitMinor();
+    final CustomSaleValidationResult validation = _customSalePolicyService
+        .validateWriteRequest(
+          request: request,
+          limitMinor: customSalesLimitMinor,
+        );
+    final User? approvingAdmin = await _resolveCustomSaleApprovingAdmin(
+      validation: validation,
+      overrideRequest: request.overrideRequest,
+    );
+    final int createdByUserId = await _resolveCustomSaleCreatorUserId(
+      line: context.line,
+      fallbackUserId: currentUser.id,
+    );
+
+    final TransactionLine updated = await _transactionRepository
+        .updateCustomSaleLine(
+          transactionLineId: transactionLineId,
+          productId: customSaleProduct.id,
+          amountMinor: validation.amountMinor,
+          customNote: validation.note,
+          createdByUserId: createdByUserId,
+          adminOverrideUserId: approvingAdmin?.id,
+        );
+    await recalculateOrderTotals(updated.transactionId);
+    return updated;
   }
 
   Future<TransactionLine> editBreakfastLine({
@@ -1048,12 +1210,18 @@ class OrderService {
   }
 
   Future<void> recalculateOrderTotals(int transactionId) async {
-    final ({int subtotalMinor, int modifierTotalMinor, int totalAmountMinor})
+    final ({
+      int subtotalMinor,
+      int modifierTotalMinor,
+      int discountAmountMinor,
+      int totalAmountMinor,
+    })
     totals = await _transactionRepository.calculateTotals(transactionId);
     await _transactionRepository.updateTotals(
       transactionId: transactionId,
       subtotalMinor: totals.subtotalMinor,
       modifierTotalMinor: totals.modifierTotalMinor,
+      discountAmountMinor: totals.discountAmountMinor,
       totalAmountMinor: totals.totalAmountMinor,
     );
   }
@@ -1075,43 +1243,63 @@ class OrderService {
       transaction: transaction,
     );
 
-    return _transactionRepository.runInTransaction(() async {
-      await recalculateOrderTotals(transactionId);
+    final Payment payment = await _transactionRepository.runInTransaction(
+      () async {
+        await recalculateOrderTotals(transactionId);
 
-      final Transaction? refreshedTransaction = await _transactionRepository
-          .getById(transactionId);
-      if (refreshedTransaction == null) {
-        throw NotFoundException('Transaction not found: $transactionId');
+        final Transaction? refreshedTransaction = await _transactionRepository
+            .getById(transactionId);
+        if (refreshedTransaction == null) {
+          throw NotFoundException('Transaction not found: $transactionId');
+        }
+        _ensureTransactionCanBePaid(refreshedTransaction);
+
+        final DateTime paidAt = DateTime.now();
+        final Payment payment = await _requiredPaymentRepository.createPayment(
+          transactionId: transactionId,
+          uuid: _uuidGenerator.v4(),
+          method: method,
+          amountMinor: refreshedTransaction.totalAmountMinor,
+          paidAt: paidAt,
+        );
+        await _transactionStateRepository.transitionSentOrderToPaid(
+          transactionId: transactionId,
+          paidAt: paidAt,
+        );
+        await _enqueueSyncGraph(transactionUuid: refreshedTransaction.uuid);
+        _logger.audit(
+          eventType: 'order_paid',
+          entityId: refreshedTransaction.uuid,
+          message: 'Order paid successfully.',
+          metadata: <String, Object?>{
+            'payment_uuid': payment.uuid,
+            'amount_minor': refreshedTransaction.totalAmountMinor,
+            'method': method.name,
+            'user_id': currentUser.id,
+          },
+        );
+
+        return payment;
+      },
+    );
+
+    if (method == PaymentMethod.cash) {
+      final PrinterService? printerService = _printerService;
+      if (printerService != null) {
+        unawaited(
+          printerService.openCashDrawer().catchError((Object error) {
+            _logger.error(
+              eventType: 'cash_drawer_pulse_failed',
+              entityId: transactionId.toString(),
+              message: 'Cash drawer opening pulse failed.',
+              error: error,
+            );
+          }),
+        );
       }
-      _ensureTransactionCanBePaid(refreshedTransaction);
+    }
 
-      final DateTime paidAt = DateTime.now();
-      final Payment payment = await _requiredPaymentRepository.createPayment(
-        transactionId: transactionId,
-        uuid: _uuidGenerator.v4(),
-        method: method,
-        amountMinor: refreshedTransaction.totalAmountMinor,
-        paidAt: paidAt,
-      );
-      await _transactionStateRepository.transitionSentOrderToPaid(
-        transactionId: transactionId,
-        paidAt: paidAt,
-      );
-      await _enqueueSyncGraph(transactionUuid: refreshedTransaction.uuid);
-      _logger.audit(
-        eventType: 'order_paid',
-        entityId: refreshedTransaction.uuid,
-        message: 'Order paid successfully.',
-        metadata: <String, Object?>{
-          'payment_uuid': payment.uuid,
-          'amount_minor': refreshedTransaction.totalAmountMinor,
-          'method': method.name,
-          'user_id': currentUser.id,
-        },
-      );
-
-      return payment;
-    });
+    return payment;
   }
 
   PaymentRepository get _requiredPaymentRepository {
@@ -1167,21 +1355,71 @@ class OrderService {
     return service;
   }
 
+  SettingsRepository get _requiredSettingsRepository {
+    final SettingsRepository? repository = _settingsRepository;
+    if (repository == null) {
+      throw StateError(
+        'SettingsRepository is required for Custom Sale operations.',
+      );
+    }
+    return repository;
+  }
+
+  AuthService get _requiredAuthService {
+    final AuthService? service = _authService;
+    if (service == null) {
+      throw StateError('AuthService is required for Custom Sale operations.');
+    }
+    return service;
+  }
+
   Future<Transaction> markOrderPaidInCheckoutIfNeeded({
     required User currentUser,
     int? tableNumber,
     required List<CheckoutItem> cartItems,
+    TransactionDiscountInput? discount,
     required String idempotencyKey,
     required PaymentMethod? immediatePaymentMethod,
   }) async {
     return _transactionRepository.runInTransaction(() async {
-      final Transaction createdTransaction = await createOrder(
+      // Persist the commercial draft only when the first checkout item is
+      // accepted so empty-cart/navigation-only flows never create a row.
+      final CheckoutItem firstItem = cartItems.first;
+      final ({Transaction transaction, TransactionLine? firstLine})
+      checkoutSeed = await _createDraftFromFirstCheckoutItem(
         currentUser: currentUser,
         tableNumber: tableNumber,
-        requestIdempotencyKey: idempotencyKey,
+        firstItem: firstItem,
+        idempotencyKey: idempotencyKey,
       );
+      final Transaction createdTransaction = checkoutSeed.transaction;
 
-      for (final CheckoutItem item in cartItems) {
+      if (checkoutSeed.firstLine != null) {
+        for (final modifier in firstItem.modifiers) {
+          await addModifierToLine(
+            transactionLineId: checkoutSeed.firstLine!.id,
+            action: modifier.action,
+            itemName: modifier.itemName,
+            extraPriceMinor: modifier.extraPriceMinor,
+            priceBehavior: modifier.priceBehavior,
+            uiSection: modifier.uiSection,
+          );
+        }
+      }
+
+      for (final CheckoutItem item in cartItems.skip(1)) {
+        final CustomSaleWriteRequest? customSaleRequest =
+            item.customSaleRequest;
+        if (customSaleRequest != null) {
+          _ensureCheckoutCustomSaleItemShape(item);
+          await addCustomSaleToOrder(
+            transactionId: createdTransaction.id,
+            currentUser: currentUser,
+            request: customSaleRequest,
+          );
+          continue;
+        }
+
         final BreakfastCartSelection? breakfastSelection =
             item.breakfastSelection;
         if (breakfastSelection != null) {
@@ -1233,6 +1471,13 @@ class OrderService {
       }
 
       await recalculateOrderTotals(createdTransaction.id);
+      if (discount != null) {
+        await _applyDiscountInCurrentTransaction(
+          transactionId: createdTransaction.id,
+          currentUser: currentUser,
+          discount: discount,
+        );
+      }
 
       await sendOrder(
         transactionId: createdTransaction.id,
@@ -1289,19 +1534,25 @@ class OrderService {
       if (lines.isEmpty) {
         throw ValidationException('Draft order cannot be sent without items.');
       }
+      final bool kitchenRequired = await _orderRequiresKitchen(lines);
       await _transactionStateRepository.transitionDraftOrderToSent(
         transactionId: transactionId,
       );
-      await _ensurePrintJobQueued(
-        transactionId: transactionId,
-        target: PrintJobTarget.kitchen,
-        source: 'sendOrder',
-      );
+      if (kitchenRequired) {
+        await _ensurePrintJobQueued(
+          transactionId: transactionId,
+          target: PrintJobTarget.kitchen,
+          source: 'sendOrder',
+        );
+      }
       _logger.audit(
         eventType: 'order_sent',
         entityId: transaction.uuid,
         message: 'Draft order sent.',
-        metadata: <String, Object?>{'user_id': currentUser.id},
+        metadata: <String, Object?>{
+          'user_id': currentUser.id,
+          'kitchen_required': kitchenRequired,
+        },
       );
     });
   }
@@ -1412,6 +1663,49 @@ class OrderService {
     return _transactionRepository.getLines(transactionId);
   }
 
+  Future<bool> isCustomSaleLine(TransactionLine line) async {
+    final int customSaleProductId = await _requireSystemCustomSaleProductId();
+    return _customSalePolicyService.isCustomSaleLine(
+      line,
+      customSaleProductId: customSaleProductId,
+    );
+  }
+
+  Future<List<TransactionLine>> getKitchenEligibleLines(
+    int transactionId,
+  ) async {
+    final List<TransactionLine> lines = await _transactionRepository.getLines(
+      transactionId,
+    );
+    return _filterKitchenEligibleLines(lines);
+  }
+
+  Future<bool> isKitchenRequired(int transactionId) async {
+    final List<TransactionLine> lines = await _transactionRepository.getLines(
+      transactionId,
+    );
+    return _orderRequiresKitchen(lines);
+  }
+
+  Future<Map<int, bool>> getKitchenRequiredByTransactionIds(
+    Iterable<int> transactionIds,
+  ) async {
+    final List<int> ids = transactionIds.toSet().toList(growable: false);
+    if (ids.isEmpty) {
+      return const <int, bool>{};
+    }
+
+    final Map<int, List<TransactionLine>> linesByTransactionId =
+        await _transactionRepository.getLinesByTransactionIds(ids);
+    final Map<int, bool> result = <int, bool>{};
+    for (final int transactionId in ids) {
+      result[transactionId] = await _orderRequiresKitchen(
+        linesByTransactionId[transactionId] ?? const <TransactionLine>[],
+      );
+    }
+    return result;
+  }
+
   Future<List<OrderModifier>> getLineModifiers(int transactionLineId) {
     return _transactionRepository.getModifiersByLine(transactionLineId);
   }
@@ -1493,8 +1787,69 @@ class OrderService {
     );
   }
 
+  Future<List<OpenOrderSummary>> getRecentPaidOrdersForToday({
+    int limit = 5,
+  }) async {
+    if (limit <= 0) {
+      return const <OpenOrderSummary>[];
+    }
+
+    final DateTime now = DateTime.now();
+    final DateTime todayStart = DateTime(now.year, now.month, now.day);
+    final DateTime tomorrowStart = todayStart.add(const Duration(days: 1));
+    final List<Transaction> paidOrders = await _transactionRepository
+        .getPaidTransactionsBetween(
+          startInclusive: todayStart,
+          endExclusive: tomorrowStart,
+        );
+    final List<Transaction> visibleOrders = paidOrders
+        .take(limit)
+        .toList(growable: false);
+    final Map<int, List<TransactionLine>> linesByTransactionId =
+        await _refetchLinesForOrders(visibleOrders);
+
+    return visibleOrders
+        .map((Transaction transaction) {
+          final List<TransactionLine> lines =
+              linesByTransactionId[transaction.id] ?? const <TransactionLine>[];
+          return OpenOrderSummary(
+            transaction: transaction,
+            itemCount: lines.fold<int>(
+              0,
+              (int sum, TransactionLine line) => sum + line.quantity,
+            ),
+            shortContent: _buildShortContent(lines),
+          );
+        })
+        .toList(growable: false);
+  }
+
   Future<List<OpenOrderSummary>> getOrderSummariesByShift(int shiftId) async {
     final List<Transaction> orders = await getActiveOrders(shiftId: shiftId);
+    final Map<int, List<TransactionLine>> linesByTransactionId =
+        await _refetchLinesForOrders(orders);
+
+    return orders
+        .map((Transaction transaction) {
+          final List<TransactionLine> lines =
+              linesByTransactionId[transaction.id] ?? const <TransactionLine>[];
+          return OpenOrderSummary(
+            transaction: transaction,
+            itemCount: lines.fold<int>(
+              0,
+              (int sum, TransactionLine line) => sum + line.quantity,
+            ),
+            shortContent: _buildShortContent(lines),
+          );
+        })
+        .toList(growable: false);
+  }
+
+  /// Returns summaries for all active (draft + sent) orders across every
+  /// shift. Uses the exact same [getActiveOrders] query that the exit-safety
+  /// guard relies on, so the two can never diverge.
+  Future<List<OpenOrderSummary>> getActiveOrderSummaries() async {
+    final List<Transaction> orders = await getActiveOrders();
     final Map<int, List<TransactionLine>> linesByTransactionId =
         await _refetchLinesForOrders(orders);
 
@@ -1526,6 +1881,294 @@ class OrderService {
       transactionId: transactionId,
       tableNumber: tableNumber,
     );
+  }
+
+  Future<Transaction> applyDiscountToDraft({
+    required int transactionId,
+    required User currentUser,
+    required TransactionDiscountInput discount,
+  }) async {
+    return _transactionRepository.runInTransaction(() async {
+      final ({Transaction before, Transaction after}) mutation =
+          await _applyDiscountInCurrentTransaction(
+            transactionId: transactionId,
+            currentUser: currentUser,
+            discount: discount,
+          );
+      return mutation.after;
+    });
+  }
+
+  Future<Transaction> removeDiscountFromDraft({
+    required int transactionId,
+    required User currentUser,
+  }) async {
+    return _transactionRepository.runInTransaction(() async {
+      final Transaction transaction = await _requireDraftForDiscountMutation(
+        transactionId: transactionId,
+        currentUser: currentUser,
+      );
+      await _transactionRepository.clearDiscount(
+        transactionId: transactionId,
+        totalAmountMinor: transaction.preDiscountTotalMinor,
+      );
+      final Transaction? updated = await _transactionRepository.getById(
+        transactionId,
+      );
+      if (updated == null) {
+        throw NotFoundException('Transaction not found: $transactionId');
+      }
+      await _logDiscountAuditSafely(
+        actorUserId: currentUser.id,
+        before: transaction,
+        after: updated,
+      );
+      return updated;
+    });
+  }
+
+  Future<Transaction> _createPersistedDraft({
+    required int shiftId,
+    required User currentUser,
+    int? tableNumber,
+    String? idempotencyKey,
+  }) async {
+    final String orderUuid = _uuidGenerator.v4();
+    final String resolvedIdempotencyKey = idempotencyKey ?? _uuidGenerator.v4();
+    final Transaction transaction = await _transactionRepository
+        .createTransaction(
+          shiftId: shiftId,
+          userId: currentUser.id,
+          tableNumber: tableNumber,
+          uuid: orderUuid,
+          idempotencyKey: resolvedIdempotencyKey,
+        );
+    _logger.audit(
+      eventType: 'order_created',
+      entityId: transaction.uuid,
+      message: 'Order created.',
+      metadata: <String, Object?>{
+        'shift_id': transaction.shiftId,
+        'user_id': currentUser.id,
+        'table_number': transaction.tableNumber,
+      },
+    );
+    return transaction;
+  }
+
+  Future<({Transaction transaction, TransactionLine? firstLine})>
+  _createDraftFromFirstCheckoutItem({
+    required User currentUser,
+    required CheckoutItem firstItem,
+    int? tableNumber,
+    required String idempotencyKey,
+  }) async {
+    await _shiftSessionService.ensureOrderCreationAllowed(currentUser);
+    final Shift openShift = await _shiftSessionService
+        .requireBackendOpenShift();
+    final Transaction transaction = await _createPersistedDraft(
+      shiftId: openShift.id,
+      currentUser: currentUser,
+      tableNumber: tableNumber,
+      idempotencyKey: idempotencyKey,
+    );
+
+    final CustomSaleWriteRequest? customSaleRequest =
+        firstItem.customSaleRequest;
+    if (customSaleRequest != null) {
+      _ensureCheckoutCustomSaleItemShape(firstItem);
+      final TransactionLine line = await addCustomSaleToOrder(
+        transactionId: transaction.id,
+        currentUser: currentUser,
+        request: customSaleRequest,
+      );
+      return (transaction: transaction, firstLine: line);
+    }
+
+    final BreakfastCartSelection? breakfastSelection =
+        firstItem.breakfastSelection;
+    if (breakfastSelection != null) {
+      await addBreakfastSelectionToOrder(
+        transactionId: transaction.id,
+        productId: firstItem.productId,
+        selection: breakfastSelection,
+      );
+      await recalculateOrderTotals(transaction.id);
+      return (transaction: transaction, firstLine: null);
+    }
+
+    final _StandardProductFlowDecision flowDecision =
+        await _decideStandardProductFlow(
+          productId: firstItem.productId,
+          mealCustomizationRequest: firstItem.mealCustomizationRequest,
+        );
+
+    if (flowDecision.kind == _StandardProductFlowKind.mealCustomization) {
+      if (firstItem.modifiers.isNotEmpty) {
+        throw ValidationException(
+          'Flat modifiers cannot be combined with meal customization.',
+        );
+      }
+      await _addMealCustomizationToOrder(
+        transactionId: transaction.id,
+        context: flowDecision.mealContext!,
+        request: firstItem.mealCustomizationRequest,
+        quantity: firstItem.quantity,
+      );
+      await recalculateOrderTotals(transaction.id);
+      return (transaction: transaction, firstLine: null);
+    }
+
+    final TransactionLine line = await addProductToOrder(
+      transactionId: transaction.id,
+      productId: firstItem.productId,
+      quantity: firstItem.quantity,
+    );
+    return (transaction: transaction, firstLine: line);
+  }
+
+  void _ensureCheckoutCustomSaleItemShape(CheckoutItem item) {
+    if (item.quantity != 1) {
+      throw ValidationException(
+        'Custom Sale checkout items must keep quantity fixed at one.',
+      );
+    }
+    if (item.modifiers.isNotEmpty ||
+        item.breakfastSelection != null ||
+        item.mealCustomizationRequest != null) {
+      throw ValidationException(
+        'Custom Sale checkout items cannot include modifiers or meal selections.',
+      );
+    }
+  }
+
+  Future<({Transaction before, Transaction after})>
+  _applyDiscountInCurrentTransaction({
+    required int transactionId,
+    required User currentUser,
+    required TransactionDiscountInput discount,
+  }) async {
+    discount.validate();
+    final Transaction transaction = await _requireDraftForDiscountMutation(
+      transactionId: transactionId,
+      currentUser: currentUser,
+    );
+    final TransactionDiscountComputation totals =
+        TransactionDiscountMath.compute(
+          subtotalMinor: transaction.subtotalMinor,
+          modifierTotalMinor: transaction.modifierTotalMinor,
+          discountType: discount.type,
+          discountValueMinor: discount.valueMinor,
+        );
+    final String? normalizedReason = discount.reason?.trim().isEmpty ?? true
+        ? null
+        : discount.reason!.trim();
+    await _transactionRepository.updateDiscount(
+      transactionId: transactionId,
+      discountType: discount.type,
+      discountValueMinor: discount.valueMinor,
+      discountAmountMinor: totals.discountAmountMinor,
+      discountReason: normalizedReason,
+      discountAppliedBy: currentUser.id,
+      totalAmountMinor: totals.totalAmountMinor,
+    );
+    final Transaction? updated = await _transactionRepository.getById(
+      transactionId,
+    );
+    if (updated == null) {
+      throw NotFoundException('Transaction not found: $transactionId');
+    }
+    await _logDiscountAuditSafely(
+      actorUserId: currentUser.id,
+      before: transaction,
+      after: updated,
+    );
+    return (before: transaction, after: updated);
+  }
+
+  Future<Transaction> _requireDraftForDiscountMutation({
+    required int transactionId,
+    required User currentUser,
+  }) async {
+    AuthorizationPolicy.ensureAllowed(
+      currentUser,
+      OperatorPermission.createDraftOrder,
+    );
+    final Transaction? transaction = await _transactionRepository.getById(
+      transactionId,
+    );
+    if (transaction == null) {
+      throw NotFoundException('Transaction not found: $transactionId');
+    }
+    if (!transaction.isDraft) {
+      throw InvalidStateTransitionException(
+        'Discount can be changed only for draft transactions.',
+      );
+    }
+    await _shiftSessionService.ensureOrderMutationAllowed(
+      user: currentUser,
+      transaction: transaction,
+    );
+    return transaction;
+  }
+
+  Future<void> _logDiscountAuditSafely({
+    required int actorUserId,
+    required Transaction before,
+    required Transaction after,
+  }) async {
+    final String? action = _resolveDiscountAuditAction(
+      before: before,
+      after: after,
+    );
+    if (action == null) {
+      return;
+    }
+    final DateTime occurredAt = DateTime.now().toUtc();
+    await _auditLogService.logActionSafely(
+      actorUserId: actorUserId,
+      action: action,
+      entityType: 'transaction',
+      entityId: after.uuid,
+      createdAt: occurredAt,
+      metadata: <String, Object?>{
+        'transaction_id': after.id,
+        'transaction_uuid': after.uuid,
+        'actor_user_id': actorUserId,
+        'old_discount_state': _discountAuditState(before),
+        'new_discount_state': _discountAuditState(after),
+        'reason': after.discountReason ?? before.discountReason,
+        'timestamp': occurredAt.toIso8601String(),
+      },
+    );
+  }
+
+  String? _resolveDiscountAuditAction({
+    required Transaction before,
+    required Transaction after,
+  }) {
+    final bool hadDiscount = before.discountType != null;
+    final bool hasDiscount = after.discountType != null;
+    if (!hadDiscount && hasDiscount) {
+      return 'discount_applied';
+    }
+    if (hadDiscount && hasDiscount) {
+      return 'discount_changed';
+    }
+    if (hadDiscount && !hasDiscount) {
+      return 'discount_removed';
+    }
+    return null;
+  }
+
+  Map<String, Object?> _discountAuditState(Transaction transaction) {
+    return <String, Object?>{
+      'type': transaction.discountType?.name,
+      'value_minor': transaction.discountValueMinor,
+      'amount_minor': transaction.discountAmountMinor,
+      'reason': transaction.discountReason,
+      'applied_by': transaction.discountAppliedBy,
+    };
   }
 
   void _ensureBreakfastLineEditable({
@@ -1808,6 +2451,87 @@ class OrderService {
         'created_new_row': enqueueResult.createdNewRow,
       },
     );
+  }
+
+  Future<Product> _requireSystemCustomSaleProduct() async {
+    final Product? customSaleProduct = await _requiredProductRepository
+        .getSystemCustomSaleProduct();
+    if (customSaleProduct == null ||
+        !_customSalePolicyService.isCustomSaleProduct(customSaleProduct) ||
+        !customSaleProduct.isActive) {
+      throw NotFoundException('System Custom Sale product is unavailable.');
+    }
+    return customSaleProduct;
+  }
+
+  Future<int> _requireSystemCustomSaleProductId() async {
+    return (await _requireSystemCustomSaleProduct()).id;
+  }
+
+  Future<User?> _resolveCustomSaleApprovingAdmin({
+    required CustomSaleValidationResult validation,
+    required CustomSaleOverrideRequest? overrideRequest,
+  }) async {
+    if (!validation.requiresAdminOverride) {
+      return null;
+    }
+    if (overrideRequest == null || overrideRequest.adminPin.trim().isEmpty) {
+      throw ValidationException(
+        'Custom Sale admin PIN approval is required when amount exceeds the configured limit.',
+      );
+    }
+
+    final User? approvingAdmin = await _requiredAuthService.verifyAdminPin(
+      overrideRequest.adminPin.trim(),
+    );
+    if (approvingAdmin == null) {
+      throw UnauthorisedException(
+        'Invalid admin PIN for Custom Sale override.',
+      );
+    }
+    return approvingAdmin;
+  }
+
+  Future<int> _resolveCustomSaleCreatorUserId({
+    required TransactionLine line,
+    required int fallbackUserId,
+  }) async {
+    final int? createdByUserId = line.createdByUserId;
+    if (createdByUserId != null) {
+      return createdByUserId;
+    }
+
+    final Transaction? transaction = await _transactionRepository.getById(
+      line.transactionId,
+    );
+    return transaction?.userId ?? fallbackUserId;
+  }
+
+  Future<List<TransactionLine>> _filterKitchenEligibleLines(
+    List<TransactionLine> lines,
+  ) async {
+    final ProductRepository? productRepository = _productRepository;
+    if (productRepository == null) {
+      return List<TransactionLine>.from(lines, growable: false);
+    }
+
+    final Product? customSaleProduct = await productRepository
+        .getSystemCustomSaleProduct();
+    if (customSaleProduct == null ||
+        !_customSalePolicyService.isCustomSaleProduct(customSaleProduct)) {
+      return List<TransactionLine>.from(lines, growable: false);
+    }
+
+    return _customSalePolicyService.kitchenRelevantLines(
+      lines,
+      customSaleProductId: customSaleProduct.id,
+    );
+  }
+
+  Future<bool> _orderRequiresKitchen(List<TransactionLine> lines) async {
+    final List<TransactionLine> kitchenEligibleLines =
+        await _filterKitchenEligibleLines(lines);
+    return kitchenEligibleLines.isNotEmpty;
   }
 
   Future<void> _ensureProductAvailableForSale(int productId) async {

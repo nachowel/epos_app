@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
@@ -17,6 +15,8 @@ import '../../providers/reports_provider.dart';
 import '../../providers/shift_provider.dart';
 import 'widgets/cashier_z_report_dialog.dart';
 import '../../widgets/counted_cash_dialog.dart';
+import '../../widgets/logout_confirmation.dart';
+import '../../widgets/operator_page_intro.dart';
 import '../../widgets/section_app_bar.dart';
 import '../../widgets/stale_final_close_recovery_dialog.dart';
 
@@ -230,6 +230,9 @@ class _ZReportScreenState extends ConsumerState<ZReportScreen> {
     final reportsState = ref.watch(reportsNotifierProvider);
     final User? currentUser = authState.currentUser;
     final bool isCashier = currentUser?.role == UserRole.cashier;
+    final String introSubtitle = isCashier
+        ? 'Review the current shift summary and print the cashier report when service is ready to close.'
+        : 'Review shift totals, switch report context, print outputs, and complete final close when authorised.';
     final Shift? selectedShift = _resolveSelectedShift(
       reportsState.currentShiftId,
       shiftState,
@@ -242,16 +245,24 @@ class _ZReportScreenState extends ConsumerState<ZReportScreen> {
         currentRoute: '/reports',
         currentUser: currentUser,
         currentShift: shiftState.currentShift,
-        onLogout: () {
-          ref.read(authNotifierProvider.notifier).logout();
-          context.go('/login');
-        },
+        onLogout: () => handleLogoutRequest(context, ref),
       ),
       body: RefreshIndicator(
         onRefresh: _loadInitialReport,
         child: ListView(
-          padding: const EdgeInsets.all(AppSizes.spacingMd),
+          padding: const EdgeInsets.fromLTRB(
+            AppSizes.spacingMd,
+            AppSizes.spacingSm,
+            AppSizes.spacingMd,
+            AppSizes.spacingMd,
+          ),
           children: <Widget>[
+            OperatorSectionHeading(
+              eyebrow: 'REPORTS',
+              title: AppStrings.reportsTitle,
+              subtitle: introSubtitle,
+            ),
+            const SizedBox(height: AppSizes.spacingSm),
             if (isCashier)
               _CashierReportsCard(
                 report: reportsState.cashierReport,
@@ -290,7 +301,7 @@ class _ZReportScreenState extends ConsumerState<ZReportScreen> {
                   );
                 },
               ),
-              const SizedBox(height: AppSizes.spacingMd),
+              const SizedBox(height: AppSizes.spacingSm),
               if (selectedShift != null)
                 _ShiftSelector(
                   currentShift: shiftState.backendOpenShift,
@@ -302,7 +313,7 @@ class _ZReportScreenState extends ConsumerState<ZReportScreen> {
                         .loadReportForShift(shiftId);
                   },
                 ),
-              const SizedBox(height: AppSizes.spacingMd),
+              const SizedBox(height: AppSizes.spacingSm),
               if (reportsState.isLoading)
                 const Padding(
                   padding: EdgeInsets.all(AppSizes.spacingLg),
@@ -541,6 +552,7 @@ class _ShiftSelector extends StatelessWidget {
     return _InfoCard(
       color: AppColors.surface,
       child: DropdownButtonFormField<int>(
+        isExpanded: true,
         value: selectedShiftId ?? shifts.first.id,
         decoration: InputDecoration(
           labelText: AppStrings.selectShift,
@@ -557,6 +569,8 @@ class _ShiftSelector extends StatelessWidget {
                 value: shift.id,
                 child: Text(
                   '${AppStrings.openShiftLabel(shift.id)} ($statusLabel)',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               );
             })
@@ -575,104 +589,166 @@ class _ReportBody extends StatelessWidget {
   const _ReportBody({required this.report});
 
   final ShiftReport report;
+  static const String _customSalesTitle = 'Custom Sales';
+  static const String _customSalesRevenueLabel = 'Custom Sale Revenue';
+  static const String _customSalesCountLabel = 'Custom Sale Count';
+  static const String _customSalesAverageValueLabel = 'Custom Sale Average Value';
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: <Widget>[
-        Wrap(
-          spacing: AppSizes.spacingMd,
-          runSpacing: AppSizes.spacingMd,
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final double summaryCardWidth = constraints.maxWidth < 360
+            ? constraints.maxWidth
+            : 260;
+
+        return Column(
           children: <Widget>[
-            _SummaryCard(
-              title: AppStrings.grossSales,
-              count: report.paidCount,
-              totalLabel: CurrencyFormatter.fromMinor(report.paidTotalMinor),
-              color: AppColors.success,
+            Wrap(
+              spacing: AppSizes.spacingMd,
+              runSpacing: AppSizes.spacingMd,
+              children: <Widget>[
+                _SummaryCard(
+                  width: summaryCardWidth,
+                  title: AppStrings.grossSales,
+                  count: report.paidCount,
+                  totalLabel: CurrencyFormatter.fromMinor(
+                    report.paidTotalMinor,
+                  ),
+                  color: AppColors.success,
+                ),
+                _SummaryCard(
+                  width: summaryCardWidth,
+                  title: AppStrings.refundTotal,
+                  count: report.refundCount,
+                  totalLabel: CurrencyFormatter.fromMinor(
+                    report.refundTotalMinor,
+                  ),
+                  color: AppColors.warning,
+                ),
+                _SummaryCard(
+                  width: summaryCardWidth,
+                  title: AppStrings.netSales,
+                  count: report.paidCount,
+                  totalLabel: CurrencyFormatter.fromMinor(report.netSalesMinor),
+                  color: AppColors.primary,
+                ),
+                _SummaryCard(
+                  width: summaryCardWidth,
+                  title: AppStrings.openOrdersTitle,
+                  count: report.openCount,
+                  totalLabel: CurrencyFormatter.fromMinor(
+                    report.openTotalMinor,
+                  ),
+                  color: AppColors.warning,
+                ),
+                _SummaryCard(
+                  width: summaryCardWidth,
+                  title: AppStrings.cancelledOrders,
+                  count: report.cancelledCount,
+                  totalLabel: null,
+                  color: AppColors.textSecondary,
+                ),
+              ],
             ),
-            _SummaryCard(
-              title: AppStrings.refundTotal,
-              count: report.refundCount,
-              totalLabel: CurrencyFormatter.fromMinor(report.refundTotalMinor),
-              color: AppColors.warning,
+            const SizedBox(height: AppSizes.spacingMd),
+            _InfoCard(
+              color: AppColors.surface,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    AppStrings.paymentBreakdown,
+                    style: const TextStyle(
+                      fontSize: AppSizes.fontMd,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppSizes.spacingMd),
+                  _BreakdownRow(
+                    label: AppStrings.grossCash,
+                    count: report.cashCount,
+                    totalMinor: report.cashGrossTotalMinor,
+                  ),
+                  _BreakdownRow(
+                    label: AppStrings.netCash,
+                    count: report.cashCount,
+                    totalMinor: report.cashTotalMinor,
+                  ),
+                  _BreakdownRow(
+                    label: AppStrings.grossCard,
+                    count: report.cardCount,
+                    totalMinor: report.cardGrossTotalMinor,
+                  ),
+                  _BreakdownRow(
+                    label: AppStrings.netCard,
+                    count: report.cardCount,
+                    totalMinor: report.cardTotalMinor,
+                  ),
+                  Divider(
+                    height: AppSizes.spacingLg,
+                    thickness: 1,
+                    color: AppColors.border.withValues(alpha: 0.72),
+                  ),
+                  _BreakdownRow(
+                    label: AppStrings.totalOrders,
+                    count: report.paidCount,
+                    totalMinor: report.netSalesMinor,
+                    isEmphasis: true,
+                  ),
+                ],
+              ),
             ),
-            _SummaryCard(
-              title: AppStrings.netSales,
-              count: report.paidCount,
-              totalLabel: CurrencyFormatter.fromMinor(report.netSalesMinor),
-              color: AppColors.primary,
-            ),
-            _SummaryCard(
-              title: AppStrings.openOrdersTitle,
-              count: report.openCount,
-              totalLabel: CurrencyFormatter.fromMinor(report.openTotalMinor),
-              color: AppColors.warning,
-            ),
-            _SummaryCard(
-              title: AppStrings.cancelledOrders,
-              count: report.cancelledCount,
-              totalLabel: null,
-              color: AppColors.textSecondary,
+            const SizedBox(height: AppSizes.spacingMd),
+            _InfoCard(
+              color: AppColors.surface,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Text(
+                    _customSalesTitle,
+                    style: TextStyle(
+                      fontSize: AppSizes.fontMd,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: AppSizes.spacingMd),
+                  _MetricValueRow(
+                    label: _customSalesRevenueLabel,
+                    value: CurrencyFormatter.fromMinor(
+                      report.customSalesRevenueMinor,
+                    ),
+                  ),
+                  _MetricValueRow(
+                    label: _customSalesCountLabel,
+                    value: '${report.customSalesCount}',
+                  ),
+                  _MetricValueRow(
+                    label: _customSalesAverageValueLabel,
+                    value: CurrencyFormatter.fromMinor(
+                      report.customSalesAverageValueMinor,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
-        const SizedBox(height: AppSizes.spacingMd),
-        _InfoCard(
-          color: AppColors.surface,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                AppStrings.paymentBreakdown,
-                style: const TextStyle(
-                  fontSize: AppSizes.fontMd,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: AppSizes.spacingMd),
-              _BreakdownRow(
-                label: AppStrings.grossCash,
-                count: report.cashCount,
-                totalMinor: report.cashGrossTotalMinor,
-              ),
-              _BreakdownRow(
-                label: AppStrings.netCash,
-                count: report.cashCount,
-                totalMinor: report.cashTotalMinor,
-              ),
-              _BreakdownRow(
-                label: AppStrings.grossCard,
-                count: report.cardCount,
-                totalMinor: report.cardGrossTotalMinor,
-              ),
-              _BreakdownRow(
-                label: AppStrings.netCard,
-                count: report.cardCount,
-                totalMinor: report.cardTotalMinor,
-              ),
-              const Divider(),
-              _BreakdownRow(
-                label: AppStrings.totalOrders,
-                count: report.paidCount,
-                totalMinor: report.netSalesMinor,
-                isEmphasis: true,
-              ),
-            ],
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 }
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
+    required this.width,
     required this.title,
     required this.count,
     required this.totalLabel,
     required this.color,
   });
 
+  final double width;
   final String title;
   final int count;
   final String? totalLabel;
@@ -681,7 +757,7 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 260,
+      width: width,
       padding: const EdgeInsets.all(AppSizes.spacingMd),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -693,6 +769,8 @@ class _SummaryCard extends StatelessWidget {
         children: <Widget>[
           Text(
             title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: AppSizes.fontSm,
               color: AppColors.textSecondary,
@@ -710,6 +788,8 @@ class _SummaryCard extends StatelessWidget {
           if (totalLabel != null)
             Text(
               totalLabel!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: AppSizes.fontMd,
                 fontWeight: FontWeight.w700,
@@ -741,16 +821,87 @@ class _BreakdownRow extends StatelessWidget {
       fontWeight: isEmphasis ? FontWeight.w700 : FontWeight.w500,
     );
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSizes.spacingSm),
-      child: Row(
-        children: <Widget>[
-          Expanded(child: Text(label, style: style)),
-          Text(AppStrings.orderCountLabel(count), style: style),
-          const SizedBox(width: AppSizes.spacingMd),
-          Text(CurrencyFormatter.fromMinor(totalMinor), style: style),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool stackValues = constraints.maxWidth < 430;
+        final Widget countText = Text(
+          AppStrings.orderCountLabel(count),
+          style: style,
+        );
+        final Widget totalText = Text(
+          CurrencyFormatter.fromMinor(totalMinor),
+          style: style,
+        );
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSizes.spacingSm),
+          child: stackValues
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(label, style: style),
+                    const SizedBox(height: AppSizes.spacingXs),
+                    Wrap(
+                      spacing: AppSizes.spacingMd,
+                      runSpacing: AppSizes.spacingXs,
+                      children: <Widget>[countText, totalText],
+                    ),
+                  ],
+                )
+              : Row(
+                  children: <Widget>[
+                    Expanded(child: Text(label, style: style)),
+                    countText,
+                    const SizedBox(width: AppSizes.spacingMd),
+                    totalText,
+                  ],
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _MetricValueRow extends StatelessWidget {
+  const _MetricValueRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    const TextStyle style = TextStyle(
+      fontSize: AppSizes.fontSm,
+      fontWeight: FontWeight.w500,
+    );
+
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool stackValues = constraints.maxWidth < 430;
+        final Widget valueText = Text(value, style: style);
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSizes.spacingSm),
+          child: stackValues
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(label, style: style),
+                    const SizedBox(height: AppSizes.spacingXs),
+                    valueText,
+                  ],
+                )
+              : Row(
+                  children: <Widget>[
+                    Expanded(child: Text(label, style: style)),
+                    valueText,
+                  ],
+                ),
+        );
+      },
     );
   }
 }

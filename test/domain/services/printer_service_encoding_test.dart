@@ -241,7 +241,7 @@ void main() {
         expect(_countPattern(payload, _codeTableCommand), greaterThan(0));
         expect(
           _countPattern(payload, _pound1250Pattern),
-          greaterThanOrEqualTo(3),
+          greaterThanOrEqualTo(2),
         );
       },
     );

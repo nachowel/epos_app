@@ -24,7 +24,7 @@ void main() {
         addTearDown(db.close);
         final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-        final order = await fixture.service.createOrder(
+        final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashier,
         );
         final line = await fixture.service.addProductToOrder(
@@ -72,7 +72,7 @@ void main() {
         addTearDown(db.close);
         final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-        final order = await fixture.service.createOrder(
+        final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashier,
         );
         final line = await fixture.service.addProductToOrder(
@@ -115,7 +115,7 @@ void main() {
           hotDrinkExplicitNoneLabel: 'No drink',
         );
 
-        final order = await fixture.service.createOrder(
+        final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashier,
         );
         final line = await fixture.service.addProductToOrder(
@@ -173,7 +173,7 @@ void main() {
         addTearDown(db.close);
         final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-        final order = await fixture.service.createOrder(
+        final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
           currentUser: fixture.cashier,
         );
         final line = await fixture.service.addProductToOrder(
@@ -261,7 +261,7 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final order = await fixture.service.createOrder(
+      final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final line = await fixture.service.addProductToOrder(
@@ -299,7 +299,7 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final order = await fixture.service.createOrder(
+      final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final line = await fixture.service.addProductToOrder(
@@ -332,7 +332,7 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final paidOrder = await fixture.service.createOrder(
+      final paidOrder = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final paidLine = await fixture.service.addProductToOrder(
@@ -360,7 +360,7 @@ void main() {
         ),
       );
 
-      final cancelledOrder = await fixture.service.createOrder(
+      final cancelledOrder = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final cancelledLine = await fixture.service.addProductToOrder(
@@ -394,7 +394,7 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final order = await fixture.service.createOrder(
+      final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
         currentUser: fixture.cashier,
       );
       final line = await fixture.service.addProductToOrder(

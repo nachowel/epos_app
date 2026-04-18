@@ -11,6 +11,7 @@ class ProductsState {
   const ProductsState({
     required this.categories,
     required this.categoryProductCounts,
+    required this.allProducts,
     required this.products,
     required this.sortDraft,
     required this.selectedCategoryId,
@@ -23,6 +24,7 @@ class ProductsState {
   const ProductsState.initial()
     : categories = const <Category>[],
       categoryProductCounts = const <int, int>{},
+      allProducts = const <Product>[],
       products = const <Product>[],
       sortDraft = const <Product>[],
       selectedCategoryId = null,
@@ -33,6 +35,8 @@ class ProductsState {
 
   final List<Category> categories;
   final Map<int, int> categoryProductCounts;
+  /// All active products across every category. Used for global POS search.
+  final List<Product> allProducts;
   final List<Product> products;
   final List<Product> sortDraft;
   final int? selectedCategoryId;
@@ -50,6 +54,7 @@ class ProductsState {
   ProductsState copyWith({
     List<Category>? categories,
     Map<int, int>? categoryProductCounts,
+    List<Product>? allProducts,
     List<Product>? products,
     List<Product>? sortDraft,
     Object? selectedCategoryId = _unset,
@@ -62,6 +67,7 @@ class ProductsState {
       categories: categories ?? this.categories,
       categoryProductCounts:
           categoryProductCounts ?? this.categoryProductCounts,
+      allProducts: allProducts ?? this.allProducts,
       products: products ?? this.products,
       sortDraft: sortDraft ?? this.sortDraft,
       selectedCategoryId: selectedCategoryId == _unset
@@ -115,6 +121,7 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
       state = state.copyWith(
         categories: categories,
         categoryProductCounts: categoryProductCounts,
+        allProducts: allProducts,
         products: products,
         sortDraft: products,
         selectedCategoryId: effectiveCategoryId,
@@ -179,6 +186,48 @@ class ProductsNotifier extends StateNotifier<ProductsState> {
       isSortMode: false,
       errorMessage: null,
     );
+  }
+
+  /// Returns products from [allProducts] whose name matches [query].
+  /// Case-insensitive with Turkish-aware character folding so that
+  /// İ/i and I/ı pairs match correctly for Turkish cashier input.
+  List<Product> searchAllProducts(String query) {
+    final String trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return const <Product>[];
+    }
+    final String foldedQuery = _foldForSearch(trimmed);
+    return state.allProducts
+        .where((Product p) => _foldForSearch(p.name).contains(foldedQuery))
+        .toList(growable: false);
+  }
+
+  /// Turkish-aware case folding for search matching.
+  ///
+  /// Standard [String.toLowerCase] is locale-dependent and produces
+  /// incorrect results for Turkish:
+  ///   - `'I'.toLowerCase()` → `'ı'` (dotless ı, not 'i')
+  ///   - `'İ'.toLowerCase()` → `'i'` (correct, but won't match 'ı')
+  ///
+  /// This function normalises both Turkish-specific and standard Latin
+  /// characters into a single canonical lowercase form so that all
+  /// of İ, i, I, ı resolve to the same character ('i').
+  static String _foldForSearch(String input) {
+    final StringBuffer buffer = StringBuffer();
+    for (int i = 0; i < input.length; i++) {
+      final int code = input.codeUnitAt(i);
+      switch (code) {
+        case 0x0130: // İ (Latin Capital Letter I With Dot Above) → i
+        case 0x0131: // ı (Latin Small Letter Dotless I) → i
+          buffer.writeCharCode(0x69); // i
+        case 0x49: // I (ASCII uppercase I) → i
+          buffer.writeCharCode(0x69); // i
+        default:
+          // For all other characters, use standard toLowerCase.
+          buffer.write(String.fromCharCode(code).toLowerCase());
+      }
+    }
+    return buffer.toString();
   }
 
   void enterSortMode() {

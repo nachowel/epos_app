@@ -1,6 +1,8 @@
 import 'package:epos_app/core/constants/app_strings.dart';
 import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/core/providers/app_providers.dart';
+import 'package:epos_app/data/database/app_database.dart' as app_db;
+import 'package:drift/drift.dart' show Value;
 import 'package:epos_app/data/repositories/transaction_repository.dart';
 import 'package:epos_app/domain/models/print_job.dart';
 import 'package:epos_app/domain/models/user.dart';
@@ -16,6 +18,8 @@ import '../../support/test_database.dart';
 void main() {
   group('OrdersNotifier print safety', () {
     test('send order is not blocked when kitchen print fails', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
       final db = createTestDatabase();
       addTearDown(db.close);
 
@@ -49,6 +53,7 @@ void main() {
       final ProviderContainer container = ProviderContainer(
         overrides: <Override>[
           appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
           printerServiceProvider.overrideWithValue(
             _FailingKitchenPrinterService(TransactionRepository(db)),
           ),
@@ -83,52 +88,152 @@ void main() {
       expect(state.errorMessage, AppStrings.kitchenPrintRetryRequired);
     });
 
-    test('receipt reprint is blocked before printer call for sent order', () async {
-      SharedPreferences.setMockInitialValues(<String, Object>{});
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final db = createTestDatabase();
-      addTearDown(db.close);
+    test(
+      'receipt reprint is blocked before printer call for sent order',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        final db = createTestDatabase();
+        addTearDown(db.close);
 
-      final int cashierId = await insertUser(
-        db,
-        name: 'Cashier',
-        role: 'cashier',
-      );
-      final int shiftId = await insertShift(db, openedBy: cashierId);
-      final int transactionId = await insertTransaction(
-        db,
-        uuid: 'orders-provider-receipt-blocked',
-        shiftId: shiftId,
-        userId: cashierId,
-        status: 'sent',
-        totalAmountMinor: 500,
-      );
+        final int cashierId = await insertUser(
+          db,
+          name: 'Cashier',
+          role: 'cashier',
+        );
+        final int shiftId = await insertShift(db, openedBy: cashierId);
+        final int transactionId = await insertTransaction(
+          db,
+          uuid: 'orders-provider-receipt-blocked',
+          shiftId: shiftId,
+          userId: cashierId,
+          status: 'sent',
+          totalAmountMinor: 500,
+        );
 
-      final _TrackingPrinterService printer = _TrackingPrinterService(
-        TransactionRepository(db),
-      );
-      final ProviderContainer container = ProviderContainer(
-        overrides: <Override>[
-          appDatabaseProvider.overrideWithValue(db),
-          sharedPreferencesProvider.overrideWithValue(prefs),
-          printerServiceProvider.overrideWithValue(printer),
-        ],
-      );
-      addTearDown(container.dispose);
-      await container.read(authNotifierProvider.notifier).loadUserById(cashierId);
+        final _TrackingPrinterService printer = _TrackingPrinterService(
+          TransactionRepository(db),
+        );
+        final ProviderContainer container = ProviderContainer(
+          overrides: <Override>[
+            appDatabaseProvider.overrideWithValue(db),
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            printerServiceProvider.overrideWithValue(printer),
+          ],
+        );
+        addTearDown(container.dispose);
+        await container
+            .read(authNotifierProvider.notifier)
+            .loadUserById(cashierId);
 
-      final OrdersNotifier notifier = container.read(
-        ordersNotifierProvider.notifier,
-      );
-      final bool result = await notifier.reprintReceipt(transactionId);
+        final OrdersNotifier notifier = container.read(
+          ordersNotifierProvider.notifier,
+        );
+        final bool result = await notifier.reprintReceipt(transactionId);
 
-      expect(result, isFalse);
-      expect(printer.receiptCalls, 0);
-      expect(
-        container.read(ordersNotifierProvider).errorMessage,
-        contains('Receipt can be printed only for paid transactions.'),
-      );
-    });
+        expect(result, isFalse);
+        expect(printer.receiptCalls, 0);
+        expect(
+          container.read(ordersNotifierProvider).errorMessage,
+          contains('Receipt can be printed only for paid transactions.'),
+        );
+      },
+    );
+
+    test(
+      'send order skips kitchen print when order contains only custom sale lines',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        final db = createTestDatabase();
+        addTearDown(db.close);
+
+        final int cashierId = await insertUser(
+          db,
+          name: 'Cashier',
+          role: 'cashier',
+        );
+        final int shiftId = await insertShift(db, openedBy: cashierId);
+        final int categoryId = await insertCategory(db, name: 'Food');
+        final int customProductId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Custom Sale',
+          priceMinor: 0,
+          isVisibleOnPos: false,
+          isCustom: true,
+        );
+        final int transactionId = await insertTransaction(
+          db,
+          uuid: 'orders-provider-custom-only-send',
+          shiftId: shiftId,
+          userId: cashierId,
+          status: 'draft',
+          totalAmountMinor: 700,
+        );
+        await db
+            .into(db.transactionLines)
+            .insert(
+              app_db.TransactionLinesCompanion.insert(
+                uuid: 'orders-provider-custom-line',
+                transactionId: transactionId,
+                productId: customProductId,
+                productName: 'Custom Sale',
+                unitPriceMinor: 700,
+                quantity: const Value<int>(1),
+                lineTotalMinor: 700,
+                customNote: const Value<String?>('Manual item'),
+                createdByUserId: Value<int?>(cashierId),
+              ),
+            );
+        await TransactionRepository(db).updateTotals(
+          transactionId: transactionId,
+          subtotalMinor: 700,
+          modifierTotalMinor: 0,
+          discountAmountMinor: 0,
+          totalAmountMinor: 700,
+        );
+
+        final _TrackingPrinterService printer = _TrackingPrinterService(
+          TransactionRepository(db),
+        );
+        final ProviderContainer container = ProviderContainer(
+          overrides: <Override>[
+            appDatabaseProvider.overrideWithValue(db),
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            printerServiceProvider.overrideWithValue(printer),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final OrdersNotifier notifier = container.read(
+          ordersNotifierProvider.notifier,
+        );
+        final bool result = await notifier.sendOrder(
+          transactionId: transactionId,
+          currentUser: User(
+            id: cashierId,
+            name: 'Cashier',
+            pin: null,
+            password: null,
+            role: UserRole.cashier,
+            isActive: true,
+            createdAt: DateTime.now(),
+          ),
+        );
+
+        final OrdersState state = container.read(ordersNotifierProvider);
+        final transaction = await TransactionRepository(
+          db,
+        ).getById(transactionId);
+
+        expect(result, isTrue);
+        expect(transaction, isNotNull);
+        expect(transaction!.status.name, 'sent');
+        expect(printer.kitchenCalls, 0);
+        expect(state.errorMessage, isNull);
+      },
+    );
   });
 }
 
@@ -148,7 +253,18 @@ class _FailingKitchenPrinterService extends PrinterService {
 class _TrackingPrinterService extends PrinterService {
   _TrackingPrinterService(super.transactionRepository);
 
+  int kitchenCalls = 0;
   int receiptCalls = 0;
+
+  @override
+  Future<PrintJob> printKitchenTicket(
+    int transactionId, {
+    bool allowReprint = false,
+    int? actorUserId,
+  }) async {
+    kitchenCalls += 1;
+    throw StateError('kitchen printer should not be called');
+  }
 
   @override
   Future<PrintJob> printReceipt(

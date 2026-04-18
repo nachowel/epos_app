@@ -304,7 +304,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Yazdırma Görünümü'));
       await tester.pumpAndSettle();
-      expect(find.text('EPOS Analiz Raporu'), findsOneWidget);
+      expect(find.text('Halfway Cafe POS Analiz Raporu'), findsOneWidget);
     });
 
     testWidgets('deep link restores period and comparison mode from route', (
@@ -423,7 +423,7 @@ void main() {
         ),
       );
 
-      expect(text, contains('EPOS Analiz Özeti'));
+      expect(text, contains('Halfway Cafe POS Analiz Ozeti'));
       expect(text, contains('Bu Ay (1 → Bugün)'));
       expect(text, contains('Karşılaştırma: İvme'));
       expect(text, contains('Trend: Son 14 Gün'));
@@ -569,7 +569,7 @@ void main() {
         selectedInsight: null,
       );
 
-      expect(export.title, 'EPOS Analiz Raporu');
+      expect(export.title, 'Halfway Cafe POS Analiz Raporu');
       expect(export.periodLabel, 'Bu Hafta (Pzt → Bugün)');
       expect(export.kpis, contains('Toplam Ciro'));
       expect(export.highlights, isNotEmpty);

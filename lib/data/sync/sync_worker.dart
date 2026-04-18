@@ -4,6 +4,7 @@ import '../../core/logging/app_logger.dart';
 import '../../data/repositories/sync_queue_repository.dart';
 import '../../domain/models/sync_queue_item.dart';
 import '../../domain/models/sync_runtime_state.dart';
+import 'mirror_schema_contract.dart';
 import 'sync_connectivity_service.dart';
 import 'sync_graph_checksum_calculator.dart';
 import 'sync_payload_repository.dart';
@@ -284,8 +285,15 @@ class SyncWorker {
         },
       );
     } catch (error) {
-      final String queueMessage = _formatFailureMessage(error);
-      final String logMessage = _humanReadableError(error);
+      final MirrorWriteFailure? mirrorFailure = _asMirrorWriteFailure(error);
+      final String queueMessage = _formatFailureMessage(
+        error,
+        mirrorFailure: mirrorFailure,
+      );
+      final String logMessage = _humanReadableError(
+        error,
+        mirrorFailure: mirrorFailure,
+      );
       SyncTransactionGraph? graph;
       try {
         graph = await _syncPayloadRepository.buildTransactionGraph(
@@ -300,7 +308,7 @@ class SyncWorker {
             if (graph != null)
               ...graph.records.map((SyncGraphRecord record) => record.queueRef),
           ];
-      if (error is MirrorWriteFailure && !error.retryable) {
+      if (mirrorFailure != null && !mirrorFailure.retryable) {
         await _syncQueueRepository.markRecordGraphFailedPermanently(
           failedRefs,
           queueMessage,
@@ -315,7 +323,7 @@ class SyncWorker {
         );
       }
       final bool permanentlyFailed =
-          error is MirrorWriteFailure && !error.retryable;
+          mirrorFailure != null && !mirrorFailure.retryable;
       final bool maxRetryHit =
           permanentlyFailed ||
           claimedItems.any(
@@ -327,22 +335,25 @@ class SyncWorker {
         'new_status': 'failed',
         'record_count': graph?.records.length ?? claimedRefs.length,
         'max_retry_hit': maxRetryHit,
-        'response_body_summary': _responseBodySummary(error),
+        'response_body_summary': _responseBodySummary(
+          error,
+          mirrorFailure: mirrorFailure,
+        ),
       };
-      if (error is MirrorWriteFailure) {
-        failureMetadata['failure_type'] = error.type.name;
-        failureMetadata['retryable'] = error.retryable;
-        if (error.tableName case final String tableName) {
+      if (mirrorFailure != null) {
+        failureMetadata['failure_type'] = mirrorFailure.type.name;
+        failureMetadata['retryable'] = mirrorFailure.retryable;
+        if (mirrorFailure.tableName case final String tableName) {
           failureMetadata['table_name'] = tableName;
         }
-        if (error.recordUuid case final String recordUuid) {
+        if (mirrorFailure.recordUuid case final String recordUuid) {
           failureMetadata['record_uuid'] = recordUuid;
         }
-        if (error.recordUuids.isNotEmpty) {
-          failureMetadata['record_uuids'] = error.recordUuids;
+        if (mirrorFailure.recordUuids.isNotEmpty) {
+          failureMetadata['record_uuids'] = mirrorFailure.recordUuids;
         }
-        if (error.issues.isNotEmpty) {
-          failureMetadata['issues'] = error.issues;
+        if (mirrorFailure.issues.isNotEmpty) {
+          failureMetadata['issues'] = mirrorFailure.issues;
         }
       }
       _logger.warn(
@@ -416,16 +427,21 @@ class SyncWorker {
     return selected;
   }
 
-  String _formatFailureMessage(Object error) {
-    if (error is MirrorWriteFailure) {
+  String _formatFailureMessage(
+    Object error, {
+    MirrorWriteFailure? mirrorFailure,
+  }) {
+    final MirrorWriteFailure? normalizedFailure =
+        mirrorFailure ?? _asMirrorWriteFailure(error);
+    if (normalizedFailure != null) {
       return <String>[
-        'failure_type=${error.type.name}',
-        'retryable=${error.retryable}',
-        'table=${_safeValue(error.tableName)}',
-        'record_uuid=${_safeValue(error.recordUuid)}',
-        'record_uuids=${_safeList(error.recordUuids)}',
-        'issues=${_safeList(error.issues)}',
-        'message=${_safeMessage(error.message)}',
+        'failure_type=${normalizedFailure.type.name}',
+        'retryable=${normalizedFailure.retryable}',
+        'table=${_safeValue(normalizedFailure.tableName)}',
+        'record_uuid=${_safeValue(normalizedFailure.recordUuid)}',
+        'record_uuids=${_safeList(normalizedFailure.recordUuids)}',
+        'issues=${_safeList(normalizedFailure.issues)}',
+        'message=${_safeMessage(normalizedFailure.message)}',
       ].join('|');
     }
     return <String>[
@@ -439,9 +455,14 @@ class SyncWorker {
     ].join('|');
   }
 
-  String _humanReadableError(Object error) {
-    if (error is MirrorWriteFailure) {
-      return error.message;
+  String _humanReadableError(
+    Object error, {
+    MirrorWriteFailure? mirrorFailure,
+  }) {
+    final MirrorWriteFailure? normalizedFailure =
+        mirrorFailure ?? _asMirrorWriteFailure(error);
+    if (normalizedFailure != null) {
+      return normalizedFailure.message;
     }
     return _truncateError(error);
   }
@@ -474,15 +495,37 @@ class SyncWorker {
     return value.substring(0, 500);
   }
 
-  String _responseBodySummary(Object error) {
-    if (error is MirrorWriteFailure) {
-      final List<String> parts = <String>[error.message];
-      if (error.issues.isNotEmpty) {
-        parts.add('issues=${error.issues.take(3).join('; ')}');
+  String _responseBodySummary(
+    Object error, {
+    MirrorWriteFailure? mirrorFailure,
+  }) {
+    final MirrorWriteFailure? normalizedFailure =
+        mirrorFailure ?? _asMirrorWriteFailure(error);
+    if (normalizedFailure != null) {
+      final List<String> parts = <String>[normalizedFailure.message];
+      if (normalizedFailure.issues.isNotEmpty) {
+        parts.add('issues=${normalizedFailure.issues.take(3).join('; ')}');
       }
       return _safeMessage(parts.join(' | '));
     }
     return _safeMessage(_truncateError(error));
+  }
+
+  MirrorWriteFailure? _asMirrorWriteFailure(Object error) {
+    if (error is MirrorWriteFailure) {
+      return error;
+    }
+    if (error is MirrorSchemaContractViolation) {
+      return MirrorWriteFailure(
+        type: MirrorWriteFailureType.validationFailure,
+        message: error.message,
+        retryable: false,
+        tableName: error.tableName,
+        recordUuid: error.recordUuid,
+        issues: error.issues,
+      );
+    }
+    return null;
   }
 
   void _updateState({

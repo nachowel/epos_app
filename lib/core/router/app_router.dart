@@ -21,6 +21,7 @@ import '../../presentation/screens/admin/admin_report_settings_screen.dart';
 import '../../presentation/screens/admin/admin_shifts_screen.dart';
 import '../../presentation/screens/admin/admin_sync_screen.dart';
 import '../../presentation/screens/admin/admin_system_screen.dart';
+import '../../presentation/screens/admin/admin_users_screen.dart';
 import '../../presentation/screens/admin/analytics/analytics_overview_screen.dart';
 import '../../presentation/screens/admin/analytics/analytics_payments_screen.dart';
 import '../../presentation/screens/admin/analytics/analytics_products_screen.dart';
@@ -43,8 +44,7 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
     routes: <RouteBase>[
       GoRoute(
         path: '/',
-        redirect: (_, __) =>
-            authState.currentUser == null ? '/login' : '/pos/categories',
+        redirect: (_, __) => _defaultAuthenticatedRoute(authState.currentUser),
       ),
       GoRoute(path: '/login', builder: (_, __) => const PinScreen()),
       GoRoute(
@@ -53,15 +53,27 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
       ),
       GoRoute(
         path: '/pos/categories',
-        builder: (_, __) => const CategoryEntryScreen(),
+        redirect: (_, GoRouterState state) {
+          final String? categoryId = state.uri.queryParameters['categoryId'];
+          return Uri(
+            path: '/pos',
+            queryParameters: categoryId == null
+                ? null
+                : <String, String>{'categoryId': categoryId},
+          ).toString();
+        },
       ),
       GoRoute(
         path: '/pos',
-        builder: (_, GoRouterState state) => PosScreen(
-          initialCategoryId: int.tryParse(
+        builder: (_, GoRouterState state) {
+          final int? initialCategoryId = int.tryParse(
             state.uri.queryParameters['categoryId'] ?? '',
-          ),
-        ),
+          );
+          if (initialCategoryId == null) {
+            return const CategoryEntryScreen();
+          }
+          return PosScreen(initialCategoryId: initialCategoryId);
+        },
       ),
       GoRoute(path: '/orders', builder: (_, __) => const OrdersScreen()),
       GoRoute(path: '/admin/orders', redirect: (_, __) => '/orders'),
@@ -189,6 +201,10 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
         path: '/admin/system',
         builder: (_, __) => const AdminSystemScreen(),
       ),
+      GoRoute(
+        path: '/admin/users',
+        builder: (_, __) => const AdminUsersScreen(),
+      ),
     ],
     redirect: (_, GoRouterState state) {
       final User? currentUser = authState.currentUser;
@@ -197,12 +213,16 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
       final bool isAdminRoute = state.matchedLocation.startsWith('/admin');
       final bool isCashierDashboardRoute =
           state.matchedLocation == '/dashboard';
+      final bool isCashierRestrictedRouteForCashier =
+          state.matchedLocation == '/dashboard' ||
+          state.matchedLocation == '/shifts' ||
+          state.matchedLocation.startsWith('/orders/');
 
       if (!isLoggedIn && !isLoginRoute) {
         return '/login';
       }
       if (isLoggedIn && isLoginRoute) {
-        return '/pos/categories';
+        return _defaultAuthenticatedRoute(currentUser);
       }
       if (isAdminRoute && currentUser?.role != UserRole.admin) {
         return '/';
@@ -210,7 +230,20 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
       if (isCashierDashboardRoute && currentUser?.role != UserRole.cashier) {
         return currentUser?.role == UserRole.admin ? '/admin' : '/';
       }
+      if (currentUser?.role == UserRole.cashier &&
+          isCashierRestrictedRouteForCashier) {
+        return state.matchedLocation.startsWith('/orders/')
+            ? '/orders'
+            : '/pos';
+      }
       return null;
     },
   );
 });
+
+String _defaultAuthenticatedRoute(User? user) {
+  if (user == null) {
+    return '/login';
+  }
+  return '/pos';
+}

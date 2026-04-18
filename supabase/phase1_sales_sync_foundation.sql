@@ -21,6 +21,8 @@
 -- - this file is the repo truth for the current live mirror shape
 -- - do not treat it as a blind in-place migration for drifted environments
 -- - client direct write closure arrives through a separate hardening migration
+-- - if mirror payload changes, deploy the matching Supabase migration before
+--   releasing the app build that emits the new payload
 
 begin;
 
@@ -32,6 +34,11 @@ create table if not exists public.transactions (
   status text not null check (status in ('paid', 'cancelled')),
   subtotal_minor integer not null check (subtotal_minor >= 0),
   modifier_total_minor integer not null check (modifier_total_minor >= 0),
+  discount_type text null check (discount_type is null or discount_type in ('amount', 'percent')),
+  discount_value_minor integer not null default 0 check (discount_value_minor >= 0),
+  discount_amount_minor integer not null default 0 check (discount_amount_minor >= 0),
+  discount_reason text null,
+  discount_applied_by_local_id bigint null,
   total_amount_minor integer not null check (total_amount_minor >= 0),
   created_at timestamptz not null,
   paid_at timestamptz null,
@@ -40,7 +47,18 @@ create table if not exists public.transactions (
   cancelled_by_local_id bigint null,
   kitchen_printed boolean not null default false,
   receipt_printed boolean not null default false,
-  synced_at timestamptz not null default timezone('utc', now())
+  synced_at timestamptz not null default timezone('utc', now()),
+  check (discount_amount_minor <= subtotal_minor + modifier_total_minor),
+  check (
+    discount_type is not null or
+    (
+      discount_value_minor = 0 and
+      discount_amount_minor = 0 and
+      discount_reason is null and
+      discount_applied_by_local_id is null
+    )
+  ),
+  check (discount_type != 'percent' or discount_value_minor <= 100)
 );
 
 create table if not exists public.transaction_lines (

@@ -1593,7 +1593,7 @@ String buildAdminAnalyticsSnapshotText({
     selectedInsight: selectedInsight,
   );
   final StringBuffer buffer = StringBuffer()
-    ..writeln('EPOS Analiz Özeti')
+    ..writeln('Halfway Cafe POS Analiz Ozeti')
     ..writeln(snapshot.periodLabel)
     ..writeln('Karşılaştırma: ${snapshot.comparisonModeLabel}')
     ..writeln(
@@ -1720,7 +1720,7 @@ AnalyticsExport buildAdminAnalyticsExport({
     selectedInsight: selectedInsight,
   );
   return AnalyticsExport(
-    title: 'EPOS Analiz Raporu',
+    title: 'Halfway Cafe POS Analiz Raporu',
     periodLabel: snapshot.periodLabel,
     kpis: <String, dynamic>{
       for (final AnalyticsSnapshotKpi kpi in snapshot.kpis)

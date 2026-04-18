@@ -5,11 +5,30 @@ import 'package:drift/native.dart';
 import 'package:epos_app/data/database/app_database.dart';
 import 'package:epos_app/domain/models/cash_movement.dart';
 import 'package:epos_app/domain/models/print_job.dart';
+import 'package:epos_app/domain/models/transaction.dart' as domain_tx;
+import 'package:epos_app/domain/models/user.dart' as domain_user;
+import 'package:epos_app/domain/services/order_service.dart';
 
 AppDatabase createTestDatabase() => _TestAppDatabase();
 
 AppDatabase createPersistentTestDatabase(String path) =>
     _TestAppDatabase(NativeDatabase(File(path)));
+
+extension OrderServiceTestDraftAccess on OrderService {
+  Future<domain_tx.Transaction> createPersistedEmptyDraftForTestingAccess({
+    required domain_user.User currentUser,
+    int? tableNumber,
+    String? requestIdempotencyKey,
+  }) {
+    return OrderService.runWithEmptyDraftTestingAccess(
+      () => createPersistedEmptyDraftForTesting(
+        currentUser: currentUser,
+        tableNumber: tableNumber,
+        requestIdempotencyKey: requestIdempotencyKey,
+      ),
+    );
+  }
+}
 
 class _TestAppDatabase extends AppDatabase {
   _TestAppDatabase([QueryExecutor? executor])
@@ -64,6 +83,7 @@ class _TestAppDatabase extends AppDatabase {
         has_modifiers INTEGER NOT NULL DEFAULT 0 CHECK (has_modifiers IN (0, 1)),
         is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
         is_visible_on_pos INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_on_pos IN (0, 1)),
+        is_custom INTEGER NOT NULL DEFAULT 0 CHECK (is_custom IN (0, 1)),
         sort_order INTEGER NOT NULL DEFAULT 0
       );
     ''');
@@ -194,6 +214,7 @@ class _TestAppDatabase extends AppDatabase {
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         free_swap_limit INTEGER NOT NULL DEFAULT 2 CHECK (free_swap_limit >= 0),
         max_swaps INTEGER NOT NULL DEFAULT 4 CHECK (max_swaps >= 0),
+        custom_sales_limit_minor INTEGER NOT NULL DEFAULT 100000 CHECK (custom_sales_limit_minor >= 0),
         updated_by INTEGER NULL,
         updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
@@ -202,10 +223,11 @@ class _TestAppDatabase extends AppDatabase {
       INSERT INTO menu_settings (
         free_swap_limit,
         max_swaps,
+        custom_sales_limit_minor,
         updated_by,
         updated_at
       )
-      SELECT 2, 4, NULL, unixepoch()
+      SELECT 2, 4, 100000, NULL, unixepoch()
       WHERE NOT EXISTS (SELECT 1 FROM menu_settings);
     ''');
     await customStatement('''
@@ -269,6 +291,11 @@ class _TestAppDatabase extends AppDatabase {
         status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','paid','cancelled')),
         subtotal_minor INTEGER NOT NULL DEFAULT 0 CHECK (subtotal_minor >= 0),
         modifier_total_minor INTEGER NOT NULL DEFAULT 0,
+        discount_type TEXT NULL CHECK (discount_type IS NULL OR discount_type IN ('amount','percent')),
+        discount_value_minor INTEGER NOT NULL DEFAULT 0 CHECK (discount_value_minor >= 0),
+        discount_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (discount_amount_minor >= 0 AND discount_amount_minor <= subtotal_minor + modifier_total_minor),
+        discount_reason TEXT NULL,
+        discount_applied_by INTEGER NULL,
         total_amount_minor INTEGER NOT NULL DEFAULT 0 CHECK (total_amount_minor >= 0),
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         paid_at INTEGER NULL,
@@ -277,7 +304,9 @@ class _TestAppDatabase extends AppDatabase {
         cancelled_by INTEGER NULL,
         idempotency_key TEXT NOT NULL UNIQUE,
         kitchen_printed INTEGER NOT NULL DEFAULT 0 CHECK (kitchen_printed IN (0, 1)),
-        receipt_printed INTEGER NOT NULL DEFAULT 0 CHECK (receipt_printed IN (0, 1))
+        receipt_printed INTEGER NOT NULL DEFAULT 0 CHECK (receipt_printed IN (0, 1)),
+        CHECK (discount_type IS NOT NULL OR (discount_value_minor = 0 AND discount_amount_minor = 0 AND discount_reason IS NULL AND discount_applied_by IS NULL)),
+        CHECK (discount_type != 'percent' OR discount_value_minor <= 100)
       );
     ''');
     await customStatement('''
@@ -291,7 +320,10 @@ class _TestAppDatabase extends AppDatabase {
         quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
         line_total_minor INTEGER NOT NULL CHECK (line_total_minor >= 0),
         pricing_mode TEXT NOT NULL DEFAULT 'standard' CHECK (pricing_mode IN ('standard','set')),
-        removal_discount_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_total_minor >= 0)
+        removal_discount_total_minor INTEGER NOT NULL DEFAULT 0 CHECK (removal_discount_total_minor >= 0),
+        custom_note TEXT NULL,
+        created_by_user_id INTEGER NULL,
+        admin_override_user_id INTEGER NULL
       );
     ''');
     await customStatement('''
@@ -488,6 +520,9 @@ class _TestAppDatabase extends AppDatabase {
     );
     await customStatement(
       'CREATE INDEX idx_products_category ON products(category_id, is_active, is_visible_on_pos, sort_order);',
+    );
+    await customStatement(
+      'CREATE UNIQUE INDEX ux_products_single_custom_product ON products(is_custom) WHERE is_custom = 1;',
     );
     await customStatement(
       'CREATE INDEX idx_products_meal_adjustment_profile ON products(meal_adjustment_profile_id);',
@@ -740,6 +775,18 @@ class _TestAppDatabase extends AppDatabase {
       referencedTable: 'products',
     );
     await _createFkTrigger(
+      table: 'transaction_lines',
+      column: 'created_by_user_id',
+      referencedTable: 'users',
+      nullable: true,
+    );
+    await _createFkTrigger(
+      table: 'transaction_lines',
+      column: 'admin_override_user_id',
+      referencedTable: 'users',
+      nullable: true,
+    );
+    await _createFkTrigger(
       table: 'meal_customization_line_snapshots',
       column: 'transaction_line_id',
       referencedTable: 'transaction_lines',
@@ -944,6 +991,7 @@ Future<int> insertProduct(
   int sortOrder = 0,
   bool isActive = true,
   bool isVisibleOnPos = true,
+  bool isCustom = false,
 }) {
   return db
       .into(db.products)
@@ -957,6 +1005,7 @@ Future<int> insertProduct(
           sortOrder: Value<int>(sortOrder),
           isActive: Value<bool>(isActive),
           isVisibleOnPos: Value<bool>(isVisibleOnPos),
+          isCustom: Value<bool>(isCustom),
         ),
       );
 }
@@ -989,12 +1038,20 @@ Future<int> insertTransaction(
   required int totalAmountMinor,
   String? idempotencyKey,
   int? tableNumber,
+  int? subtotalMinor,
+  int modifierTotalMinor = 0,
+  String? discountType,
+  int discountValueMinor = 0,
+  int discountAmountMinor = 0,
+  String? discountReason,
+  int? discountAppliedBy,
   DateTime? updatedAt,
   DateTime? paidAt,
   DateTime? cancelledAt,
   int? cancelledBy,
 }) {
   final DateTime now = updatedAt ?? DateTime.now();
+  final int persistedSubtotalMinor = subtotalMinor ?? totalAmountMinor;
   return db
       .into(db.transactions)
       .insert(
@@ -1006,8 +1063,13 @@ Future<int> insertTransaction(
           idempotencyKey: idempotencyKey ?? 'idem-$uuid',
           updatedAt: now,
           status: Value<String>(status),
-          subtotalMinor: Value<int>(totalAmountMinor),
-          modifierTotalMinor: const Value<int>(0),
+          subtotalMinor: Value<int>(persistedSubtotalMinor),
+          modifierTotalMinor: Value<int>(modifierTotalMinor),
+          discountType: Value<String?>(discountType),
+          discountValueMinor: Value<int>(discountValueMinor),
+          discountAmountMinor: Value<int>(discountAmountMinor),
+          discountReason: Value<String?>(discountReason),
+          discountAppliedBy: Value<int?>(discountAppliedBy),
           totalAmountMinor: Value<int>(totalAmountMinor),
           paidAt: Value<DateTime?>(paidAt),
           cancelledAt: Value<DateTime?>(cancelledAt),

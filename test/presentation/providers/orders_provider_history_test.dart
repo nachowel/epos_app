@@ -1,17 +1,22 @@
 import 'package:epos_app/core/providers/app_providers.dart';
 import 'package:epos_app/data/database/app_database.dart'
     show TransactionLinesCompanion;
+import 'package:epos_app/domain/models/open_order_summary.dart';
+import 'package:epos_app/presentation/providers/auth_provider.dart';
 import 'package:epos_app/presentation/providers/orders_provider.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/test_database.dart';
 
 void main() {
   test(
-    'OrdersNotifier loads paid history even when there is no active shift',
+    'cashier OrdersNotifier loads only today paid history even when there is no active shift',
     () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
       final db = createTestDatabase();
       addTearDown(db.close);
 
@@ -43,6 +48,15 @@ void main() {
         userId: cashierId,
         status: 'paid',
         totalAmountMinor: 250,
+        paidAt: DateTime.now(),
+      );
+      final int sentOrderId = await insertTransaction(
+        db,
+        uuid: 'orders-history-sent',
+        shiftId: closedShiftId,
+        userId: cashierId,
+        status: 'sent',
+        totalAmountMinor: 250,
       );
       await db
           .into(db.transactionLines)
@@ -57,11 +71,18 @@ void main() {
               lineTotalMinor: 250,
             ),
           );
+      await _insertLine(db, transactionId: sentOrderId, productId: productId);
 
       final ProviderContainer container = ProviderContainer(
-        overrides: <Override>[appDatabaseProvider.overrideWithValue(db)],
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
       );
       addTearDown(container.dispose);
+      await container
+          .read(authNotifierProvider.notifier)
+          .loadUserById(cashierId);
 
       final OrdersNotifier notifier = container.read(
         ordersNotifierProvider.notifier,
@@ -71,116 +92,94 @@ void main() {
       final OrdersState allState = container.read(ordersNotifierProvider);
       expect(allState.orderSummaries, hasLength(1));
       expect(allState.orderSummaries.single.transaction.id, paidOrderId);
-
-      await notifier.setFilter(OrdersFilter.paid);
-      final OrdersState paidState = container.read(ordersNotifierProvider);
-      expect(paidState.orderSummaries, hasLength(1));
-      expect(paidState.orderSummaries.single.transaction.status.name, 'paid');
-
-      await notifier.setFilter(OrdersFilter.openSent);
-      final OrdersState activeState = container.read(ordersNotifierProvider);
-      expect(activeState.orderSummaries, isEmpty);
+      expect(allState.orderSummaries.single.transaction.status.name, 'paid');
+      expect(allState.searchQuery, isEmpty);
+      expect(allState.hasMore, isFalse);
     },
   );
 
-  test('OrdersNotifier paginates large order history', () async {
-    final db = createTestDatabase();
-    addTearDown(db.close);
+  test(
+    'cashier OrdersNotifier shows only the five newest paid orders today',
+    () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final db = createTestDatabase();
+      addTearDown(db.close);
 
-    final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
-    final int shiftId = await insertShift(db, openedBy: cashierId);
-    final int categoryId = await insertCategory(db, name: 'Food');
-    final int productId = await insertProduct(
-      db,
-      categoryId: categoryId,
-      name: 'Toast',
-      priceMinor: 200,
-    );
-
-    for (int index = 0; index < 55; index++) {
-      final int transactionId = await insertTransaction(
+      final int cashierId = await insertUser(
         db,
-        uuid: 'orders-history-page-$index',
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      final int shiftId = await insertShift(db, openedBy: cashierId);
+      final int categoryId = await insertCategory(db, name: 'Food');
+      final int productId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Toast',
+        priceMinor: 200,
+      );
+
+      final List<int> paidOrderIds = <int>[];
+      for (int index = 0; index < 6; index++) {
+        final int transactionId = await insertTransaction(
+          db,
+          uuid: 'orders-history-page-$index',
+          shiftId: shiftId,
+          userId: cashierId,
+          status: 'paid',
+          totalAmountMinor: 200,
+          paidAt: DateTime(2026, 4, 14, 8 + index),
+        );
+        paidOrderIds.add(transactionId);
+        await _insertLine(
+          db,
+          transactionId: transactionId,
+          productId: productId,
+        );
+      }
+      final int yesterdayOrderId = await insertTransaction(
+        db,
+        uuid: 'orders-history-yesterday',
         shiftId: shiftId,
         userId: cashierId,
         status: 'paid',
         totalAmountMinor: 200,
+        paidAt: DateTime(2026, 4, 13, 23, 0),
       );
-      await _insertLine(db, transactionId: transactionId, productId: productId);
-    }
+      await _insertLine(
+        db,
+        transactionId: yesterdayOrderId,
+        productId: productId,
+      );
 
-    final ProviderContainer container = ProviderContainer(
-      overrides: <Override>[appDatabaseProvider.overrideWithValue(db)],
-    );
-    addTearDown(container.dispose);
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container
+          .read(authNotifierProvider.notifier)
+          .loadUserById(cashierId);
 
-    final OrdersNotifier notifier = container.read(
-      ordersNotifierProvider.notifier,
-    );
-    await notifier.setDateFilter(OrdersDateFilter.allTime);
-    await notifier.setFilter(OrdersFilter.paid);
+      final OrdersNotifier notifier = container.read(
+        ordersNotifierProvider.notifier,
+      );
+      await notifier.refreshOpenOrders();
 
-    OrdersState state = container.read(ordersNotifierProvider);
-    expect(state.orderSummaries, hasLength(50));
-    expect(state.hasMore, isTrue);
-
-    await notifier.loadMoreOrders();
-    state = container.read(ordersNotifierProvider);
-
-    expect(state.orderSummaries, hasLength(55));
-    expect(state.hasMore, isFalse);
-  });
-
-  test('search by order number bypasses today filter for old paid order', () async {
-    final db = createTestDatabase();
-    addTearDown(db.close);
-
-    final int cashierId = await insertUser(db, name: 'Cashier', role: 'cashier');
-    final int shiftId = await insertShift(db, openedBy: cashierId);
-    final int categoryId = await insertCategory(db, name: 'Food');
-    final int productId = await insertProduct(
-      db,
-      categoryId: categoryId,
-      name: 'Sandwich',
-      priceMinor: 450,
-    );
-    final int oldOrderId = await insertTransaction(
-      db,
-      uuid: 'orders-history-old-paid',
-      shiftId: shiftId,
-      userId: cashierId,
-      status: 'paid',
-      totalAmountMinor: 450,
-    );
-    await _insertLine(db, transactionId: oldOrderId, productId: productId);
-    await db.customStatement(
-      'UPDATE transactions SET created_at = ?, updated_at = ? WHERE id = ?',
-      <Object?>[
-        DateTime(2025, 1, 5).millisecondsSinceEpoch ~/ 1000,
-        DateTime(2025, 1, 5).millisecondsSinceEpoch ~/ 1000,
-        oldOrderId,
-      ],
-    );
-
-    final ProviderContainer container = ProviderContainer(
-      overrides: <Override>[appDatabaseProvider.overrideWithValue(db)],
-    );
-    addTearDown(container.dispose);
-
-    final OrdersNotifier notifier = container.read(
-      ordersNotifierProvider.notifier,
-    );
-    await notifier.setFilter(OrdersFilter.paid);
-
-    OrdersState state = container.read(ordersNotifierProvider);
-    expect(state.orderSummaries, isEmpty);
-
-    await notifier.setSearchQuery('$oldOrderId');
-    state = container.read(ordersNotifierProvider);
-
-    expect(state.orderSummaries, hasLength(1));
-    expect(state.orderSummaries.single.transaction.id, oldOrderId);
-  });
+      OrdersState state = container.read(ordersNotifierProvider);
+      expect(state.orderSummaries, hasLength(5));
+      expect(
+        state.orderSummaries.map(
+          (OpenOrderSummary summary) => summary.transaction.id,
+        ),
+        orderedEquals(paidOrderIds.reversed.take(5).toList(growable: false)),
+      );
+      expect(state.hasMore, isFalse);
+    },
+  );
 }
 
 Future<void> _insertLine(
@@ -188,15 +187,17 @@ Future<void> _insertLine(
   required int transactionId,
   required int productId,
 }) {
-  return db.into(db.transactionLines).insert(
-    TransactionLinesCompanion.insert(
-      uuid: 'line-$transactionId-$productId',
-      transactionId: transactionId,
-      productId: productId,
-      productName: 'Item',
-      unitPriceMinor: 200,
-      quantity: const Value<int>(1),
-      lineTotalMinor: 200,
-    ),
-  );
+  return db
+      .into(db.transactionLines)
+      .insert(
+        TransactionLinesCompanion.insert(
+          uuid: 'line-$transactionId-$productId',
+          transactionId: transactionId,
+          productId: productId,
+          productName: 'Item',
+          unitPriceMinor: 200,
+          quantity: const Value<int>(1),
+          lineTotalMinor: 200,
+        ),
+      );
 }

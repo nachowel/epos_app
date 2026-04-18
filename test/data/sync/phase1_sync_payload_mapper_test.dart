@@ -7,6 +7,7 @@ import 'package:epos_app/data/repositories/shift_repository.dart';
 import 'package:epos_app/data/repositories/sync_queue_repository.dart';
 import 'package:epos_app/data/repositories/transaction_repository.dart';
 import 'package:epos_app/data/repositories/transaction_state_repository.dart';
+import 'package:epos_app/data/sync/mirror_schema_contract.dart';
 import 'package:epos_app/data/sync/phase1_sync_contract.dart';
 import 'package:epos_app/data/sync/sync_payload_repository.dart';
 import 'package:epos_app/data/sync/sync_transaction_graph.dart';
@@ -46,6 +47,12 @@ void main() {
         );
         expect(
           transactionRecord.payload.keys.toSet(),
+          MirrorSchemaContract.tableSpec(
+            Phase1SyncTable.transactions,
+          ).payloadColumnNames,
+        );
+        expect(
+          transactionRecord.payload.keys.toSet(),
           containsAll(<String>{
             'uuid',
             'shift_local_id',
@@ -54,6 +61,11 @@ void main() {
             'status',
             'subtotal_minor',
             'modifier_total_minor',
+            'discount_type',
+            'discount_value_minor',
+            'discount_amount_minor',
+            'discount_reason',
+            'discount_applied_by_local_id',
             'total_amount_minor',
             'created_at',
             'paid_at',
@@ -67,10 +79,24 @@ void main() {
         expect(transactionRecord.payload.containsKey('id'), isFalse);
         expect(transactionRecord.payload.containsKey('shift_id'), isFalse);
         expect(transactionRecord.payload.containsKey('user_id'), isFalse);
+        expect(transactionRecord.payload['discount_type'], isNull);
+        expect(transactionRecord.payload['discount_value_minor'], 0);
+        expect(transactionRecord.payload['discount_amount_minor'], 0);
+        expect(transactionRecord.payload['discount_reason'], isNull);
+        expect(
+          transactionRecord.payload['discount_applied_by_local_id'],
+          isNull,
+        );
 
         final SyncGraphRecord lineRecord = _recordFor(
           graph,
           'transaction_lines',
+        );
+        expect(
+          lineRecord.payload.keys.toSet(),
+          MirrorSchemaContract.tableSpec(
+            Phase1SyncTable.transactionLines,
+          ).payloadColumnNames,
         );
         expect(
           lineRecord.payload.keys.toSet(),
@@ -103,6 +129,12 @@ void main() {
         final SyncGraphRecord modifierRecord = _recordFor(
           graph,
           'order_modifiers',
+        );
+        expect(
+          modifierRecord.payload.keys.toSet(),
+          MirrorSchemaContract.tableSpec(
+            Phase1SyncTable.orderModifiers,
+          ).payloadColumnNames,
         );
         expect(
           modifierRecord.payload.keys.toSet(),
@@ -143,6 +175,12 @@ void main() {
         expect(modifierRecord.payload['ui_section'], isNull);
 
         final SyncGraphRecord paymentRecord = _recordFor(graph, 'payments');
+        expect(
+          paymentRecord.payload.keys.toSet(),
+          MirrorSchemaContract.tableSpec(
+            Phase1SyncTable.payments,
+          ).payloadColumnNames,
+        );
         expect(
           paymentRecord.payload.keys.toSet(),
           containsAll(<String>{
@@ -262,6 +300,7 @@ void main() {
         expect(choiceRecord.payload['extra_price_minor'], 9999);
 
         expect(transactionRecord.payload['modifier_total_minor'], 0);
+        expect(transactionRecord.payload['discount_amount_minor'], 0);
         expect(lineRecord.payload['line_total_minor'], 400);
         expect(
           choiceRecord.payload['price_effect_minor'],
@@ -563,9 +602,8 @@ Future<_BreakfastPayloadFixture> _createPaidBreakfastPayloadFixture(
     syncQueueRepository: syncQueueRepository,
   );
 
-  final Transaction transaction = await orderService.createOrder(
-    currentUser: cashierUser,
-  );
+  final Transaction transaction = await orderService
+      .createPersistedEmptyDraftForTestingAccess(currentUser: cashierUser);
   final TransactionLine line = await orderService.addProductToOrder(
     transactionId: transaction.id,
     productId: set4ProductId,
@@ -673,9 +711,8 @@ Future<_FixtureContext> _createFixtureContext(
     syncQueueRepository: syncQueueRepository,
   );
 
-  final Transaction transaction = await orderService.createOrder(
-    currentUser: cashierUser,
-  );
+  final Transaction transaction = await orderService
+      .createPersistedEmptyDraftForTestingAccess(currentUser: cashierUser);
   final TransactionLine line = await orderService.addProductToOrder(
     transactionId: transaction.id,
     productId: productId,

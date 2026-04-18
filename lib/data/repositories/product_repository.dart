@@ -34,6 +34,7 @@ class ProductRepository {
   Future<List<Product>> getAll({
     bool activeOnly = true,
     bool visibleOnPosOnly = false,
+    bool includeCustomProducts = false,
   }) async {
     final query = _database.select(_database.products)
       ..orderBy(<OrderingTerm Function(db.$ProductsTable)>[
@@ -47,6 +48,9 @@ class ProductRepository {
     if (visibleOnPosOnly) {
       query.where((db.$ProductsTable t) => t.isVisibleOnPos.equals(true));
     }
+    if (!includeCustomProducts) {
+      query.where((db.$ProductsTable t) => t.isCustom.equals(false));
+    }
 
     final List<db.Product> rows = await query.get();
     return rows.map(_mapProduct).toList(growable: false);
@@ -56,6 +60,7 @@ class ProductRepository {
     int categoryId, {
     bool activeOnly = true,
     bool visibleOnPosOnly = false,
+    bool includeCustomProducts = false,
   }) async {
     final query = _database.select(_database.products)
       ..where((db.$ProductsTable t) => t.categoryId.equals(categoryId))
@@ -69,6 +74,9 @@ class ProductRepository {
     }
     if (visibleOnPosOnly) {
       query.where((db.$ProductsTable t) => t.isVisibleOnPos.equals(true));
+    }
+    if (!includeCustomProducts) {
+      query.where((db.$ProductsTable t) => t.isCustom.equals(false));
     }
 
     final List<db.Product> rows = await query.get();
@@ -86,6 +94,7 @@ class ProductRepository {
             (db.$ProductsTable t) =>
                 t.isActive.equals(true) &
                 t.isVisibleOnPos.equals(true) &
+                t.isCustom.equals(false) &
                 t.categoryId.isInQuery(activeCategoriesQuery),
           )
           ..orderBy(<OrderingTerm Function(db.$ProductsTable)>[
@@ -149,6 +158,7 @@ class ProductRepository {
             hasModifiers: row.read<int>('has_modifiers') == 1,
             isActive: row.read<int>('is_active') == 1,
             isVisibleOnPos: row.read<int>('is_visible_on_pos') == 1,
+            isCustom: false,
             sortOrder: row.read<int>('sort_order'),
           ),
         )
@@ -160,6 +170,18 @@ class ProductRepository {
       _database.products,
     )..where((db.$ProductsTable t) => t.id.equals(id))).getSingleOrNull();
 
+    return row == null ? null : _mapProduct(row);
+  }
+
+  Future<Product?> getSystemCustomSaleProduct() async {
+    final db.Product? row =
+        await (_database.select(_database.products)
+              ..where((db.$ProductsTable t) => t.isCustom.equals(true))
+              ..orderBy(<OrderingTerm Function(db.$ProductsTable)>[
+                (db.$ProductsTable t) => OrderingTerm.asc(t.id),
+              ])
+              ..limit(1))
+            .getSingleOrNull();
     return row == null ? null : _mapProduct(row);
   }
 
@@ -532,6 +554,7 @@ class ProductRepository {
       hasModifiers: row.hasModifiers,
       isActive: row.isActive,
       isVisibleOnPos: row.isVisibleOnPos,
+      isCustom: row.isCustom,
       sortOrder: row.sortOrder,
     );
   }

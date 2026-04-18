@@ -1,7 +1,10 @@
 import 'package:epos_app/data/database/app_database.dart' as app_db;
+import 'package:drift/drift.dart' show Value;
 import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/core/logging/app_logger.dart';
 import 'package:epos_app/data/repositories/audit_log_repository.dart';
+import 'package:epos_app/data/database/app_database.dart'
+    show TransactionLinesCompanion;
 import 'package:epos_app/data/repositories/payment_repository.dart';
 import 'package:epos_app/data/repositories/shift_repository.dart';
 import 'package:epos_app/data/repositories/transaction_repository.dart';
@@ -9,6 +12,7 @@ import 'package:epos_app/data/repositories/transaction_state_repository.dart';
 import 'package:epos_app/domain/models/order_modifier.dart';
 import 'package:epos_app/domain/models/payment.dart';
 import 'package:epos_app/domain/models/product_modifier.dart';
+import 'package:epos_app/domain/models/transaction_discount.dart';
 import 'package:epos_app/domain/models/transaction.dart';
 import 'package:epos_app/domain/models/transaction_line.dart';
 import 'package:epos_app/domain/models/user.dart';
@@ -82,7 +86,97 @@ void main() {
       },
     );
 
-    test('table number is nullable and can be updated later', () async {
+    test(
+      'recent paid orders for today are limited to five newest first',
+      () async {
+        final db = createTestDatabase();
+        addTearDown(db.close);
+        final DateTime now = DateTime.now();
+        final DateTime todayBase = DateTime(now.year, now.month, now.day, 10);
+        final DateTime yesterdayBase = todayBase.subtract(
+          const Duration(days: 1),
+        );
+
+        final int cashierId = await insertUser(
+          db,
+          name: 'Cashier',
+          role: 'cashier',
+        );
+        final int shiftId = await insertShift(db, openedBy: cashierId);
+        final int categoryId = await insertCategory(db, name: 'Drinks');
+        final int teaId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Tea',
+          priceMinor: 200,
+        );
+
+        final service = OrderService(
+          shiftSessionService: ShiftSessionService(ShiftRepository(db)),
+          transactionRepository: TransactionRepository(db),
+          transactionStateRepository: TransactionStateRepository(db),
+        );
+
+        final List<int> paidOrderIds = <int>[];
+        for (int index = 0; index < 6; index++) {
+          final int transactionId = await insertTransaction(
+            db,
+            uuid: 'recent-paid-$index',
+            shiftId: shiftId,
+            userId: cashierId,
+            status: 'paid',
+            totalAmountMinor: 200,
+            paidAt: todayBase.add(Duration(hours: index)),
+          );
+          paidOrderIds.add(transactionId);
+          await db
+              .into(db.transactionLines)
+              .insert(
+                TransactionLinesCompanion.insert(
+                  uuid: 'recent-paid-line-$index',
+                  transactionId: transactionId,
+                  productId: teaId,
+                  productName: 'Tea',
+                  unitPriceMinor: 200,
+                  quantity: const Value<int>(1),
+                  lineTotalMinor: 200,
+                ),
+              );
+        }
+        final int yesterdayOrderId = await insertTransaction(
+          db,
+          uuid: 'recent-paid-yesterday',
+          shiftId: shiftId,
+          userId: cashierId,
+          status: 'paid',
+          totalAmountMinor: 200,
+          paidAt: yesterdayBase.add(const Duration(hours: 13, minutes: 30)),
+        );
+        await db
+            .into(db.transactionLines)
+            .insert(
+              TransactionLinesCompanion.insert(
+                uuid: 'recent-paid-line-yesterday',
+                transactionId: yesterdayOrderId,
+                productId: teaId,
+                productName: 'Tea',
+                unitPriceMinor: 200,
+                quantity: const Value<int>(1),
+                lineTotalMinor: 200,
+              ),
+            );
+
+        final summaries = await service.getRecentPaidOrdersForToday();
+
+        expect(summaries, hasLength(5));
+        expect(
+          summaries.map((summary) => summary.transaction.id),
+          orderedEquals(paidOrderIds.reversed.take(5).toList(growable: false)),
+        );
+      },
+    );
+
+    test('table number is nullable and can be updated while draft', () async {
       final db = createTestDatabase();
       addTearDown(db.close);
 
@@ -97,7 +191,7 @@ void main() {
         uuid: 'table-number-order',
         shiftId: shiftId,
         userId: cashierId,
-        status: 'sent',
+        status: 'draft',
         totalAmountMinor: 600,
       );
 
@@ -123,6 +217,40 @@ void main() {
       expect(withTable!.tableNumber, 12);
       expect(withoutTable, isNotNull);
       expect(withoutTable!.tableNumber, isNull);
+    });
+
+    test('table number cannot be updated after order is sent', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      final int shiftId = await insertShift(db, openedBy: cashierId);
+      final int transactionId = await insertTransaction(
+        db,
+        uuid: 'table-number-sent-order',
+        shiftId: shiftId,
+        userId: cashierId,
+        status: 'sent',
+        totalAmountMinor: 600,
+      );
+
+      final service = OrderService(
+        shiftSessionService: ShiftSessionService(ShiftRepository(db)),
+        transactionRepository: TransactionRepository(db),
+        transactionStateRepository: TransactionStateRepository(db),
+      );
+
+      await expectLater(
+        service.updateTableNumber(
+          transactionId: transactionId,
+          tableNumber: 12,
+        ),
+        throwsA(isA<InvalidStateTransitionException>()),
+      );
     });
 
     test('cashier can cancel only their own open orders', () async {
@@ -224,6 +352,150 @@ void main() {
       expect(logs.single.metadata['shift_id'], shiftId);
     });
 
+    test('discount apply/change/remove audit logs are written', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int cashierId = await insertUser(
+        db,
+        name: 'Cashier',
+        role: 'cashier',
+      );
+      await insertShift(db, openedBy: cashierId);
+      final int categoryId = await insertCategory(db, name: 'Drinks');
+      final int productId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Latte',
+        priceMinor: 1000,
+      );
+      final AuditLogRepository auditLogRepository = AuditLogRepository(db);
+      final AuditLogService auditLogService = PersistedAuditLogService(
+        auditLogRepository: auditLogRepository,
+        logger: const NoopAppLogger(),
+      );
+      final service = OrderService(
+        shiftSessionService: ShiftSessionService(ShiftRepository(db)),
+        transactionRepository: TransactionRepository(db),
+        transactionStateRepository: TransactionStateRepository(db),
+        paymentRepository: PaymentRepository(db),
+        auditLogService: auditLogService,
+      );
+      final User cashier = User(
+        id: cashierId,
+        name: 'Cashier',
+        pin: null,
+        password: null,
+        role: UserRole.cashier,
+        isActive: true,
+        createdAt: DateTime.now(),
+      );
+
+      final Transaction order = await service
+          .createPersistedEmptyDraftForTestingAccess(currentUser: cashier);
+      await service.addProductToOrder(
+        transactionId: order.id,
+        productId: productId,
+      );
+
+      await service.applyDiscountToDraft(
+        transactionId: order.id,
+        currentUser: cashier,
+        discount: const TransactionDiscountInput(
+          type: TransactionDiscountType.amount,
+          valueMinor: 250,
+          reason: 'Promo',
+        ),
+      );
+      await service.applyDiscountToDraft(
+        transactionId: order.id,
+        currentUser: cashier,
+        discount: const TransactionDiscountInput(
+          type: TransactionDiscountType.percent,
+          valueMinor: 10,
+          reason: 'Manager ok',
+        ),
+      );
+      await service.removeDiscountFromDraft(
+        transactionId: order.id,
+        currentUser: cashier,
+      );
+
+      final List<dynamic> logs = await auditLogRepository.listAuditLogsByEntity(
+        entityType: 'transaction',
+        entityId: order.uuid,
+      );
+
+      expect(logs, hasLength(3));
+      expect(logs.map((log) => log.action), <String>[
+        'discount_removed',
+        'discount_changed',
+        'discount_applied',
+      ]);
+
+      final appliedLog = logs.singleWhere(
+        (log) => log.action == 'discount_applied',
+      );
+      expect(appliedLog.actorUserId, cashierId);
+      expect(appliedLog.metadata['transaction_id'], order.id);
+      expect(appliedLog.metadata['transaction_uuid'], order.uuid);
+      expect(appliedLog.metadata['actor_user_id'], cashierId);
+      expect(appliedLog.metadata['reason'], 'Promo');
+      expect(appliedLog.metadata['old_discount_state'], <String, Object?>{
+        'type': null,
+        'value_minor': 0,
+        'amount_minor': 0,
+        'reason': null,
+        'applied_by': null,
+      });
+      expect(appliedLog.metadata['new_discount_state'], <String, Object?>{
+        'type': 'amount',
+        'value_minor': 250,
+        'amount_minor': 250,
+        'reason': 'Promo',
+        'applied_by': cashierId,
+      });
+      expect(appliedLog.metadata['timestamp'], isA<String>());
+
+      final changedLog = logs.singleWhere(
+        (log) => log.action == 'discount_changed',
+      );
+      expect(changedLog.metadata['reason'], 'Manager ok');
+      expect(changedLog.metadata['old_discount_state'], <String, Object?>{
+        'type': 'amount',
+        'value_minor': 250,
+        'amount_minor': 250,
+        'reason': 'Promo',
+        'applied_by': cashierId,
+      });
+      expect(changedLog.metadata['new_discount_state'], <String, Object?>{
+        'type': 'percent',
+        'value_minor': 10,
+        'amount_minor': 100,
+        'reason': 'Manager ok',
+        'applied_by': cashierId,
+      });
+
+      final removedLog = logs.singleWhere(
+        (log) => log.action == 'discount_removed',
+      );
+      expect(removedLog.metadata['reason'], 'Manager ok');
+      expect(removedLog.metadata['old_discount_state'], <String, Object?>{
+        'type': 'percent',
+        'value_minor': 10,
+        'amount_minor': 100,
+        'reason': 'Manager ok',
+        'applied_by': cashierId,
+      });
+      expect(removedLog.metadata['new_discount_state'], <String, Object?>{
+        'type': null,
+        'value_minor': 0,
+        'amount_minor': 0,
+        'reason': null,
+        'applied_by': null,
+      });
+    });
+
     test('modifier totals stay consistent with quantity', () async {
       final db = createTestDatabase();
       addTearDown(db.close);
@@ -259,7 +531,9 @@ void main() {
         createdAt: DateTime.now(),
       );
 
-      final order = await service.createOrder(currentUser: user);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(
+        currentUser: user,
+      );
       final line = await service.addProductToOrder(
         transactionId: order.id,
         productId: productId,
@@ -283,14 +557,69 @@ void main() {
     });
 
     test(
+      'standard product add flow keeps custom_note null because the field is reserved for Custom Sale lines',
+      () async {
+        final db = createTestDatabase();
+        addTearDown(db.close);
+
+        final int cashierId = await insertUser(
+          db,
+          name: 'Cashier',
+          role: 'cashier',
+        );
+        await insertShift(db, openedBy: cashierId);
+        final int categoryId = await insertCategory(db, name: 'Drinks');
+        final int productId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Tea',
+          priceMinor: 200,
+        );
+
+        final service = OrderService(
+          shiftSessionService: ShiftSessionService(ShiftRepository(db)),
+          transactionRepository: TransactionRepository(db),
+          transactionStateRepository: TransactionStateRepository(db),
+        );
+        final user = User(
+          id: cashierId,
+          name: 'Cashier',
+          pin: null,
+          password: null,
+          role: UserRole.cashier,
+          isActive: true,
+          createdAt: DateTime.now(),
+        );
+
+        final Transaction order = await service
+            .createPersistedEmptyDraftForTestingAccess(currentUser: user);
+        final TransactionLine line = await service.addProductToOrder(
+          transactionId: order.id,
+          productId: productId,
+          quantity: 1,
+        );
+        final app_db.TransactionLine persistedLine =
+            await (db.select(db.transactionLines)
+                  ..where((app_db.$TransactionLinesTable t) {
+                    return t.id.equals(line.id);
+                  }))
+                .getSingle();
+
+        expect(line.customNote, isNull);
+        expect(persistedLine.customNote, isNull);
+      },
+    );
+
+    test(
       'plain burger plus fried onion keeps totals flat and persists a free add snapshot row',
       () async {
         final _BurgerOrderFixture fixture = await _createBurgerOrderFixture();
         addTearDown(fixture.db.close);
 
-        final Transaction order = await fixture.service.createOrder(
-          currentUser: fixture.user,
-        );
+        final Transaction order = await fixture.service
+            .createPersistedEmptyDraftForTestingAccess(
+              currentUser: fixture.user,
+            );
         final TransactionLine line = await fixture.service.addProductToOrder(
           transactionId: order.id,
           productId: fixture.productId,
@@ -330,9 +659,10 @@ void main() {
         final _BurgerOrderFixture fixture = await _createBurgerOrderFixture();
         addTearDown(fixture.db.close);
 
-        final Transaction order = await fixture.service.createOrder(
-          currentUser: fixture.user,
-        );
+        final Transaction order = await fixture.service
+            .createPersistedEmptyDraftForTestingAccess(
+              currentUser: fixture.user,
+            );
         final TransactionLine line = await fixture.service.addProductToOrder(
           transactionId: order.id,
           productId: fixture.productId,
@@ -380,9 +710,10 @@ void main() {
         final _BurgerOrderFixture fixture = await _createBurgerOrderFixture();
         addTearDown(fixture.db.close);
 
-        final Transaction order = await fixture.service.createOrder(
-          currentUser: fixture.user,
-        );
+        final Transaction order = await fixture.service
+            .createPersistedEmptyDraftForTestingAccess(
+              currentUser: fixture.user,
+            );
         final TransactionLine line = await fixture.service.addProductToOrder(
           transactionId: order.id,
           productId: fixture.productId,
@@ -421,9 +752,10 @@ void main() {
         final _BurgerOrderFixture fixture = await _createBurgerOrderFixture();
         addTearDown(fixture.db.close);
 
-        final Transaction order = await fixture.service.createOrder(
-          currentUser: fixture.user,
-        );
+        final Transaction order = await fixture.service
+            .createPersistedEmptyDraftForTestingAccess(
+              currentUser: fixture.user,
+            );
         final TransactionLine line = await fixture.service.addProductToOrder(
           transactionId: order.id,
           productId: fixture.productId,
@@ -480,9 +812,10 @@ void main() {
         final _BurgerOrderFixture fixture = await _createBurgerOrderFixture();
         addTearDown(fixture.db.close);
 
-        final Transaction order = await fixture.service.createOrder(
-          currentUser: fixture.user,
-        );
+        final Transaction order = await fixture.service
+            .createPersistedEmptyDraftForTestingAccess(
+              currentUser: fixture.user,
+            );
         final TransactionLine line = await fixture.service.addProductToOrder(
           transactionId: order.id,
           productId: fixture.productId,
@@ -541,7 +874,9 @@ void main() {
         isActive: true,
         createdAt: DateTime.now(),
       );
-      final order = await service.createOrder(currentUser: cashier);
+      final order = await service.createPersistedEmptyDraftForTestingAccess(
+        currentUser: cashier,
+      );
 
       await expectLater(
         service.addProductToOrder(
@@ -627,7 +962,8 @@ void main() {
           throwsA(isA<NoSuchMethodError>()),
         );
 
-        final paidOrder = await service.createOrder(currentUser: cashier);
+        final paidOrder = await service
+            .createPersistedEmptyDraftForTestingAccess(currentUser: cashier);
         await service.addProductToOrder(
           transactionId: paidOrder.id,
           productId: productId,
@@ -660,9 +996,8 @@ void main() {
           throwsA(isA<InvalidStateTransitionException>()),
         );
 
-        final cancellableOrder = await service.createOrder(
-          currentUser: cashier,
-        );
+        final cancellableOrder = await service
+            .createPersistedEmptyDraftForTestingAccess(currentUser: cashier);
         await service.addProductToOrder(
           transactionId: cancellableOrder.id,
           productId: productId,
@@ -719,7 +1054,9 @@ void main() {
         createdAt: DateTime.now(),
       );
 
-      final draft = await service.createOrder(currentUser: cashier);
+      final draft = await service.createPersistedEmptyDraftForTestingAccess(
+        currentUser: cashier,
+      );
       await service.addProductToOrder(
         transactionId: draft.id,
         productId: productId,

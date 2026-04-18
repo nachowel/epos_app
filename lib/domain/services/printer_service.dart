@@ -14,6 +14,7 @@ import '../../core/utils/date_formatter.dart';
 import '../../core/utils/report_category_display_formatter.dart';
 import '../../data/repositories/payment_repository.dart';
 import '../../data/repositories/print_job_repository.dart';
+import '../../data/repositories/product_repository.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/repositories/transaction_repository.dart';
 import '../models/breakfast_cooking_instruction.dart';
@@ -30,6 +31,7 @@ import '../models/transaction.dart';
 import '../models/transaction_line.dart';
 import 'audit_log_service.dart';
 import 'breakfast_modifier_renderer.dart';
+import 'custom_sale_policy_service.dart';
 
 typedef SocketConnector =
     Future<Socket> Function(String host, int port, Duration timeout);
@@ -43,6 +45,9 @@ class PrinterService {
   static const Duration _networkWriteTimeout = Duration(seconds: 5);
   static const int _kitchenTicketWidth = 48;
   static const String _printerCodeTable = 'CP1252';
+  static const String _businessName = 'HALFWAY CAFE';
+  static const String _businessAddress = '176 Halfway St, Sidcup';
+  static const String _businessPhone = '020 3343 5303';
   static const String _kitchenSeparator =
       '------------------------------------------------';
 
@@ -50,14 +55,19 @@ class PrinterService {
     TransactionRepository transactionRepository, {
     PaymentRepository? paymentRepository,
     PrintJobRepository? printJobRepository,
+    ProductRepository? productRepository,
     SettingsRepository? settingsRepository,
+    CustomSalePolicyService customSalePolicyService =
+        const CustomSalePolicyService(),
     AuditLogService auditLogService = const NoopAuditLogService(),
     AppLogger logger = const NoopAppLogger(),
     SocketConnector? socketConnector,
   }) : _transactionRepository = transactionRepository,
        _paymentRepository = paymentRepository,
        _printJobRepository = printJobRepository,
+       _productRepository = productRepository,
        _settingsRepository = settingsRepository,
+       _customSalePolicyService = customSalePolicyService,
        _auditLogService = auditLogService,
        _logger = logger,
        _socketConnector =
@@ -69,7 +79,9 @@ class PrinterService {
   final TransactionRepository _transactionRepository;
   final PaymentRepository? _paymentRepository;
   final PrintJobRepository? _printJobRepository;
+  final ProductRepository? _productRepository;
   final SettingsRepository? _settingsRepository;
+  final CustomSalePolicyService _customSalePolicyService;
   final AuditLogService _auditLogService;
   final AppLogger _logger;
   final SocketConnector _socketConnector;
@@ -174,6 +186,108 @@ class PrinterService {
           error: error,
         );
         throw PrinterException('Cashier Z report print failed: $error');
+      }
+    });
+  }
+
+  /// Manual "Open Drawer" action shared by Category and POS screens.
+  ///
+  /// Uses the same ESC/POS pulse path as [openCashDrawer] but rethrows
+  /// failures so the UI can surface them (unlike [openCashDrawer], which
+  /// swallows errors to protect the post-payment lifecycle).
+  Future<void> openCashDrawerManually({int? actorUserId}) async {
+    await _runSerialized(() async {
+      const String entityId = 'CASH_DRAWER_MANUAL';
+      final PrinterSettingsModel printer = await _requirePrinterSettings();
+      final List<int> bytes = <int>[27, 112, 0, 25, 250];
+      try {
+        _logger.info(
+          eventType: 'open_cash_drawer_manual_attempt',
+          entityId: printer.deviceAddress,
+          message: 'Manual cash drawer open requested.',
+          metadata: <String, Object?>{'actor_user_id': actorUserId},
+        );
+        await _sendBytesToPrinter(printer: printer, bytes: bytes);
+        _logger.info(
+          eventType: 'open_cash_drawer_manual_success',
+          entityId: printer.deviceAddress,
+          message: 'Manual cash drawer opened.',
+          metadata: <String, Object?>{'actor_user_id': actorUserId},
+        );
+        if (actorUserId != null && actorUserId > 0) {
+          await _auditLogService.logActionSafely(
+            actorUserId: actorUserId,
+            action: 'cash_drawer_opened_manual',
+            entityType: 'cash_drawer',
+            entityId: printer.deviceAddress,
+            metadata: const <String, Object?>{},
+          );
+        }
+      } on AppException catch (error) {
+        _logger.warn(
+          eventType: 'open_cash_drawer_manual_failure',
+          entityId: entityId,
+          message: 'Manual cash drawer open failed.',
+          error: error,
+        );
+        rethrow;
+      } catch (error) {
+        _logger.error(
+          eventType: 'open_cash_drawer_manual_failure',
+          entityId: entityId,
+          message: 'Manual cash drawer open failed.',
+          error: error,
+        );
+        throw PrinterException('Cash drawer open failed: $error');
+      }
+    });
+  }
+
+  /// Sends an ESC/POS pulse command to open the cash drawer.
+  ///
+  /// Pulse command: ESC p m t1 t2
+  /// - ESC p: 27, 112 (0x1B, 0x70)
+  /// - m=0: Pin 2
+  /// - t1=25: 50ms on
+  /// - t2=250: 500ms off
+  Future<void> openCashDrawer() async {
+    await _runSerialized(() async {
+      final String entityId = 'CASH_DRAWER';
+      try {
+        final PrinterSettingsModel printer = await _requirePrinterSettings();
+        // ESC p 0 25 250
+        final List<int> bytes = <int>[27, 112, 0, 25, 250];
+
+        _logger.info(
+          eventType: 'open_cash_drawer_attempt',
+          entityId: printer.deviceAddress,
+          message: 'Attempting to open cash drawer.',
+        );
+
+        await _sendBytesToPrinter(printer: printer, bytes: bytes);
+
+        _logger.info(
+          eventType: 'open_cash_drawer_success',
+          entityId: printer.deviceAddress,
+          message: 'Cash drawer opened.',
+        );
+      } on AppException catch (error) {
+        _logger.warn(
+          eventType: 'open_cash_drawer_failure',
+          entityId: entityId,
+          message: 'Cash drawer opening failed (AppException).',
+          error: error,
+        );
+        // Requirement: "Ensure no crash if printer is disconnected"
+        // Also "Do not affect print logic or transaction flow"
+        // So we swallow the error after logging.
+      } catch (error) {
+        _logger.error(
+          eventType: 'open_cash_drawer_failure',
+          entityId: entityId,
+          message: 'Cash drawer opening failed (Unexpected).',
+          error: error,
+        );
       }
     });
   }
@@ -350,9 +464,13 @@ class PrinterService {
     return printer;
   }
 
-  Future<_PrintableOrder> _loadPrintableOrder(Transaction transaction) async {
-    final List<TransactionLine> lines = await _transactionRepository.getLines(
-      transaction.id,
+  Future<_PrintableOrder> _loadPrintableOrder(
+    Transaction transaction, {
+    required PrintJobTarget target,
+  }) async {
+    final List<TransactionLine> lines = await _loadPrintableLines(
+      transaction: transaction,
+      target: target,
     );
     final List<_PrintableLine> printableLines = <_PrintableLine>[];
 
@@ -407,10 +525,21 @@ class PrinterService {
           ),
         );
       } else {
+        final OrderModifier? breadTypeModifier =
+            _detectKitchenSandwichBreadTypeModifier(modifiers);
+        final String printableProductName = _mergeKitchenProductNameWithBread(
+          productName: line.productName,
+          breadTypeLabel: breadTypeModifier?.itemName,
+        );
         printableLines.add(
           _PrintableLine(
-            line: line,
+            line: line.copyWith(productName: printableProductName),
             modifiers: modifiers
+                .where(
+                  (OrderModifier modifier) =>
+                      breadTypeModifier == null ||
+                      modifier.uuid != breadTypeModifier.uuid,
+                )
                 .map(
                   (OrderModifier modifier) => _PrintableModifier(
                     label: modifier.itemName,
@@ -437,6 +566,69 @@ class PrinterService {
     }
 
     return _PrintableOrder(transaction: transaction, lines: printableLines);
+  }
+
+  Future<List<TransactionLine>> _loadPrintableLines({
+    required Transaction transaction,
+    required PrintJobTarget target,
+  }) async {
+    final List<TransactionLine> lines = await _transactionRepository.getLines(
+      transaction.id,
+    );
+    if (target != PrintJobTarget.kitchen) {
+      return lines;
+    }
+    return _loadKitchenEligibleLines(lines);
+  }
+
+  Future<List<TransactionLine>> _loadKitchenEligibleLines(
+    List<TransactionLine> lines,
+  ) async {
+    final ProductRepository? productRepository = _productRepository;
+    if (productRepository == null) {
+      return List<TransactionLine>.from(lines, growable: false);
+    }
+
+    final product = await productRepository.getSystemCustomSaleProduct();
+    if (product == null ||
+        !_customSalePolicyService.isCustomSaleProduct(product)) {
+      return List<TransactionLine>.from(lines, growable: false);
+    }
+
+    return _customSalePolicyService.kitchenRelevantLines(
+      lines,
+      customSaleProductId: product.id,
+    );
+  }
+
+  Future<bool> _shouldSkipKitchenPrintForTransaction(
+    Transaction transaction,
+  ) async {
+    final List<TransactionLine> lines = await _transactionRepository.getLines(
+      transaction.id,
+    );
+    if (lines.isEmpty) {
+      return false;
+    }
+    final List<TransactionLine> kitchenEligibleLines =
+        await _loadKitchenEligibleLines(lines);
+    return kitchenEligibleLines.isEmpty;
+  }
+
+  PrintJob _buildSkippedKitchenPrintJob(int transactionId) {
+    final DateTime now = DateTime.now();
+    return PrintJob(
+      id: 0,
+      transactionId: transactionId,
+      target: PrintJobTarget.kitchen,
+      status: PrintJobStatus.printed,
+      createdAt: now,
+      updatedAt: now,
+      attemptCount: 0,
+      lastAttemptAt: null,
+      completedAt: now,
+      lastError: null,
+    );
   }
 
   PaymentRepository get _requiredPaymentRepository {
@@ -473,31 +665,38 @@ class PrinterService {
       bytes.addAll(
         generator.text(
           _sanitizeKitchenLine(headerLine),
-          styles: const PosStyles(align: PosAlign.left),
+          styles: headerLine.trimLeft().startsWith('Order #')
+              ? const PosStyles(align: PosAlign.left, bold: true)
+              : const PosStyles(align: PosAlign.left),
         ),
       );
     }
     bytes.addAll(generator.feed(1));
 
-    final List<List<String>> blocks = order.lines
-        .map(_buildKitchenProductBlock)
-        .where((List<String> block) => block.isNotEmpty)
-        .toList(growable: false);
-    for (int index = 0; index < blocks.length; index += 1) {
-      for (int rowIndex = 0; rowIndex < blocks[index].length; rowIndex += 1) {
-        final String row = blocks[index][rowIndex];
+    for (int index = 0; index < order.lines.length; index += 1) {
+      final _PrintableLine line = order.lines[index];
+      bytes.addAll(
+        generator.text(
+          _sanitizeKitchenLine(_formatKitchenMainLine(line)),
+          styles: const PosStyles(align: PosAlign.left, bold: true),
+        ),
+      );
+      for (final _KitchenTextRow row in _buildKitchenProductDetailRows(line)) {
         bytes.addAll(
           generator.text(
-            _sanitizeKitchenLine(row),
-            styles: PosStyles(
-              align: PosAlign.left,
-              bold: rowIndex == 0 || row.trimLeft().startsWith('>>> '),
-            ),
+            _sanitizeKitchenLine(row.text),
+            styles: _kitchenTextRowStyles(row.kind),
           ),
         );
       }
-      if (index != blocks.length - 1) {
+      if (index != order.lines.length - 1) {
         bytes.addAll(generator.feed(1));
+        bytes.addAll(
+          generator.text(
+            _sanitizeKitchenLine('-------------------------'),
+            styles: const PosStyles(align: PosAlign.left),
+          ),
+        );
       }
     }
 
@@ -512,6 +711,17 @@ class PrinterService {
     return bytes;
   }
 
+  PosStyles _kitchenTextRowStyles(_KitchenTextRowKind kind) {
+    switch (kind) {
+      case _KitchenTextRowKind.standard:
+        return const PosStyles(align: PosAlign.left);
+      case _KitchenTextRowKind.instruction:
+        return const PosStyles(align: PosAlign.left, bold: true);
+      case _KitchenTextRowKind.extra:
+        return const PosStyles(align: PosAlign.left);
+    }
+  }
+
   Future<List<int>> _buildReceiptBytes({
     required PrinterSettingsModel printer,
     required _PrintableOrder order,
@@ -523,7 +733,7 @@ class PrinterService {
 
     bytes.addAll(
       generator.text(
-        'RECEIPT',
+        _businessName,
         styles: const PosStyles(
           align: PosAlign.center,
           bold: true,
@@ -534,27 +744,49 @@ class PrinterService {
     );
     bytes.addAll(
       generator.text(
-        'Order #${order.transaction.id}',
-        styles: const PosStyles(align: PosAlign.center, bold: true),
-      ),
-    );
-    if (order.transaction.tableNumber != null) {
-      bytes.addAll(
-        generator.text(
-          'Table ${order.transaction.tableNumber}',
-          styles: const PosStyles(align: PosAlign.center),
-        ),
-      );
-    }
-    bytes.addAll(
-      generator.text(
-        'Paid ${DateFormatter.formatDefault(payment.paidAt)}',
+        _businessAddress,
         styles: const PosStyles(align: PosAlign.center),
       ),
     );
-    bytes.addAll(generator.hr());
+    bytes.addAll(
+      generator.text(
+        _businessPhone,
+        styles: const PosStyles(align: PosAlign.center),
+      ),
+    );
+    bytes.addAll(
+      generator.text(
+        _kitchenSeparator,
+        styles: const PosStyles(align: PosAlign.left),
+      ),
+    );
+    bytes.addAll(
+      generator.text(
+        'Receipt',
+        styles: const PosStyles(align: PosAlign.center),
+      ),
+    );
+    bytes.addAll(
+      generator.text(
+        'Order #${order.transaction.id}',
+        styles: const PosStyles(align: PosAlign.center),
+      ),
+    );
+    bytes.addAll(
+      generator.text(
+        DateFormatter.formatDefault(payment.paidAt),
+        styles: const PosStyles(align: PosAlign.center),
+      ),
+    );
+    bytes.addAll(
+      generator.text(
+        _kitchenSeparator,
+        styles: const PosStyles(align: PosAlign.left),
+      ),
+    );
 
-    for (final _PrintableLine line in order.lines) {
+    for (int index = 0; index < order.lines.length; index += 1) {
+      final _PrintableLine line = order.lines[index];
       bytes.addAll(
         generator.row(<PosColumn>[
           PosColumn(
@@ -568,66 +800,77 @@ class PrinterService {
           ),
         ]),
       );
-      for (final _PrintableModifier modifier in line.modifiers) {
-        if (!modifier.showOnReceipt) continue;
-        final String suffix = modifier.isAdd && modifier.extraPriceMinor > 0
-            ? ' ${CurrencyFormatter.fromMinor(modifier.extraPriceMinor)}'
-            : '';
-        bytes.addAll(
-          generator.text(
-            '  ${(modifier.receiptLabel ?? modifier.label)}$suffix',
-          ),
-        );
+      for (final _ReceiptModifierRow modifier in _buildReceiptModifierRows(
+        line.modifiers,
+      )) {
+        bytes.addAll(generator.text(modifier.label));
       }
       for (final _PrintableCookingInstruction instruction
           in line.cookingInstructions) {
-        bytes.addAll(
-          generator.text(
-            '  ${instruction.itemName}'
-            '${instruction.quantity > 1 ? ' x${instruction.quantity}' : ' x1'}'
-            ' - ${instruction.instructionLabel.toUpperCase()}',
-            styles: const PosStyles(bold: true),
-          ),
-        );
+        bytes.addAll(generator.text(_buildReceiptInstructionLine(instruction)));
+      }
+      if (index != order.lines.length - 1) {
+        bytes.addAll(generator.feed(1));
       }
     }
 
-    bytes.addAll(generator.hr());
     bytes.addAll(
-      generator.row(<PosColumn>[
-        PosColumn(text: 'Subtotal', width: 8),
-        PosColumn(
-          text: CurrencyFormatter.fromMinor(order.transaction.subtotalMinor),
-          width: 4,
-          styles: const PosStyles(align: PosAlign.right),
-        ),
-      ]),
+      generator.text(
+        _kitchenSeparator,
+        styles: const PosStyles(align: PosAlign.left),
+      ),
     );
-    bytes.addAll(
-      generator.row(<PosColumn>[
-        PosColumn(text: 'Modifiers', width: 8),
-        PosColumn(
-          text: CurrencyFormatter.fromMinor(
-            order.transaction.modifierTotalMinor,
+    if (order.transaction.discountAmountMinor > 0) {
+      bytes.addAll(
+        generator.row(<PosColumn>[
+          PosColumn(
+            text: 'Discount',
+            width: 8,
+            styles: PosStyles(align: PosAlign.left),
           ),
-          width: 4,
-          styles: const PosStyles(align: PosAlign.right),
-        ),
-      ]),
-    );
+          PosColumn(
+            text:
+                '-${CurrencyFormatter.fromMinor(order.transaction.discountAmountMinor)}',
+            width: 4,
+            styles: const PosStyles(align: PosAlign.right),
+          ),
+        ]),
+      );
+    }
     bytes.addAll(
       generator.row(<PosColumn>[
-        PosColumn(text: 'TOTAL', width: 8, styles: const PosStyles(bold: true)),
+        PosColumn(
+          text: 'TOTAL',
+          width: 8,
+          styles: const PosStyles(bold: true, height: PosTextSize.size2),
+        ),
         PosColumn(
           text: CurrencyFormatter.fromMinor(order.transaction.totalAmountMinor),
           width: 4,
-          styles: const PosStyles(align: PosAlign.right, bold: true),
+          styles: const PosStyles(
+            align: PosAlign.right,
+            bold: true,
+            height: PosTextSize.size2,
+          ),
         ),
       ]),
     );
     bytes.addAll(
       generator.text(
+        _kitchenSeparator,
+        styles: const PosStyles(align: PosAlign.left),
+      ),
+    );
+    bytes.addAll(
+      generator.text(
         'Payment: ${payment.method.name.toUpperCase()}',
+        styles: const PosStyles(align: PosAlign.left),
+      ),
+    );
+    bytes.addAll(generator.feed(1));
+    bytes.addAll(
+      generator.text(
+        'Thank you for your visit!',
         styles: const PosStyles(align: PosAlign.center),
       ),
     );
@@ -637,97 +880,172 @@ class PrinterService {
   }
 
   List<String> _buildKitchenProductBlock(_PrintableLine line) {
-    final List<String> rows = <String>[
-      ..._formatKitchenMainRows(
-        quantity: line.line.quantity,
-        productName: line.line.productName,
-        priceMinor: line.line.lineTotalMinor,
-      ),
-    ];
-    final _KitchenModifierBuckets buckets = _bucketKitchenModifiers(
-      line.modifiers,
-    );
+    final List<String> rows = <String>[_formatKitchenMainLine(line)];
+    rows.addAll(_buildKitchenProductDetailRows(line).map((row) => row.text));
+    return rows;
+  }
 
-    if (buckets.choices.isNotEmpty) {
-      rows.addAll(
-        _wrapKitchenJoinedItems(
-          prefix: '  ',
-          values: buckets.choices,
-          separator: ' | ',
-        ),
-      );
-    }
-    if (buckets.choices.isNotEmpty && buckets.swaps.isNotEmpty) {
-      rows.add('');
-    }
-    for (final _KitchenSwapRow swap in buckets.swaps) {
-      rows.addAll(_formatKitchenSwapRows(swap.removed, swap.added));
-    }
-    for (final _PrintableCookingInstruction instruction
-        in line.cookingInstructions.toList(growable: false)..sort(
-          (_PrintableCookingInstruction a, _PrintableCookingInstruction b) =>
-              a.sortKey.compareTo(b.sortKey),
-        )) {
-      rows.addAll(_formatKitchenInstructionRows(instruction));
-    }
-    if (buckets.extras.isNotEmpty) {
-      if (rows.isNotEmpty && rows.last.isNotEmpty) {
-        rows.add('');
-      }
-      rows.add('  EXTRAS:');
-      for (final String extra in buckets.extras) {
-        rows.addAll(_wrapKitchenValue(prefix: '    + ', value: extra));
-      }
-    }
-    if (buckets.sauces.isNotEmpty) {
-      if (rows.isNotEmpty && rows.last.isNotEmpty) {
-        rows.add('');
-      }
-      rows.add('  SAUCE:');
-      for (final String sauce in buckets.sauces) {
-        rows.addAll(_wrapKitchenValue(prefix: '    + ', value: sauce));
-      }
+  List<_ReceiptModifierRow> _buildReceiptModifierRows(
+    List<_PrintableModifier> modifiers,
+  ) {
+    final List<_ReceiptModifierRow> rows = <_ReceiptModifierRow>[];
+    for (final _PrintableModifier modifier in modifiers) {
+      if (!modifier.showOnReceipt) continue;
+      final String prefix = modifier.action == ModifierAction.remove
+          ? '-'
+          : '+';
+      final String quantitySuffix = modifier.quantity > 1
+          ? ' x${modifier.quantity}'
+          : '';
+      final String label =
+          '  $prefix ${_sanitizeReceiptText(modifier.label)}$quantitySuffix';
+      rows.add(_ReceiptModifierRow(label: label));
     }
     return rows;
   }
 
-  _KitchenModifierBuckets _bucketKitchenModifiers(
-    List<_PrintableModifier> modifiers,
+  String _buildReceiptInstructionLine(
+    _PrintableCookingInstruction instruction,
   ) {
+    return '  ${_sanitizeReceiptText(instruction.itemName)}: '
+        '${_sanitizeReceiptText(instruction.instructionLabel).toUpperCase()}';
+  }
+
+  String _sanitizeReceiptText(String value) {
+    final String indent = RegExp(r'^\s*').stringMatch(value) ?? '';
+    final String content = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    return '$indent${_sanitizeKitchenLine(content)}';
+  }
+
+  String _formatReceiptColumns({required String left, required String right}) {
+    final String safeLeft = _sanitizeReceiptText(left);
+    final String safeRight = _sanitizeReceiptText(right);
+    final int spacing =
+        (_kitchenTicketWidth - safeLeft.length - safeRight.length).clamp(
+          1,
+          _kitchenTicketWidth,
+        );
+    return '$safeLeft${' ' * spacing}$safeRight';
+  }
+
+  List<_KitchenTextRow> _buildKitchenProductDetailRows(_PrintableLine line) {
+    final List<_KitchenTextRow> rows = <_KitchenTextRow>[];
+    final _KitchenModifierSections sections = _buildKitchenModifierSections(
+      line,
+    );
+    final List<_PrintableCookingInstruction> notes =
+        line.cookingInstructions.toList(growable: false)..sort(
+          (_PrintableCookingInstruction a, _PrintableCookingInstruction b) =>
+              a.sortKey.compareTo(b.sortKey),
+        );
+    if (sections.included.isNotEmpty) {
+      rows.addAll(
+        _wrapKitchenJoinedItems(
+          prefix: '  ',
+          values: sections.included,
+          separator: ' | ',
+        ).map(
+          (text) =>
+              _KitchenTextRow(text: text, kind: _KitchenTextRowKind.standard),
+        ),
+      );
+    }
+    final List<_KitchenSectionBlock> blocks = <_KitchenSectionBlock>[
+      _KitchenSectionBlock(
+        title: 'REMOVE:',
+        prefix: '  - ',
+        values: sections.removes,
+      ),
+      _KitchenSectionBlock(
+        title: 'ADD:',
+        prefix: '  + ',
+        values: sections.adds,
+      ),
+      _KitchenSectionBlock(
+        title: 'SAUCE:',
+        prefix: '  + ',
+        values: sections.sauces,
+      ),
+      _KitchenSectionBlock(
+        title: 'NOTE:',
+        prefix: '  ',
+        values: notes
+            .map(_formatKitchenInstructionValue)
+            .toList(growable: false),
+      ),
+    ];
+
+    bool hasPreviousSection = false;
+    for (final _KitchenSectionBlock block in blocks) {
+      if (block.values.isEmpty) continue;
+      final bool needsLeadingGap =
+          hasPreviousSection || rows.isNotEmpty || block.title == 'SAUCE:';
+      if (needsLeadingGap) {
+        rows.add(
+          const _KitchenTextRow(text: '', kind: _KitchenTextRowKind.standard),
+        );
+      }
+      if (block.title.isNotEmpty) {
+        rows.add(
+          _KitchenTextRow(
+            text: block.title,
+            kind: _KitchenTextRowKind.standard,
+          ),
+        );
+      }
+      for (final String value in block.values) {
+        rows.addAll(
+          _wrapKitchenValue(prefix: block.prefix, value: value).map(
+            (text) =>
+                _KitchenTextRow(text: text, kind: _KitchenTextRowKind.standard),
+          ),
+        );
+      }
+      hasPreviousSection = true;
+    }
+    return rows;
+  }
+
+  _KitchenModifierSections _buildKitchenModifierSections(_PrintableLine line) {
+    final bool separateSauces = _shouldSeparateKitchenSauces(line);
     final List<_PrintableModifier> sorted =
-        modifiers
+        line.modifiers
             .where((modifier) => modifier.showOnKitchen)
             .toList(growable: true)
           ..sort(
             (_PrintableModifier a, _PrintableModifier b) =>
                 a.sortKey.compareTo(b.sortKey),
           );
-    final List<String> choices = <String>[];
+    final List<String> included = <String>[];
+    final List<String> adds = <String>[];
     final List<String> sauces = <String>[];
-    final List<String> extras = <String>[];
-    final List<_PrintableModifier> swapAdds = <_PrintableModifier>[];
-    final List<_PrintableModifier> removals = <_PrintableModifier>[];
+    final List<String> removes = <String>[];
 
     for (final _PrintableModifier modifier in sorted) {
-      final bool isSauce = _isSauceModifier(modifier);
       switch (modifier.chargeReason) {
         case ModifierChargeReason.includedChoice:
-          if (isSauce) {
+          if (separateSauces && _isKitchenSauceModifier(modifier)) {
             sauces.add(_formatModifierValue(modifier));
           } else {
-            choices.add(_formatModifierValue(modifier));
+            included.add(_formatModifierValue(modifier));
           }
           break;
         case ModifierChargeReason.freeSwap:
         case ModifierChargeReason.paidSwap:
-          swapAdds.add(modifier);
+          _appendKitchenAddOrSauce(
+            target: modifier,
+            adds: adds,
+            sauces: sauces,
+            separateSauces: separateSauces,
+          );
           break;
         case ModifierChargeReason.extraAdd:
-          if (isSauce) {
-            sauces.add(_formatModifierValue(modifier));
-          } else {
-            extras.add(_formatModifierValue(modifier));
-          }
+          _appendKitchenAddOrSauce(
+            target: modifier,
+            adds: adds,
+            sauces: sauces,
+            separateSauces: separateSauces,
+          );
           break;
         case ModifierChargeReason.removalDiscount:
         case ModifierChargeReason.comboDiscount:
@@ -735,159 +1053,136 @@ class PrinterService {
         case null:
           switch (modifier.action) {
             case ModifierAction.choice:
-              if (isSauce) {
+              if (separateSauces && _isKitchenSauceModifier(modifier)) {
                 sauces.add(_formatModifierValue(modifier));
               } else {
-                choices.add(_formatModifierValue(modifier));
+                included.add(_formatModifierValue(modifier));
               }
               break;
             case ModifierAction.remove:
-              removals.add(modifier);
+              removes.add(_formatModifierValue(modifier));
               break;
             case ModifierAction.add:
-              if (isSauce) {
-                sauces.add(_formatModifierValue(modifier));
-              } else {
-                extras.add(_formatModifierValue(modifier));
-              }
+              _appendKitchenAddOrSauce(
+                target: modifier,
+                adds: adds,
+                sauces: sauces,
+                separateSauces: separateSauces,
+              );
               break;
           }
           break;
       }
     }
 
-    final List<_KitchenSwapRow> swaps = <_KitchenSwapRow>[];
-    final List<_PrintableModifier> remainingRemovals =
-        List<_PrintableModifier>.from(removals);
-    for (final _PrintableModifier add in swapAdds) {
-      // Swap pairing is best-effort. We prefer the same source group when the
-      // semantic snapshot persisted it; otherwise we fall back to first
-      // remaining remove to keep kitchen output deterministic.
-      int removeIndex = -1;
-      if (add.sourceGroupId != null) {
-        removeIndex = remainingRemovals.indexWhere(
-          (_PrintableModifier remove) =>
-              remove.sourceGroupId == add.sourceGroupId,
-        );
-      }
-      if (removeIndex == -1 && remainingRemovals.isNotEmpty) {
-        removeIndex = 0;
-      }
-      final _PrintableModifier? removed = removeIndex == -1
-          ? null
-          : remainingRemovals.removeAt(removeIndex);
-      swaps.add(
-        _KitchenSwapRow(
-          removed: removed == null ? null : _formatModifierValue(removed),
-          added: _formatModifierValue(add),
-        ),
-      );
-    }
-    for (final _PrintableModifier remove in remainingRemovals) {
-      swaps.add(_KitchenSwapRow(removed: _formatModifierValue(remove)));
-    }
-
-    return _KitchenModifierBuckets(
-      choices: choices,
-      swaps: swaps,
+    return _KitchenModifierSections(
+      included: included,
+      adds: adds,
       sauces: sauces,
-      extras: extras,
+      removes: removes,
     );
   }
 
   List<String> _buildKitchenHeaderLines(Transaction transaction) {
     return <String>[
       _kitchenSeparator,
-      _formatKitchenColumns(
-        left: 'KITCHEN TICKET',
-        right:
-            'Order #${transaction.id}  ${_formatKitchenTime(transaction.createdAt)}',
-        uppercaseLeft: false,
-      ),
+      'KITCHEN TICKET',
+      'Order #${transaction.id}',
+      _alignKitchenRight(_formatKitchenTime(transaction.createdAt)),
       _alignKitchenRight(_formatKitchenDate(transaction.createdAt)),
       _kitchenSeparator,
     ];
   }
 
-  List<String> _formatKitchenMainRows({
-    required int quantity,
-    required String productName,
-    required int priceMinor,
-  }) {
-    final String left = '${quantity}x ${_normalizeKitchenText(productName)}';
-    final String right = CurrencyFormatter.fromMinor(priceMinor);
-    final int firstLineWidth = _kitchenTicketWidth - right.length - 2;
-    final List<String> wrapped = _wrapKitchenPlainText(
-      value: left,
-      width: firstLineWidth,
+  String _formatKitchenMainLine(_PrintableLine line) {
+    return _formatKitchenColumns(
+      left:
+          '${line.line.quantity}x ${_normalizeKitchenText(line.line.productName)}',
+      right: CurrencyFormatter.fromMinor(line.line.lineTotalMinor),
+      uppercaseLeft: false,
     );
-    if (wrapped.length <= 1) {
-      return <String>[
-        _formatKitchenColumns(left: left, right: right, uppercaseLeft: false),
-      ];
-    }
-    final List<String> rows = <String>[
-      _formatKitchenColumns(
-        left: wrapped.first,
-        right: right,
-        uppercaseLeft: false,
-      ),
-    ];
-    for (final String continuation in wrapped.skip(1)) {
-      rows.add('  $continuation');
-    }
-    return rows;
   }
 
-  List<String> _formatKitchenSwapRows(String? removed, String? added) {
-    if (removed == null || removed.isEmpty) {
-      return _wrapKitchenValue(prefix: '  + ', value: added ?? '');
+  OrderModifier? _detectKitchenSandwichBreadTypeModifier(
+    List<OrderModifier> modifiers,
+  ) {
+    for (final OrderModifier modifier in modifiers) {
+      if (modifier.action != ModifierAction.choice) {
+        continue;
+      }
+      final String normalized = _normalizeKitchenText(modifier.itemName);
+      if (normalized == 'ROLL' ||
+          normalized == 'SANDWICH' ||
+          normalized == 'BAGUETTE') {
+        return modifier;
+      }
     }
-    if (added == null || added.isEmpty) {
-      return _wrapKitchenValue(prefix: '  - ', value: removed);
-    }
-
-    final String safeRemoved = _normalizeKitchenText(removed);
-    final String safeAdded = _normalizeKitchenText(added);
-    if (_canFitKitchenColumns(
-      left: '  - $safeRemoved',
-      right: '+ $safeAdded',
-    )) {
-      const String leftPrefix = '  - ';
-      const String rightPrefix = '+ ';
-      final int gap =
-          _kitchenTicketWidth -
-          leftPrefix.length -
-          safeRemoved.length -
-          rightPrefix.length -
-          safeAdded.length;
-      return <String>[
-        '$leftPrefix$safeRemoved${' ' * gap}$rightPrefix$safeAdded',
-      ];
-    }
-    return <String>[
-      ..._wrapKitchenValue(prefix: '  - ', value: safeRemoved),
-      ..._wrapKitchenValue(prefix: '  + ', value: safeAdded),
-    ];
+    return null;
   }
 
-  List<String> _formatKitchenInstructionRows(
+  String _mergeKitchenProductNameWithBread({
+    required String productName,
+    required String? breadTypeLabel,
+  }) {
+    if (breadTypeLabel == null || breadTypeLabel.trim().isEmpty) {
+      return productName;
+    }
+    final String normalizedProductName = _normalizeKitchenText(productName);
+    final String normalizedBreadType = _normalizeKitchenText(breadTypeLabel);
+    if (normalizedProductName.endsWith(' $normalizedBreadType') ||
+        normalizedProductName == normalizedBreadType) {
+      return productName;
+    }
+    return '${productName.trim()} ${breadTypeLabel.trim()}';
+  }
+
+  String _formatKitchenInstructionValue(
     _PrintableCookingInstruction instruction,
   ) {
     final String item = _normalizeKitchenText(instruction.itemName);
-    final String payload =
-        '$item - ${_normalizeKitchenText(instruction.instructionLabel)}';
-    final String line = '  >>> $payload <<<';
-    if (line.length <= _kitchenTicketWidth) {
-      return <String>[line];
+    final String label = _normalizeKitchenText(instruction.instructionLabel);
+    return '$item: $label';
+  }
+
+  void _appendKitchenAddOrSauce({
+    required _PrintableModifier target,
+    required List<String> adds,
+    required List<String> sauces,
+    required bool separateSauces,
+  }) {
+    final String value = _formatModifierValue(target);
+    if (separateSauces && _isKitchenSauceModifier(target)) {
+      sauces.add(value);
+      return;
     }
-    return <String>[
-      ..._wrapKitchenValue(prefix: '  >>> ', value: item),
-      ..._wrapKitchenValue(
-        prefix: '      ',
-        value: '- ${_normalizeKitchenText(instruction.instructionLabel)} <<<',
-      ),
-    ];
+    adds.add(value);
+  }
+
+  bool _isBurgerKitchenProduct(_PrintableLine line) {
+    final String productName = _normalizeKitchenText(line.line.productName);
+    return productName.contains('BURGER');
+  }
+
+  bool _isSandwichKitchenProduct(_PrintableLine line) {
+    if (line.line.pricingMode == TransactionLinePricingMode.set) {
+      return false;
+    }
+    final String productName = _normalizeKitchenText(line.line.productName);
+    return productName.endsWith(' ROLL') ||
+        productName.endsWith(' SANDWICH') ||
+        productName.endsWith(' BAGUETTE');
+  }
+
+  bool _shouldSeparateKitchenSauces(_PrintableLine line) {
+    return _isBurgerKitchenProduct(line) || _isSandwichKitchenProduct(line);
+  }
+
+  bool _isKitchenSauceModifier(_PrintableModifier modifier) {
+    if (modifier.uiSection == ModifierUiSection.sauces) {
+      return true;
+    }
+    final String label = _normalizeKitchenText(modifier.label);
+    return label.contains('SAUCE') || label == 'MAYO' || label == 'BBQ';
   }
 
   List<String> _wrapKitchenJoinedItems({
@@ -966,10 +1261,6 @@ class PrinterService {
     return '$safeLeft${' ' * spacing}$safeRight';
   }
 
-  bool _canFitKitchenColumns({required String left, required String right}) {
-    return left.length + right.length + 1 <= _kitchenTicketWidth;
-  }
-
   String _alignKitchenRight(String value) {
     final String normalized = _sanitizeKitchenLine(value.trim());
     if (normalized.length >= _kitchenTicketWidth) {
@@ -993,14 +1284,6 @@ class PrinterService {
       return '$normalized x${modifier.quantity}';
     }
     return normalized;
-  }
-
-  bool _isSauceModifier(_PrintableModifier modifier) {
-    if (modifier.uiSection == ModifierUiSection.sauces) {
-      return true;
-    }
-    final String normalized = _normalizeKitchenText(modifier.label);
-    return normalized.endsWith(' SAUCE') || normalized.contains(' SAUCE ');
   }
 
   String _formatKitchenTime(DateTime value) {
@@ -1081,7 +1364,10 @@ class PrinterService {
     required int transactionId,
   }) async {
     final Transaction transaction = await _requireTransaction(transactionId);
-    final _PrintableOrder order = await _loadPrintableOrder(transaction);
+    final _PrintableOrder order = await _loadPrintableOrder(
+      transaction,
+      target: PrintJobTarget.kitchen,
+    );
     final List<String> lines = <String>[
       _centerKitchenText('HALFWAY CAFE'),
       ..._buildKitchenHeaderLines(order.transaction),
@@ -1095,9 +1381,77 @@ class PrinterService {
       lines.addAll(blocks[index]);
       if (index != blocks.length - 1) {
         lines.add('');
+        lines.add('-------------------------');
       }
     }
     lines.add(_kitchenSeparator);
+    return lines.map(_sanitizeKitchenLine).join('\n');
+  }
+
+  @visibleForTesting
+  Future<String> buildReceiptPreviewForTesting({
+    required int transactionId,
+  }) async {
+    final Transaction transaction = await _requireTransaction(transactionId);
+    final _PrintableOrder order = await _loadPrintableOrder(
+      transaction,
+      target: PrintJobTarget.receipt,
+    );
+    final Payment payment = await _requirePayment(transactionId);
+    final List<String> lines = <String>[
+      _centerKitchenText(_businessName),
+      _centerKitchenText(_businessAddress),
+      _centerKitchenText(_businessPhone),
+      _kitchenSeparator,
+      _centerKitchenText('Receipt'),
+      _centerKitchenText('Order #${order.transaction.id}'),
+      _centerKitchenText(DateFormatter.formatDefault(payment.paidAt)),
+      _kitchenSeparator,
+    ];
+
+    for (int index = 0; index < order.lines.length; index += 1) {
+      final _PrintableLine line = order.lines[index];
+      lines.add(
+        _formatReceiptColumns(
+          left: '${line.line.quantity}x ${line.line.productName}',
+          right: CurrencyFormatter.fromMinor(line.line.lineTotalMinor),
+        ),
+      );
+      for (final _ReceiptModifierRow modifier in _buildReceiptModifierRows(
+        line.modifiers,
+      )) {
+        lines.add(modifier.label);
+      }
+      for (final _PrintableCookingInstruction instruction
+          in line.cookingInstructions) {
+        lines.add(_buildReceiptInstructionLine(instruction));
+      }
+      if (index != order.lines.length - 1) {
+        lines.add('');
+      }
+    }
+
+    lines.add(_kitchenSeparator);
+    if (order.transaction.discountAmountMinor > 0) {
+      lines.add(
+        _formatReceiptColumns(
+          left: 'Discount',
+          right:
+              '-${CurrencyFormatter.fromMinor(order.transaction.discountAmountMinor)}',
+        ),
+      );
+    }
+    lines.add(
+      _formatReceiptColumns(
+        left: 'TOTAL',
+        right: CurrencyFormatter.fromMinor(order.transaction.totalAmountMinor),
+      ),
+    );
+    lines.add(_kitchenSeparator);
+    lines.add('Payment: ${payment.method.name.toUpperCase()}');
+    lines.add('');
+    lines.add(_centerKitchenText('Thank you for your visit!'));
+
     return lines.map(_sanitizeKitchenLine).join('\n');
   }
 
@@ -1405,7 +1759,10 @@ class PrinterService {
     required int transactionId,
   }) async {
     final Transaction transaction = await _requireTransaction(transactionId);
-    final _PrintableOrder order = await _loadPrintableOrder(transaction);
+    final _PrintableOrder order = await _loadPrintableOrder(
+      transaction,
+      target: PrintJobTarget.kitchen,
+    );
     return _buildKitchenTicketBytes(printer: printer, order: order);
   }
 
@@ -1604,6 +1961,24 @@ class PrinterService {
         ' status=${transaction.status.name}'
         ' kitchenPrinted=${transaction.kitchenPrinted}',
       );
+      if (target == PrintJobTarget.kitchen &&
+          await _shouldSkipKitchenPrintForTransaction(transaction)) {
+        debugPrint(
+          '[KITCHEN_PRINT] skipped — no kitchen-eligible lines'
+          ' tx=$transactionId',
+        );
+        _logger.info(
+          eventType: 'print_kitchen_skipped_not_required',
+          entityId: transaction.uuid,
+          message:
+              'Kitchen print skipped because the order has no kitchen-eligible lines.',
+          metadata: <String, Object?>{
+            'transaction_id': transactionId,
+            'manual_reprint': allowReprint,
+          },
+        );
+        return _buildSkippedKitchenPrintJob(transactionId);
+      }
       final PrintJobRepository printJobRepository = _requiredPrintJobRepository;
       final PrintJob job = await _ensurePrintJobState(
         transaction: transaction,
@@ -1675,6 +2050,7 @@ class PrinterService {
 
         final _PrintableOrder printableOrder = await _loadPrintableOrder(
           transaction,
+          target: target,
         );
         debugPrint(
           '[KITCHEN_PRINT] order loaded tx=$transactionId'
@@ -2013,23 +2389,43 @@ class _PrintableCookingInstruction {
   final int sortKey;
 }
 
-class _KitchenModifierBuckets {
-  const _KitchenModifierBuckets({
-    required this.choices,
-    required this.swaps,
-    required this.sauces,
-    required this.extras,
-  });
+enum _KitchenTextRowKind { standard, instruction, extra }
 
-  final List<String> choices;
-  final List<_KitchenSwapRow> swaps;
-  final List<String> sauces;
-  final List<String> extras;
+class _KitchenTextRow {
+  const _KitchenTextRow({required this.text, required this.kind});
+
+  final String text;
+  final _KitchenTextRowKind kind;
 }
 
-class _KitchenSwapRow {
-  const _KitchenSwapRow({this.removed, this.added});
+class _ReceiptModifierRow {
+  const _ReceiptModifierRow({required this.label});
 
-  final String? removed;
-  final String? added;
+  final String label;
+}
+
+class _KitchenSectionBlock {
+  const _KitchenSectionBlock({
+    required this.title,
+    required this.prefix,
+    required this.values,
+  });
+
+  final String title;
+  final String prefix;
+  final List<String> values;
+}
+
+class _KitchenModifierSections {
+  const _KitchenModifierSections({
+    required this.included,
+    required this.adds,
+    required this.sauces,
+    required this.removes,
+  });
+
+  final List<String> included;
+  final List<String> adds;
+  final List<String> sauces;
+  final List<String> removes;
 }

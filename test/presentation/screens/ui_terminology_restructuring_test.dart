@@ -4,10 +4,11 @@ import 'package:epos_app/core/providers/app_providers.dart';
 import 'package:epos_app/core/router/app_router.dart';
 import 'package:epos_app/data/database/app_database.dart';
 import 'package:epos_app/l10n/app_localizations.dart';
+import 'package:epos_app/domain/models/product.dart' as domain;
+import 'package:epos_app/domain/services/breakfast_pos_service.dart';
 import 'package:epos_app/presentation/providers/auth_provider.dart';
 import 'package:epos_app/presentation/providers/orders_provider.dart';
 import 'package:epos_app/presentation/providers/shift_provider.dart';
-import 'package:epos_app/presentation/screens/pos/category_entry_screen.dart';
 import 'package:epos_app/presentation/screens/pos/pos_screen.dart';
 import 'package:epos_app/presentation/screens/pos/widgets/modifier_popup.dart';
 import 'package:flutter/material.dart';
@@ -314,15 +315,40 @@ void main() {
           .loadUserById(fixture.cashierId);
       await container.read(shiftNotifierProvider.notifier).refreshOpenShift();
 
-      await tester.pumpWidget(_testPosApp(container));
+      final List<domain.Product> drinkProducts = await container
+          .read(catalogServiceProvider)
+          .getProducts(categoryId: fixture.drinkCategoryId);
+      final domain.Product flatTea = drinkProducts.firstWhere(
+        (domain.Product product) => product.name == 'Flat Tea',
+      );
+      final PosProductSelectionPath selectionPath = await container
+          .read(breakfastPosServiceProvider)
+          .getSelectionPath(flatTea);
+
+      expect(selectionPath, PosProductSelectionPath.legacyFlat);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            home: Scaffold(
+              body: ModifierPopup(
+                productId: flatTea.id,
+                productName: flatTea.name,
+              ),
+            ),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Drinks').first);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Flat Tea'));
-      await tester.pumpAndSettle();
-
-      // Legacy flat product opens ModifierPopup, not semantic editor
       expect(find.byType(ModifierPopup), findsOneWidget);
       expect(
         find.byKey(const ValueKey<String>('semantic-bundle-dialog')),
@@ -450,6 +476,7 @@ Future<_PosFixture> _seedPosFixture(AppDatabase db) async {
   return _PosFixture(
     cashierId: cashierId,
     drinkGroupId: drinkGroupId,
+    drinkCategoryId: drinkCategoryId,
     teaProductId: teaProductId,
     beansProductId: beansProductId,
   );
@@ -459,12 +486,14 @@ class _PosFixture {
   const _PosFixture({
     required this.cashierId,
     required this.drinkGroupId,
+    required this.drinkCategoryId,
     required this.teaProductId,
     required this.beansProductId,
   });
 
   final int cashierId;
   final int drinkGroupId;
+  final int drinkCategoryId;
   final int teaProductId;
   final int beansProductId;
 }
@@ -478,7 +507,7 @@ class _StaticOrdersNotifier extends OrdersNotifier {
   }
 }
 
-Widget _testPosApp(ProviderContainer container) {
+Widget _testPosApp(ProviderContainer container, {int? initialCategoryId}) {
   return UncontrolledProviderScope(
     container: container,
     child: MaterialApp(
@@ -489,7 +518,7 @@ Widget _testPosApp(ProviderContainer container) {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const PosScreen(),
+      home: PosScreen(initialCategoryId: initialCategoryId),
     ),
   );
 }
@@ -507,5 +536,4 @@ Future<void> _loginWithPin(WidgetTester tester, String pin) async {
   await tester.enterText(find.byType(TextField), pin);
   await tester.tap(find.text(AppStrings.loginButton));
   await tester.pumpAndSettle();
-  expect(find.byType(CategoryEntryScreen), findsOneWidget);
 }

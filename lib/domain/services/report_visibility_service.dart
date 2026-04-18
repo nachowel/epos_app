@@ -84,6 +84,14 @@ class ReportVisibilityService {
       cashTotalMinor: visibleCashTotalMinor,
       cardGrossTotalMinor: visibleCardGrossTotalMinor,
       cardTotalMinor: visibleCardTotalMinor,
+      customSalesRevenueMinor: _maskAmount(
+        raw.customSalesRevenueMinor,
+        safeRatio,
+      ),
+      customSalesAverageValueMinor: _maskAmount(
+        raw.customSalesAverageValueMinor,
+        safeRatio,
+      ),
       semanticSalesAnalytics: const SemanticSalesAnalytics.empty(),
     );
   }

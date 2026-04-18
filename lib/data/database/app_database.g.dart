@@ -1717,6 +1717,21 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _isCustomMeta = const VerificationMeta(
+    'isCustom',
+  );
+  @override
+  late final GeneratedColumn<bool> isCustom = GeneratedColumn<bool>(
+    'is_custom',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_custom" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _sortOrderMeta = const VerificationMeta(
     'sortOrder',
   );
@@ -1740,6 +1755,7 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     hasModifiers,
     isActive,
     isVisibleOnPos,
+    isCustom,
     sortOrder,
   ];
   @override
@@ -1820,6 +1836,12 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         ),
       );
     }
+    if (data.containsKey('is_custom')) {
+      context.handle(
+        _isCustomMeta,
+        isCustom.isAcceptableOrUnknown(data['is_custom']!, _isCustomMeta),
+      );
+    }
     if (data.containsKey('sort_order')) {
       context.handle(
         _sortOrderMeta,
@@ -1871,6 +1893,10 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_visible_on_pos'],
       )!,
+      isCustom: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_custom'],
+      )!,
       sortOrder: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
@@ -1894,6 +1920,7 @@ class Product extends DataClass implements Insertable<Product> {
   final bool hasModifiers;
   final bool isActive;
   final bool isVisibleOnPos;
+  final bool isCustom;
   final int sortOrder;
   const Product({
     required this.id,
@@ -1905,6 +1932,7 @@ class Product extends DataClass implements Insertable<Product> {
     required this.hasModifiers,
     required this.isActive,
     required this.isVisibleOnPos,
+    required this.isCustom,
     required this.sortOrder,
   });
   @override
@@ -1925,6 +1953,7 @@ class Product extends DataClass implements Insertable<Product> {
     map['has_modifiers'] = Variable<bool>(hasModifiers);
     map['is_active'] = Variable<bool>(isActive);
     map['is_visible_on_pos'] = Variable<bool>(isVisibleOnPos);
+    map['is_custom'] = Variable<bool>(isCustom);
     map['sort_order'] = Variable<int>(sortOrder);
     return map;
   }
@@ -1944,6 +1973,7 @@ class Product extends DataClass implements Insertable<Product> {
       hasModifiers: Value(hasModifiers),
       isActive: Value(isActive),
       isVisibleOnPos: Value(isVisibleOnPos),
+      isCustom: Value(isCustom),
       sortOrder: Value(sortOrder),
     );
   }
@@ -1965,6 +1995,7 @@ class Product extends DataClass implements Insertable<Product> {
       hasModifiers: serializer.fromJson<bool>(json['hasModifiers']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       isVisibleOnPos: serializer.fromJson<bool>(json['isVisibleOnPos']),
+      isCustom: serializer.fromJson<bool>(json['isCustom']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
     );
   }
@@ -1983,6 +2014,7 @@ class Product extends DataClass implements Insertable<Product> {
       'hasModifiers': serializer.toJson<bool>(hasModifiers),
       'isActive': serializer.toJson<bool>(isActive),
       'isVisibleOnPos': serializer.toJson<bool>(isVisibleOnPos),
+      'isCustom': serializer.toJson<bool>(isCustom),
       'sortOrder': serializer.toJson<int>(sortOrder),
     };
   }
@@ -1997,6 +2029,7 @@ class Product extends DataClass implements Insertable<Product> {
     bool? hasModifiers,
     bool? isActive,
     bool? isVisibleOnPos,
+    bool? isCustom,
     int? sortOrder,
   }) => Product(
     id: id ?? this.id,
@@ -2010,6 +2043,7 @@ class Product extends DataClass implements Insertable<Product> {
     hasModifiers: hasModifiers ?? this.hasModifiers,
     isActive: isActive ?? this.isActive,
     isVisibleOnPos: isVisibleOnPos ?? this.isVisibleOnPos,
+    isCustom: isCustom ?? this.isCustom,
     sortOrder: sortOrder ?? this.sortOrder,
   );
   Product copyWithCompanion(ProductsCompanion data) {
@@ -2033,6 +2067,7 @@ class Product extends DataClass implements Insertable<Product> {
       isVisibleOnPos: data.isVisibleOnPos.present
           ? data.isVisibleOnPos.value
           : this.isVisibleOnPos,
+      isCustom: data.isCustom.present ? data.isCustom.value : this.isCustom,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
     );
   }
@@ -2049,6 +2084,7 @@ class Product extends DataClass implements Insertable<Product> {
           ..write('hasModifiers: $hasModifiers, ')
           ..write('isActive: $isActive, ')
           ..write('isVisibleOnPos: $isVisibleOnPos, ')
+          ..write('isCustom: $isCustom, ')
           ..write('sortOrder: $sortOrder')
           ..write(')'))
         .toString();
@@ -2065,6 +2101,7 @@ class Product extends DataClass implements Insertable<Product> {
     hasModifiers,
     isActive,
     isVisibleOnPos,
+    isCustom,
     sortOrder,
   );
   @override
@@ -2080,6 +2117,7 @@ class Product extends DataClass implements Insertable<Product> {
           other.hasModifiers == this.hasModifiers &&
           other.isActive == this.isActive &&
           other.isVisibleOnPos == this.isVisibleOnPos &&
+          other.isCustom == this.isCustom &&
           other.sortOrder == this.sortOrder);
 }
 
@@ -2093,6 +2131,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<bool> hasModifiers;
   final Value<bool> isActive;
   final Value<bool> isVisibleOnPos;
+  final Value<bool> isCustom;
   final Value<int> sortOrder;
   const ProductsCompanion({
     this.id = const Value.absent(),
@@ -2104,6 +2143,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.hasModifiers = const Value.absent(),
     this.isActive = const Value.absent(),
     this.isVisibleOnPos = const Value.absent(),
+    this.isCustom = const Value.absent(),
     this.sortOrder = const Value.absent(),
   });
   ProductsCompanion.insert({
@@ -2116,6 +2156,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.hasModifiers = const Value.absent(),
     this.isActive = const Value.absent(),
     this.isVisibleOnPos = const Value.absent(),
+    this.isCustom = const Value.absent(),
     this.sortOrder = const Value.absent(),
   }) : categoryId = Value(categoryId),
        name = Value(name),
@@ -2130,6 +2171,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<bool>? hasModifiers,
     Expression<bool>? isActive,
     Expression<bool>? isVisibleOnPos,
+    Expression<bool>? isCustom,
     Expression<int>? sortOrder,
   }) {
     return RawValuesInsertable({
@@ -2143,6 +2185,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (hasModifiers != null) 'has_modifiers': hasModifiers,
       if (isActive != null) 'is_active': isActive,
       if (isVisibleOnPos != null) 'is_visible_on_pos': isVisibleOnPos,
+      if (isCustom != null) 'is_custom': isCustom,
       if (sortOrder != null) 'sort_order': sortOrder,
     });
   }
@@ -2157,6 +2200,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Value<bool>? hasModifiers,
     Value<bool>? isActive,
     Value<bool>? isVisibleOnPos,
+    Value<bool>? isCustom,
     Value<int>? sortOrder,
   }) {
     return ProductsCompanion(
@@ -2170,6 +2214,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       hasModifiers: hasModifiers ?? this.hasModifiers,
       isActive: isActive ?? this.isActive,
       isVisibleOnPos: isVisibleOnPos ?? this.isVisibleOnPos,
+      isCustom: isCustom ?? this.isCustom,
       sortOrder: sortOrder ?? this.sortOrder,
     );
   }
@@ -2206,6 +2251,9 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     if (isVisibleOnPos.present) {
       map['is_visible_on_pos'] = Variable<bool>(isVisibleOnPos.value);
     }
+    if (isCustom.present) {
+      map['is_custom'] = Variable<bool>(isCustom.value);
+    }
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
     }
@@ -2224,6 +2272,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
           ..write('hasModifiers: $hasModifiers, ')
           ..write('isActive: $isActive, ')
           ..write('isVisibleOnPos: $isVisibleOnPos, ')
+          ..write('isCustom: $isCustom, ')
           ..write('sortOrder: $sortOrder')
           ..write(')'))
         .toString();
@@ -5830,6 +5879,17 @@ class $MenuSettingsTable extends MenuSettings
     requiredDuringInsert: false,
     defaultValue: const Constant(4),
   );
+  static const VerificationMeta _customSalesLimitMinorMeta =
+      const VerificationMeta('customSalesLimitMinor');
+  @override
+  late final GeneratedColumn<int> customSalesLimitMinor = GeneratedColumn<int>(
+    'custom_sales_limit_minor',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(kDefaultCustomSalesLimitMinor),
+  );
   static const VerificationMeta _updatedByMeta = const VerificationMeta(
     'updatedBy',
   );
@@ -5859,6 +5919,7 @@ class $MenuSettingsTable extends MenuSettings
     id,
     freeSwapLimit,
     maxSwaps,
+    customSalesLimitMinor,
     updatedBy,
     updatedAt,
   ];
@@ -5890,6 +5951,15 @@ class $MenuSettingsTable extends MenuSettings
       context.handle(
         _maxSwapsMeta,
         maxSwaps.isAcceptableOrUnknown(data['max_swaps']!, _maxSwapsMeta),
+      );
+    }
+    if (data.containsKey('custom_sales_limit_minor')) {
+      context.handle(
+        _customSalesLimitMinorMeta,
+        customSalesLimitMinor.isAcceptableOrUnknown(
+          data['custom_sales_limit_minor']!,
+          _customSalesLimitMinorMeta,
+        ),
       );
     }
     if (data.containsKey('updated_by')) {
@@ -5925,6 +5995,10 @@ class $MenuSettingsTable extends MenuSettings
         DriftSqlType.int,
         data['${effectivePrefix}max_swaps'],
       )!,
+      customSalesLimitMinor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}custom_sales_limit_minor'],
+      )!,
       updatedBy: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}updated_by'],
@@ -5946,12 +6020,14 @@ class MenuSetting extends DataClass implements Insertable<MenuSetting> {
   final int id;
   final int freeSwapLimit;
   final int maxSwaps;
+  final int customSalesLimitMinor;
   final int? updatedBy;
   final DateTime updatedAt;
   const MenuSetting({
     required this.id,
     required this.freeSwapLimit,
     required this.maxSwaps,
+    required this.customSalesLimitMinor,
     this.updatedBy,
     required this.updatedAt,
   });
@@ -5961,6 +6037,7 @@ class MenuSetting extends DataClass implements Insertable<MenuSetting> {
     map['id'] = Variable<int>(id);
     map['free_swap_limit'] = Variable<int>(freeSwapLimit);
     map['max_swaps'] = Variable<int>(maxSwaps);
+    map['custom_sales_limit_minor'] = Variable<int>(customSalesLimitMinor);
     if (!nullToAbsent || updatedBy != null) {
       map['updated_by'] = Variable<int>(updatedBy);
     }
@@ -5973,6 +6050,7 @@ class MenuSetting extends DataClass implements Insertable<MenuSetting> {
       id: Value(id),
       freeSwapLimit: Value(freeSwapLimit),
       maxSwaps: Value(maxSwaps),
+      customSalesLimitMinor: Value(customSalesLimitMinor),
       updatedBy: updatedBy == null && nullToAbsent
           ? const Value.absent()
           : Value(updatedBy),
@@ -5989,6 +6067,9 @@ class MenuSetting extends DataClass implements Insertable<MenuSetting> {
       id: serializer.fromJson<int>(json['id']),
       freeSwapLimit: serializer.fromJson<int>(json['freeSwapLimit']),
       maxSwaps: serializer.fromJson<int>(json['maxSwaps']),
+      customSalesLimitMinor: serializer.fromJson<int>(
+        json['customSalesLimitMinor'],
+      ),
       updatedBy: serializer.fromJson<int?>(json['updatedBy']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -6000,6 +6081,7 @@ class MenuSetting extends DataClass implements Insertable<MenuSetting> {
       'id': serializer.toJson<int>(id),
       'freeSwapLimit': serializer.toJson<int>(freeSwapLimit),
       'maxSwaps': serializer.toJson<int>(maxSwaps),
+      'customSalesLimitMinor': serializer.toJson<int>(customSalesLimitMinor),
       'updatedBy': serializer.toJson<int?>(updatedBy),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -6009,12 +6091,14 @@ class MenuSetting extends DataClass implements Insertable<MenuSetting> {
     int? id,
     int? freeSwapLimit,
     int? maxSwaps,
+    int? customSalesLimitMinor,
     Value<int?> updatedBy = const Value.absent(),
     DateTime? updatedAt,
   }) => MenuSetting(
     id: id ?? this.id,
     freeSwapLimit: freeSwapLimit ?? this.freeSwapLimit,
     maxSwaps: maxSwaps ?? this.maxSwaps,
+    customSalesLimitMinor: customSalesLimitMinor ?? this.customSalesLimitMinor,
     updatedBy: updatedBy.present ? updatedBy.value : this.updatedBy,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -6025,6 +6109,9 @@ class MenuSetting extends DataClass implements Insertable<MenuSetting> {
           ? data.freeSwapLimit.value
           : this.freeSwapLimit,
       maxSwaps: data.maxSwaps.present ? data.maxSwaps.value : this.maxSwaps,
+      customSalesLimitMinor: data.customSalesLimitMinor.present
+          ? data.customSalesLimitMinor.value
+          : this.customSalesLimitMinor,
       updatedBy: data.updatedBy.present ? data.updatedBy.value : this.updatedBy,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -6036,6 +6123,7 @@ class MenuSetting extends DataClass implements Insertable<MenuSetting> {
           ..write('id: $id, ')
           ..write('freeSwapLimit: $freeSwapLimit, ')
           ..write('maxSwaps: $maxSwaps, ')
+          ..write('customSalesLimitMinor: $customSalesLimitMinor, ')
           ..write('updatedBy: $updatedBy, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -6043,8 +6131,14 @@ class MenuSetting extends DataClass implements Insertable<MenuSetting> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, freeSwapLimit, maxSwaps, updatedBy, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    freeSwapLimit,
+    maxSwaps,
+    customSalesLimitMinor,
+    updatedBy,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -6052,6 +6146,7 @@ class MenuSetting extends DataClass implements Insertable<MenuSetting> {
           other.id == this.id &&
           other.freeSwapLimit == this.freeSwapLimit &&
           other.maxSwaps == this.maxSwaps &&
+          other.customSalesLimitMinor == this.customSalesLimitMinor &&
           other.updatedBy == this.updatedBy &&
           other.updatedAt == this.updatedAt);
 }
@@ -6060,12 +6155,14 @@ class MenuSettingsCompanion extends UpdateCompanion<MenuSetting> {
   final Value<int> id;
   final Value<int> freeSwapLimit;
   final Value<int> maxSwaps;
+  final Value<int> customSalesLimitMinor;
   final Value<int?> updatedBy;
   final Value<DateTime> updatedAt;
   const MenuSettingsCompanion({
     this.id = const Value.absent(),
     this.freeSwapLimit = const Value.absent(),
     this.maxSwaps = const Value.absent(),
+    this.customSalesLimitMinor = const Value.absent(),
     this.updatedBy = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -6073,6 +6170,7 @@ class MenuSettingsCompanion extends UpdateCompanion<MenuSetting> {
     this.id = const Value.absent(),
     this.freeSwapLimit = const Value.absent(),
     this.maxSwaps = const Value.absent(),
+    this.customSalesLimitMinor = const Value.absent(),
     this.updatedBy = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -6080,6 +6178,7 @@ class MenuSettingsCompanion extends UpdateCompanion<MenuSetting> {
     Expression<int>? id,
     Expression<int>? freeSwapLimit,
     Expression<int>? maxSwaps,
+    Expression<int>? customSalesLimitMinor,
     Expression<int>? updatedBy,
     Expression<DateTime>? updatedAt,
   }) {
@@ -6087,6 +6186,8 @@ class MenuSettingsCompanion extends UpdateCompanion<MenuSetting> {
       if (id != null) 'id': id,
       if (freeSwapLimit != null) 'free_swap_limit': freeSwapLimit,
       if (maxSwaps != null) 'max_swaps': maxSwaps,
+      if (customSalesLimitMinor != null)
+        'custom_sales_limit_minor': customSalesLimitMinor,
       if (updatedBy != null) 'updated_by': updatedBy,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -6096,6 +6197,7 @@ class MenuSettingsCompanion extends UpdateCompanion<MenuSetting> {
     Value<int>? id,
     Value<int>? freeSwapLimit,
     Value<int>? maxSwaps,
+    Value<int>? customSalesLimitMinor,
     Value<int?>? updatedBy,
     Value<DateTime>? updatedAt,
   }) {
@@ -6103,6 +6205,8 @@ class MenuSettingsCompanion extends UpdateCompanion<MenuSetting> {
       id: id ?? this.id,
       freeSwapLimit: freeSwapLimit ?? this.freeSwapLimit,
       maxSwaps: maxSwaps ?? this.maxSwaps,
+      customSalesLimitMinor:
+          customSalesLimitMinor ?? this.customSalesLimitMinor,
       updatedBy: updatedBy ?? this.updatedBy,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -6120,6 +6224,11 @@ class MenuSettingsCompanion extends UpdateCompanion<MenuSetting> {
     if (maxSwaps.present) {
       map['max_swaps'] = Variable<int>(maxSwaps.value);
     }
+    if (customSalesLimitMinor.present) {
+      map['custom_sales_limit_minor'] = Variable<int>(
+        customSalesLimitMinor.value,
+      );
+    }
     if (updatedBy.present) {
       map['updated_by'] = Variable<int>(updatedBy.value);
     }
@@ -6135,6 +6244,7 @@ class MenuSettingsCompanion extends UpdateCompanion<MenuSetting> {
           ..write('id: $id, ')
           ..write('freeSwapLimit: $freeSwapLimit, ')
           ..write('maxSwaps: $maxSwaps, ')
+          ..write('customSalesLimitMinor: $customSalesLimitMinor, ')
           ..write('updatedBy: $updatedBy, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -8246,6 +8356,62 @@ class $TransactionsTable extends Transactions
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _discountTypeMeta = const VerificationMeta(
+    'discountType',
+  );
+  @override
+  late final GeneratedColumn<String> discountType = GeneratedColumn<String>(
+    'discount_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _discountValueMinorMeta =
+      const VerificationMeta('discountValueMinor');
+  @override
+  late final GeneratedColumn<int> discountValueMinor = GeneratedColumn<int>(
+    'discount_value_minor',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _discountAmountMinorMeta =
+      const VerificationMeta('discountAmountMinor');
+  @override
+  late final GeneratedColumn<int> discountAmountMinor = GeneratedColumn<int>(
+    'discount_amount_minor',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _discountReasonMeta = const VerificationMeta(
+    'discountReason',
+  );
+  @override
+  late final GeneratedColumn<String> discountReason = GeneratedColumn<String>(
+    'discount_reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _discountAppliedByMeta = const VerificationMeta(
+    'discountAppliedBy',
+  );
+  @override
+  late final GeneratedColumn<int> discountAppliedBy = GeneratedColumn<int>(
+    'discount_applied_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'REFERENCES "users" ("id")',
+  );
   static const VerificationMeta _totalAmountMinorMeta = const VerificationMeta(
     'totalAmountMinor',
   );
@@ -8365,6 +8531,11 @@ class $TransactionsTable extends Transactions
     status,
     subtotalMinor,
     modifierTotalMinor,
+    discountType,
+    discountValueMinor,
+    discountAmountMinor,
+    discountReason,
+    discountAppliedBy,
     totalAmountMinor,
     createdAt,
     paidAt,
@@ -8444,6 +8615,51 @@ class $TransactionsTable extends Transactions
         modifierTotalMinor.isAcceptableOrUnknown(
           data['modifier_total_minor']!,
           _modifierTotalMinorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('discount_type')) {
+      context.handle(
+        _discountTypeMeta,
+        discountType.isAcceptableOrUnknown(
+          data['discount_type']!,
+          _discountTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('discount_value_minor')) {
+      context.handle(
+        _discountValueMinorMeta,
+        discountValueMinor.isAcceptableOrUnknown(
+          data['discount_value_minor']!,
+          _discountValueMinorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('discount_amount_minor')) {
+      context.handle(
+        _discountAmountMinorMeta,
+        discountAmountMinor.isAcceptableOrUnknown(
+          data['discount_amount_minor']!,
+          _discountAmountMinorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('discount_reason')) {
+      context.handle(
+        _discountReasonMeta,
+        discountReason.isAcceptableOrUnknown(
+          data['discount_reason']!,
+          _discountReasonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('discount_applied_by')) {
+      context.handle(
+        _discountAppliedByMeta,
+        discountAppliedBy.isAcceptableOrUnknown(
+          data['discount_applied_by']!,
+          _discountAppliedByMeta,
         ),
       );
     }
@@ -8564,6 +8780,26 @@ class $TransactionsTable extends Transactions
         DriftSqlType.int,
         data['${effectivePrefix}modifier_total_minor'],
       )!,
+      discountType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}discount_type'],
+      ),
+      discountValueMinor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}discount_value_minor'],
+      )!,
+      discountAmountMinor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}discount_amount_minor'],
+      )!,
+      discountReason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}discount_reason'],
+      ),
+      discountAppliedBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}discount_applied_by'],
+      ),
       totalAmountMinor: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}total_amount_minor'],
@@ -8618,6 +8854,11 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   final String status;
   final int subtotalMinor;
   final int modifierTotalMinor;
+  final String? discountType;
+  final int discountValueMinor;
+  final int discountAmountMinor;
+  final String? discountReason;
+  final int? discountAppliedBy;
   final int totalAmountMinor;
   final DateTime createdAt;
   final DateTime? paidAt;
@@ -8636,6 +8877,11 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     required this.status,
     required this.subtotalMinor,
     required this.modifierTotalMinor,
+    this.discountType,
+    required this.discountValueMinor,
+    required this.discountAmountMinor,
+    this.discountReason,
+    this.discountAppliedBy,
     required this.totalAmountMinor,
     required this.createdAt,
     this.paidAt,
@@ -8659,6 +8905,17 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     map['status'] = Variable<String>(status);
     map['subtotal_minor'] = Variable<int>(subtotalMinor);
     map['modifier_total_minor'] = Variable<int>(modifierTotalMinor);
+    if (!nullToAbsent || discountType != null) {
+      map['discount_type'] = Variable<String>(discountType);
+    }
+    map['discount_value_minor'] = Variable<int>(discountValueMinor);
+    map['discount_amount_minor'] = Variable<int>(discountAmountMinor);
+    if (!nullToAbsent || discountReason != null) {
+      map['discount_reason'] = Variable<String>(discountReason);
+    }
+    if (!nullToAbsent || discountAppliedBy != null) {
+      map['discount_applied_by'] = Variable<int>(discountAppliedBy);
+    }
     map['total_amount_minor'] = Variable<int>(totalAmountMinor);
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || paidAt != null) {
@@ -8689,6 +8946,17 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       status: Value(status),
       subtotalMinor: Value(subtotalMinor),
       modifierTotalMinor: Value(modifierTotalMinor),
+      discountType: discountType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(discountType),
+      discountValueMinor: Value(discountValueMinor),
+      discountAmountMinor: Value(discountAmountMinor),
+      discountReason: discountReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(discountReason),
+      discountAppliedBy: discountAppliedBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(discountAppliedBy),
       totalAmountMinor: Value(totalAmountMinor),
       createdAt: Value(createdAt),
       paidAt: paidAt == null && nullToAbsent
@@ -8721,6 +8989,13 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       status: serializer.fromJson<String>(json['status']),
       subtotalMinor: serializer.fromJson<int>(json['subtotalMinor']),
       modifierTotalMinor: serializer.fromJson<int>(json['modifierTotalMinor']),
+      discountType: serializer.fromJson<String?>(json['discountType']),
+      discountValueMinor: serializer.fromJson<int>(json['discountValueMinor']),
+      discountAmountMinor: serializer.fromJson<int>(
+        json['discountAmountMinor'],
+      ),
+      discountReason: serializer.fromJson<String?>(json['discountReason']),
+      discountAppliedBy: serializer.fromJson<int?>(json['discountAppliedBy']),
       totalAmountMinor: serializer.fromJson<int>(json['totalAmountMinor']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       paidAt: serializer.fromJson<DateTime?>(json['paidAt']),
@@ -8744,6 +9019,11 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       'status': serializer.toJson<String>(status),
       'subtotalMinor': serializer.toJson<int>(subtotalMinor),
       'modifierTotalMinor': serializer.toJson<int>(modifierTotalMinor),
+      'discountType': serializer.toJson<String?>(discountType),
+      'discountValueMinor': serializer.toJson<int>(discountValueMinor),
+      'discountAmountMinor': serializer.toJson<int>(discountAmountMinor),
+      'discountReason': serializer.toJson<String?>(discountReason),
+      'discountAppliedBy': serializer.toJson<int?>(discountAppliedBy),
       'totalAmountMinor': serializer.toJson<int>(totalAmountMinor),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'paidAt': serializer.toJson<DateTime?>(paidAt),
@@ -8765,6 +9045,11 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     String? status,
     int? subtotalMinor,
     int? modifierTotalMinor,
+    Value<String?> discountType = const Value.absent(),
+    int? discountValueMinor,
+    int? discountAmountMinor,
+    Value<String?> discountReason = const Value.absent(),
+    Value<int?> discountAppliedBy = const Value.absent(),
     int? totalAmountMinor,
     DateTime? createdAt,
     Value<DateTime?> paidAt = const Value.absent(),
@@ -8783,6 +9068,15 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     status: status ?? this.status,
     subtotalMinor: subtotalMinor ?? this.subtotalMinor,
     modifierTotalMinor: modifierTotalMinor ?? this.modifierTotalMinor,
+    discountType: discountType.present ? discountType.value : this.discountType,
+    discountValueMinor: discountValueMinor ?? this.discountValueMinor,
+    discountAmountMinor: discountAmountMinor ?? this.discountAmountMinor,
+    discountReason: discountReason.present
+        ? discountReason.value
+        : this.discountReason,
+    discountAppliedBy: discountAppliedBy.present
+        ? discountAppliedBy.value
+        : this.discountAppliedBy,
     totalAmountMinor: totalAmountMinor ?? this.totalAmountMinor,
     createdAt: createdAt ?? this.createdAt,
     paidAt: paidAt.present ? paidAt.value : this.paidAt,
@@ -8809,6 +9103,21 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       modifierTotalMinor: data.modifierTotalMinor.present
           ? data.modifierTotalMinor.value
           : this.modifierTotalMinor,
+      discountType: data.discountType.present
+          ? data.discountType.value
+          : this.discountType,
+      discountValueMinor: data.discountValueMinor.present
+          ? data.discountValueMinor.value
+          : this.discountValueMinor,
+      discountAmountMinor: data.discountAmountMinor.present
+          ? data.discountAmountMinor.value
+          : this.discountAmountMinor,
+      discountReason: data.discountReason.present
+          ? data.discountReason.value
+          : this.discountReason,
+      discountAppliedBy: data.discountAppliedBy.present
+          ? data.discountAppliedBy.value
+          : this.discountAppliedBy,
       totalAmountMinor: data.totalAmountMinor.present
           ? data.totalAmountMinor.value
           : this.totalAmountMinor,
@@ -8844,6 +9153,11 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           ..write('status: $status, ')
           ..write('subtotalMinor: $subtotalMinor, ')
           ..write('modifierTotalMinor: $modifierTotalMinor, ')
+          ..write('discountType: $discountType, ')
+          ..write('discountValueMinor: $discountValueMinor, ')
+          ..write('discountAmountMinor: $discountAmountMinor, ')
+          ..write('discountReason: $discountReason, ')
+          ..write('discountAppliedBy: $discountAppliedBy, ')
           ..write('totalAmountMinor: $totalAmountMinor, ')
           ..write('createdAt: $createdAt, ')
           ..write('paidAt: $paidAt, ')
@@ -8858,7 +9172,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     uuid,
     shiftId,
@@ -8867,6 +9181,11 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     status,
     subtotalMinor,
     modifierTotalMinor,
+    discountType,
+    discountValueMinor,
+    discountAmountMinor,
+    discountReason,
+    discountAppliedBy,
     totalAmountMinor,
     createdAt,
     paidAt,
@@ -8876,7 +9195,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     idempotencyKey,
     kitchenPrinted,
     receiptPrinted,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -8889,6 +9208,11 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           other.status == this.status &&
           other.subtotalMinor == this.subtotalMinor &&
           other.modifierTotalMinor == this.modifierTotalMinor &&
+          other.discountType == this.discountType &&
+          other.discountValueMinor == this.discountValueMinor &&
+          other.discountAmountMinor == this.discountAmountMinor &&
+          other.discountReason == this.discountReason &&
+          other.discountAppliedBy == this.discountAppliedBy &&
           other.totalAmountMinor == this.totalAmountMinor &&
           other.createdAt == this.createdAt &&
           other.paidAt == this.paidAt &&
@@ -8909,6 +9233,11 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   final Value<String> status;
   final Value<int> subtotalMinor;
   final Value<int> modifierTotalMinor;
+  final Value<String?> discountType;
+  final Value<int> discountValueMinor;
+  final Value<int> discountAmountMinor;
+  final Value<String?> discountReason;
+  final Value<int?> discountAppliedBy;
   final Value<int> totalAmountMinor;
   final Value<DateTime> createdAt;
   final Value<DateTime?> paidAt;
@@ -8927,6 +9256,11 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     this.status = const Value.absent(),
     this.subtotalMinor = const Value.absent(),
     this.modifierTotalMinor = const Value.absent(),
+    this.discountType = const Value.absent(),
+    this.discountValueMinor = const Value.absent(),
+    this.discountAmountMinor = const Value.absent(),
+    this.discountReason = const Value.absent(),
+    this.discountAppliedBy = const Value.absent(),
     this.totalAmountMinor = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.paidAt = const Value.absent(),
@@ -8946,6 +9280,11 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     this.status = const Value.absent(),
     this.subtotalMinor = const Value.absent(),
     this.modifierTotalMinor = const Value.absent(),
+    this.discountType = const Value.absent(),
+    this.discountValueMinor = const Value.absent(),
+    this.discountAmountMinor = const Value.absent(),
+    this.discountReason = const Value.absent(),
+    this.discountAppliedBy = const Value.absent(),
     this.totalAmountMinor = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.paidAt = const Value.absent(),
@@ -8969,6 +9308,11 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     Expression<String>? status,
     Expression<int>? subtotalMinor,
     Expression<int>? modifierTotalMinor,
+    Expression<String>? discountType,
+    Expression<int>? discountValueMinor,
+    Expression<int>? discountAmountMinor,
+    Expression<String>? discountReason,
+    Expression<int>? discountAppliedBy,
     Expression<int>? totalAmountMinor,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? paidAt,
@@ -8989,6 +9333,13 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       if (subtotalMinor != null) 'subtotal_minor': subtotalMinor,
       if (modifierTotalMinor != null)
         'modifier_total_minor': modifierTotalMinor,
+      if (discountType != null) 'discount_type': discountType,
+      if (discountValueMinor != null)
+        'discount_value_minor': discountValueMinor,
+      if (discountAmountMinor != null)
+        'discount_amount_minor': discountAmountMinor,
+      if (discountReason != null) 'discount_reason': discountReason,
+      if (discountAppliedBy != null) 'discount_applied_by': discountAppliedBy,
       if (totalAmountMinor != null) 'total_amount_minor': totalAmountMinor,
       if (createdAt != null) 'created_at': createdAt,
       if (paidAt != null) 'paid_at': paidAt,
@@ -9010,6 +9361,11 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     Value<String>? status,
     Value<int>? subtotalMinor,
     Value<int>? modifierTotalMinor,
+    Value<String?>? discountType,
+    Value<int>? discountValueMinor,
+    Value<int>? discountAmountMinor,
+    Value<String?>? discountReason,
+    Value<int?>? discountAppliedBy,
     Value<int>? totalAmountMinor,
     Value<DateTime>? createdAt,
     Value<DateTime?>? paidAt,
@@ -9029,6 +9385,11 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       status: status ?? this.status,
       subtotalMinor: subtotalMinor ?? this.subtotalMinor,
       modifierTotalMinor: modifierTotalMinor ?? this.modifierTotalMinor,
+      discountType: discountType ?? this.discountType,
+      discountValueMinor: discountValueMinor ?? this.discountValueMinor,
+      discountAmountMinor: discountAmountMinor ?? this.discountAmountMinor,
+      discountReason: discountReason ?? this.discountReason,
+      discountAppliedBy: discountAppliedBy ?? this.discountAppliedBy,
       totalAmountMinor: totalAmountMinor ?? this.totalAmountMinor,
       createdAt: createdAt ?? this.createdAt,
       paidAt: paidAt ?? this.paidAt,
@@ -9067,6 +9428,21 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     }
     if (modifierTotalMinor.present) {
       map['modifier_total_minor'] = Variable<int>(modifierTotalMinor.value);
+    }
+    if (discountType.present) {
+      map['discount_type'] = Variable<String>(discountType.value);
+    }
+    if (discountValueMinor.present) {
+      map['discount_value_minor'] = Variable<int>(discountValueMinor.value);
+    }
+    if (discountAmountMinor.present) {
+      map['discount_amount_minor'] = Variable<int>(discountAmountMinor.value);
+    }
+    if (discountReason.present) {
+      map['discount_reason'] = Variable<String>(discountReason.value);
+    }
+    if (discountAppliedBy.present) {
+      map['discount_applied_by'] = Variable<int>(discountAppliedBy.value);
     }
     if (totalAmountMinor.present) {
       map['total_amount_minor'] = Variable<int>(totalAmountMinor.value);
@@ -9109,6 +9485,11 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
           ..write('status: $status, ')
           ..write('subtotalMinor: $subtotalMinor, ')
           ..write('modifierTotalMinor: $modifierTotalMinor, ')
+          ..write('discountType: $discountType, ')
+          ..write('discountValueMinor: $discountValueMinor, ')
+          ..write('discountAmountMinor: $discountAmountMinor, ')
+          ..write('discountReason: $discountReason, ')
+          ..write('discountAppliedBy: $discountAppliedBy, ')
           ..write('totalAmountMinor: $totalAmountMinor, ')
           ..write('createdAt: $createdAt, ')
           ..write('paidAt: $paidAt, ')
@@ -9245,6 +9626,40 @@ class $TransactionLinesTable extends TransactionLines
         requiredDuringInsert: false,
         defaultValue: const Constant(0),
       );
+  static const VerificationMeta _customNoteMeta = const VerificationMeta(
+    'customNote',
+  );
+  @override
+  late final GeneratedColumn<String> customNote = GeneratedColumn<String>(
+    'custom_note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdByUserIdMeta = const VerificationMeta(
+    'createdByUserId',
+  );
+  @override
+  late final GeneratedColumn<int> createdByUserId = GeneratedColumn<int>(
+    'created_by_user_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'REFERENCES "users" ("id")',
+  );
+  static const VerificationMeta _adminOverrideUserIdMeta =
+      const VerificationMeta('adminOverrideUserId');
+  @override
+  late final GeneratedColumn<int> adminOverrideUserId = GeneratedColumn<int>(
+    'admin_override_user_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'REFERENCES "users" ("id")',
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -9257,6 +9672,9 @@ class $TransactionLinesTable extends TransactionLines
     lineTotalMinor,
     pricingMode,
     removalDiscountTotalMinor,
+    customNote,
+    createdByUserId,
+    adminOverrideUserId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -9357,6 +9775,30 @@ class $TransactionLinesTable extends TransactionLines
         ),
       );
     }
+    if (data.containsKey('custom_note')) {
+      context.handle(
+        _customNoteMeta,
+        customNote.isAcceptableOrUnknown(data['custom_note']!, _customNoteMeta),
+      );
+    }
+    if (data.containsKey('created_by_user_id')) {
+      context.handle(
+        _createdByUserIdMeta,
+        createdByUserId.isAcceptableOrUnknown(
+          data['created_by_user_id']!,
+          _createdByUserIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('admin_override_user_id')) {
+      context.handle(
+        _adminOverrideUserIdMeta,
+        adminOverrideUserId.isAcceptableOrUnknown(
+          data['admin_override_user_id']!,
+          _adminOverrideUserIdMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -9406,6 +9848,18 @@ class $TransactionLinesTable extends TransactionLines
         DriftSqlType.int,
         data['${effectivePrefix}removal_discount_total_minor'],
       )!,
+      customNote: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}custom_note'],
+      ),
+      createdByUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_by_user_id'],
+      ),
+      adminOverrideUserId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}admin_override_user_id'],
+      ),
     );
   }
 
@@ -9426,6 +9880,9 @@ class TransactionLine extends DataClass implements Insertable<TransactionLine> {
   final int lineTotalMinor;
   final String pricingMode;
   final int removalDiscountTotalMinor;
+  final String? customNote;
+  final int? createdByUserId;
+  final int? adminOverrideUserId;
   const TransactionLine({
     required this.id,
     required this.uuid,
@@ -9437,6 +9894,9 @@ class TransactionLine extends DataClass implements Insertable<TransactionLine> {
     required this.lineTotalMinor,
     required this.pricingMode,
     required this.removalDiscountTotalMinor,
+    this.customNote,
+    this.createdByUserId,
+    this.adminOverrideUserId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -9453,6 +9913,15 @@ class TransactionLine extends DataClass implements Insertable<TransactionLine> {
     map['removal_discount_total_minor'] = Variable<int>(
       removalDiscountTotalMinor,
     );
+    if (!nullToAbsent || customNote != null) {
+      map['custom_note'] = Variable<String>(customNote);
+    }
+    if (!nullToAbsent || createdByUserId != null) {
+      map['created_by_user_id'] = Variable<int>(createdByUserId);
+    }
+    if (!nullToAbsent || adminOverrideUserId != null) {
+      map['admin_override_user_id'] = Variable<int>(adminOverrideUserId);
+    }
     return map;
   }
 
@@ -9468,6 +9937,15 @@ class TransactionLine extends DataClass implements Insertable<TransactionLine> {
       lineTotalMinor: Value(lineTotalMinor),
       pricingMode: Value(pricingMode),
       removalDiscountTotalMinor: Value(removalDiscountTotalMinor),
+      customNote: customNote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customNote),
+      createdByUserId: createdByUserId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdByUserId),
+      adminOverrideUserId: adminOverrideUserId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(adminOverrideUserId),
     );
   }
 
@@ -9489,6 +9967,11 @@ class TransactionLine extends DataClass implements Insertable<TransactionLine> {
       removalDiscountTotalMinor: serializer.fromJson<int>(
         json['removalDiscountTotalMinor'],
       ),
+      customNote: serializer.fromJson<String?>(json['customNote']),
+      createdByUserId: serializer.fromJson<int?>(json['createdByUserId']),
+      adminOverrideUserId: serializer.fromJson<int?>(
+        json['adminOverrideUserId'],
+      ),
     );
   }
   @override
@@ -9507,6 +9990,9 @@ class TransactionLine extends DataClass implements Insertable<TransactionLine> {
       'removalDiscountTotalMinor': serializer.toJson<int>(
         removalDiscountTotalMinor,
       ),
+      'customNote': serializer.toJson<String?>(customNote),
+      'createdByUserId': serializer.toJson<int?>(createdByUserId),
+      'adminOverrideUserId': serializer.toJson<int?>(adminOverrideUserId),
     };
   }
 
@@ -9521,6 +10007,9 @@ class TransactionLine extends DataClass implements Insertable<TransactionLine> {
     int? lineTotalMinor,
     String? pricingMode,
     int? removalDiscountTotalMinor,
+    Value<String?> customNote = const Value.absent(),
+    Value<int?> createdByUserId = const Value.absent(),
+    Value<int?> adminOverrideUserId = const Value.absent(),
   }) => TransactionLine(
     id: id ?? this.id,
     uuid: uuid ?? this.uuid,
@@ -9533,6 +10022,13 @@ class TransactionLine extends DataClass implements Insertable<TransactionLine> {
     pricingMode: pricingMode ?? this.pricingMode,
     removalDiscountTotalMinor:
         removalDiscountTotalMinor ?? this.removalDiscountTotalMinor,
+    customNote: customNote.present ? customNote.value : this.customNote,
+    createdByUserId: createdByUserId.present
+        ? createdByUserId.value
+        : this.createdByUserId,
+    adminOverrideUserId: adminOverrideUserId.present
+        ? adminOverrideUserId.value
+        : this.adminOverrideUserId,
   );
   TransactionLine copyWithCompanion(TransactionLinesCompanion data) {
     return TransactionLine(
@@ -9558,6 +10054,15 @@ class TransactionLine extends DataClass implements Insertable<TransactionLine> {
       removalDiscountTotalMinor: data.removalDiscountTotalMinor.present
           ? data.removalDiscountTotalMinor.value
           : this.removalDiscountTotalMinor,
+      customNote: data.customNote.present
+          ? data.customNote.value
+          : this.customNote,
+      createdByUserId: data.createdByUserId.present
+          ? data.createdByUserId.value
+          : this.createdByUserId,
+      adminOverrideUserId: data.adminOverrideUserId.present
+          ? data.adminOverrideUserId.value
+          : this.adminOverrideUserId,
     );
   }
 
@@ -9573,7 +10078,10 @@ class TransactionLine extends DataClass implements Insertable<TransactionLine> {
           ..write('quantity: $quantity, ')
           ..write('lineTotalMinor: $lineTotalMinor, ')
           ..write('pricingMode: $pricingMode, ')
-          ..write('removalDiscountTotalMinor: $removalDiscountTotalMinor')
+          ..write('removalDiscountTotalMinor: $removalDiscountTotalMinor, ')
+          ..write('customNote: $customNote, ')
+          ..write('createdByUserId: $createdByUserId, ')
+          ..write('adminOverrideUserId: $adminOverrideUserId')
           ..write(')'))
         .toString();
   }
@@ -9590,6 +10098,9 @@ class TransactionLine extends DataClass implements Insertable<TransactionLine> {
     lineTotalMinor,
     pricingMode,
     removalDiscountTotalMinor,
+    customNote,
+    createdByUserId,
+    adminOverrideUserId,
   );
   @override
   bool operator ==(Object other) =>
@@ -9604,7 +10115,10 @@ class TransactionLine extends DataClass implements Insertable<TransactionLine> {
           other.quantity == this.quantity &&
           other.lineTotalMinor == this.lineTotalMinor &&
           other.pricingMode == this.pricingMode &&
-          other.removalDiscountTotalMinor == this.removalDiscountTotalMinor);
+          other.removalDiscountTotalMinor == this.removalDiscountTotalMinor &&
+          other.customNote == this.customNote &&
+          other.createdByUserId == this.createdByUserId &&
+          other.adminOverrideUserId == this.adminOverrideUserId);
 }
 
 class TransactionLinesCompanion extends UpdateCompanion<TransactionLine> {
@@ -9618,6 +10132,9 @@ class TransactionLinesCompanion extends UpdateCompanion<TransactionLine> {
   final Value<int> lineTotalMinor;
   final Value<String> pricingMode;
   final Value<int> removalDiscountTotalMinor;
+  final Value<String?> customNote;
+  final Value<int?> createdByUserId;
+  final Value<int?> adminOverrideUserId;
   const TransactionLinesCompanion({
     this.id = const Value.absent(),
     this.uuid = const Value.absent(),
@@ -9629,6 +10146,9 @@ class TransactionLinesCompanion extends UpdateCompanion<TransactionLine> {
     this.lineTotalMinor = const Value.absent(),
     this.pricingMode = const Value.absent(),
     this.removalDiscountTotalMinor = const Value.absent(),
+    this.customNote = const Value.absent(),
+    this.createdByUserId = const Value.absent(),
+    this.adminOverrideUserId = const Value.absent(),
   });
   TransactionLinesCompanion.insert({
     this.id = const Value.absent(),
@@ -9641,6 +10161,9 @@ class TransactionLinesCompanion extends UpdateCompanion<TransactionLine> {
     required int lineTotalMinor,
     this.pricingMode = const Value.absent(),
     this.removalDiscountTotalMinor = const Value.absent(),
+    this.customNote = const Value.absent(),
+    this.createdByUserId = const Value.absent(),
+    this.adminOverrideUserId = const Value.absent(),
   }) : uuid = Value(uuid),
        transactionId = Value(transactionId),
        productId = Value(productId),
@@ -9658,6 +10181,9 @@ class TransactionLinesCompanion extends UpdateCompanion<TransactionLine> {
     Expression<int>? lineTotalMinor,
     Expression<String>? pricingMode,
     Expression<int>? removalDiscountTotalMinor,
+    Expression<String>? customNote,
+    Expression<int>? createdByUserId,
+    Expression<int>? adminOverrideUserId,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -9671,6 +10197,10 @@ class TransactionLinesCompanion extends UpdateCompanion<TransactionLine> {
       if (pricingMode != null) 'pricing_mode': pricingMode,
       if (removalDiscountTotalMinor != null)
         'removal_discount_total_minor': removalDiscountTotalMinor,
+      if (customNote != null) 'custom_note': customNote,
+      if (createdByUserId != null) 'created_by_user_id': createdByUserId,
+      if (adminOverrideUserId != null)
+        'admin_override_user_id': adminOverrideUserId,
     });
   }
 
@@ -9685,6 +10215,9 @@ class TransactionLinesCompanion extends UpdateCompanion<TransactionLine> {
     Value<int>? lineTotalMinor,
     Value<String>? pricingMode,
     Value<int>? removalDiscountTotalMinor,
+    Value<String?>? customNote,
+    Value<int?>? createdByUserId,
+    Value<int?>? adminOverrideUserId,
   }) {
     return TransactionLinesCompanion(
       id: id ?? this.id,
@@ -9698,6 +10231,9 @@ class TransactionLinesCompanion extends UpdateCompanion<TransactionLine> {
       pricingMode: pricingMode ?? this.pricingMode,
       removalDiscountTotalMinor:
           removalDiscountTotalMinor ?? this.removalDiscountTotalMinor,
+      customNote: customNote ?? this.customNote,
+      createdByUserId: createdByUserId ?? this.createdByUserId,
+      adminOverrideUserId: adminOverrideUserId ?? this.adminOverrideUserId,
     );
   }
 
@@ -9736,6 +10272,15 @@ class TransactionLinesCompanion extends UpdateCompanion<TransactionLine> {
         removalDiscountTotalMinor.value,
       );
     }
+    if (customNote.present) {
+      map['custom_note'] = Variable<String>(customNote.value);
+    }
+    if (createdByUserId.present) {
+      map['created_by_user_id'] = Variable<int>(createdByUserId.value);
+    }
+    if (adminOverrideUserId.present) {
+      map['admin_override_user_id'] = Variable<int>(adminOverrideUserId.value);
+    }
     return map;
   }
 
@@ -9751,7 +10296,10 @@ class TransactionLinesCompanion extends UpdateCompanion<TransactionLine> {
           ..write('quantity: $quantity, ')
           ..write('lineTotalMinor: $lineTotalMinor, ')
           ..write('pricingMode: $pricingMode, ')
-          ..write('removalDiscountTotalMinor: $removalDiscountTotalMinor')
+          ..write('removalDiscountTotalMinor: $removalDiscountTotalMinor, ')
+          ..write('customNote: $customNote, ')
+          ..write('createdByUserId: $createdByUserId, ')
+          ..write('adminOverrideUserId: $adminOverrideUserId')
           ..write(')'))
         .toString();
   }
@@ -16361,6 +16909,30 @@ final class $$UsersTableReferences
   }
 
   static MultiTypedResultKey<$TransactionsTable, List<Transaction>>
+  _appliedDiscountTransactionsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.transactions,
+        aliasName: $_aliasNameGenerator(
+          db.users.id,
+          db.transactions.discountAppliedBy,
+        ),
+      );
+
+  $$TransactionsTableProcessedTableManager get appliedDiscountTransactions {
+    final manager = $$TransactionsTableTableManager(
+      $_db,
+      $_db.transactions,
+    ).filter((f) => f.discountAppliedBy.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _appliedDiscountTransactionsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$TransactionsTable, List<Transaction>>
   _cancelledTransactionsTable(_$AppDatabase db) =>
       MultiTypedResultKey.fromTable(
         db.transactions,
@@ -16645,6 +17217,31 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
       getCurrentColumn: (t) => t.id,
       referencedTable: $db.transactions,
       getReferencedColumn: (t) => t.userId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TransactionsTableFilterComposer(
+            $db: $db,
+            $table: $db.transactions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> appliedDiscountTransactions(
+    Expression<bool> Function($$TransactionsTableFilterComposer f) f,
+  ) {
+    final $$TransactionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.transactions,
+      getReferencedColumn: (t) => t.discountAppliedBy,
       builder:
           (
             joinBuilder, {
@@ -17013,6 +17610,31 @@ class $$UsersTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> appliedDiscountTransactions<T extends Object>(
+    Expression<T> Function($$TransactionsTableAnnotationComposer a) f,
+  ) {
+    final $$TransactionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.transactions,
+      getReferencedColumn: (t) => t.discountAppliedBy,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TransactionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.transactions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> cancelledTransactions<T extends Object>(
     Expression<T> Function($$TransactionsTableAnnotationComposer a) f,
   ) {
@@ -17185,6 +17807,7 @@ class $$UsersTableTableManager
             bool closedShifts,
             bool cashierPreviewedShifts,
             bool createdTransactions,
+            bool appliedDiscountTransactions,
             bool cancelledTransactions,
             bool paymentAdjustmentsRefs,
             bool shiftReconciliationsRefs,
@@ -17253,6 +17876,7 @@ class $$UsersTableTableManager
                 closedShifts = false,
                 cashierPreviewedShifts = false,
                 createdTransactions = false,
+                appliedDiscountTransactions = false,
                 cancelledTransactions = false,
                 paymentAdjustmentsRefs = false,
                 shiftReconciliationsRefs = false,
@@ -17268,6 +17892,7 @@ class $$UsersTableTableManager
                     if (closedShifts) db.shifts,
                     if (cashierPreviewedShifts) db.shifts,
                     if (createdTransactions) db.transactions,
+                    if (appliedDiscountTransactions) db.transactions,
                     if (cancelledTransactions) db.transactions,
                     if (paymentAdjustmentsRefs) db.paymentAdjustments,
                     if (shiftReconciliationsRefs) db.shiftReconciliations,
@@ -17368,6 +17993,27 @@ class $$UsersTableTableManager
                           referencedItemsForCurrentItem:
                               (item, referencedItems) => referencedItems.where(
                                 (e) => e.userId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (appliedDiscountTransactions)
+                        await $_getPrefetchedData<
+                          User,
+                          $UsersTable,
+                          Transaction
+                        >(
+                          currentTable: table,
+                          referencedTable: $$UsersTableReferences
+                              ._appliedDiscountTransactionsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$UsersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).appliedDiscountTransactions,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.discountAppliedBy == item.id,
                               ),
                           typedResults: items,
                         ),
@@ -17519,6 +18165,7 @@ typedef $$UsersTableProcessedTableManager =
         bool closedShifts,
         bool cashierPreviewedShifts,
         bool createdTransactions,
+        bool appliedDiscountTransactions,
         bool cancelledTransactions,
         bool paymentAdjustmentsRefs,
         bool shiftReconciliationsRefs,
@@ -18671,6 +19318,7 @@ typedef $$ProductsTableCreateCompanionBuilder =
       Value<bool> hasModifiers,
       Value<bool> isActive,
       Value<bool> isVisibleOnPos,
+      Value<bool> isCustom,
       Value<int> sortOrder,
     });
 typedef $$ProductsTableUpdateCompanionBuilder =
@@ -18684,6 +19332,7 @@ typedef $$ProductsTableUpdateCompanionBuilder =
       Value<bool> hasModifiers,
       Value<bool> isActive,
       Value<bool> isVisibleOnPos,
+      Value<bool> isCustom,
       Value<int> sortOrder,
     });
 
@@ -19101,6 +19750,11 @@ class $$ProductsTableFilterComposer
 
   ColumnFilters<bool> get isVisibleOnPos => $composableBuilder(
     column: $table.isVisibleOnPos,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isCustom => $composableBuilder(
+    column: $table.isCustom,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -19548,6 +20202,11 @@ class $$ProductsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isCustom => $composableBuilder(
+    column: $table.isCustom,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
     builder: (column) => ColumnOrderings(column),
@@ -19636,6 +20295,9 @@ class $$ProductsTableAnnotationComposer
     column: $table.isVisibleOnPos,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get isCustom =>
+      $composableBuilder(column: $table.isCustom, builder: (column) => column);
 
   GeneratedColumn<int> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
@@ -20088,6 +20750,7 @@ class $$ProductsTableTableManager
                 Value<bool> hasModifiers = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<bool> isVisibleOnPos = const Value.absent(),
+                Value<bool> isCustom = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
               }) => ProductsCompanion(
                 id: id,
@@ -20099,6 +20762,7 @@ class $$ProductsTableTableManager
                 hasModifiers: hasModifiers,
                 isActive: isActive,
                 isVisibleOnPos: isVisibleOnPos,
+                isCustom: isCustom,
                 sortOrder: sortOrder,
               ),
           createCompanionCallback:
@@ -20112,6 +20776,7 @@ class $$ProductsTableTableManager
                 Value<bool> hasModifiers = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<bool> isVisibleOnPos = const Value.absent(),
+                Value<bool> isCustom = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
               }) => ProductsCompanion.insert(
                 id: id,
@@ -20123,6 +20788,7 @@ class $$ProductsTableTableManager
                 hasModifiers: hasModifiers,
                 isActive: isActive,
                 isVisibleOnPos: isVisibleOnPos,
+                isCustom: isCustom,
                 sortOrder: sortOrder,
               ),
           withReferenceMapper: (p0) => p0
@@ -24128,6 +24794,7 @@ typedef $$MenuSettingsTableCreateCompanionBuilder =
       Value<int> id,
       Value<int> freeSwapLimit,
       Value<int> maxSwaps,
+      Value<int> customSalesLimitMinor,
       Value<int?> updatedBy,
       Value<DateTime> updatedAt,
     });
@@ -24136,6 +24803,7 @@ typedef $$MenuSettingsTableUpdateCompanionBuilder =
       Value<int> id,
       Value<int> freeSwapLimit,
       Value<int> maxSwaps,
+      Value<int> customSalesLimitMinor,
       Value<int?> updatedBy,
       Value<DateTime> updatedAt,
     });
@@ -24184,6 +24852,11 @@ class $$MenuSettingsTableFilterComposer
 
   ColumnFilters<int> get maxSwaps => $composableBuilder(
     column: $table.maxSwaps,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get customSalesLimitMinor => $composableBuilder(
+    column: $table.customSalesLimitMinor,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -24240,6 +24913,11 @@ class $$MenuSettingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get customSalesLimitMinor => $composableBuilder(
+    column: $table.customSalesLimitMinor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -24288,6 +24966,11 @@ class $$MenuSettingsTableAnnotationComposer
 
   GeneratedColumn<int> get maxSwaps =>
       $composableBuilder(column: $table.maxSwaps, builder: (column) => column);
+
+  GeneratedColumn<int> get customSalesLimitMinor => $composableBuilder(
+    column: $table.customSalesLimitMinor,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -24347,12 +25030,14 @@ class $$MenuSettingsTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> freeSwapLimit = const Value.absent(),
                 Value<int> maxSwaps = const Value.absent(),
+                Value<int> customSalesLimitMinor = const Value.absent(),
                 Value<int?> updatedBy = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => MenuSettingsCompanion(
                 id: id,
                 freeSwapLimit: freeSwapLimit,
                 maxSwaps: maxSwaps,
+                customSalesLimitMinor: customSalesLimitMinor,
                 updatedBy: updatedBy,
                 updatedAt: updatedAt,
               ),
@@ -24361,12 +25046,14 @@ class $$MenuSettingsTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> freeSwapLimit = const Value.absent(),
                 Value<int> maxSwaps = const Value.absent(),
+                Value<int> customSalesLimitMinor = const Value.absent(),
                 Value<int?> updatedBy = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => MenuSettingsCompanion.insert(
                 id: id,
                 freeSwapLimit: freeSwapLimit,
                 maxSwaps: maxSwaps,
+                customSalesLimitMinor: customSalesLimitMinor,
                 updatedBy: updatedBy,
                 updatedAt: updatedAt,
               ),
@@ -26888,6 +27575,11 @@ typedef $$TransactionsTableCreateCompanionBuilder =
       Value<String> status,
       Value<int> subtotalMinor,
       Value<int> modifierTotalMinor,
+      Value<String?> discountType,
+      Value<int> discountValueMinor,
+      Value<int> discountAmountMinor,
+      Value<String?> discountReason,
+      Value<int?> discountAppliedBy,
       Value<int> totalAmountMinor,
       Value<DateTime> createdAt,
       Value<DateTime?> paidAt,
@@ -26908,6 +27600,11 @@ typedef $$TransactionsTableUpdateCompanionBuilder =
       Value<String> status,
       Value<int> subtotalMinor,
       Value<int> modifierTotalMinor,
+      Value<String?> discountType,
+      Value<int> discountValueMinor,
+      Value<int> discountAmountMinor,
+      Value<String?> discountReason,
+      Value<int?> discountAppliedBy,
       Value<int> totalAmountMinor,
       Value<DateTime> createdAt,
       Value<DateTime?> paidAt,
@@ -26953,6 +27650,25 @@ final class $$TransactionsTableReferences
       $_db.users,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_userIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $UsersTable _discountAppliedByTable(_$AppDatabase db) =>
+      db.users.createAlias(
+        $_aliasNameGenerator(db.transactions.discountAppliedBy, db.users.id),
+      );
+
+  $$UsersTableProcessedTableManager? get discountAppliedBy {
+    final $_column = $_itemColumn<int>('discount_applied_by');
+    if ($_column == null) return null;
+    final manager = $$UsersTableTableManager(
+      $_db,
+      $_db.users,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_discountAppliedByTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -27108,6 +27824,26 @@ class $$TransactionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get discountType => $composableBuilder(
+    column: $table.discountType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get discountValueMinor => $composableBuilder(
+    column: $table.discountValueMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get discountAmountMinor => $composableBuilder(
+    column: $table.discountAmountMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get discountReason => $composableBuilder(
+    column: $table.discountReason,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get totalAmountMinor => $composableBuilder(
     column: $table.totalAmountMinor,
     builder: (column) => ColumnFilters(column),
@@ -27175,6 +27911,29 @@ class $$TransactionsTableFilterComposer
     final $$UsersTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableFilterComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$UsersTableFilterComposer get discountAppliedBy {
+    final $$UsersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.discountAppliedBy,
       referencedTable: $db.users,
       getReferencedColumn: (t) => t.id,
       builder:
@@ -27357,6 +28116,26 @@ class $$TransactionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get discountType => $composableBuilder(
+    column: $table.discountType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get discountValueMinor => $composableBuilder(
+    column: $table.discountValueMinor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get discountAmountMinor => $composableBuilder(
+    column: $table.discountAmountMinor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get discountReason => $composableBuilder(
+    column: $table.discountReason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get totalAmountMinor => $composableBuilder(
     column: $table.totalAmountMinor,
     builder: (column) => ColumnOrderings(column),
@@ -27443,6 +28222,29 @@ class $$TransactionsTableOrderingComposer
     return composer;
   }
 
+  $$UsersTableOrderingComposer get discountAppliedBy {
+    final $$UsersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.discountAppliedBy,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableOrderingComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
   $$UsersTableOrderingComposer get cancelledBy {
     final $$UsersTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -27497,6 +28299,26 @@ class $$TransactionsTableAnnotationComposer
 
   GeneratedColumn<int> get modifierTotalMinor => $composableBuilder(
     column: $table.modifierTotalMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get discountType => $composableBuilder(
+    column: $table.discountType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get discountValueMinor => $composableBuilder(
+    column: $table.discountValueMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get discountAmountMinor => $composableBuilder(
+    column: $table.discountAmountMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get discountReason => $composableBuilder(
+    column: $table.discountReason,
     builder: (column) => column,
   );
 
@@ -27561,6 +28383,29 @@ class $$TransactionsTableAnnotationComposer
     final $$UsersTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.userId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$UsersTableAnnotationComposer get discountAppliedBy {
+    final $$UsersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.discountAppliedBy,
       referencedTable: $db.users,
       getReferencedColumn: (t) => t.id,
       builder:
@@ -27721,6 +28566,7 @@ class $$TransactionsTableTableManager
           PrefetchHooks Function({
             bool shiftId,
             bool userId,
+            bool discountAppliedBy,
             bool cancelledBy,
             bool transactionLinesRefs,
             bool paymentsRefs,
@@ -27749,6 +28595,11 @@ class $$TransactionsTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<int> subtotalMinor = const Value.absent(),
                 Value<int> modifierTotalMinor = const Value.absent(),
+                Value<String?> discountType = const Value.absent(),
+                Value<int> discountValueMinor = const Value.absent(),
+                Value<int> discountAmountMinor = const Value.absent(),
+                Value<String?> discountReason = const Value.absent(),
+                Value<int?> discountAppliedBy = const Value.absent(),
                 Value<int> totalAmountMinor = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> paidAt = const Value.absent(),
@@ -27767,6 +28618,11 @@ class $$TransactionsTableTableManager
                 status: status,
                 subtotalMinor: subtotalMinor,
                 modifierTotalMinor: modifierTotalMinor,
+                discountType: discountType,
+                discountValueMinor: discountValueMinor,
+                discountAmountMinor: discountAmountMinor,
+                discountReason: discountReason,
+                discountAppliedBy: discountAppliedBy,
                 totalAmountMinor: totalAmountMinor,
                 createdAt: createdAt,
                 paidAt: paidAt,
@@ -27787,6 +28643,11 @@ class $$TransactionsTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<int> subtotalMinor = const Value.absent(),
                 Value<int> modifierTotalMinor = const Value.absent(),
+                Value<String?> discountType = const Value.absent(),
+                Value<int> discountValueMinor = const Value.absent(),
+                Value<int> discountAmountMinor = const Value.absent(),
+                Value<String?> discountReason = const Value.absent(),
+                Value<int?> discountAppliedBy = const Value.absent(),
                 Value<int> totalAmountMinor = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> paidAt = const Value.absent(),
@@ -27805,6 +28666,11 @@ class $$TransactionsTableTableManager
                 status: status,
                 subtotalMinor: subtotalMinor,
                 modifierTotalMinor: modifierTotalMinor,
+                discountType: discountType,
+                discountValueMinor: discountValueMinor,
+                discountAmountMinor: discountAmountMinor,
+                discountReason: discountReason,
+                discountAppliedBy: discountAppliedBy,
                 totalAmountMinor: totalAmountMinor,
                 createdAt: createdAt,
                 paidAt: paidAt,
@@ -27827,6 +28693,7 @@ class $$TransactionsTableTableManager
               ({
                 shiftId = false,
                 userId = false,
+                discountAppliedBy = false,
                 cancelledBy = false,
                 transactionLinesRefs = false,
                 paymentsRefs = false,
@@ -27883,6 +28750,21 @@ class $$TransactionsTableTableManager
                                     referencedColumn:
                                         $$TransactionsTableReferences
                                             ._userIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (discountAppliedBy) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.discountAppliedBy,
+                                    referencedTable:
+                                        $$TransactionsTableReferences
+                                            ._discountAppliedByTable(db),
+                                    referencedColumn:
+                                        $$TransactionsTableReferences
+                                            ._discountAppliedByTable(db)
                                             .id,
                                   )
                                   as T;
@@ -28014,6 +28896,7 @@ typedef $$TransactionsTableProcessedTableManager =
       PrefetchHooks Function({
         bool shiftId,
         bool userId,
+        bool discountAppliedBy,
         bool cancelledBy,
         bool transactionLinesRefs,
         bool paymentsRefs,
@@ -28033,6 +28916,9 @@ typedef $$TransactionLinesTableCreateCompanionBuilder =
       required int lineTotalMinor,
       Value<String> pricingMode,
       Value<int> removalDiscountTotalMinor,
+      Value<String?> customNote,
+      Value<int?> createdByUserId,
+      Value<int?> adminOverrideUserId,
     });
 typedef $$TransactionLinesTableUpdateCompanionBuilder =
     TransactionLinesCompanion Function({
@@ -28046,6 +28932,9 @@ typedef $$TransactionLinesTableUpdateCompanionBuilder =
       Value<int> lineTotalMinor,
       Value<String> pricingMode,
       Value<int> removalDiscountTotalMinor,
+      Value<String?> customNote,
+      Value<int?> createdByUserId,
+      Value<int?> adminOverrideUserId,
     });
 
 final class $$TransactionLinesTableReferences
@@ -28092,6 +28981,47 @@ final class $$TransactionLinesTableReferences
       $_db.products,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_productIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $UsersTable _createdByUserIdTable(_$AppDatabase db) =>
+      db.users.createAlias(
+        $_aliasNameGenerator(db.transactionLines.createdByUserId, db.users.id),
+      );
+
+  $$UsersTableProcessedTableManager? get createdByUserId {
+    final $_column = $_itemColumn<int>('created_by_user_id');
+    if ($_column == null) return null;
+    final manager = $$UsersTableTableManager(
+      $_db,
+      $_db.users,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_createdByUserIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $UsersTable _adminOverrideUserIdTable(_$AppDatabase db) =>
+      db.users.createAlias(
+        $_aliasNameGenerator(
+          db.transactionLines.adminOverrideUserId,
+          db.users.id,
+        ),
+      );
+
+  $$UsersTableProcessedTableManager? get adminOverrideUserId {
+    final $_column = $_itemColumn<int>('admin_override_user_id');
+    if ($_column == null) return null;
+    final manager = $$UsersTableTableManager(
+      $_db,
+      $_db.users,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_adminOverrideUserIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -28197,6 +29127,11 @@ class $$TransactionLinesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get customNote => $composableBuilder(
+    column: $table.customNote,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$TransactionsTableFilterComposer get transactionId {
     final $$TransactionsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -28234,6 +29169,52 @@ class $$TransactionLinesTableFilterComposer
           }) => $$ProductsTableFilterComposer(
             $db: $db,
             $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$UsersTableFilterComposer get createdByUserId {
+    final $$UsersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.createdByUserId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableFilterComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$UsersTableFilterComposer get adminOverrideUserId {
+    final $$UsersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.adminOverrideUserId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableFilterComposer(
+            $db: $db,
+            $table: $db.users,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -28347,6 +29328,11 @@ class $$TransactionLinesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get customNote => $composableBuilder(
+    column: $table.customNote,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$TransactionsTableOrderingComposer get transactionId {
     final $$TransactionsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -28384,6 +29370,52 @@ class $$TransactionLinesTableOrderingComposer
           }) => $$ProductsTableOrderingComposer(
             $db: $db,
             $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$UsersTableOrderingComposer get createdByUserId {
+    final $$UsersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.createdByUserId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableOrderingComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$UsersTableOrderingComposer get adminOverrideUserId {
+    final $$UsersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.adminOverrideUserId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableOrderingComposer(
+            $db: $db,
+            $table: $db.users,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -28437,6 +29469,11 @@ class $$TransactionLinesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get customNote => $composableBuilder(
+    column: $table.customNote,
+    builder: (column) => column,
+  );
+
   $$TransactionsTableAnnotationComposer get transactionId {
     final $$TransactionsTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -28474,6 +29511,52 @@ class $$TransactionLinesTableAnnotationComposer
           }) => $$ProductsTableAnnotationComposer(
             $db: $db,
             $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$UsersTableAnnotationComposer get createdByUserId {
+    final $$UsersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.createdByUserId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$UsersTableAnnotationComposer get adminOverrideUserId {
+    final $$UsersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.adminOverrideUserId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.users,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -28554,6 +29637,8 @@ class $$TransactionLinesTableTableManager
           PrefetchHooks Function({
             bool transactionId,
             bool productId,
+            bool createdByUserId,
+            bool adminOverrideUserId,
             bool orderModifiersRefs,
             bool breakfastCookingInstructionsRefs,
           })
@@ -28583,6 +29668,9 @@ class $$TransactionLinesTableTableManager
                 Value<int> lineTotalMinor = const Value.absent(),
                 Value<String> pricingMode = const Value.absent(),
                 Value<int> removalDiscountTotalMinor = const Value.absent(),
+                Value<String?> customNote = const Value.absent(),
+                Value<int?> createdByUserId = const Value.absent(),
+                Value<int?> adminOverrideUserId = const Value.absent(),
               }) => TransactionLinesCompanion(
                 id: id,
                 uuid: uuid,
@@ -28594,6 +29682,9 @@ class $$TransactionLinesTableTableManager
                 lineTotalMinor: lineTotalMinor,
                 pricingMode: pricingMode,
                 removalDiscountTotalMinor: removalDiscountTotalMinor,
+                customNote: customNote,
+                createdByUserId: createdByUserId,
+                adminOverrideUserId: adminOverrideUserId,
               ),
           createCompanionCallback:
               ({
@@ -28607,6 +29698,9 @@ class $$TransactionLinesTableTableManager
                 required int lineTotalMinor,
                 Value<String> pricingMode = const Value.absent(),
                 Value<int> removalDiscountTotalMinor = const Value.absent(),
+                Value<String?> customNote = const Value.absent(),
+                Value<int?> createdByUserId = const Value.absent(),
+                Value<int?> adminOverrideUserId = const Value.absent(),
               }) => TransactionLinesCompanion.insert(
                 id: id,
                 uuid: uuid,
@@ -28618,6 +29712,9 @@ class $$TransactionLinesTableTableManager
                 lineTotalMinor: lineTotalMinor,
                 pricingMode: pricingMode,
                 removalDiscountTotalMinor: removalDiscountTotalMinor,
+                customNote: customNote,
+                createdByUserId: createdByUserId,
+                adminOverrideUserId: adminOverrideUserId,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -28631,6 +29728,8 @@ class $$TransactionLinesTableTableManager
               ({
                 transactionId = false,
                 productId = false,
+                createdByUserId = false,
+                adminOverrideUserId = false,
                 orderModifiersRefs = false,
                 breakfastCookingInstructionsRefs = false,
               }) {
@@ -28683,6 +29782,36 @@ class $$TransactionLinesTableTableManager
                                     referencedColumn:
                                         $$TransactionLinesTableReferences
                                             ._productIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (createdByUserId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.createdByUserId,
+                                    referencedTable:
+                                        $$TransactionLinesTableReferences
+                                            ._createdByUserIdTable(db),
+                                    referencedColumn:
+                                        $$TransactionLinesTableReferences
+                                            ._createdByUserIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (adminOverrideUserId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.adminOverrideUserId,
+                                    referencedTable:
+                                        $$TransactionLinesTableReferences
+                                            ._adminOverrideUserIdTable(db),
+                                    referencedColumn:
+                                        $$TransactionLinesTableReferences
+                                            ._adminOverrideUserIdTable(db)
                                             .id,
                                   )
                                   as T;
@@ -28757,6 +29886,8 @@ typedef $$TransactionLinesTableProcessedTableManager =
       PrefetchHooks Function({
         bool transactionId,
         bool productId,
+        bool createdByUserId,
+        bool adminOverrideUserId,
         bool orderModifiersRefs,
         bool breakfastCookingInstructionsRefs,
       })

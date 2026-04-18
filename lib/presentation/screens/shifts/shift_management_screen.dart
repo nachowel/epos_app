@@ -18,6 +18,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/reports_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../widgets/counted_cash_dialog.dart';
+import '../../widgets/logout_confirmation.dart';
+import '../../widgets/operator_page_intro.dart';
 import '../../widgets/section_app_bar.dart';
 import '../../widgets/stale_final_close_recovery_dialog.dart';
 
@@ -180,6 +182,9 @@ class _ShiftManagementScreenState extends ConsumerState<ShiftManagementScreen> {
       currentUser,
       OperatorPermission.finalCloseShift,
     );
+    final String introSubtitle = hasOpenShift
+        ? 'Monitor the current shift, control lock and close actions, and review recent shift history.'
+        : 'Open a new shift, review close readiness, and keep the last completed sessions in view.';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -188,10 +193,7 @@ class _ShiftManagementScreenState extends ConsumerState<ShiftManagementScreen> {
         currentRoute: '/shifts',
         currentUser: currentUser,
         currentShift: shiftState.currentShift,
-        onLogout: () {
-          ref.read(authNotifierProvider.notifier).logout();
-          context.go('/login');
-        },
+        onLogout: () => handleLogoutRequest(context, ref),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -199,8 +201,19 @@ class _ShiftManagementScreenState extends ConsumerState<ShiftManagementScreen> {
           await ref.read(shiftNotifierProvider.notifier).loadRecentShifts();
         },
         child: ListView(
-          padding: const EdgeInsets.all(AppSizes.spacingMd),
+          padding: const EdgeInsets.fromLTRB(
+            AppSizes.spacingMd,
+            AppSizes.spacingSm,
+            AppSizes.spacingMd,
+            AppSizes.spacingMd,
+          ),
           children: <Widget>[
+            OperatorSectionHeading(
+              eyebrow: 'SHIFT CONTROL',
+              title: AppStrings.navShifts,
+              subtitle: introSubtitle,
+            ),
+            const SizedBox(height: AppSizes.spacingSm),
             if (shiftState.errorMessage != null)
               _Banner(
                 message: shiftState.errorMessage!,
@@ -281,13 +294,12 @@ class _ShiftManagementScreenState extends ConsumerState<ShiftManagementScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: AppSizes.spacingLg),
-            Text(
-              AppStrings.recentShifts,
-              style: const TextStyle(
-                fontSize: AppSizes.fontMd,
-                fontWeight: FontWeight.w800,
-              ),
+            const SizedBox(height: AppSizes.spacingMd),
+            const OperatorSectionHeading(
+              eyebrow: 'HISTORY',
+              title: 'Recent Shifts',
+              subtitle:
+                  'Latest shift sessions and close history for operators and managers.',
             ),
             const SizedBox(height: AppSizes.spacingMd),
             if (shiftState.recentShifts.isEmpty)
@@ -328,7 +340,7 @@ class _CurrentShiftCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (backendShift == null) {
       return Container(
-        padding: const EdgeInsets.all(AppSizes.spacingLg),
+        padding: const EdgeInsets.all(AppSizes.spacingMd),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppSizes.radiusLg),
@@ -360,7 +372,7 @@ class _CurrentShiftCard extends ConsumerWidget {
         : null;
 
     return Container(
-      padding: const EdgeInsets.all(AppSizes.spacingLg),
+      padding: const EdgeInsets.all(AppSizes.spacingMd),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppSizes.radiusLg),
@@ -604,25 +616,50 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSizes.spacingXs),
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(color: AppColors.textSecondary),
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: emphasize ? FontWeight.w700 : FontWeight.w500,
-              color: emphasize ? AppColors.warning : AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
+    final TextStyle valueStyle = TextStyle(
+      fontWeight: emphasize ? FontWeight.w700 : FontWeight.w500,
+      color: emphasize ? AppColors.warning : AppColors.textPrimary,
+    );
+
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool stackValues = constraints.maxWidth < 420;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSizes.spacingXs),
+          child: stackValues
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      label,
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(value, style: valueStyle),
+                  ],
+                )
+              : Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: const TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                    Flexible(
+                      child: Text(
+                        value,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: valueStyle,
+                      ),
+                    ),
+                  ],
+                ),
+        );
+      },
     );
   }
 }
@@ -636,8 +673,11 @@ class _Banner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSizes.spacingMd),
-      padding: const EdgeInsets.all(AppSizes.spacingMd),
+      margin: const EdgeInsets.only(bottom: AppSizes.spacingSm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSizes.spacingMd,
+        vertical: AppSizes.spacingSm,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),

@@ -17,7 +17,17 @@ class AuthSecurity {
   static String get demoCashierPin => _seedCashierPin;
 
   static String hashPin(String pin) {
+    validatePinPolicy(pin);
     return _hashSecret(pin, SecretKind.pin);
+  }
+
+  static void validatePinPolicy(String pin) {
+    if (pin.length < 4 || pin.length > 8) {
+      throw const FormatException('PIN must be between 4 and 8 digits.');
+    }
+    if (!RegExp(r'^\d+$').hasMatch(pin)) {
+      throw const FormatException('PIN must contain only numbers.');
+    }
   }
 
   static String hashPassword(String password) {

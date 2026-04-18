@@ -15,6 +15,10 @@ revisions are deployed by following
 
 ## Preconditions
 
+- Mirror schema release gate:
+  - If the mirror payload contract changes, deploy the matching Supabase migration before app release.
+  - Keep the Dart contract, edge allowlist, and Supabase schema aligned.
+  - Treat schema drift as a deployment failure, not a retryable runtime issue.
 - Use a non-customer shift, cashier/admin user, and disposable validation order.
 - Root `.env` exists and is loaded at startup
 - `FEATURE_SYNC_ENABLED=true`

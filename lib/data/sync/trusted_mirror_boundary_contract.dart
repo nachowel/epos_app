@@ -1,3 +1,4 @@
+import 'mirror_schema_contract.dart';
 import 'phase1_sync_contract.dart';
 import 'sync_transaction_graph.dart';
 
@@ -136,6 +137,11 @@ class TrustedMirrorWriteRequest {
       );
       switch (record.tableName) {
         case 'transactions':
+          MirrorSchemaContract.validatePayload(
+            table: Phase1SyncTable.transactions,
+            payload: payload,
+            recordUuid: record.recordUuid,
+          );
           _requireUuidField(
             payload,
             key: 'uuid',
@@ -145,6 +151,11 @@ class TrustedMirrorWriteRequest {
           transaction = payload;
           break;
         case 'transaction_lines':
+          MirrorSchemaContract.validatePayload(
+            table: Phase1SyncTable.transactionLines,
+            payload: payload,
+            recordUuid: record.recordUuid,
+          );
           _requireUuidField(
             payload,
             key: 'uuid',
@@ -160,6 +171,11 @@ class TrustedMirrorWriteRequest {
           transactionLines.add(payload);
           break;
         case 'order_modifiers':
+          MirrorSchemaContract.validatePayload(
+            table: Phase1SyncTable.orderModifiers,
+            payload: payload,
+            recordUuid: record.recordUuid,
+          );
           _requireUuidField(
             payload,
             key: 'uuid',
@@ -175,6 +191,11 @@ class TrustedMirrorWriteRequest {
           orderModifiers.add(payload);
           break;
         case 'payments':
+          MirrorSchemaContract.validatePayload(
+            table: Phase1SyncTable.payments,
+            payload: payload,
+            recordUuid: record.recordUuid,
+          );
           _requireUuidField(
             payload,
             key: 'uuid',

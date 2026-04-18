@@ -7,6 +7,8 @@ import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/shift_provider.dart';
+import '../../../widgets/logout_confirmation.dart';
+import '../../../widgets/operator_page_intro.dart';
 import '../../../widgets/section_app_bar.dart';
 
 const String _cashMovementsLabel = 'Cash Movements';
@@ -99,12 +101,51 @@ class AdminScaffold extends ConsumerWidget {
       route: '/admin/sync',
       icon: Icons.sync_rounded,
     ),
+    const _AdminDestination(
+      label: 'Users',
+      route: '/admin/users',
+      icon: Icons.people_rounded,
+    ),
     _AdminDestination(
       label: AppStrings.system,
       route: '/admin/system',
       icon: Icons.health_and_safety_rounded,
     ),
   ];
+
+  static String _resolveIntroSubtitle(String currentRoute, String title) {
+    if (currentRoute == '/admin') {
+      return 'Monitor trading, sync health, and operational control points from one workspace.';
+    }
+    if (currentRoute.startsWith('/admin/analytics')) {
+      return 'Review revenue, order, and payment performance without leaving the admin shell.';
+    }
+    if (currentRoute.startsWith('/admin/products')) {
+      return 'Manage catalog availability, structure, and operator-facing product setup.';
+    }
+    if (currentRoute.startsWith('/admin/categories')) {
+      return 'Control category structure and keep POS navigation organised for service.';
+    }
+    if (currentRoute.startsWith('/admin/modifiers')) {
+      return 'Maintain modifier options and keep ordering logic consistent across the menu.';
+    }
+    if (currentRoute.startsWith('/admin/shifts')) {
+      return 'Review shift activity, controls, and closure context for the current operation.';
+    }
+    if (currentRoute.startsWith('/admin/sync')) {
+      return 'Track sync state, failures, and recovery signals from the operational shell.';
+    }
+    if (currentRoute.startsWith('/admin/users')) {
+      return 'Manage operator access, roles, and active account status for the live system.';
+    }
+    if (currentRoute.startsWith('/admin/system')) {
+      return 'Review environment status, diagnostics, and system health from one workspace.';
+    }
+    if (currentRoute.startsWith('/admin/settings')) {
+      return 'Adjust operator-facing configuration without disrupting the live service flow.';
+    }
+    return 'Manage $title while staying inside the shared operator workspace.';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -119,10 +160,7 @@ class AdminScaffold extends ConsumerWidget {
         currentRoute: currentRoute,
         currentUser: authState.currentUser,
         currentShift: shiftState.currentShift,
-        onLogout: () {
-          ref.read(authNotifierProvider.notifier).logout();
-          context.go('/login');
-        },
+        onLogout: () => handleLogoutRequest(context, ref),
       ),
       body: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
@@ -130,17 +168,33 @@ class AdminScaffold extends ConsumerWidget {
             return Row(
               children: <Widget>[
                 Container(
-                  width: 220,
-                  padding: const EdgeInsets.all(AppSizes.spacingMd),
+                  width: 228,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSizes.spacingMd,
+                    AppSizes.spacingSm,
+                    AppSizes.spacingMd,
+                    AppSizes.spacingMd,
+                  ),
                   decoration: const BoxDecoration(
-                    color: AppColors.surface,
+                    color: AppColors.background,
                     border: Border(right: BorderSide(color: AppColors.border)),
                   ),
-                  child: _AdminRail(currentRoute: currentRoute),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSizes.spacingSm),
+                      child: _AdminRail(currentRoute: currentRoute),
+                    ),
+                  ),
                 ),
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSizes.spacingMd),
+                  child: _AdminContentShell(
+                    title: title,
+                    subtitle: _resolveIntroSubtitle(currentRoute, title),
                     child: child,
                   ),
                 ),
@@ -151,9 +205,9 @@ class AdminScaffold extends ConsumerWidget {
           return Column(
             children: <Widget>[
               Container(
-                height: 72,
+                height: 68,
                 padding: const EdgeInsets.symmetric(
-                  vertical: AppSizes.spacingSm,
+                  vertical: AppSizes.spacingXs,
                 ),
                 decoration: const BoxDecoration(
                   color: AppColors.surface,
@@ -185,8 +239,9 @@ class AdminScaffold extends ConsumerWidget {
                 ),
               ),
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSizes.spacingMd),
+                child: _AdminContentShell(
+                  title: title,
+                  subtitle: _resolveIntroSubtitle(currentRoute, title),
                   child: child,
                 ),
               ),
@@ -208,6 +263,41 @@ class AdminScaffold extends ConsumerWidget {
   }
 }
 
+class _AdminContentShell extends StatelessWidget {
+  const _AdminContentShell({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSizes.spacingMd,
+        AppSizes.spacingSm,
+        AppSizes.spacingMd,
+        AppSizes.spacingMd,
+      ),
+      child: Column(
+        children: <Widget>[
+          OperatorSectionHeading(
+            eyebrow: 'ADMIN',
+            title: title,
+            subtitle: subtitle,
+          ),
+          const SizedBox(height: AppSizes.spacingSm),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
 class _AdminRail extends StatelessWidget {
   const _AdminRail({required this.currentRoute});
 
@@ -218,17 +308,40 @@ class _AdminRail extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.only(bottom: AppSizes.spacingMd),
-          child: Text(
-            AppStrings.operationsControl,
-            style: const TextStyle(
-              fontSize: AppSizes.fontMd,
-              fontWeight: FontWeight.w800,
-              color: AppColors.primary,
-            ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Admin Navigation',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Keep core management tools visible and reachable during service.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
+                  height: 1.3,
+                ),
+              ),
+            ],
           ),
         ),
+        const SizedBox(height: AppSizes.spacingSm),
         Expanded(
           child: ListView(
             children: AdminScaffold._destinations()
@@ -258,34 +371,65 @@ class _AdminRailTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSizes.spacingSm),
+      padding: const EdgeInsets.only(bottom: AppSizes.spacingXs),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
         onTap: isActive ? null : () => context.go(destination.route),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: AppSizes.minTouch),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          constraints: const BoxConstraints(minHeight: 60),
           padding: const EdgeInsets.symmetric(
             horizontal: AppSizes.spacingMd,
-            vertical: AppSizes.spacingSm,
+            vertical: 10,
           ),
           decoration: BoxDecoration(
-            color: isActive ? AppColors.primary : AppColors.surfaceMuted,
+            color: isActive ? AppColors.primaryLight : AppColors.surfaceAlt,
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            border: Border.all(
+              color: isActive
+                  ? AppColors.primary.withValues(alpha: 0.22)
+                  : AppColors.border,
+            ),
+            boxShadow: isActive
+                ? <BoxShadow>[
+                    BoxShadow(
+                      color: AppColors.primaryDarker.withValues(alpha: 0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
+                    ),
+                  ]
+                : const <BoxShadow>[],
           ),
           child: Row(
             children: <Widget>[
-              Icon(
-                destination.icon,
-                color: isActive ? AppColors.surface : AppColors.textSecondary,
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? AppColors.primary.withValues(alpha: 0.14)
+                      : AppColors.surface,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  destination.icon,
+                  color: isActive
+                      ? AppColors.primaryStrong
+                      : AppColors.textSecondary,
+                ),
               ),
               const SizedBox(width: AppSizes.spacingSm),
               Expanded(
                 child: Text(
                   destination.label,
-                  style: TextStyle(
-                    fontSize: AppSizes.fontSm,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14.5,
                     fontWeight: FontWeight.w700,
-                    color: isActive ? AppColors.surface : AppColors.textPrimary,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.1,
                   ),
                 ),
               ),
@@ -305,11 +449,46 @@ class _AdminChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChoiceChip(
-      selected: isActive,
-      label: Text(destination.label),
-      avatar: Icon(destination.icon, size: 20),
-      onSelected: (_) => context.go(destination.route),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: isActive ? null : () => context.go(destination.route),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.primaryLight : AppColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isActive
+                  ? AppColors.primary.withValues(alpha: 0.22)
+                  : AppColors.border,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(
+                destination.icon,
+                size: 18,
+                color: isActive
+                    ? AppColors.primaryStrong
+                    : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                destination.label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

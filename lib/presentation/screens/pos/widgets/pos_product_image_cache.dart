@@ -2,12 +2,27 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
+String? normalizePosCategoryImageUrl(String? imageUrl) {
+  final String? trimmed = imageUrl?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+  return trimmed;
+}
+
 String? normalizePosProductImageUrl(String? imageUrl) {
   final String? trimmed = imageUrl?.trim();
   if (trimmed == null || trimmed.isEmpty) {
     return null;
   }
   return trimmed;
+}
+
+ImageProvider<Object> resolveCachedPosCategoryImageProvider(String imageUrl) {
+  return CachedNetworkImageProvider(
+    imageUrl,
+    cacheManager: PosCategoryImageCacheManager.instance,
+  );
 }
 
 ImageProvider<Object> resolveCachedPosProductImageProvider(String imageUrl) {
@@ -18,6 +33,29 @@ ImageProvider<Object> resolveCachedPosProductImageProvider(String imageUrl) {
   return CachedNetworkImageProvider(
     imageUrl,
     cacheManager: PosProductImageCacheManager.instance,
+  );
+}
+
+Future<void> warmCatalogImageCache({
+  required CacheManager cacheManager,
+  required String imageUrl,
+}) async {
+  try {
+    await cacheManager.getSingleFile(imageUrl);
+  } catch (_) {
+    // Image warmup is best-effort and must never affect POS/navigation flow.
+  }
+}
+
+class PosCategoryImageCacheManager {
+  PosCategoryImageCacheManager._();
+
+  static final CacheManager instance = CacheManager(
+    Config(
+      'posCategoryImages',
+      stalePeriod: const Duration(days: 14),
+      maxNrOfCacheObjects: 120,
+    ),
   );
 }
 
