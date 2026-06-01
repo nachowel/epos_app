@@ -1,5 +1,9 @@
+import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/domain/models/custom_sale.dart';
+import 'package:epos_app/domain/models/breakfast_cart_selection.dart';
+import 'package:epos_app/domain/models/breakfast_rebuild.dart';
 import 'package:epos_app/domain/models/meal_customization.dart';
+import 'package:epos_app/domain/models/order_modifier.dart';
 import 'package:epos_app/presentation/providers/cart_models.dart';
 import 'package:epos_app/presentation/screens/pos/widgets/cart_line_tile.dart';
 import 'package:flutter/material.dart';
@@ -158,6 +162,90 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Ignored'), findsNothing);
+  });
+
+  testWidgets('breakfast cart strips Bread prefix from bread type summary', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 360,
+            child: Material(
+              child: CartLineTile(
+                item: CartItem(
+                  localId: 'cart-breakfast',
+                  productId: 1,
+                  productName: 'Set 1',
+                  unitPriceMinor: 850,
+                  hasModifiers: false,
+                  quantity: 1,
+                  modifiers: const <CartModifier>[],
+                  breakfastSelection: const BreakfastCartSelection(
+                    requestedState: BreakfastRequestedState(),
+                    choiceDisplayLines: <BreakfastCartChoiceDisplayLine>[
+                      BreakfastCartChoiceDisplayLine(
+                        groupName: 'Bread',
+                        selectedLabel: 'Toasts',
+                      ),
+                      BreakfastCartChoiceDisplayLine(
+                        groupName: 'Drink',
+                        selectedLabel: 'Tea',
+                      ),
+                    ],
+                    rebuildResult: BreakfastRebuildResult(
+                      lineSnapshot: BreakfastLineSnapshot(
+                        baseUnitPriceMinor: 850,
+                        removalDiscountTotalMinor: 0,
+                        modifierTotalMinor: 0,
+                        lineTotalMinor: 850,
+                      ),
+                      classifiedModifiers: <BreakfastClassifiedModifier>[
+                        BreakfastClassifiedModifier(
+                          kind: BreakfastModifierKind.extraAdd,
+                          action: ModifierAction.add,
+                          chargeReason: ModifierChargeReason.extraAdd,
+                          itemProductId: 201,
+                          displayName: 'Bread: Brown Bread',
+                          quantity: 1,
+                          unitPriceMinor: 0,
+                          priceEffectMinor: 0,
+                          sortKey: 2503,
+                        ),
+                      ],
+                      pricingBreakdown: BreakfastPricingBreakdown(
+                        basePriceMinor: 850,
+                        extraAddTotalMinor: 0,
+                        paidSwapTotalMinor: 0,
+                        freeSwapTotalMinor: 0,
+                        includedChoiceTotalMinor: 0,
+                        removeTotalMinor: 0,
+                        removalDiscountTotalMinor: 0,
+                        finalLineTotalMinor: 850,
+                      ),
+                      validationErrors: <BreakfastEditErrorCode>[],
+                      rebuildMetadata: BreakfastRebuildMetadata(
+                        replacementCount: 0,
+                        unmatchedRemovalCount: 0,
+                      ),
+                    ),
+                  ),
+                ),
+                onIncrease: _noop,
+                onDecrease: _noop,
+                onDelete: _noop,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Toasts · Tea'), findsOneWidget);
+    expect(find.text('+ Brown Bread'), findsOneWidget);
+    expect(find.text('+ Bread: Brown Bread'), findsNothing);
   });
 }
 

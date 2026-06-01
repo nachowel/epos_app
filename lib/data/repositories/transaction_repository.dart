@@ -393,6 +393,9 @@ class TransactionRepository {
       transactionLineId,
     );
     await _ensureTransactionIsDraft(lineRow.transactionId);
+    final ModifierAction persistedAction = action == ModifierAction.choice
+        ? ModifierAction.add
+        : action;
 
     final int modifierId = await _database
         .into(_database.orderModifiers)
@@ -400,7 +403,7 @@ class TransactionRepository {
           db.OrderModifiersCompanion.insert(
             uuid: _uuidGenerator.v4(),
             transactionLineId: transactionLineId,
-            action: _modifierActionToDb(action),
+            action: _modifierActionToDb(persistedAction),
             itemName: itemName,
             quantity: const Value<int>(1),
             itemProductId: const Value<int?>(null),

@@ -1150,6 +1150,189 @@ void main() {
   });
 
   testWidgets(
+    'breakfast set editor can edit, cancel delete, and delete an extras preset',
+    (WidgetTester tester) async {
+      _setLargeView(tester);
+      final AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+
+      await insertUser(db, name: 'Admin', role: 'admin', pin: '9999');
+      final int setBreakfastCategoryId = await insertCategory(
+        db,
+        name: 'Set Breakfast',
+      );
+      final int breakfastItemsCategoryId = await insertCategory(
+        db,
+        name: 'Breakfast Items',
+      );
+      final int rootProductId = await insertProduct(
+        db,
+        categoryId: setBreakfastCategoryId,
+        name: 'Set Extras Preset',
+        priceMinor: 1150,
+      );
+      await insertProduct(
+        db,
+        categoryId: breakfastItemsCategoryId,
+        name: 'Egg',
+        priceMinor: 120,
+      );
+      final int extraBaconId = await insertProduct(
+        db,
+        categoryId: breakfastItemsCategoryId,
+        name: 'Extra Bacon',
+        priceMinor: 180,
+      );
+      final int extraMushroomId = await insertProduct(
+        db,
+        categoryId: breakfastItemsCategoryId,
+        name: 'Extra Mushroom',
+        priceMinor: 170,
+      );
+
+      // Pre-seed a preset directly in the database
+      final int presetId = await db.into(db.breakfastExtraPresets).insert(
+        BreakfastExtraPresetsCompanion.insert(
+          name: 'Standard Preset',
+          createdAt: Value<DateTime>(DateTime.now()),
+          updatedAt: Value<DateTime>(DateTime.now()),
+        ),
+      );
+      await db.into(db.breakfastExtraPresetItems).insert(
+        BreakfastExtraPresetItemsCompanion.insert(
+          presetId: presetId,
+          itemProductId: extraBaconId,
+          sortOrder: const Value<int>(0),
+        ),
+      );
+
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          sharedPreferencesProvider.overrideWithValue(_testPrefs),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const _TestRouterApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _loginWithPin(tester, '9999');
+
+      container
+          .read(appRouterProvider)
+          .go('/admin/breakfast-sets/$rootProductId');
+      await tester.pumpAndSettle();
+
+      // Open Apply Preset Dialog
+      await tester.tap(
+        find.byKey(const ValueKey<String>('breakfast-editor-extra-apply-preset')),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify preset is listed with correct product count and Edit/Delete keys exist
+      expect(find.text('Standard Preset'), findsOneWidget);
+      expect(find.text('1 product'), findsOneWidget);
+      expect(
+        find.byKey(ValueKey<String>('breakfast-editor-extra-preset-edit-$presetId')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(ValueKey<String>('breakfast-editor-extra-preset-delete-$presetId')),
+        findsOneWidget,
+      );
+
+      // Test Cancel Delete
+      await tester.tap(
+        find.byKey(ValueKey<String>('breakfast-editor-extra-preset-delete-$presetId')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Delete preset?'), findsOneWidget);
+      expect(
+        find.text(
+          'This will not remove extras from existing breakfast sets. It only deletes the saved preset.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey<String>('breakfast-editor-preset-delete-cancel')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Standard Preset'), findsOneWidget); // still there
+
+      // Test Edit Preset
+      await tester.tap(
+        find.byKey(ValueKey<String>('breakfast-editor-extra-preset-edit-$presetId')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Edit Extras Preset'), findsOneWidget);
+      
+      // Rename
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('breakfast-editor-extra-preset-name')),
+        'Standard Preset (Edited)',
+      );
+      // Uncheck Bacon, Check Mushroom
+      await tester.tap(
+        find.byKey(ValueKey<String>('breakfast-editor-extra-preset-product-$extraBaconId')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(ValueKey<String>('breakfast-editor-extra-preset-product-$extraMushroomId')),
+      );
+      await tester.pumpAndSettle();
+
+      // Save edits
+      await tester.tap(
+        find.byKey(const ValueKey<String>('breakfast-editor-extra-preset-save')),
+      );
+      await tester.pumpAndSettle();
+
+      // Verify preset updates reactively in the list dialog without closing
+      expect(find.text('Standard Preset (Edited)'), findsOneWidget);
+      expect(find.text('1 product'), findsOneWidget); // Mushroom only
+
+      // Test Apply still works after edits
+      await tester.tap(
+        find.byKey(ValueKey<String>('breakfast-editor-extra-preset-apply-$presetId')),
+      );
+      await tester.pumpAndSettle();
+
+      // Dialog should close, and Extra Mushroom must be added to current extras pool
+      expect(find.text('Extra Mushroom'), findsOneWidget);
+      expect(find.text('Extra Bacon'), findsNothing);
+
+      // Test Delete Preset
+      await tester.tap(
+        find.byKey(const ValueKey<String>('breakfast-editor-extra-apply-preset')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(ValueKey<String>('breakfast-editor-extra-preset-delete-$presetId')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey<String>('breakfast-editor-preset-delete-confirm')),
+      );
+      await tester.pumpAndSettle();
+
+      // Dialog reactively updates showing empty list
+      expect(find.text('No breakfast extras presets saved yet.'), findsOneWidget);
+
+      // Close apply preset dialog
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel').last);
+      await tester.pumpAndSettle();
+
+      // Existing applied extra in current breakfast set is untouched
+      expect(find.text('Extra Mushroom'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'breakfast set editor set items update local draft with inline validation',
     (WidgetTester tester) async {
       _setLargeView(tester);

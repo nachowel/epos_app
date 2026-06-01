@@ -5,10 +5,13 @@ import 'package:epos_app/data/database/app_database.dart' as app_db;
 import 'package:epos_app/data/repositories/shift_repository.dart';
 import 'package:epos_app/data/repositories/transaction_repository.dart';
 import 'package:epos_app/data/repositories/transaction_state_repository.dart';
+import 'package:epos_app/domain/models/breakfast_cart_selection.dart';
 import 'package:epos_app/domain/models/breakfast_line_edit.dart';
+import 'package:epos_app/domain/models/breakfast_rebuild.dart';
 import 'package:epos_app/domain/models/order_modifier.dart';
 import 'package:epos_app/domain/models/transaction_line.dart';
 import 'package:epos_app/domain/models/user.dart';
+import 'package:epos_app/domain/services/breakfast_rebuild_engine.dart';
 import 'package:epos_app/domain/services/order_service.dart';
 import 'package:epos_app/domain/services/shift_session_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,9 +27,10 @@ void main() {
         addTearDown(db.close);
         final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-        final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
-          currentUser: fixture.cashier,
-        );
+        final order = await fixture.service
+            .createPersistedEmptyDraftForTestingAccess(
+              currentUser: fixture.cashier,
+            );
         final line = await fixture.service.addProductToOrder(
           transactionId: order.id,
           productId: fixture.set4ProductId,
@@ -72,9 +76,10 @@ void main() {
         addTearDown(db.close);
         final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-        final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
-          currentUser: fixture.cashier,
-        );
+        final order = await fixture.service
+            .createPersistedEmptyDraftForTestingAccess(
+              currentUser: fixture.cashier,
+            );
         final line = await fixture.service.addProductToOrder(
           transactionId: order.id,
           productId: fixture.set4ProductId,
@@ -115,9 +120,10 @@ void main() {
           hotDrinkExplicitNoneLabel: 'No drink',
         );
 
-        final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
-          currentUser: fixture.cashier,
-        );
+        final order = await fixture.service
+            .createPersistedEmptyDraftForTestingAccess(
+              currentUser: fixture.cashier,
+            );
         final line = await fixture.service.addProductToOrder(
           transactionId: order.id,
           productId: fixture.set4ProductId,
@@ -173,9 +179,10 @@ void main() {
         addTearDown(db.close);
         final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-        final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
-          currentUser: fixture.cashier,
-        );
+        final order = await fixture.service
+            .createPersistedEmptyDraftForTestingAccess(
+              currentUser: fixture.cashier,
+            );
         final line = await fixture.service.addProductToOrder(
           transactionId: order.id,
           productId: fixture.set4ProductId,
@@ -261,9 +268,10 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
-        currentUser: fixture.cashier,
-      );
+      final order = await fixture.service
+          .createPersistedEmptyDraftForTestingAccess(
+            currentUser: fixture.cashier,
+          );
       final line = await fixture.service.addProductToOrder(
         transactionId: order.id,
         productId: fixture.set4ProductId,
@@ -299,9 +307,10 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
-        currentUser: fixture.cashier,
-      );
+      final order = await fixture.service
+          .createPersistedEmptyDraftForTestingAccess(
+            currentUser: fixture.cashier,
+          );
       final line = await fixture.service.addProductToOrder(
         transactionId: order.id,
         productId: fixture.set4ProductId,
@@ -332,9 +341,10 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final paidOrder = await fixture.service.createPersistedEmptyDraftForTestingAccess(
-        currentUser: fixture.cashier,
-      );
+      final paidOrder = await fixture.service
+          .createPersistedEmptyDraftForTestingAccess(
+            currentUser: fixture.cashier,
+          );
       final paidLine = await fixture.service.addProductToOrder(
         transactionId: paidOrder.id,
         productId: fixture.set4ProductId,
@@ -360,9 +370,10 @@ void main() {
         ),
       );
 
-      final cancelledOrder = await fixture.service.createPersistedEmptyDraftForTestingAccess(
-        currentUser: fixture.cashier,
-      );
+      final cancelledOrder = await fixture.service
+          .createPersistedEmptyDraftForTestingAccess(
+            currentUser: fixture.cashier,
+          );
       final cancelledLine = await fixture.service.addProductToOrder(
         transactionId: cancelledOrder.id,
         productId: fixture.set4ProductId,
@@ -394,9 +405,10 @@ void main() {
       addTearDown(db.close);
       final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
 
-      final order = await fixture.service.createPersistedEmptyDraftForTestingAccess(
-        currentUser: fixture.cashier,
-      );
+      final order = await fixture.service
+          .createPersistedEmptyDraftForTestingAccess(
+            currentUser: fixture.cashier,
+          );
       final line = await fixture.service.addProductToOrder(
         transactionId: order.id,
         productId: fixture.set4ProductId,
@@ -420,6 +432,165 @@ void main() {
         lines.map((TransactionLine item) => item.quantity),
         everyElement(1),
       );
+    });
+
+    test(
+      'egg type and cook preference persist as zero-price add modifiers',
+      () async {
+        final db = createTestDatabase();
+        addTearDown(db.close);
+        final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
+        final BreakfastSetConfiguration configuration =
+            (await BreakfastConfigurationRepository(
+              db,
+            ).loadSetConfiguration(fixture.set4ProductId))!;
+        final BreakfastRequestedState requestedState = BreakfastRequestedState(
+          chosenGroups: <BreakfastChosenGroupRequest>[
+            BreakfastChosenGroupRequest(
+              groupId: fixture.toastBreadGroupId,
+              selectedItemProductId: fixture.toastProductId,
+              requestedQuantity: 1,
+            ),
+          ],
+          customModifiers: <BreakfastCustomModifierRequest>[
+            BreakfastCustomModifierRequest(
+              itemProductId: fixture.eggProductId,
+              itemName: 'Egg: Poached Egg',
+              sortKey: 1,
+            ),
+            BreakfastCustomModifierRequest(
+              itemProductId: fixture.eggProductId,
+              itemName: 'Cook: Well done',
+              sortKey: 2,
+            ),
+          ],
+        );
+        final BreakfastRebuildResult rebuildResult =
+            const BreakfastRebuildEngine().rebuild(
+              BreakfastRebuildInput(
+                transactionLine: BreakfastTransactionLineInput(
+                  lineId: 0,
+                  lineUuid: 'egg-custom',
+                  rootProductId: fixture.set4ProductId,
+                  rootProductName: 'Set 4',
+                  baseUnitPriceMinor: 400,
+                  lineQuantity: 1,
+                ),
+                setConfiguration: configuration,
+                requestedState: requestedState,
+              ),
+            );
+        expect(rebuildResult.validationErrors, isEmpty);
+
+        final order = await fixture.service
+            .createPersistedEmptyDraftForTestingAccess(
+              currentUser: fixture.cashier,
+            );
+        final TransactionLine line = await fixture.service
+            .addBreakfastSelectionToOrder(
+              transactionId: order.id,
+              productId: fixture.set4ProductId,
+              selection: BreakfastCartSelection(
+                requestedState: requestedState,
+                rebuildResult: rebuildResult,
+              ),
+            );
+
+        final List<OrderModifier> modifiers = await fixture.service
+            .getLineModifiers(line.id);
+        final List<OrderModifier> eggModifiers = modifiers
+            .where(
+              (OrderModifier modifier) =>
+                  modifier.itemName == 'Egg: Poached Egg' ||
+                  modifier.itemName == 'Cook: Well done',
+            )
+            .toList(growable: false);
+
+        expect(eggModifiers, hasLength(2));
+        expect(
+          eggModifiers.map((OrderModifier modifier) => modifier.action),
+          everyElement(ModifierAction.add),
+        );
+        expect(
+          eggModifiers.map(
+            (OrderModifier modifier) => modifier.extraPriceMinor,
+          ),
+          everyElement(0),
+        );
+        expect(
+          eggModifiers.map(
+            (OrderModifier modifier) => modifier.priceEffectMinor,
+          ),
+          everyElement(0),
+        );
+      },
+    );
+
+    test('bread type persists as a zero-price add modifier', () async {
+      final db = createTestDatabase();
+      addTearDown(db.close);
+      final _BreakfastFixture fixture = await _seedBreakfastFixture(db);
+      final BreakfastSetConfiguration configuration =
+          (await BreakfastConfigurationRepository(
+            db,
+          ).loadSetConfiguration(fixture.set4ProductId))!;
+      final BreakfastRequestedState requestedState = BreakfastRequestedState(
+        chosenGroups: <BreakfastChosenGroupRequest>[
+          BreakfastChosenGroupRequest(
+            groupId: fixture.toastBreadGroupId,
+            selectedItemProductId: fixture.breadProductId,
+            requestedQuantity: 1,
+          ),
+        ],
+        customModifiers: <BreakfastCustomModifierRequest>[
+          BreakfastCustomModifierRequest(
+            itemProductId: fixture.breadProductId,
+            itemName: 'Bread: Brown Bread',
+            sortKey: 3,
+          ),
+        ],
+      );
+      final BreakfastRebuildResult rebuildResult =
+          const BreakfastRebuildEngine().rebuild(
+            BreakfastRebuildInput(
+              transactionLine: BreakfastTransactionLineInput(
+                lineId: 0,
+                lineUuid: 'bread-custom',
+                rootProductId: fixture.set4ProductId,
+                rootProductName: 'Set 4',
+                baseUnitPriceMinor: 400,
+                lineQuantity: 1,
+              ),
+              setConfiguration: configuration,
+              requestedState: requestedState,
+            ),
+          );
+      expect(rebuildResult.validationErrors, isEmpty);
+
+      final order = await fixture.service
+          .createPersistedEmptyDraftForTestingAccess(
+            currentUser: fixture.cashier,
+          );
+      final TransactionLine line = await fixture.service
+          .addBreakfastSelectionToOrder(
+            transactionId: order.id,
+            productId: fixture.set4ProductId,
+            selection: BreakfastCartSelection(
+              requestedState: requestedState,
+              rebuildResult: rebuildResult,
+            ),
+          );
+
+      final List<OrderModifier> modifiers = await fixture.service
+          .getLineModifiers(line.id);
+      final OrderModifier breadModifier = modifiers.singleWhere(
+        (OrderModifier modifier) => modifier.itemName == 'Bread: Brown Bread',
+      );
+
+      expect(breadModifier.action, ModifierAction.add);
+      expect(breadModifier.extraPriceMinor, 0);
+      expect(breadModifier.priceEffectMinor, 0);
+      expect(breadModifier.itemProductId, fixture.breadProductId);
     });
   });
 }
@@ -672,6 +843,7 @@ Future<_BreakfastFixture> _seedBreakfastFixture(
     beansProductId: beansProductId,
     teaProductId: teaProductId,
     toastProductId: toastProductId,
+    breadProductId: breadProductId,
     hotDrinkGroupId: hotDrinkGroupId,
     toastBreadGroupId: toastBreadGroupId,
   );
@@ -688,6 +860,7 @@ class _BreakfastFixture {
     required this.beansProductId,
     required this.teaProductId,
     required this.toastProductId,
+    required this.breadProductId,
     required this.hotDrinkGroupId,
     required this.toastBreadGroupId,
   });
@@ -701,6 +874,7 @@ class _BreakfastFixture {
   final int beansProductId;
   final int teaProductId;
   final int toastProductId;
+  final int breadProductId;
   final int hotDrinkGroupId;
   final int toastBreadGroupId;
 }

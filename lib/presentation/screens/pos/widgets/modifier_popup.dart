@@ -28,6 +28,18 @@ class ModifierPopup extends ConsumerStatefulWidget {
 }
 
 class _ModifierPopupState extends ConsumerState<ModifierPopup> {
+  static const String _defaultEggType = 'Fried Egg';
+  static const List<String> _eggTypes = <String>[
+    _defaultEggType,
+    'Poached Egg',
+    'Scrambled Egg',
+  ];
+  static const List<String> _eggCookPreferences = <String>[
+    'Runny',
+    'Medium',
+    'Well Done',
+  ];
+
   final Stopwatch _sessionStopwatch = Stopwatch();
   bool _isLoading = true;
   bool _isStructuredMode = false;
@@ -41,6 +53,8 @@ class _ModifierPopupState extends ConsumerState<ModifierPopup> {
   final Map<int, int> _legacyExtraCounts = <int, int>{};
   final Map<int, bool> _freeChecked = <int, bool>{};
   final Map<int, bool> _paidAddInSelected = <int, bool>{};
+  String _selectedEggType = _defaultEggType;
+  String? _selectedEggCookPreference;
   int _modifierSelectionTapCount = 0;
   PosMetricRating? _lastSelectionRating;
   int? _lastSelectionElapsedMs;
@@ -136,6 +150,8 @@ class _ModifierPopupState extends ConsumerState<ModifierPopup> {
                 MapEntry<int, bool>(modifier.id, false),
           ),
         );
+      _selectedEggType = _defaultEggType;
+      _selectedEggCookPreference = null;
 
       setState(() {
         _isStructuredMode = isStructuredMode;
@@ -444,20 +460,7 @@ class _ModifierPopupState extends ConsumerState<ModifierPopup> {
           ),
           const SizedBox(height: AppSizes.spacingSm),
           ..._legacyIncluded.map(
-            (ProductModifier modifier) => CheckboxListTile(
-              value: _legacyIncludedChecked[modifier.id] ?? true,
-              title: Text(
-                modifier.name,
-                style: const TextStyle(fontSize: AppSizes.fontSm),
-              ),
-              onChanged: (bool? checked) {
-                setState(() {
-                  _legacyIncludedChecked[modifier.id] = checked ?? true;
-                });
-              },
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
-            ),
+            (ProductModifier modifier) => _buildLegacyIncludedTile(modifier),
           ),
         ],
         if (_legacyIncluded.isNotEmpty && _legacyExtras.isNotEmpty)
@@ -501,6 +504,120 @@ class _ModifierPopupState extends ConsumerState<ModifierPopup> {
             );
           }),
         ],
+      ],
+    );
+  }
+
+  Widget _buildLegacyIncludedTile(ProductModifier modifier) {
+    final bool isChecked = _legacyIncludedChecked[modifier.id] ?? true;
+    if (!_isEggIncludedModifier(modifier)) {
+      return CheckboxListTile(
+        value: isChecked,
+        title: Text(
+          modifier.name,
+          style: const TextStyle(fontSize: AppSizes.fontSm),
+        ),
+        onChanged: (bool? checked) {
+          setState(() {
+            _legacyIncludedChecked[modifier.id] = checked ?? true;
+          });
+        },
+        controlAffinity: ListTileControlAffinity.leading,
+        contentPadding: EdgeInsets.zero,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        CheckboxListTile(
+          value: isChecked,
+          title: const Text('Egg', style: TextStyle(fontSize: AppSizes.fontSm)),
+          subtitle: const Text(
+            'Default: Fried Egg',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          onChanged: (bool? checked) {
+            setState(() {
+              _legacyIncludedChecked[modifier.id] = checked ?? true;
+            });
+          },
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 16, bottom: AppSizes.spacingSm),
+          child: Opacity(
+            opacity: isChecked ? 1 : 0.45,
+            child: IgnorePointer(
+              ignoring: !isChecked,
+              child: _buildEggCustomizationControls(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEggCustomizationControls() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const Text(
+          'Egg Type',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _eggTypes
+              .map(
+                (String type) => ChoiceChip(
+                  key: ValueKey<String>(_eggOptionKey('egg-type', type)),
+                  label: Text(type),
+                  selected: _selectedEggType == type,
+                  onSelected: (_) {
+                    setState(() {
+                      _selectedEggType = type;
+                    });
+                  },
+                ),
+              )
+              .toList(growable: false),
+        ),
+        const SizedBox(height: AppSizes.spacingMd),
+        const Text(
+          'Cook Preference',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _eggCookPreferences
+              .map(
+                (String preference) => ChoiceChip(
+                  key: ValueKey<String>(_eggOptionKey('egg-cook', preference)),
+                  label: Text(preference),
+                  selected: _selectedEggCookPreference == preference,
+                  onSelected: (_) {
+                    setState(() {
+                      _selectedEggCookPreference = preference;
+                    });
+                  },
+                ),
+              )
+              .toList(growable: false),
+        ),
       ],
     );
   }
@@ -653,6 +770,28 @@ class _ModifierPopupState extends ConsumerState<ModifierPopup> {
             extraPriceMinor: 0,
           ),
         );
+        continue;
+      }
+      if (_isEggIncludedModifier(modifier)) {
+        if (_selectedEggType != _defaultEggType) {
+          selected.add(
+            CartModifier(
+              action: ModifierAction.add,
+              itemName: 'Egg: $_selectedEggType',
+              extraPriceMinor: 0,
+            ),
+          );
+        }
+        final String? cookPreference = _selectedEggCookPreference;
+        if (cookPreference != null) {
+          selected.add(
+            CartModifier(
+              action: ModifierAction.add,
+              itemName: 'Cook: $cookPreference',
+              extraPriceMinor: 0,
+            ),
+          );
+        }
       }
     }
 
@@ -766,6 +905,14 @@ class _ModifierPopupState extends ConsumerState<ModifierPopup> {
     logPosDebugSummary(context);
 
     Navigator.of(context).pop(selected);
+  }
+
+  bool _isEggIncludedModifier(ProductModifier modifier) {
+    return modifier.name.trim().toLowerCase() == 'egg';
+  }
+
+  static String _eggOptionKey(String prefix, String label) {
+    return '$prefix-${label.toLowerCase().replaceAll(' ', '-')}';
   }
 }
 

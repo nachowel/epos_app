@@ -55,6 +55,11 @@ class BreakfastRebuildEngine {
       requestedAdds: input.requestedState.addedProducts,
       configuration: input.setConfiguration,
     );
+    final List<BreakfastClassifiedModifier> customModifierRows =
+        _classifyCustomModifiers(
+          requestedCustomModifiers: input.requestedState.customModifiers,
+          configuration: input.setConfiguration,
+        );
 
     int replacementCounter = 0;
     final List<BreakfastClassifiedModifier> classifiedAddRows =
@@ -114,6 +119,7 @@ class BreakfastRebuildEngine {
       _foldRows(<BreakfastClassifiedModifier>[
         ...removalResult.rows,
         ...choiceResult.rows,
+        ...customModifierRows,
         ...classifiedAddRows,
       ]),
     );
@@ -201,6 +207,13 @@ class BreakfastRebuildEngine {
       if (selectedItemProductId != null &&
           !knownProductIds.contains(selectedItemProductId)) {
         errors.add(BreakfastEditErrorCode.unknownProduct);
+      }
+    }
+    for (final BreakfastCustomModifierRequest modifier
+        in input.requestedState.customModifiers) {
+      if (!knownProductIds.contains(modifier.itemProductId) ||
+          modifier.itemName.trim().isEmpty) {
+        errors.add(BreakfastEditErrorCode.unknownRequestedEntity);
       }
     }
     return errors.toList(growable: false);
@@ -612,6 +625,44 @@ class BreakfastRebuildEngine {
     return result;
   }
 
+  List<BreakfastClassifiedModifier> _classifyCustomModifiers({
+    required List<BreakfastCustomModifierRequest> requestedCustomModifiers,
+    required BreakfastSetConfiguration configuration,
+  }) {
+    final List<BreakfastClassifiedModifier> rows =
+        <BreakfastClassifiedModifier>[];
+    for (final BreakfastCustomModifierRequest modifier
+        in requestedCustomModifiers) {
+      final BreakfastCatalogProduct? product = configuration.findCatalogProduct(
+        modifier.itemProductId,
+      );
+      if (product == null || modifier.itemName.trim().isEmpty) {
+        continue;
+      }
+      rows.add(
+        BreakfastClassifiedModifier(
+          kind: BreakfastModifierKind.extraAdd,
+          action: ModifierAction.add,
+          chargeReason: ModifierChargeReason.extraAdd,
+          itemProductId: modifier.itemProductId,
+          displayName: modifier.itemName.trim(),
+          quantity: 1,
+          unitPriceMinor: 0,
+          priceEffectMinor: 0,
+          sortKey: _customModifierSortKey(modifier),
+        ),
+      );
+    }
+    return rows;
+  }
+
+  int _customModifierSortKey(BreakfastCustomModifierRequest modifier) {
+    if (modifier.sortKey > 0) {
+      return 2500 + modifier.sortKey;
+    }
+    return 2500 + modifier.itemProductId;
+  }
+
   BreakfastClassifiedModifier _buildAddRow({
     required _AddUnit addUnit,
     required BreakfastModifierKind kind,
@@ -646,6 +697,7 @@ class BreakfastRebuildEngine {
         action: row.action,
         chargeReason: row.chargeReason,
         itemProductId: row.itemProductId,
+        displayName: row.displayName,
         unitPriceMinor: row.unitPriceMinor,
       );
       final BreakfastClassifiedModifier? existing = folded[key];
@@ -955,12 +1007,14 @@ class _FoldKey {
     required this.action,
     required this.chargeReason,
     required this.itemProductId,
+    required this.displayName,
     required this.unitPriceMinor,
   });
 
   final ModifierAction action;
   final ModifierChargeReason? chargeReason;
   final int? itemProductId;
+  final String displayName;
   final int unitPriceMinor;
 
   @override
@@ -972,10 +1026,16 @@ class _FoldKey {
         other.action == action &&
         other.chargeReason == chargeReason &&
         other.itemProductId == itemProductId &&
+        other.displayName == displayName &&
         other.unitPriceMinor == unitPriceMinor;
   }
 
   @override
-  int get hashCode =>
-      Object.hash(action, chargeReason, itemProductId, unitPriceMinor);
+  int get hashCode => Object.hash(
+    action,
+    chargeReason,
+    itemProductId,
+    displayName,
+    unitPriceMinor,
+  );
 }

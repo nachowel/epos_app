@@ -6,6 +6,7 @@ import 'package:epos_app/data/database/app_database.dart' as app_db;
 import 'package:epos_app/data/repositories/category_repository.dart';
 import 'package:epos_app/data/repositories/modifier_repository.dart';
 import 'package:epos_app/data/repositories/product_repository.dart';
+import 'package:epos_app/domain/models/order_modifier.dart';
 import 'package:epos_app/domain/models/shift.dart';
 import 'package:epos_app/domain/services/catalog_service.dart';
 import 'package:epos_app/presentation/providers/cart_models.dart';
@@ -250,6 +251,140 @@ void main() {
       expect(find.text('Lettuce'), findsNothing);
       expect(find.text('Cheese'), findsNothing);
     });
+
+    testWidgets(
+      'Egg included item defaults to Fried Egg without returning a modifier',
+      (WidgetTester tester) async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final _EggFixture fixture = await _createEggProduct(db);
+        late Future<List<CartModifier>?> popupResult;
+
+        await tester.pumpWidget(
+          _buildTestHarness(
+            db: db,
+            child: MaterialApp(
+              home: Builder(
+                builder: (BuildContext context) {
+                  return Scaffold(
+                    body: Center(
+                      child: FilledButton(
+                        onPressed: () {
+                          popupResult = showDialog<List<CartModifier>>(
+                            context: context,
+                            builder: (_) => ModifierPopup(
+                              productId: fixture.productId,
+                              productName: 'Breakfast Roll',
+                            ),
+                          );
+                        },
+                        child: const Text('Open'),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Egg Type'), findsOneWidget);
+        expect(find.text('Fried Egg'), findsOneWidget);
+        expect(_choiceChipSelected(tester, 'egg-type-fried-egg'), isTrue);
+
+        await tester.tap(find.text(AppStrings.addToCart));
+        await tester.pumpAndSettle();
+
+        final List<CartModifier>? result = await popupResult;
+        expect(result, isNotNull);
+        expect(result, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'Egg type and cook preference are independent single selections',
+      (WidgetTester tester) async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final _EggFixture fixture = await _createEggProduct(db);
+        late Future<List<CartModifier>?> popupResult;
+
+        await tester.pumpWidget(
+          _buildTestHarness(
+            db: db,
+            child: MaterialApp(
+              home: Builder(
+                builder: (BuildContext context) {
+                  return Scaffold(
+                    body: Center(
+                      child: FilledButton(
+                        onPressed: () {
+                          popupResult = showDialog<List<CartModifier>>(
+                            context: context,
+                            builder: (_) => ModifierPopup(
+                              productId: fixture.productId,
+                              productName: 'Breakfast Roll',
+                            ),
+                          );
+                        },
+                        child: const Text('Open'),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.byKey(const ValueKey<String>('egg-type-poached-egg')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey<String>('egg-type-scrambled-egg')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey<String>('egg-type-poached-egg')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey<String>('egg-cook-well-done')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(_choiceChipSelected(tester, 'egg-type-fried-egg'), isFalse);
+        expect(_choiceChipSelected(tester, 'egg-type-poached-egg'), isTrue);
+        expect(_choiceChipSelected(tester, 'egg-type-scrambled-egg'), isFalse);
+        expect(_choiceChipSelected(tester, 'egg-cook-well-done'), isTrue);
+
+        await tester.tap(find.text(AppStrings.addToCart));
+        await tester.pumpAndSettle();
+
+        final List<CartModifier>? result = await popupResult;
+        expect(result, isNotNull);
+        expect(result, hasLength(2));
+        expect(
+          result!.map((CartModifier modifier) => modifier.action),
+          everyElement(ModifierAction.add),
+        );
+        expect(
+          result.map((CartModifier modifier) => modifier.itemName),
+          containsAllInOrder(<String>['Egg: Poached Egg', 'Cook: Well Done']),
+        );
+        expect(
+          result.map((CartModifier modifier) => modifier.extraPriceMinor),
+          everyElement(0),
+        );
+      },
+    );
   });
 }
 
@@ -337,6 +472,38 @@ Color? _buttonColor(WidgetTester tester, String key) {
   );
   final BoxDecoration decoration = widget.decoration! as BoxDecoration;
   return decoration.color;
+}
+
+bool _choiceChipSelected(WidgetTester tester, String key) {
+  final Finder chip = find.byKey(ValueKey<String>(key));
+  return tester.widget<ChoiceChip>(chip).selected;
+}
+
+class _EggFixture {
+  const _EggFixture({required this.productId});
+
+  final int productId;
+}
+
+Future<_EggFixture> _createEggProduct(app_db.AppDatabase db) async {
+  final int categoryId = await insertCategory(db, name: 'Breakfast');
+  final int productId = await insertProduct(
+    db,
+    categoryId: categoryId,
+    name: 'Breakfast Roll',
+    priceMinor: 500,
+    hasModifiers: true,
+  );
+  await db
+      .into(db.productModifiers)
+      .insert(
+        app_db.ProductModifiersCompanion.insert(
+          productId: productId,
+          name: 'Egg',
+          type: 'included',
+        ),
+      );
+  return _EggFixture(productId: productId);
 }
 
 class _StructuredBurgerFixture {

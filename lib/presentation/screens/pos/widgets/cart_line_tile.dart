@@ -294,7 +294,9 @@ class _CartLineTileState extends State<CartLineTile> {
       }
       entries.add(
         _ModifierVisualEntry(
-          text: _stripCartSummaryPriceText(_breakfastRenderedLabel(modifier)),
+          text: _stripBreadTypeDisplayPrefix(
+            _stripCartSummaryPriceText(_breakfastRenderedLabel(modifier)),
+          ),
           kind: _kindFromBreakfastModifier(modifier),
         ),
       );
@@ -514,6 +516,18 @@ class _CartLineTileState extends State<CartLineTile> {
       '',
     );
     return normalized.trim();
+  }
+
+  String _stripBreadTypeDisplayPrefix(String value) {
+    final String trimmed = value.trim();
+    final RegExpMatch? prefixed = RegExp(
+      r'^([+↔-]\s*)?Bread:\s*(.+)$',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
+    if (prefixed == null) {
+      return trimmed;
+    }
+    return '${prefixed.group(1) ?? ''}${prefixed.group(2) ?? ''}'.trim();
   }
 
   _ModifierLineSet _buildModifierLineSet(List<_ModifierVisualEntry> entries) {

@@ -97,6 +97,7 @@ class BreakfastRequestedStateMapper {
     final Map<int, _ChoiceSelectionAccumulator> choiceSelections =
         <int, _ChoiceSelectionAccumulator>{};
     final Set<int> overflowModifierIds = <int>{};
+    final Set<int> customModifierIds = <int>{};
 
     for (final OrderModifier modifier in modifiers) {
       if (modifier.action == ModifierAction.remove &&
@@ -151,12 +152,39 @@ class BreakfastRequestedStateMapper {
       );
     }
 
+    final List<BreakfastCustomModifierRequest> customModifiers =
+        <BreakfastCustomModifierRequest>[];
+    for (final OrderModifier modifier in modifiers) {
+      final BreakfastCustomModifierRequest? customModifier =
+          _customModifierFromPersistedRow(modifier);
+      if (customModifier == null) {
+        continue;
+      }
+      customModifierIds.add(modifier.id);
+      customModifiers.add(customModifier);
+    }
+    customModifiers.sort((
+      BreakfastCustomModifierRequest a,
+      BreakfastCustomModifierRequest b,
+    ) {
+      final int sortCompare = a.sortKey.compareTo(b.sortKey);
+      if (sortCompare != 0) {
+        return sortCompare;
+      }
+      final int productCompare = a.itemProductId.compareTo(b.itemProductId);
+      if (productCompare != 0) {
+        return productCompare;
+      }
+      return a.itemName.compareTo(b.itemName);
+    });
+
     final List<BreakfastAddedProductRequest> addedProducts =
         modifiers
             .where(
               (OrderModifier modifier) =>
                   modifier.action == ModifierAction.add &&
                   !overflowModifierIds.contains(modifier.id) &&
+                  !customModifierIds.contains(modifier.id) &&
                   modifier.itemProductId != null,
             )
             .map(
@@ -214,9 +242,46 @@ class BreakfastRequestedStateMapper {
                   BreakfastCookingInstructionRequest b,
                 ) => a.itemProductId.compareTo(b.itemProductId),
               ),
+        customModifiers: customModifiers,
       ),
       source: sourceLabel,
     );
+  }
+
+  static BreakfastCustomModifierRequest? _customModifierFromPersistedRow(
+    OrderModifier modifier,
+  ) {
+    if (modifier.action != ModifierAction.add ||
+        modifier.chargeReason != ModifierChargeReason.extraAdd ||
+        modifier.itemProductId == null ||
+        modifier.quantity != 1 ||
+        modifier.extraPriceMinor != 0 ||
+        modifier.priceEffectMinor != 0) {
+      return null;
+    }
+
+    final String itemName = modifier.itemName.trim();
+    if (!_isBreakfastCustomModifierName(itemName)) {
+      return null;
+    }
+    return BreakfastCustomModifierRequest(
+      itemProductId: modifier.itemProductId!,
+      itemName: itemName,
+      sortKey: _requestedCustomSortKey(modifier.sortKey),
+    );
+  }
+
+  static bool _isBreakfastCustomModifierName(String itemName) {
+    return itemName.startsWith('Egg:') ||
+        itemName.startsWith('Cook:') ||
+        itemName.startsWith('Bread:');
+  }
+
+  static int _requestedCustomSortKey(int persistedSortKey) {
+    if (persistedSortKey > 2500) {
+      return persistedSortKey - 2500;
+    }
+    return persistedSortKey;
   }
 }
 

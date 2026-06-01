@@ -414,6 +414,35 @@ class AdminBreakfastSetEditorNotifier
     }
   }
 
+  Future<bool> deleteExtraPreset(int presetId) async {
+    final User? currentUser = _ref.read(authNotifierProvider).currentUser;
+    final SemanticProductConfigurationEditorData? editorData = state.editorData;
+    if (currentUser == null || editorData == null) {
+      return false;
+    }
+
+    try {
+      await _ref
+          .read(semanticMenuAdminServiceProvider)
+          .deleteExtraPreset(
+            user: currentUser,
+            presetId: presetId,
+          );
+      await _refreshExtraPresets();
+      return true;
+    } catch (error, stackTrace) {
+      state = state.copyWith(
+        errorMessage: ErrorMapper.toUserMessageAndLog(
+          error,
+          logger: _ref.read(appLoggerProvider),
+          eventType: 'admin_breakfast_extra_preset_delete_failed',
+          stackTrace: stackTrace,
+        ),
+      );
+      return false;
+    }
+  }
+
   Future<void> updateSetItemQuantityAt(int index, String rawValue) async {
     final SemanticProductConfigurationDraft? draftConfiguration =
         state.draftConfiguration;

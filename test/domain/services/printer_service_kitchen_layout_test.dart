@@ -188,6 +188,22 @@ void main() {
             .into(database.orderModifiers)
             .insert(
               db.OrderModifiersCompanion.insert(
+                uuid: 'bread-type-brown',
+                transactionLineId: lineId,
+                action: 'add',
+                itemName: 'Bread: Brown Bread',
+                quantity: const Value<int>(1),
+                itemProductId: Value<int?>(breadProductId),
+                chargeReason: const Value<String?>('extra_add'),
+                extraPriceMinor: const Value<int>(0),
+                priceEffectMinor: const Value<int>(0),
+                sortKey: const Value<int>(33),
+              ),
+            );
+        await database
+            .into(database.orderModifiers)
+            .insert(
+              db.OrderModifiersCompanion.insert(
                 uuid: 'extra-hash-brown',
                 transactionLineId: lineId,
                 action: 'add',
@@ -236,7 +252,7 @@ void main() {
         expect(
           printable,
           contains(
-            '  CAPPUCCINO | TOAST\n\nREMOVE:\n  - BACON\n\nADD:\n  + SAUSAGE\n  + HASH BROWN\n\nNOTE:\n  BACON: EXTRA CRISPY',
+            '  CAPPUCCINO | TOAST\n  BREAD: BROWN BREAD\n\nREMOVE:\n  - BACON\n\nADD:\n  + SAUSAGE\n  + HASH BROWN\n\nNOTE:\n  BACON: EXTRA CRISPY',
           ),
         );
         expect(printable, isNot(contains('>>>')));
@@ -246,7 +262,6 @@ void main() {
         expect(printable, isNot(contains('TOTAL')));
         expect(printable, isNot(contains('TABLE')));
         expect(printable, isNot(contains('DRINK:')));
-        expect(printable, isNot(contains('BREAD:')));
         expect(printable, isNot(contains('EXTRAS:')));
         expect(printable, isNot(contains('SAUCE:')));
       },
@@ -536,6 +551,90 @@ void main() {
         expect(printable, contains('1x SOUP'));
         expect(printable, isNot(contains('CUSTOM SALE')));
         expect(printable, isNot(contains('MANUAL ITEM')));
+      },
+    );
+
+    test(
+      'kitchen ticket renders custom egg type and cook preference as instruction rows',
+      () async {
+        final db.AppDatabase database = createTestDatabase();
+        addTearDown(database.close);
+
+        final int cashierId = await insertUser(
+          database,
+          name: 'Cashier',
+          role: 'cashier',
+        );
+        final int shiftId = await insertShift(database, openedBy: cashierId);
+        final int categoryId = await insertCategory(
+          database,
+          name: 'Breakfast',
+        );
+        final int rollProductId = await insertProduct(
+          database,
+          categoryId: categoryId,
+          name: 'Breakfast Roll',
+          priceMinor: 500,
+        );
+        final int transactionId = await insertTransaction(
+          database,
+          uuid: 'kitchen-layout-egg-choice',
+          shiftId: shiftId,
+          userId: cashierId,
+          status: 'sent',
+          totalAmountMinor: 500,
+        );
+        final int lineId = await database
+            .into(database.transactionLines)
+            .insert(
+              db.TransactionLinesCompanion.insert(
+                uuid: 'line-egg-choice',
+                transactionId: transactionId,
+                productId: rollProductId,
+                productName: 'Breakfast Roll',
+                unitPriceMinor: 500,
+                quantity: const Value<int>(1),
+                lineTotalMinor: 500,
+              ),
+            );
+
+        await database
+            .into(database.orderModifiers)
+            .insert(
+              db.OrderModifiersCompanion.insert(
+                uuid: 'egg-type-poached',
+                transactionLineId: lineId,
+                action: 'add',
+                itemName: 'Egg: Poached Egg',
+                quantity: const Value<int>(1),
+                extraPriceMinor: const Value<int>(0),
+                sortKey: const Value<int>(10),
+              ),
+            );
+        await database
+            .into(database.orderModifiers)
+            .insert(
+              db.OrderModifiersCompanion.insert(
+                uuid: 'egg-cook-well-done',
+                transactionLineId: lineId,
+                action: 'add',
+                itemName: 'Cook: Well Done',
+                quantity: const Value<int>(1),
+                extraPriceMinor: const Value<int>(0),
+                sortKey: const Value<int>(20),
+              ),
+            );
+
+        final PrinterService service = PrinterService(
+          TransactionRepository(database),
+        );
+        final String printable = await service
+            .buildKitchenTicketPreviewForTesting(transactionId: transactionId);
+
+        expect(printable, contains('1x BREAKFAST ROLL'));
+        expect(printable, contains('  EGG: POACHED EGG\n  COOK: WELL DONE'));
+        expect(printable, isNot(contains('ADD:\n  + EGG: POACHED EGG')));
+        expect(printable, isNot(contains('REMOVE:')));
       },
     );
   });

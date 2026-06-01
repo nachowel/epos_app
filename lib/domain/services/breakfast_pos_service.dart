@@ -239,7 +239,7 @@ class BreakfastPosService {
     required BreakfastRequestedState requestedState,
   }) {
     final BreakfastRequestedState normalizedRequestedState =
-        _cookingInstructionService.sanitizeRequestedState(
+        _sanitizeRequestedState(
           configuration: configuration,
           requestedState: requestedState,
         );
@@ -280,6 +280,66 @@ class BreakfastPosService {
         requestedState: normalizedRequestedState,
       ),
     );
+  }
+
+  BreakfastRequestedState _sanitizeRequestedState({
+    required BreakfastSetConfiguration configuration,
+    required BreakfastRequestedState requestedState,
+  }) {
+    final BreakfastRequestedState cookingSanitized = _cookingInstructionService
+        .sanitizeRequestedState(
+          configuration: configuration,
+          requestedState: requestedState,
+        );
+    final Set<int> activeProductIds = _activeProductIds(
+      configuration: configuration,
+      requestedState: cookingSanitized,
+    );
+    final List<BreakfastCustomModifierRequest> customModifiers =
+        cookingSanitized.customModifiers
+            .where(
+              (BreakfastCustomModifierRequest modifier) =>
+                  activeProductIds.contains(modifier.itemProductId) &&
+                  modifier.itemName.trim().isNotEmpty,
+            )
+            .toList(growable: false);
+    if (customModifiers.length == cookingSanitized.customModifiers.length) {
+      return cookingSanitized;
+    }
+    return cookingSanitized.copyWith(customModifiers: customModifiers);
+  }
+
+  Set<int> _activeProductIds({
+    required BreakfastSetConfiguration configuration,
+    required BreakfastRequestedState requestedState,
+  }) {
+    final Set<int> productIds = <int>{};
+    final Map<int, int> removedByProductId = <int, int>{
+      for (final BreakfastRemovedSetItemRequest removal
+          in requestedState.removedSetItems)
+        removal.itemProductId: removal.quantity,
+    };
+    for (final BreakfastSetItemConfig item in configuration.setItems) {
+      final int keptQuantity =
+          item.defaultQuantity - (removedByProductId[item.itemProductId] ?? 0);
+      if (keptQuantity > 0) {
+        productIds.add(item.itemProductId);
+      }
+    }
+    for (final BreakfastChosenGroupRequest choice
+        in requestedState.chosenGroups) {
+      final int? selectedItemProductId = choice.selectedItemProductId;
+      if (selectedItemProductId != null && choice.requestedQuantity > 0) {
+        productIds.add(selectedItemProductId);
+      }
+    }
+    for (final BreakfastAddedProductRequest add
+        in requestedState.addedProducts) {
+      if (add.quantity > 0) {
+        productIds.add(add.itemProductId);
+      }
+    }
+    return productIds;
   }
 
   Future<BreakfastCartSelection> buildCartSelection({

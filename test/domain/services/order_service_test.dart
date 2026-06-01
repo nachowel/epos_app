@@ -834,6 +834,42 @@ void main() {
       },
     );
 
+    test(
+      'flat choice modifier requests are persisted as zero-price add rows',
+      () async {
+        final _BurgerOrderFixture fixture = await _createBurgerOrderFixture();
+        addTearDown(fixture.db.close);
+
+        final Transaction order = await fixture.service
+            .createPersistedEmptyDraftForTestingAccess(
+              currentUser: fixture.user,
+            );
+        final TransactionLine line = await fixture.service.addProductToOrder(
+          transactionId: order.id,
+          productId: fixture.productId,
+        );
+
+        await fixture.service.addModifierToLine(
+          transactionLineId: line.id,
+          action: ModifierAction.choice,
+          itemName: 'Egg: Poached Egg',
+          extraPriceMinor: 0,
+        );
+
+        final List<OrderModifier> modifiers = await fixture.service
+            .getLineModifiers(line.id);
+        final Transaction refreshed = (await fixture.service.getOrderById(
+          order.id,
+        ))!;
+
+        expect(modifiers, hasLength(1));
+        expect(modifiers.single.action, ModifierAction.add);
+        expect(modifiers.single.itemName, 'Egg: Poached Egg');
+        expect(modifiers.single.extraPriceMinor, 0);
+        expect(refreshed.modifierTotalMinor, 0);
+      },
+    );
+
     test('Hidden product cannot be added to new order', () async {
       final db = createTestDatabase();
       addTearDown(db.close);

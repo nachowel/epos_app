@@ -385,6 +385,44 @@ void main() {
         ]);
       },
     );
+
+    test('strict reverse mapping preserves breakfast custom modifier rows', () {
+      final BreakfastRequestedState state =
+          BreakfastRequestedStateMapper.fromPersistedSnapshot(
+            modifiers: <OrderModifier>[
+              _modifier(
+                id: 30,
+                action: ModifierAction.add,
+                chargeReason: ModifierChargeReason.extraAdd,
+                itemProductId: 103,
+                itemName: 'Bread: Brown Bread',
+                sortKey: 2503,
+              ),
+              _modifier(
+                id: 31,
+                action: ModifierAction.add,
+                chargeReason: ModifierChargeReason.extraAdd,
+                itemProductId: 101,
+                itemName: 'Egg: Poached Egg',
+                sortKey: 2501,
+              ),
+            ],
+          );
+
+      expect(state.addedProducts, isEmpty);
+      expect(state.customModifiers, const <BreakfastCustomModifierRequest>[
+        BreakfastCustomModifierRequest(
+          itemProductId: 101,
+          itemName: 'Egg: Poached Egg',
+          sortKey: 1,
+        ),
+        BreakfastCustomModifierRequest(
+          itemProductId: 103,
+          itemName: 'Bread: Brown Bread',
+          sortKey: 3,
+        ),
+      ]);
+    });
   });
 }
 
@@ -394,6 +432,7 @@ OrderModifier _modifier({
   ModifierChargeReason? chargeReason,
   int? itemProductId,
   int? sourceGroupId,
+  String? itemName,
   int quantity = 1,
   int sortKey = 0,
 }) {
@@ -402,7 +441,7 @@ OrderModifier _modifier({
     uuid: 'modifier-$id',
     transactionLineId: 1,
     action: action,
-    itemName: 'Item $id',
+    itemName: itemName ?? 'Item $id',
     extraPriceMinor: 0,
     chargeReason: chargeReason,
     itemProductId: itemProductId,

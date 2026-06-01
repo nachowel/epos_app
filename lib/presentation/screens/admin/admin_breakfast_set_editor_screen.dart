@@ -172,7 +172,7 @@ class _AdminBreakfastSetEditorScreenState
               ),
               onApplyPreset: editorData.extraPresets.isEmpty
                   ? null
-                  : () => _showApplyExtraPresetDialog(editorData.extraPresets),
+                  : () => _showApplyExtraPresetDialog(editorData.availableProducts),
               onCreatePreset: () => _showCreateExtraPresetDialog(
                 availableProducts: editorData.availableProducts,
                 initialSelectedProductIds: draftConfiguration.extras
@@ -341,12 +341,12 @@ class _AdminBreakfastSetEditorScreenState
   }
 
   Future<void> _showApplyExtraPresetDialog(
-    List<BreakfastExtraPreset> presets,
+    List<Product> availableProducts,
   ) async {
     final BreakfastExtraPreset? preset = await showDialog<BreakfastExtraPreset>(
       context: context,
       builder: (BuildContext context) {
-        return _ExtraPresetPickerDialog(presets: presets);
+        return _ExtraPresetPickerDialog(availableProducts: availableProducts);
       },
     );
     if (preset == null || !mounted) {
@@ -1291,17 +1291,123 @@ class _ActionBar extends StatelessWidget {
   }
 }
 
-class _ExtraPresetPickerDialog extends StatelessWidget {
-  const _ExtraPresetPickerDialog({required this.presets});
+class _ExtraPresetPickerDialog extends ConsumerWidget {
+  const _ExtraPresetPickerDialog({required this.availableProducts});
 
-  final List<BreakfastExtraPreset> presets;
+  final List<Product> availableProducts;
+
+  List<Product> _presetProducts(List<Product> availableProducts, int? rootProductId) {
+    return availableProducts
+        .where((Product product) => product.id != rootProductId)
+        .toList(growable: false);
+  }
+
+  Future<void> _handleEditPreset(
+    BuildContext context,
+    WidgetRef ref,
+    BreakfastExtraPreset preset,
+    int? rootProductId,
+  ) async {
+    final _ExtraPresetDraft? presetDraft = await showDialog<_ExtraPresetDraft>(
+      context: context,
+      builder: (BuildContext context) {
+        return _ExtraPresetEditorDialog(
+          presetId: preset.id,
+          presetName: preset.name,
+          products: _presetProducts(availableProducts, rootProductId),
+          initialSelectedProductIds: preset.items
+              .map((BreakfastExtraPresetItem item) => item.itemProductId)
+              .toSet(),
+        );
+      },
+    );
+    if (presetDraft == null || !context.mounted) {
+      return;
+    }
+    final bool success = await ref
+        .read(adminBreakfastSetEditorNotifierProvider.notifier)
+        .saveExtraPreset(
+          presetId: preset.id,
+          name: presetDraft.name,
+          products: presetDraft.products,
+        );
+    if (!context.mounted) {
+      return;
+    }
+    final String message = success
+        ? 'Breakfast extras preset saved.'
+        : (ref.read(adminBreakfastSetEditorNotifierProvider).errorMessage ??
+              'Failed to save breakfast extras preset.');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _handleDeletePreset(
+    BuildContext context,
+    WidgetRef ref,
+    BreakfastExtraPreset preset,
+  ) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete preset?'),
+          content: const Text(
+            'This will not remove extras from existing breakfast sets. It only deletes the saved preset.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              key: const ValueKey<String>('breakfast-editor-preset-delete-cancel'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const ValueKey<String>('breakfast-editor-preset-delete-confirm'),
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.error,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true || !context.mounted) {
+      return;
+    }
+
+    final bool success = await ref
+        .read(adminBreakfastSetEditorNotifierProvider.notifier)
+        .deleteExtraPreset(preset.id);
+
+    if (!context.mounted) {
+      return;
+    }
+
+    final String message = success
+        ? 'Breakfast extras preset deleted.'
+        : (ref.read(adminBreakfastSetEditorNotifierProvider).errorMessage ??
+              'Failed to delete breakfast extras preset.');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AdminBreakfastSetEditorState state = ref.watch(
+      adminBreakfastSetEditorNotifierProvider,
+    );
+    final List<BreakfastExtraPreset> presets =
+        state.editorData?.extraPresets ?? const <BreakfastExtraPreset>[];
+
     return AlertDialog(
       title: const Text('Apply Extras Preset'),
       content: SizedBox(
-        width: 520,
+        width: 540,
         height: 420,
         child: presets.isEmpty
             ? const Center(
@@ -1326,6 +1432,42 @@ class _ExtraPresetPickerDialog extends StatelessWidget {
                           : '${preset.items.length} products',
                     ),
                     onTap: () => Navigator.of(context).pop(preset),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        IconButton(
+                          key: ValueKey<String>(
+                            'breakfast-editor-extra-preset-apply-${preset.id}',
+                          ),
+                          icon: const Icon(Icons.check_circle_outline_rounded),
+                          color: AppColors.success,
+                          onPressed: () => Navigator.of(context).pop(preset),
+                          tooltip: 'Apply Preset',
+                        ),
+                        IconButton(
+                          key: ValueKey<String>(
+                            'breakfast-editor-extra-preset-edit-${preset.id}',
+                          ),
+                          icon: const Icon(Icons.edit_outlined),
+                          onPressed: () => _handleEditPreset(
+                            context,
+                            ref,
+                            preset,
+                            state.productId,
+                          ),
+                          tooltip: 'Edit Preset',
+                        ),
+                        IconButton(
+                          key: ValueKey<String>(
+                            'breakfast-editor-extra-preset-delete-${preset.id}',
+                          ),
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          color: AppColors.error,
+                          onPressed: () => _handleDeletePreset(context, ref, preset),
+                          tooltip: 'Delete Preset',
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),
@@ -1342,10 +1484,14 @@ class _ExtraPresetPickerDialog extends StatelessWidget {
 
 class _ExtraPresetEditorDialog extends StatefulWidget {
   const _ExtraPresetEditorDialog({
+    this.presetId,
+    this.presetName,
     required this.products,
     required this.initialSelectedProductIds,
   });
 
+  final int? presetId;
+  final String? presetName;
   final List<Product> products;
   final Set<int> initialSelectedProductIds;
 
@@ -1362,7 +1508,7 @@ class _ExtraPresetEditorDialogState extends State<_ExtraPresetEditorDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
+    _nameController = TextEditingController(text: widget.presetName);
     _selectedProductIds = Set<int>.from(widget.initialSelectedProductIds);
   }
 
@@ -1393,7 +1539,7 @@ class _ExtraPresetEditorDialogState extends State<_ExtraPresetEditorDialog> {
         _selectedProductIds.isNotEmpty;
 
     return AlertDialog(
-      title: const Text('Create Extras Preset'),
+      title: Text(widget.presetId == null ? 'Create Extras Preset' : 'Edit Extras Preset'),
       content: SizedBox(
         width: 560,
         height: 560,

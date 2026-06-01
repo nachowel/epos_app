@@ -643,6 +643,25 @@ class BreakfastConfigurationRepository {
     });
   }
 
+  Future<void> deleteExtraPreset(int presetId) {
+    return _database.transaction(() async {
+      await (_database.delete(_database.breakfastExtraPresetItems)
+            ..where(
+              (db.$BreakfastExtraPresetItemsTable t) =>
+                  t.presetId.equals(presetId),
+            ))
+          .go();
+      final int deletedCount = await (_database.delete(_database.breakfastExtraPresets)
+            ..where(
+              (db.$BreakfastExtraPresetsTable t) => t.id.equals(presetId),
+            ))
+          .go();
+      if (deletedCount == 0) {
+        throw NotFoundException('Breakfast extras preset not found.');
+      }
+    });
+  }
+
   Future<SemanticProductConfigurationDraft> loadAdminConfigurationDraft(
     int rootProductId,
   ) async {

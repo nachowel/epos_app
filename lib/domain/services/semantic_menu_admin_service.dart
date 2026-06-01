@@ -192,6 +192,14 @@ class SemanticMenuAdminService {
     );
   }
 
+  Future<void> deleteExtraPreset({
+    required User user,
+    required int presetId,
+  }) async {
+    _ensureAdmin(user);
+    await _breakfastConfigurationRepository.deleteExtraPreset(presetId);
+  }
+
   Future<SemanticMenuValidationResult> validateConfiguration({
     required SemanticProductConfigurationDraft configuration,
     ProductMenuConfigurationProfile? profile,

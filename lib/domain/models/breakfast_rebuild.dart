@@ -231,24 +231,28 @@ class BreakfastRequestedState {
     this.addedProducts = const <BreakfastAddedProductRequest>[],
     this.chosenGroups = const <BreakfastChosenGroupRequest>[],
     this.cookingInstructions = const <BreakfastCookingInstructionRequest>[],
+    this.customModifiers = const <BreakfastCustomModifierRequest>[],
   });
 
   final List<BreakfastRemovedSetItemRequest> removedSetItems;
   final List<BreakfastAddedProductRequest> addedProducts;
   final List<BreakfastChosenGroupRequest> chosenGroups;
   final List<BreakfastCookingInstructionRequest> cookingInstructions;
+  final List<BreakfastCustomModifierRequest> customModifiers;
 
   BreakfastRequestedState copyWith({
     List<BreakfastRemovedSetItemRequest>? removedSetItems,
     List<BreakfastAddedProductRequest>? addedProducts,
     List<BreakfastChosenGroupRequest>? chosenGroups,
     List<BreakfastCookingInstructionRequest>? cookingInstructions,
+    List<BreakfastCustomModifierRequest>? customModifiers,
   }) {
     return BreakfastRequestedState(
       removedSetItems: removedSetItems ?? this.removedSetItems,
       addedProducts: addedProducts ?? this.addedProducts,
       chosenGroups: chosenGroups ?? this.chosenGroups,
       cookingInstructions: cookingInstructions ?? this.cookingInstructions,
+      customModifiers: customModifiers ?? this.customModifiers,
     );
   }
 
@@ -261,7 +265,8 @@ class BreakfastRequestedState {
         _listEquals(other.removedSetItems, removedSetItems) &&
         _listEquals(other.addedProducts, addedProducts) &&
         _listEquals(other.chosenGroups, chosenGroups) &&
-        _listEquals(other.cookingInstructions, cookingInstructions);
+        _listEquals(other.cookingInstructions, cookingInstructions) &&
+        _listEquals(other.customModifiers, customModifiers);
   }
 
   @override
@@ -270,7 +275,34 @@ class BreakfastRequestedState {
     Object.hashAll(addedProducts),
     Object.hashAll(chosenGroups),
     Object.hashAll(cookingInstructions),
+    Object.hashAll(customModifiers),
   );
+}
+
+class BreakfastCustomModifierRequest {
+  const BreakfastCustomModifierRequest({
+    required this.itemProductId,
+    required this.itemName,
+    this.sortKey = 0,
+  });
+
+  final int itemProductId;
+  final String itemName;
+  final int sortKey;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is BreakfastCustomModifierRequest &&
+        other.itemProductId == itemProductId &&
+        other.itemName == itemName &&
+        other.sortKey == sortKey;
+  }
+
+  @override
+  int get hashCode => Object.hash(itemProductId, itemName, sortKey);
 }
 
 class BreakfastRemovedSetItemRequest {

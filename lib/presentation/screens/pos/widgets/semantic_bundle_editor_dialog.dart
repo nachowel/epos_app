@@ -33,6 +33,9 @@ class SemanticBundleEditorDialog extends ConsumerStatefulWidget {
 
 class _SemanticBundleEditorDialogState
     extends ConsumerState<SemanticBundleEditorDialog> {
+  static const String _defaultEggType = 'Fried Egg';
+  static const String _defaultBreadType = 'Crusty Bread';
+
   bool _isLoading = true;
   String? _errorMessage;
   BreakfastPosEditorData? _editorData;
@@ -41,6 +44,7 @@ class _SemanticBundleEditorDialogState
   final GlobalKey _requiredChoicesSectionKey = GlobalKey();
   int? _expandedRemovalSelectorProductId;
   int? _expandedCookingSelectorProductId;
+  int? _expandedStickyBarBreadProductId;
 
   @override
   void initState() {
@@ -186,10 +190,90 @@ class _SemanticBundleEditorDialogState
 
   void _toggleCookingSelector(int itemProductId) {
     setState(() {
+      _expandedRemovalSelectorProductId = null;
       _expandedCookingSelectorProductId =
           _expandedCookingSelectorProductId == itemProductId
           ? null
           : itemProductId;
+    });
+  }
+
+  void _selectChoice({
+    required BreakfastChoiceGroupConfig group,
+    required int? selectedItemProductId,
+    required int quantity,
+    int? toggleCustomizationProductId,
+  }) {
+    final BreakfastPosEditorData? editorData = _editorData;
+    if (editorData == null) {
+      return;
+    }
+    final int? previousExpandedCustomizationProductId =
+        _expandedCookingSelectorProductId;
+    final BreakfastRequestedState nextState = BreakfastLineEdit.chooseGroup(
+      groupId: group.groupId,
+      selectedItemProductId: selectedItemProductId,
+      quantity: quantity,
+    ).applyTo(_requestedState);
+    final BreakfastPosSelectionPreview preview = ref
+        .read(breakfastPosServiceProvider)
+        .previewSelection(
+          product: widget.product,
+          configuration: editorData.configuration,
+          requestedState: nextState,
+        );
+    final Set<int> availableCookingTargetIds = preview.cookingTargets
+        .map((BreakfastCookingInstructionTarget target) => target.itemProductId)
+        .toSet();
+    setState(() {
+      _requestedState = preview.requestedState;
+      _editorData = BreakfastPosEditorData(
+        product: editorData.product,
+        profile: editorData.profile,
+        configuration: editorData.configuration,
+        preview: preview,
+      );
+      _expandedRemovalSelectorProductId = null;
+      if (toggleCustomizationProductId != null) {
+        _expandedCookingSelectorProductId =
+            previousExpandedCustomizationProductId ==
+                toggleCustomizationProductId
+            ? null
+            : toggleCustomizationProductId;
+      } else if (!availableCookingTargetIds.contains(
+        _expandedCookingSelectorProductId,
+      )) {
+        _expandedCookingSelectorProductId = null;
+      }
+      _errorMessage = null;
+    });
+  }
+
+  void _toggleStickyBarBread({
+    required BreakfastChoiceGroupConfig group,
+    required int itemProductId,
+  }) {
+    final BreakfastPosEditorData? editorData = _editorData;
+    if (editorData == null) {
+      return;
+    }
+    final BreakfastRequestedState nextState = BreakfastLineEdit.chooseGroup(
+      groupId: group.groupId,
+      selectedItemProductId: itemProductId,
+      quantity: group.includedQuantity,
+    ).applyTo(_requestedState);
+    ref.read(breakfastPosServiceProvider).previewSelection(
+      product: widget.product,
+      configuration: editorData.configuration,
+      requestedState: nextState,
+    );
+    setState(() {
+      _requestedState = nextState;
+      _expandedStickyBarBreadProductId =
+          _expandedStickyBarBreadProductId == itemProductId
+              ? null
+              : itemProductId;
+      _expandedCookingSelectorProductId = null;
     });
   }
 
@@ -207,6 +291,121 @@ class _SemanticBundleEditorDialogState
     setState(() {
       _expandedCookingSelectorProductId = null;
     });
+  }
+
+  void _selectEggType({required int itemProductId, required String eggType}) {
+    _setCustomModifiers(
+      itemProductId: itemProductId,
+      prefix: 'Egg:',
+      nextItemName: eggType == _defaultEggType ? null : 'Egg: $eggType',
+      sortKey: 1,
+    );
+  }
+
+  void _selectEggCookPreference({
+    required int itemProductId,
+    required String? cookPreference,
+  }) {
+    _setCustomModifiers(
+      itemProductId: itemProductId,
+      prefix: 'Cook:',
+      nextItemName: cookPreference == null ? null : 'Cook: $cookPreference',
+      sortKey: 2,
+    );
+  }
+
+  void _selectBreadType({
+    required int itemProductId,
+    required String breadType,
+  }) {
+    _setCustomModifiers(
+      itemProductId: itemProductId,
+      prefix: 'Bread:',
+      nextItemName: breadType == _defaultBreadType ? null : 'Bread: $breadType',
+      sortKey: 3,
+    );
+  }
+
+  void _setCustomModifiers({
+    required int itemProductId,
+    required String prefix,
+    required String? nextItemName,
+    required int sortKey,
+  }) {
+    final BreakfastPosEditorData? editorData = _editorData;
+    if (editorData == null) {
+      return;
+    }
+    final List<BreakfastCustomModifierRequest> customModifiers = _requestedState
+        .customModifiers
+        .where(
+          (BreakfastCustomModifierRequest modifier) =>
+              modifier.itemProductId != itemProductId ||
+              !modifier.itemName.startsWith(prefix),
+        )
+        .toList(growable: true);
+    if (nextItemName != null) {
+      customModifiers.add(
+        BreakfastCustomModifierRequest(
+          itemProductId: itemProductId,
+          itemName: nextItemName,
+          sortKey: sortKey,
+        ),
+      );
+    }
+    final BreakfastRequestedState nextState = _requestedState.copyWith(
+      customModifiers: customModifiers,
+    );
+    final BreakfastPosSelectionPreview preview = ref
+        .read(breakfastPosServiceProvider)
+        .previewSelection(
+          product: widget.product,
+          configuration: editorData.configuration,
+          requestedState: nextState,
+        );
+    setState(() {
+      _requestedState = preview.requestedState;
+      _editorData = BreakfastPosEditorData(
+        product: editorData.product,
+        profile: editorData.profile,
+        configuration: editorData.configuration,
+        preview: preview,
+      );
+      _errorMessage = null;
+    });
+  }
+
+  String _selectedEggType(int itemProductId) {
+    for (final BreakfastCustomModifierRequest modifier
+        in _requestedState.customModifiers) {
+      if (modifier.itemProductId == itemProductId &&
+          modifier.itemName.startsWith('Egg:')) {
+        return modifier.itemName.substring('Egg:'.length).trim();
+      }
+    }
+    return _defaultEggType;
+  }
+
+  String? _selectedEggCookPreference(int itemProductId) {
+    for (final BreakfastCustomModifierRequest modifier
+        in _requestedState.customModifiers) {
+      if (modifier.itemProductId == itemProductId &&
+          modifier.itemName.startsWith('Cook:')) {
+        return modifier.itemName.substring('Cook:'.length).trim();
+      }
+    }
+    return null;
+  }
+
+  String _selectedBreadType(int itemProductId) {
+    for (final BreakfastCustomModifierRequest modifier
+        in _requestedState.customModifiers) {
+      if (modifier.itemProductId == itemProductId &&
+          modifier.itemName.startsWith('Bread:')) {
+        return modifier.itemName.substring('Bread:'.length).trim();
+      }
+    }
+    return _defaultBreadType;
   }
 
   Future<void> _scrollToRequiredChoices() async {
@@ -315,6 +514,64 @@ class _SemanticBundleEditorDialogState
       RegExp(r'\s+choice$', caseSensitive: false),
       '',
     );
+  }
+
+  bool _supportsBreadTypeChoiceCustomization({
+    required BreakfastChoiceGroupConfig group,
+    required BreakfastChoiceGroupMemberConfig member,
+  }) {
+    final String groupName = group.groupName.trim().toLowerCase();
+    final String memberName = member.displayName.trim().toLowerCase();
+    return groupName.contains('bread') ||
+        groupName.contains('toast') ||
+        memberName.contains('bread') ||
+        memberName.contains('toast');
+  }
+
+  Map<int, bool> _buildStickyCustomizationExpandedMap(
+    List<BreakfastChoiceGroupConfig> groups,
+    Map<int, BreakfastChosenGroupRequest> selectedChoices,
+  ) {
+    final Map<int, bool> result = <int, bool>{};
+    final int? expandedId = _expandedCookingSelectorProductId;
+    if (expandedId == null) {
+      return result;
+    }
+    for (final BreakfastChoiceGroupConfig group in groups) {
+      for (final BreakfastChoiceGroupMemberConfig member in group.members) {
+        if (_supportsBreadTypeChoiceCustomization(
+          group: group,
+          member: member,
+        )) {
+          result[member.itemProductId] =
+              member.itemProductId == expandedId;
+        }
+      }
+    }
+    return result;
+  }
+
+  ({int? stickyExpandedProductId, String? selectedBreadType}) _getStickyBarBreadState(
+    List<BreakfastChoiceGroupConfig> groups,
+  ) {
+    final int? stickyExpandedId = _expandedStickyBarBreadProductId;
+    if (stickyExpandedId == null) {
+      return (stickyExpandedProductId: null, selectedBreadType: null);
+    }
+    for (final BreakfastChoiceGroupConfig group in groups) {
+      for (final BreakfastChoiceGroupMemberConfig member in group.members) {
+        if (_supportsBreadTypeChoiceCustomization(
+          group: group,
+          member: member,
+        )) {
+          return (
+            stickyExpandedProductId: member.itemProductId,
+            selectedBreadType: _selectedBreadType(member.itemProductId),
+          );
+        }
+      }
+    }
+    return (stickyExpandedProductId: null, selectedBreadType: null);
   }
 
   String _normalizeChoiceToken(String value) {
@@ -552,6 +809,34 @@ class _SemanticBundleEditorDialogState
                   );
                 },
             choiceSummaryName: _choiceSummaryName,
+            customizationExpandedByProductId: _buildStickyCustomizationExpandedMap(
+              editorData.configuration.choiceGroups,
+              selectedChoices,
+            ),
+            onToggleCustomization: (
+              BreakfastChoiceGroupConfig group,
+              int itemProductId,
+            ) {
+              _toggleStickyBarBread(
+                group: group,
+                itemProductId: itemProductId,
+              );
+            },
+            stickyExpandedBreadProductId: _getStickyBarBreadState(
+              editorData.configuration.choiceGroups,
+            ).stickyExpandedProductId,
+            selectedBreadType: _getStickyBarBreadState(
+              editorData.configuration.choiceGroups,
+            ).selectedBreadType,
+            onSelectBreadType: (String breadType) {
+              final int? expandedId = _expandedStickyBarBreadProductId;
+              if (expandedId != null) {
+                _selectBreadType(
+                  itemProductId: expandedId,
+                  breadType: breadType,
+                );
+              }
+            },
           ),
         ),
         const SizedBox(height: AppSizes.spacingSm),
@@ -602,6 +887,16 @@ class _SemanticBundleEditorDialogState
                                       selectedCookingInstruction:
                                           selectedCookingInstructions[item
                                               .itemProductId],
+                                      selectedEggType: _selectedEggType(
+                                        item.itemProductId,
+                                      ),
+                                      selectedEggCookPreference:
+                                          _selectedEggCookPreference(
+                                            item.itemProductId,
+                                          ),
+                                      selectedBreadType: _selectedBreadType(
+                                        item.itemProductId,
+                                      ),
                                       cookingSelectorExpanded:
                                           _expandedCookingSelectorProductId ==
                                           item.itemProductId,
@@ -631,6 +926,23 @@ class _SemanticBundleEditorDialogState
                                           ) => _selectCookingInstruction(
                                             itemProductId: item.itemProductId,
                                             option: option,
+                                          ),
+                                      onSelectEggType: (String eggType) =>
+                                          _selectEggType(
+                                            itemProductId: item.itemProductId,
+                                            eggType: eggType,
+                                          ),
+                                      onSelectEggCookPreference:
+                                          (String? cookPreference) =>
+                                              _selectEggCookPreference(
+                                                itemProductId:
+                                                    item.itemProductId,
+                                                cookPreference: cookPreference,
+                                              ),
+                                      onSelectBreadType: (String breadType) =>
+                                          _selectBreadType(
+                                            itemProductId: item.itemProductId,
+                                            breadType: breadType,
                                           ),
                                     ),
                                   );
@@ -785,22 +1097,26 @@ class _SemanticBundleEditorDialogState
                                                 label: group
                                                     .explicitNoneDisplayLabel,
                                                 selected: isExplicitNone,
-                                                onTap: () {
-                                                  _apply(
-                                                    BreakfastLineEdit.chooseGroup(
-                                                      groupId: group.groupId,
-                                                      selectedItemProductId:
-                                                          null,
-                                                      quantity: 1,
-                                                    ),
-                                                  );
-                                                },
+                                                onTap: () => _selectChoice(
+                                                  group: group,
+                                                  selectedItemProductId: null,
+                                                  quantity: 1,
+                                                ),
                                               ),
                                             ),
                                           ...group.members.map((
                                             BreakfastChoiceGroupMemberConfig
                                             member,
                                           ) {
+                                            final bool
+                                            supportsBreadCustomization =
+                                                _supportsBreadTypeChoiceCustomization(
+                                                  group: group,
+                                                  member: member,
+                                                );
+                                            final bool customizationExpanded =
+                                                _expandedCookingSelectorProductId ==
+                                                member.itemProductId;
                                             return SizedBox(
                                               width: optionWidth,
                                               child: _ChoiceOptionButton(
@@ -812,17 +1128,57 @@ class _SemanticBundleEditorDialogState
                                                     !isExplicitNone &&
                                                     selectedId ==
                                                         member.itemProductId,
-                                                onTap: () {
-                                                  _apply(
-                                                    BreakfastLineEdit.chooseGroup(
-                                                      groupId: group.groupId,
-                                                      selectedItemProductId:
-                                                          member.itemProductId,
-                                                      quantity: group
-                                                          .includedQuantity,
-                                                    ),
-                                                  );
-                                                },
+                                                onTap: () => _selectChoice(
+                                                  group: group,
+                                                  selectedItemProductId:
+                                                      member.itemProductId,
+                                                  quantity:
+                                                      group.includedQuantity,
+                                                ),
+                                                customizeKey:
+                                                    supportsBreadCustomization
+                                                    ? ValueKey<String>(
+                                                        'semantic-choice-customize-${group.groupId}-${member.itemProductId}',
+                                                      )
+                                                    : null,
+                                                customizeExpanded:
+                                                    customizationExpanded,
+                                                onCustomize:
+                                                    supportsBreadCustomization
+                                                    ? () => _selectChoice(
+                                                        group: group,
+                                                        selectedItemProductId:
+                                                            member
+                                                                .itemProductId,
+                                                        quantity: group
+                                                            .includedQuantity,
+                                                        toggleCustomizationProductId:
+                                                            member
+                                                                .itemProductId,
+                                                      )
+                                                    : null,
+                                                customizationPanel:
+                                                    supportsBreadCustomization &&
+                                                        customizationExpanded
+                                                    ? _BreadCustomizationPanel(
+                                                        itemProductId: member
+                                                            .itemProductId,
+                                                        selectedBreadType:
+                                                            _selectedBreadType(
+                                                              member
+                                                                  .itemProductId,
+                                                            ),
+                                                        onSelectBreadType:
+                                                            (
+                                                              String breadType,
+                                                            ) => _selectBreadType(
+                                                              itemProductId: member
+                                                                  .itemProductId,
+                                                              breadType:
+                                                                  breadType,
+                                                            ),
+                                                      )
+                                                    : null,
                                               ),
                                             );
                                           }),
@@ -1144,6 +1500,11 @@ class _StickyShortcutBar extends StatelessWidget {
     required this.selectedChoices,
     required this.onSelectChoice,
     required this.choiceSummaryName,
+    this.customizationExpandedByProductId,
+    this.onToggleCustomization,
+    this.stickyExpandedBreadProductId,
+    this.selectedBreadType,
+    this.onSelectBreadType,
   });
 
   final List<BreakfastChoiceGroupConfig> groups;
@@ -1155,6 +1516,12 @@ class _StickyShortcutBar extends StatelessWidget {
   })
   onSelectChoice;
   final String Function(BreakfastChoiceGroupConfig group) choiceSummaryName;
+  final Map<int, bool>? customizationExpandedByProductId;
+  final void Function(BreakfastChoiceGroupConfig group, int itemProductId)?
+      onToggleCustomization;
+  final int? stickyExpandedBreadProductId;
+  final String? selectedBreadType;
+  final void Function(String breadType)? onSelectBreadType;
 
   @override
   Widget build(BuildContext context) {
@@ -1171,6 +1538,12 @@ class _StickyShortcutBar extends StatelessWidget {
               currentChoice: selectedChoices[group.groupId],
               onSelectChoice: onSelectChoice,
               semanticLabel: choiceSummaryName(group),
+              customizationExpandedByProductId:
+                  customizationExpandedByProductId,
+              onToggleCustomization: onToggleCustomization,
+              stickyExpandedBreadProductId: stickyExpandedBreadProductId,
+              selectedBreadType: selectedBreadType,
+              onSelectBreadType: onSelectBreadType,
             ),
           ),
         )
@@ -1180,13 +1553,13 @@ class _StickyShortcutBar extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return Row(
+    return Wrap(
+      spacing: AppSizes.spacingSm,
+      runSpacing: AppSizes.spacingXs,
       children: groupWidgets
           .expand(
             (Widget groupWidget) => <Widget>[
               groupWidget,
-              if (groupWidget != groupWidgets.last)
-                const SizedBox(width: AppSizes.spacingSm),
             ],
           )
           .toList(growable: false),
@@ -1213,6 +1586,11 @@ class _StickyShortcutGroup extends StatelessWidget {
     required this.currentChoice,
     required this.onSelectChoice,
     required this.semanticLabel,
+    this.customizationExpandedByProductId,
+    this.onToggleCustomization,
+    this.stickyExpandedBreadProductId,
+    this.selectedBreadType,
+    this.onSelectBreadType,
   });
 
   final BreakfastChoiceGroupConfig group;
@@ -1224,32 +1602,73 @@ class _StickyShortcutGroup extends StatelessWidget {
   })
   onSelectChoice;
   final String semanticLabel;
+  final Map<int, bool>? customizationExpandedByProductId;
+  final void Function(BreakfastChoiceGroupConfig group, int itemProductId)?
+      onToggleCustomization;
+  final int? stickyExpandedBreadProductId;
+  final String? selectedBreadType;
+  final void Function(String breadType)? onSelectBreadType;
+
+  bool _supportsBreadCustomization(BreakfastChoiceGroupMemberConfig member) {
+    final String groupName = group.groupName.toLowerCase();
+    final String memberName = member.displayName.toLowerCase();
+    return groupName.contains('bread') ||
+        groupName.contains('toast') ||
+        memberName.contains('bread') ||
+        memberName.contains('toast');
+  }
 
   @override
   Widget build(BuildContext context) {
     final int? selectedId = currentChoice?.selectedItemProductId;
     final bool isExplicitNone = currentChoice?.isExplicitNone ?? false;
     final bool supportsExplicitNone = group.allowsExplicitNoneSelection;
+
+    int? expandedBreadMemberId;
+    if (stickyExpandedBreadProductId != null) {
+      for (final BreakfastChoiceGroupMemberConfig member in group.members) {
+        if (_supportsBreadCustomization(member) &&
+            member.itemProductId == stickyExpandedBreadProductId) {
+          expandedBreadMemberId = member.itemProductId;
+          break;
+        }
+      }
+    }
+
     final List<Widget> buttons = <Widget>[
       ...group.members.map(
-        (BreakfastChoiceGroupMemberConfig member) => Expanded(
-          child: _StickyChoiceButton(
-            buttonKey: ValueKey<String>(
-              'semantic-sticky-choice-select-${group.groupId}-${member.itemProductId}',
+        (BreakfastChoiceGroupMemberConfig member) {
+          final bool supportsCustomization = _supportsBreadCustomization(member);
+          final bool customizationExpanded =
+              customizationExpandedByProductId?[member.itemProductId] ?? false;
+          return Expanded(
+            child: _StickyChoiceButton(
+              buttonKey: ValueKey<String>(
+                'semantic-sticky-choice-select-${group.groupId}-${member.itemProductId}',
+              ),
+              semanticLabel: '$semanticLabel ${member.displayName}',
+              label: member.displayName,
+              selected: !isExplicitNone && selectedId == member.itemProductId,
+              weakened: false,
+              onTap: () {
+                onSelectChoice(
+                  group: group,
+                  selectedItemProductId: member.itemProductId,
+                  quantity: group.includedQuantity,
+                );
+              },
+              customizeKey: supportsCustomization
+                  ? ValueKey<String>(
+                      'semantic-sticky-customize-${group.groupId}-${member.itemProductId}',
+                    )
+                  : null,
+              customizeExpanded: customizationExpanded,
+              onCustomize: supportsCustomization
+                  ? () => onToggleCustomization?.call(group, member.itemProductId)
+                  : null,
             ),
-            semanticLabel: '$semanticLabel ${member.displayName}',
-            label: member.displayName,
-            selected: !isExplicitNone && selectedId == member.itemProductId,
-            weakened: false,
-            onTap: () {
-              onSelectChoice(
-                group: group,
-                selectedItemProductId: member.itemProductId,
-                quantity: group.includedQuantity,
-              );
-            },
-          ),
-        ),
+          );
+        },
       ),
       if (supportsExplicitNone)
         Expanded(
@@ -1272,15 +1691,62 @@ class _StickyShortcutGroup extends StatelessWidget {
         ),
     ];
 
-    return Row(
-      children: buttons
-          .expand(
-            (Widget button) => <Widget>[
-              button,
-              if (button != buttons.last) const SizedBox(width: 6),
-            ],
-          )
-          .toList(growable: false),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Row(
+          children: buttons
+              .expand(
+                (Widget button) => <Widget>[
+                  button,
+                  if (button != buttons.last) const SizedBox(width: 6),
+                ],
+              )
+              .toList(growable: false),
+        ),
+        if (expandedBreadMemberId != null && onSelectBreadType != null) ...<Widget>[
+          const SizedBox(height: 6),
+          Container(
+            key: ValueKey<String>('semantic-sticky-bread-panel-$expandedBreadMemberId'),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'Bread Type',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: AppSizes.spacingXs,
+                  runSpacing: AppSizes.spacingXs,
+                  children: <String>['Crusty Bread', 'Normal Bread', 'Brown Bread']
+                      .map((String optionLabel) {
+                    return _CookingInstructionChip(
+                      chipKey: ValueKey<String>(
+                        'semantic-sticky-bread-type-$expandedBreadMemberId-$optionLabel',
+                      ),
+                      label: optionLabel,
+                      selected: selectedBreadType == optionLabel,
+                      onTap: () => onSelectBreadType!(optionLabel),
+                    );
+                  }).toList(growable: false),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -1293,6 +1759,9 @@ class _StickyChoiceButton extends StatelessWidget {
     required this.selected,
     required this.weakened,
     required this.onTap,
+    this.customizeKey,
+    this.customizeExpanded = false,
+    this.onCustomize,
   });
 
   final Key buttonKey;
@@ -1301,12 +1770,16 @@ class _StickyChoiceButton extends StatelessWidget {
   final bool selected;
   final bool weakened;
   final VoidCallback onTap;
+  final Key? customizeKey;
+  final bool customizeExpanded;
+  final VoidCallback? onCustomize;
 
   @override
   Widget build(BuildContext context) {
     final Color activeColor = weakened
         ? AppColors.textSecondary
         : AppColors.primary;
+    final bool showCustomizeIcon = onCustomize != null && customizeKey != null;
     return Semantics(
       label: semanticLabel,
       button: true,
@@ -1316,7 +1789,10 @@ class _StickyChoiceButton extends StatelessWidget {
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(0, 44),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 8,
+          ),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.compact,
           side: BorderSide(
@@ -1334,21 +1810,63 @@ class _StickyChoiceButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppSizes.radiusMd),
           ),
         ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            label,
-            maxLines: 1,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: selected
-                  ? activeColor
-                  : weakened
-                  ? AppColors.textSecondary
-                  : AppColors.textPrimary,
+        child: Row(
+          mainAxisSize: MainAxisSize.max,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: selected
+                        ? activeColor
+                        : weakened
+                        ? AppColors.textSecondary
+                        : AppColors.textPrimary,
+                  ),
+                ),
+              ),
             ),
-          ),
+            if (showCustomizeIcon) ...<Widget>[
+              const SizedBox(width: 4),
+              Tooltip(
+                message: 'Bread Type',
+                child: InkWell(
+                  key: customizeKey,
+                  onTap: onCustomize,
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: customizeExpanded
+                          ? AppColors.primary.withValues(alpha: 0.14)
+                          : AppColors.surfaceAlt,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: customizeExpanded
+                            ? AppColors.primary.withValues(alpha: 0.3)
+                            : AppColors.border,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.restaurant_menu_rounded,
+                      size: 14,
+                      color: customizeExpanded
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -1403,12 +1921,20 @@ class _ChoiceOptionButton extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.customizeKey,
+    this.customizeExpanded = false,
+    this.onCustomize,
+    this.customizationPanel,
   });
 
   final Key optionKey;
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final Key? customizeKey;
+  final bool customizeExpanded;
+  final VoidCallback? onCustomize;
+  final Widget? customizationPanel;
 
   @override
   Widget build(BuildContext context) {
@@ -1417,45 +1943,273 @@ class _ChoiceOptionButton extends StatelessWidget {
           ? AppColors.primary.withValues(alpha: 0.12)
           : AppColors.surface,
       borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-      child: InkWell(
-        key: optionKey,
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 56),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSizes.spacingSm,
-            vertical: AppSizes.spacingXs,
-          ),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
-              width: selected ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: AppSizes.fontSm,
-                    fontWeight: FontWeight.w800,
-                    color: selected ? AppColors.primary : AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                size: 18,
-                color: selected ? AppColors.primary : AppColors.textSecondary,
-              ),
-            ],
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          border: Border.all(
+            color: selected || customizeExpanded
+                ? AppColors.primary
+                : AppColors.border,
+            width: selected || customizeExpanded ? 2 : 1,
           ),
         ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            InkWell(
+              key: optionKey,
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 56),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSizes.spacingSm,
+                  vertical: AppSizes.spacingXs,
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: AppSizes.fontSm,
+                          fontWeight: FontWeight.w800,
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    if (onCustomize != null &&
+                        customizeKey != null) ...<Widget>[
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: 'Bread Type',
+                        child: InkWell(
+                          key: customizeKey,
+                          onTap: onCustomize,
+                          borderRadius: BorderRadius.circular(999),
+                          child: Container(
+                            width: 34,
+                            height: 34,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: customizeExpanded
+                                  ? AppColors.primary.withValues(alpha: 0.14)
+                                  : AppColors.surfaceAlt,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: customizeExpanded
+                                    ? AppColors.primary.withValues(alpha: 0.3)
+                                    : AppColors.border,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.restaurant_menu_rounded,
+                              size: 18,
+                              color: customizeExpanded
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 6),
+                    Icon(
+                      selected
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      size: 18,
+                      color: selected
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (customizationPanel != null) ...<Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSizes.spacingXs,
+                  0,
+                  AppSizes.spacingXs,
+                  AppSizes.spacingXs,
+                ),
+                child: customizationPanel,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EggCustomizationPanel extends StatelessWidget {
+  const _EggCustomizationPanel({
+    required this.itemProductId,
+    required this.selectedEggType,
+    required this.selectedCookPreference,
+    required this.onSelectEggType,
+    required this.onSelectCookPreference,
+  });
+
+  static const List<({String code, String label})> _eggTypeOptions =
+      <({String code, String label})>[
+        (code: 'fried', label: 'Fried Egg'),
+        (code: 'poached', label: 'Poached Egg'),
+        (code: 'scrambled', label: 'Scrambled Egg'),
+      ];
+  static const List<({String code, String label})> _cookOptions =
+      <({String code, String label})>[
+        (code: 'runny', label: 'Runny'),
+        (code: 'medium', label: 'Medium'),
+        (code: 'well_done', label: 'Well done'),
+      ];
+
+  final int itemProductId;
+  final String selectedEggType;
+  final String? selectedCookPreference;
+  final ValueChanged<String> onSelectEggType;
+  final ValueChanged<String?> onSelectCookPreference;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: ValueKey<String>('semantic-egg-customization-$itemProductId'),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'Egg Type',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: AppSizes.spacingXs,
+            runSpacing: AppSizes.spacingXs,
+            children: _eggTypeOptions
+                .map((option) {
+                  return _CookingInstructionChip(
+                    chipKey: ValueKey<String>(
+                      'semantic-egg-type-$itemProductId-${option.code}',
+                    ),
+                    label: option.label,
+                    selected: selectedEggType == option.label,
+                    onTap: () => onSelectEggType(option.label),
+                  );
+                })
+                .toList(growable: false),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Cook Preference',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: AppSizes.spacingXs,
+            runSpacing: AppSizes.spacingXs,
+            children: <Widget>[
+              _CookingInstructionChip(
+                chipKey: ValueKey<String>(
+                  'semantic-egg-cook-$itemProductId-standard',
+                ),
+                label: 'Standard',
+                selected: selectedCookPreference == null,
+                onTap: () => onSelectCookPreference(null),
+              ),
+              ..._cookOptions.map((option) {
+                return _CookingInstructionChip(
+                  chipKey: ValueKey<String>(
+                    'semantic-egg-cook-$itemProductId-${option.code}',
+                  ),
+                  label: option.label,
+                  selected: selectedCookPreference == option.label,
+                  onTap: () => onSelectCookPreference(option.label),
+                );
+              }),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BreadCustomizationPanel extends StatelessWidget {
+  const _BreadCustomizationPanel({
+    required this.itemProductId,
+    required this.selectedBreadType,
+    required this.onSelectBreadType,
+  });
+
+  static const List<({String code, String label})> _breadTypeOptions =
+      <({String code, String label})>[
+        (code: 'crusty', label: 'Crusty Bread'),
+        (code: 'normal', label: 'Normal Bread'),
+        (code: 'brown', label: 'Brown Bread'),
+      ];
+
+  final int itemProductId;
+  final String selectedBreadType;
+  final ValueChanged<String> onSelectBreadType;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: ValueKey<String>('semantic-bread-customization-$itemProductId'),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'Bread Type',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w900,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: AppSizes.spacingXs,
+            runSpacing: AppSizes.spacingXs,
+            children: _breadTypeOptions
+                .map((option) {
+                  return _CookingInstructionChip(
+                    chipKey: ValueKey<String>(
+                      'semantic-bread-type-$itemProductId-${option.code}',
+                    ),
+                    label: option.label,
+                    selected: selectedBreadType == option.label,
+                    onTap: () => onSelectBreadType(option.label),
+                  );
+                })
+                .toList(growable: false),
+          ),
+        ],
       ),
     );
   }
@@ -1682,6 +2436,12 @@ class _IncludedItemRow extends StatelessWidget {
     required this.onOpenSelector,
     required this.onToggleCookingSelector,
     required this.onSelectCookingInstruction,
+    required this.selectedEggType,
+    required this.selectedEggCookPreference,
+    required this.selectedBreadType,
+    required this.onSelectEggType,
+    required this.onSelectEggCookPreference,
+    required this.onSelectBreadType,
     this.cookingTarget,
     this.selectedCookingInstruction,
   });
@@ -1696,11 +2456,22 @@ class _IncludedItemRow extends StatelessWidget {
   final VoidCallback onToggleCookingSelector;
   final ValueChanged<BreakfastCookingInstructionOption?>
   onSelectCookingInstruction;
+  final String selectedEggType;
+  final String? selectedEggCookPreference;
+  final String selectedBreadType;
+  final ValueChanged<String> onSelectEggType;
+  final ValueChanged<String?> onSelectEggCookPreference;
+  final ValueChanged<String> onSelectBreadType;
   final BreakfastCookingInstructionTarget? cookingTarget;
   final BreakfastCookingInstructionRequest? selectedCookingInstruction;
 
   bool get _isMultiQuantity => item.defaultQuantity > 1;
   int get _remainingQuantity => item.defaultQuantity - removedQuantity;
+  bool get _isEggItem => item.itemName.trim().toLowerCase() == 'egg';
+  bool get _isBreadItem {
+    final String normalized = item.itemName.trim().toLowerCase();
+    return normalized == 'bread' || normalized == 'crusty bread';
+  }
 
   String get _subtitle {
     if (!item.isRemovable) {
@@ -1774,7 +2545,7 @@ class _IncludedItemRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool showSelector =
         item.isRemovable && _isMultiQuantity && selectorExpanded;
-    final bool hasCookingTrigger = cookingTarget != null;
+    final bool hasCookingTrigger = cookingTarget != null || _isBreadItem;
     final bool showCookingSelector =
         hasCookingTrigger && cookingSelectorExpanded;
     final bool showChangeAction =
@@ -1990,6 +2761,28 @@ class _IncludedItemRow extends StatelessWidget {
                   ),
               ],
             ),
+            if (_isEggItem &&
+                _remainingQuantity > 0 &&
+                showCookingSelector) ...<Widget>[
+              const SizedBox(height: 8),
+              _EggCustomizationPanel(
+                itemProductId: item.itemProductId,
+                selectedEggType: selectedEggType,
+                selectedCookPreference: selectedEggCookPreference,
+                onSelectEggType: onSelectEggType,
+                onSelectCookPreference: onSelectEggCookPreference,
+              ),
+            ],
+            if (_isBreadItem &&
+                _remainingQuantity > 0 &&
+                showCookingSelector) ...<Widget>[
+              const SizedBox(height: 8),
+              _BreadCustomizationPanel(
+                itemProductId: item.itemProductId,
+                selectedBreadType: selectedBreadType,
+                onSelectBreadType: onSelectBreadType,
+              ),
+            ],
             if (showSelector) ...<Widget>[
               const SizedBox(height: 8),
               Container(
@@ -2036,7 +2829,10 @@ class _IncludedItemRow extends StatelessWidget {
                 ),
               ),
             ],
-            if (showCookingSelector && cookingTarget != null) ...<Widget>[
+            if (showCookingSelector &&
+                cookingTarget != null &&
+                !_isEggItem &&
+                !_isBreadItem) ...<Widget>[
               const SizedBox(height: 8),
               Container(
                 key: ValueKey<String>(

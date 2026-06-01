@@ -938,14 +938,30 @@ class PrinterService {
           (_PrintableCookingInstruction a, _PrintableCookingInstruction b) =>
               a.sortKey.compareTo(b.sortKey),
         );
-    if (sections.included.isNotEmpty) {
+    final List<String> customInstructionRows = sections.included
+        .where(_isBreakfastCustomInstructionModifierValue)
+        .toList(growable: false);
+    final List<String> includedRows = sections.included
+        .where(
+          (String value) => !_isBreakfastCustomInstructionModifierValue(value),
+        )
+        .toList(growable: false);
+    if (includedRows.isNotEmpty) {
       rows.addAll(
         _wrapKitchenJoinedItems(
           prefix: '  ',
-          values: sections.included,
+          values: includedRows,
           separator: ' | ',
         ).map(
           (text) =>
+              _KitchenTextRow(text: text, kind: _KitchenTextRowKind.standard),
+        ),
+      );
+    }
+    for (final String value in customInstructionRows) {
+      rows.addAll(
+        _wrapKitchenValue(prefix: '  ', value: value).map(
+          (String text) =>
               _KitchenTextRow(text: text, kind: _KitchenTextRowKind.standard),
         ),
       );
@@ -1022,6 +1038,10 @@ class PrinterService {
     final List<String> removes = <String>[];
 
     for (final _PrintableModifier modifier in sorted) {
+      if (_isBreakfastCustomInstructionModifierValue(modifier.label)) {
+        included.add(_formatModifierValue(modifier));
+        continue;
+      }
       switch (modifier.chargeReason) {
         case ModifierChargeReason.includedChoice:
           if (separateSauces && _isKitchenSauceModifier(modifier)) {
@@ -1284,6 +1304,13 @@ class PrinterService {
       return '$normalized x${modifier.quantity}';
     }
     return normalized;
+  }
+
+  bool _isBreakfastCustomInstructionModifierValue(String value) {
+    final String normalized = _normalizeKitchenText(value);
+    return normalized.startsWith('EGG:') ||
+        normalized.startsWith('COOK:') ||
+        normalized.startsWith('BREAD:');
   }
 
   String _formatKitchenTime(DateTime value) {

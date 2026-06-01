@@ -430,6 +430,37 @@ void main() {
       );
     });
 
+    test('deleting a breakfast extras preset works', () async {
+      final app_db.AppDatabase db = createTestDatabase();
+      addTearDown(db.close);
+      final _SemanticFixture fixture = await _seedSemanticFixture(db);
+      final SemanticMenuAdminService service = _createService(db);
+
+      final int presetId = await service.saveExtraPreset(
+        user: fixture.adminUser,
+        name: 'Standard Breakfast Extras',
+        itemProductIds: <int>[fixture.baconProductId, fixture.coffeeProductId],
+      );
+
+      final List<BreakfastExtraPreset> presetsBefore = await service
+          .loadExtraPresets();
+      expect(presetsBefore, hasLength(1));
+
+      await service.deleteExtraPreset(
+        user: fixture.adminUser,
+        presetId: presetId,
+      );
+
+      final List<BreakfastExtraPreset> presetsAfter = await service
+          .loadExtraPresets();
+      expect(presetsAfter, isEmpty);
+
+      // Verify that deleting the preset did not delete the catalog products
+      final List<app_db.Product> products = await db.select(db.products).get();
+      expect(products.any((app_db.Product p) => p.id == fixture.baconProductId), isTrue);
+      expect(products.any((app_db.Product p) => p.id == fixture.coffeeProductId), isTrue);
+    });
+
     test(
       'editing an extras preset does not mutate already-saved set extras',
       () async {
