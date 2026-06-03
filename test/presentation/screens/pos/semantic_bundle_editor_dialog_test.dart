@@ -1,4 +1,6 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:epos_app/core/providers/app_providers.dart';
+import 'package:epos_app/data/database/app_database.dart' as app_db;
 import 'package:epos_app/data/repositories/breakfast_configuration_repository.dart';
 import 'package:epos_app/domain/models/breakfast_cart_selection.dart';
 import 'package:epos_app/domain/models/breakfast_rebuild.dart';
@@ -14,6 +16,85 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../../support/test_database.dart';
 
 void main() {
+  testWidgets(
+    'missing breakfast semantic configuration shows explicit empty state',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final db = createTestDatabase();
+      addTearDown(db.close);
+
+      final int categoryId = await insertCategory(db, name: 'Set Breakfast');
+      final int rootProductId = await insertProduct(
+        db,
+        categoryId: categoryId,
+        name: 'Set Breakfast',
+        priceMinor: 650,
+      );
+      await db
+          .into(db.modifierGroups)
+          .insert(
+            app_db.ModifierGroupsCompanion.insert(
+              productId: rootProductId,
+              name: 'Drink choice',
+              minSelect: const Value<int>(1),
+              maxSelect: const Value<int>(1),
+              includedQuantity: const Value<int>(1),
+              sortOrder: const Value<int>(1),
+            ),
+          );
+
+      final BreakfastPosService service = BreakfastPosService(
+        breakfastConfigurationRepository: BreakfastConfigurationRepository(db),
+      );
+
+      final Product product = Product(
+        id: rootProductId,
+        categoryId: categoryId,
+        name: 'Set Breakfast',
+        priceMinor: 650,
+        imageUrl: null,
+        hasModifiers: false,
+        isActive: true,
+        isVisibleOnPos: true,
+        sortOrder: 0,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: <Override>[
+            breakfastPosServiceProvider.overrideWithValue(service),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: Center(child: SemanticBundleEditorDialog(product: product)),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey<String>('semantic-bundle-error-state')),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Breakfast configuration missing. Please sync or import menu configuration.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Retry'), findsOneWidget);
+      expect(find.text('Close'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('semantic-bundle-confirm')),
+        findsNothing,
+      );
+    },
+  );
+
   testWidgets(
     'Egg customization panel is hidden initially and cook icon does not remove item',
     (WidgetTester tester) async {

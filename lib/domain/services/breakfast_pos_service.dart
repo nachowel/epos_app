@@ -13,6 +13,9 @@ import 'semantic_menu_policy_service.dart';
 
 enum PosProductSelectionPath { standard, legacyFlat, semanticBundle }
 
+const String kBreakfastConfigurationMissingMessage =
+    'Breakfast configuration missing. Please sync or import menu configuration.';
+
 class BreakfastPosAddableProduct {
   const BreakfastPosAddableProduct({
     required this.id,
@@ -207,9 +210,7 @@ class BreakfastPosService {
           product.id,
         );
     if (!profile.hasSemanticSetConfig || baseConfiguration == null) {
-      throw ValidationException(
-        'This bundle is not ready for sale. Ask an admin to complete its set configuration.',
-      );
+      throw ValidationException(kBreakfastConfigurationMissingMessage);
     }
     final SemanticMenuValidationResult policyResult = _policyService
         .validateRuntime(profile: profile, configuration: baseConfiguration);

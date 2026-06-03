@@ -262,17 +262,19 @@ class _SemanticBundleEditorDialogState
       selectedItemProductId: itemProductId,
       quantity: group.includedQuantity,
     ).applyTo(_requestedState);
-    ref.read(breakfastPosServiceProvider).previewSelection(
-      product: widget.product,
-      configuration: editorData.configuration,
-      requestedState: nextState,
-    );
+    ref
+        .read(breakfastPosServiceProvider)
+        .previewSelection(
+          product: widget.product,
+          configuration: editorData.configuration,
+          requestedState: nextState,
+        );
     setState(() {
       _requestedState = nextState;
       _expandedStickyBarBreadProductId =
           _expandedStickyBarBreadProductId == itemProductId
-              ? null
-              : itemProductId;
+          ? null
+          : itemProductId;
       _expandedCookingSelectorProductId = null;
     });
   }
@@ -543,17 +545,15 @@ class _SemanticBundleEditorDialogState
           group: group,
           member: member,
         )) {
-          result[member.itemProductId] =
-              member.itemProductId == expandedId;
+          result[member.itemProductId] = member.itemProductId == expandedId;
         }
       }
     }
     return result;
   }
 
-  ({int? stickyExpandedProductId, String? selectedBreadType}) _getStickyBarBreadState(
-    List<BreakfastChoiceGroupConfig> groups,
-  ) {
+  ({int? stickyExpandedProductId, String? selectedBreadType})
+  _getStickyBarBreadState(List<BreakfastChoiceGroupConfig> groups) {
     final int? stickyExpandedId = _expandedStickyBarBreadProductId;
     if (stickyExpandedId == null) {
       return (stickyExpandedProductId: null, selectedBreadType: null);
@@ -670,18 +670,89 @@ class _SemanticBundleEditorDialogState
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : editorData == null
-              ? Center(
-                  child: Text(
-                    _errorMessage ?? 'Unable to load breakfast builder.',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.error,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                )
+              ? _buildErrorState(context)
               : _buildLoaded(editorData),
         ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(BuildContext context) {
+    return SizedBox(
+      key: const ValueKey<String>('semantic-bundle-error-state'),
+      width: 560,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Expanded(
+                child: Text(
+                  'Breakfast unavailable',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              IconButton(
+                key: const ValueKey<String>('semantic-bundle-error-close-x'),
+                tooltip: 'Close',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSizes.spacingSm),
+          Container(
+            padding: const EdgeInsets.all(AppSizes.spacingMd),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Icon(
+                  Icons.sync_problem_rounded,
+                  color: AppColors.warning,
+                  size: 24,
+                ),
+                const SizedBox(width: AppSizes.spacingSm),
+                Expanded(
+                  child: Text(
+                    _errorMessage ?? 'Unable to load breakfast builder.',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSizes.spacingMd),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: <Widget>[
+              OutlinedButton(
+                key: const ValueKey<String>('semantic-bundle-error-retry'),
+                onPressed: _load,
+                child: const Text('Retry'),
+              ),
+              const SizedBox(width: AppSizes.spacingSm),
+              FilledButton(
+                key: const ValueKey<String>('semantic-bundle-error-close'),
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -809,19 +880,18 @@ class _SemanticBundleEditorDialogState
                   );
                 },
             choiceSummaryName: _choiceSummaryName,
-            customizationExpandedByProductId: _buildStickyCustomizationExpandedMap(
-              editorData.configuration.choiceGroups,
-              selectedChoices,
-            ),
-            onToggleCustomization: (
-              BreakfastChoiceGroupConfig group,
-              int itemProductId,
-            ) {
-              _toggleStickyBarBread(
-                group: group,
-                itemProductId: itemProductId,
-              );
-            },
+            customizationExpandedByProductId:
+                _buildStickyCustomizationExpandedMap(
+                  editorData.configuration.choiceGroups,
+                  selectedChoices,
+                ),
+            onToggleCustomization:
+                (BreakfastChoiceGroupConfig group, int itemProductId) {
+                  _toggleStickyBarBread(
+                    group: group,
+                    itemProductId: itemProductId,
+                  );
+                },
             stickyExpandedBreadProductId: _getStickyBarBreadState(
               editorData.configuration.choiceGroups,
             ).stickyExpandedProductId,
@@ -1518,7 +1588,7 @@ class _StickyShortcutBar extends StatelessWidget {
   final String Function(BreakfastChoiceGroupConfig group) choiceSummaryName;
   final Map<int, bool>? customizationExpandedByProductId;
   final void Function(BreakfastChoiceGroupConfig group, int itemProductId)?
-      onToggleCustomization;
+  onToggleCustomization;
   final int? stickyExpandedBreadProductId;
   final String? selectedBreadType;
   final void Function(String breadType)? onSelectBreadType;
@@ -1530,39 +1600,48 @@ class _StickyShortcutBar extends StatelessWidget {
           ..sort((BreakfastChoiceGroupConfig a, BreakfastChoiceGroupConfig b) {
             return _groupRank(a).compareTo(_groupRank(b));
           });
-    final List<Widget> groupWidgets = orderedGroups
-        .map(
-          (BreakfastChoiceGroupConfig group) => Expanded(
-            child: _StickyShortcutGroup(
-              group: group,
-              currentChoice: selectedChoices[group.groupId],
-              onSelectChoice: onSelectChoice,
-              semanticLabel: choiceSummaryName(group),
-              customizationExpandedByProductId:
-                  customizationExpandedByProductId,
-              onToggleCustomization: onToggleCustomization,
-              stickyExpandedBreadProductId: stickyExpandedBreadProductId,
-              selectedBreadType: selectedBreadType,
-              onSelectBreadType: onSelectBreadType,
-            ),
-          ),
-        )
-        .toList(growable: false);
-
-    if (groupWidgets.isEmpty) {
+    if (orderedGroups.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    return Wrap(
-      spacing: AppSizes.spacingSm,
-      runSpacing: AppSizes.spacingXs,
-      children: groupWidgets
-          .expand(
-            (Widget groupWidget) => <Widget>[
-              groupWidget,
-            ],
-          )
-          .toList(growable: false),
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool hasBoundedWidth = constraints.maxWidth.isFinite;
+        final double availableWidth = hasBoundedWidth
+            ? constraints.maxWidth
+            : 480;
+        final bool useSingleColumn =
+            orderedGroups.length == 1 ||
+            !hasBoundedWidth ||
+            availableWidth < 620;
+        final double groupWidth = useSingleColumn
+            ? availableWidth
+            : (availableWidth - AppSizes.spacingSm) / 2;
+
+        return Wrap(
+          spacing: AppSizes.spacingSm,
+          runSpacing: AppSizes.spacingXs,
+          children: orderedGroups
+              .map((BreakfastChoiceGroupConfig group) {
+                return SizedBox(
+                  width: groupWidth,
+                  child: _StickyShortcutGroup(
+                    group: group,
+                    currentChoice: selectedChoices[group.groupId],
+                    onSelectChoice: onSelectChoice,
+                    semanticLabel: choiceSummaryName(group),
+                    customizationExpandedByProductId:
+                        customizationExpandedByProductId,
+                    onToggleCustomization: onToggleCustomization,
+                    stickyExpandedBreadProductId: stickyExpandedBreadProductId,
+                    selectedBreadType: selectedBreadType,
+                    onSelectBreadType: onSelectBreadType,
+                  ),
+                );
+              })
+              .toList(growable: false),
+        );
+      },
     );
   }
 
@@ -1604,7 +1683,7 @@ class _StickyShortcutGroup extends StatelessWidget {
   final String semanticLabel;
   final Map<int, bool>? customizationExpandedByProductId;
   final void Function(BreakfastChoiceGroupConfig group, int itemProductId)?
-      onToggleCustomization;
+  onToggleCustomization;
   final int? stickyExpandedBreadProductId;
   final String? selectedBreadType;
   final void Function(String breadType)? onSelectBreadType;
@@ -1636,40 +1715,38 @@ class _StickyShortcutGroup extends StatelessWidget {
     }
 
     final List<Widget> buttons = <Widget>[
-      ...group.members.map(
-        (BreakfastChoiceGroupMemberConfig member) {
-          final bool supportsCustomization = _supportsBreadCustomization(member);
-          final bool customizationExpanded =
-              customizationExpandedByProductId?[member.itemProductId] ?? false;
-          return Expanded(
-            child: _StickyChoiceButton(
-              buttonKey: ValueKey<String>(
-                'semantic-sticky-choice-select-${group.groupId}-${member.itemProductId}',
-              ),
-              semanticLabel: '$semanticLabel ${member.displayName}',
-              label: member.displayName,
-              selected: !isExplicitNone && selectedId == member.itemProductId,
-              weakened: false,
-              onTap: () {
-                onSelectChoice(
-                  group: group,
-                  selectedItemProductId: member.itemProductId,
-                  quantity: group.includedQuantity,
-                );
-              },
-              customizeKey: supportsCustomization
-                  ? ValueKey<String>(
-                      'semantic-sticky-customize-${group.groupId}-${member.itemProductId}',
-                    )
-                  : null,
-              customizeExpanded: customizationExpanded,
-              onCustomize: supportsCustomization
-                  ? () => onToggleCustomization?.call(group, member.itemProductId)
-                  : null,
+      ...group.members.map((BreakfastChoiceGroupMemberConfig member) {
+        final bool supportsCustomization = _supportsBreadCustomization(member);
+        final bool customizationExpanded =
+            customizationExpandedByProductId?[member.itemProductId] ?? false;
+        return Expanded(
+          child: _StickyChoiceButton(
+            buttonKey: ValueKey<String>(
+              'semantic-sticky-choice-select-${group.groupId}-${member.itemProductId}',
             ),
-          );
-        },
-      ),
+            semanticLabel: '$semanticLabel ${member.displayName}',
+            label: member.displayName,
+            selected: !isExplicitNone && selectedId == member.itemProductId,
+            weakened: false,
+            onTap: () {
+              onSelectChoice(
+                group: group,
+                selectedItemProductId: member.itemProductId,
+                quantity: group.includedQuantity,
+              );
+            },
+            customizeKey: supportsCustomization
+                ? ValueKey<String>(
+                    'semantic-sticky-customize-${group.groupId}-${member.itemProductId}',
+                  )
+                : null,
+            customizeExpanded: customizationExpanded,
+            onCustomize: supportsCustomization
+                ? () => onToggleCustomization?.call(group, member.itemProductId)
+                : null,
+          ),
+        );
+      }),
       if (supportsExplicitNone)
         Expanded(
           child: _StickyChoiceButton(
@@ -1705,10 +1782,13 @@ class _StickyShortcutGroup extends StatelessWidget {
               )
               .toList(growable: false),
         ),
-        if (expandedBreadMemberId != null && onSelectBreadType != null) ...<Widget>[
+        if (expandedBreadMemberId != null &&
+            onSelectBreadType != null) ...<Widget>[
           const SizedBox(height: 6),
           Container(
-            key: ValueKey<String>('semantic-sticky-bread-panel-$expandedBreadMemberId'),
+            key: ValueKey<String>(
+              'semantic-sticky-bread-panel-$expandedBreadMemberId',
+            ),
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AppColors.surface,
@@ -1732,15 +1812,16 @@ class _StickyShortcutGroup extends StatelessWidget {
                   runSpacing: AppSizes.spacingXs,
                   children: <String>['Crusty Bread', 'Normal Bread', 'Brown Bread']
                       .map((String optionLabel) {
-                    return _CookingInstructionChip(
-                      chipKey: ValueKey<String>(
-                        'semantic-sticky-bread-type-$expandedBreadMemberId-$optionLabel',
-                      ),
-                      label: optionLabel,
-                      selected: selectedBreadType == optionLabel,
-                      onTap: () => onSelectBreadType!(optionLabel),
-                    );
-                  }).toList(growable: false),
+                        return _CookingInstructionChip(
+                          chipKey: ValueKey<String>(
+                            'semantic-sticky-bread-type-$expandedBreadMemberId-$optionLabel',
+                          ),
+                          label: optionLabel,
+                          selected: selectedBreadType == optionLabel,
+                          onTap: () => onSelectBreadType!(optionLabel),
+                        );
+                      })
+                      .toList(growable: false),
                 ),
               ],
             ),
@@ -1789,10 +1870,7 @@ class _StickyChoiceButton extends StatelessWidget {
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(0, 44),
-          padding: EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 8,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.compact,
           side: BorderSide(

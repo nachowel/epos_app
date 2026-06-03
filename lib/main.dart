@@ -1,3 +1,5 @@
+import 'dart:io' as io;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,13 +9,15 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'core/bootstrap/bootstrap_policy.dart';
+import 'core/bootstrap/pre_install_backup_runner.dart';
 import 'core/config/app_config.dart';
 import 'core/logging/app_logger.dart';
 import 'core/ops/app_crash_guard.dart';
 import 'data/database/app_database.dart';
 import 'data/database/seed_data.dart';
+import 'presentation/screens/startup/startup_failure_app.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
   AppLogger logger = const NoopAppLogger();
   late final AppConfig config;
 
@@ -21,6 +25,19 @@ Future<void> main() async {
     logger: () => logger,
     body: () async {
       WidgetsFlutterBinding.ensureInitialized();
+
+      if (args.contains('--backup-before-upgrade')) {
+        final PreInstallBackupResult result =
+            await const PreInstallBackupRunner(
+              databaseFileResolver: AppDatabase.resolveDefaultDatabaseFile,
+            ).run();
+        if (result.exitCode == 0) {
+          io.stdout.writeln(result.message);
+        } else {
+          io.stderr.writeln(result.message);
+        }
+        io.exit(result.exitCode);
+      }
 
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
         await windowManager.ensureInitialized();
@@ -69,9 +86,42 @@ Future<void> main() async {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       final SupabaseClient? supabaseClient =
           await _initialiseSupabaseIfConfigured(config, logger);
+      final io.File databaseFile =
+          await AppDatabase.resolveDefaultDatabaseFile();
       final AppDatabase database = AppDatabase();
-      if (BootstrapPolicy.shouldAutoSeed) {
-        await SeedData.insertIfEmpty(database);
+      try {
+        await database.customSelect('PRAGMA user_version;').get();
+        if (BootstrapPolicy.shouldAutoSeed) {
+          await SeedData.insertIfEmpty(database);
+        }
+      } catch (error, stackTrace) {
+        try {
+          await database.close();
+        } catch (_) {
+          // Ignore close failures while rendering the controlled startup error.
+        }
+        logger.error(
+          eventType: 'database_startup_failed',
+          message:
+              'Database startup failed during migration or seed validation.',
+          metadata: <String, Object?>{
+            'database_path': databaseFile.path,
+            'backup_directory':
+                '${databaseFile.parent.path}${io.Platform.pathSeparator}backups',
+            'schema_version': AppDatabase.currentSchemaVersion,
+          },
+          error: error,
+          stackTrace: stackTrace,
+        );
+        runApp(
+          StartupFailureApp.databaseMigrationFailure(
+            databasePath: databaseFile.path,
+            backupDirectoryPath:
+                '${databaseFile.parent.path}${io.Platform.pathSeparator}backups',
+            technicalDetails: error.toString(),
+          ),
+        );
+        return;
       }
       logger.audit(
         eventType: 'app_bootstrap_completed',
@@ -129,9 +179,9 @@ Future<SupabaseClient?> _initialiseSupabaseIfConfigured(
       anonKey: config.supabaseAnonKey!,
     );
     final Session? session = Supabase.instance.client.auth.currentSession;
-    print('=== ANALYTICS DEBUG ===');
-    print('USER ID: ${session?.user.id}');
-    print('TOKEN NULL: ${session?.accessToken == null}');
+    debugPrint('=== ANALYTICS DEBUG ===');
+    debugPrint('USER ID: ${session?.user.id}');
+    debugPrint('TOKEN NULL: ${session?.accessToken == null}');
     logger.audit(
       eventType: 'supabase_initialized',
       message: 'Supabase client initialized for sync.',

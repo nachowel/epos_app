@@ -474,6 +474,16 @@ local → sync queue → edge function → supabase
 
 ---
 
+## 🧹 KNOWN REPO HEALTH DEBT
+
+* Full `flutter analyze` currently fails on existing unrelated issues.
+* Highest-priority cleanup: `test/presentation/screens/admin/admin_breakfast_sets_screen_test.dart`
+  references `TextFormField.readOnly`, which is not a valid getter.
+* Treat that analyzer error as a separate cleanup task. Do not let "unrelated
+  analyzer failure" become a permanent dumping ground for future work.
+
+---
+
 ## 🤖 AI USAGE RULE
 
 When using Codex / Claude / Cursor:

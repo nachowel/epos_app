@@ -115,6 +115,57 @@ void main() {
     );
 
     test(
+      'semantic footprint without set items reports missing breakfast configuration',
+      () async {
+        final app_db.AppDatabase db = createTestDatabase();
+        addTearDown(db.close);
+        final BreakfastPosService service = BreakfastPosService(
+          breakfastConfigurationRepository: BreakfastConfigurationRepository(
+            db,
+          ),
+        );
+
+        final int categoryId = await insertCategory(db, name: 'Set Breakfast');
+        final int rootProductId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Set Breakfast',
+          priceMinor: 600,
+        );
+        await db
+            .into(db.modifierGroups)
+            .insert(
+              app_db.ModifierGroupsCompanion.insert(
+                productId: rootProductId,
+                name: 'Drink choice',
+                minSelect: const Value<int>(1),
+                maxSelect: const Value<int>(1),
+                includedQuantity: const Value<int>(1),
+                sortOrder: const Value<int>(1),
+              ),
+            );
+        final Product rootProduct = (await ProductRepository(
+          db,
+        ).getById(rootProductId))!;
+
+        expect(
+          await service.getSelectionPath(rootProduct),
+          PosProductSelectionPath.semanticBundle,
+        );
+        await expectLater(
+          service.loadEditorData(product: rootProduct),
+          throwsA(
+            isA<ValidationException>().having(
+              (ValidationException error) => error.message,
+              'message',
+              'Breakfast configuration missing. Please sync or import menu configuration.',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
       'required grouped choices must be completed before confirmation',
       () async {
         final app_db.AppDatabase db = createTestDatabase();
