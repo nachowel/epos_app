@@ -1,8 +1,9 @@
-import 'package:drift/drift.dart' show Value, Variable;
+import 'package:drift/drift.dart' show QueryRow, Value, Variable;
 import 'package:epos_app/core/errors/exceptions.dart';
 import 'package:epos_app/core/logging/app_logger.dart';
 import 'package:epos_app/data/database/app_database.dart'
     hide User, ShiftReconciliation;
+import 'package:epos_app/data/repositories/breakfast_configuration_repository.dart';
 import 'package:epos_app/data/repositories/audit_log_repository.dart';
 import 'package:epos_app/data/repositories/payment_repository.dart';
 import 'package:epos_app/data/repositories/settings_repository.dart';
@@ -499,6 +500,265 @@ void main() {
         expect(report.customSalesRevenueMinor, 1800);
         expect(report.customSalesCount, 1);
         expect(report.customSalesAverageValueMinor, 1800);
+      },
+    );
+
+    test(
+      'shift report survives paid transaction lines without current catalog joins',
+      () async {
+        final db = createTestDatabase();
+        addTearDown(db.close);
+
+        final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+        final int shiftId = await insertShift(db, openedBy: adminId);
+        final int categoryId = await insertCategory(
+          db,
+          name: 'Deleted Catalog',
+        );
+        final int productId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Historical Item',
+          priceMinor: 100,
+        );
+        const int paidOrderCount = 259;
+
+        for (int index = 0; index < paidOrderCount; index += 1) {
+          final int transactionId = await insertTransaction(
+            db,
+            uuid: 'production-paid-$index',
+            shiftId: shiftId,
+            userId: adminId,
+            status: 'paid',
+            totalAmountMinor: 100,
+            paidAt: DateTime(2026, 7, 3, 10, index % 60),
+          );
+          await db
+              .into(db.transactionLines)
+              .insert(
+                TransactionLinesCompanion.insert(
+                  uuid: 'production-paid-line-$index',
+                  transactionId: transactionId,
+                  productId: productId,
+                  productName: 'Historical Item',
+                  unitPriceMinor: 100,
+                  lineTotalMinor: 100,
+                ),
+              );
+          await insertPayment(
+            db,
+            uuid: 'production-payment-$index',
+            transactionId: transactionId,
+            method: index.isEven ? 'cash' : 'card',
+            amountMinor: 100,
+            paidAt: DateTime(2026, 7, 3, 10, index % 60),
+          );
+        }
+
+        await db.customStatement('DELETE FROM products WHERE id = $productId');
+        final QueryRow paidCountRow = await db
+            .customSelect(
+              '''
+          SELECT COUNT(*) AS paid_count
+          FROM transactions
+          WHERE shift_id = ? AND status = 'paid'
+        ''',
+              variables: <Variable<Object>>[Variable<int>(shiftId)],
+            )
+            .getSingle();
+        expect(paidCountRow.read<int>('paid_count'), paidOrderCount);
+
+        final ShiftRepository shiftRepository = ShiftRepository(db);
+        final ReportService reportService = ReportService(
+          shiftRepository: shiftRepository,
+          shiftSessionService: ShiftSessionService(shiftRepository),
+          transactionRepository: TransactionRepository(db),
+          paymentRepository: PaymentRepository(db),
+          settingsRepository: SettingsRepository(db),
+          reportVisibilityService: const ReportVisibilityService(),
+        );
+
+        final ShiftReport report = await reportService.getShiftReport(shiftId);
+
+        expect(report.paidCount, paidOrderCount);
+        expect(report.paidTotalMinor, 25900);
+        expect(report.netSalesMinor, 25900);
+        expect(report.openCount, 0);
+        expect(report.categoryBreakdown, const <ShiftReportCategoryLine>[
+          ShiftReportCategoryLine(
+            categoryName: 'Uncategorised',
+            totalMinor: 25900,
+          ),
+        ]);
+
+        final ZReportActionResult closeResult = await reportService
+            .runAdminFinalCloseWithCountedCash(
+              user: User(
+                id: adminId,
+                name: 'Admin',
+                pin: null,
+                password: null,
+                role: UserRole.admin,
+                isActive: true,
+                createdAt: DateTime.now(),
+              ),
+              countedCashMinor: report.cashTotalMinor,
+            );
+
+        expect(closeResult.finalCloseCompleted, isTrue);
+        expect(closeResult.report.paidCount, paidOrderCount);
+        expect(closeResult.report.paidTotalMinor, 25900);
+        expect(await shiftRepository.getOpenShift(), isNull);
+      },
+    );
+
+    test(
+      'breakfast semantic reconstruction failure does not block Z report or final close',
+      () async {
+        final db = createTestDatabase();
+        addTearDown(db.close);
+
+        final int adminId = await insertUser(db, name: 'Admin', role: 'admin');
+        final int shiftId = await insertShift(db, openedBy: adminId);
+        final int categoryId = await insertCategory(db, name: 'Set Breakfast');
+        final int rootProductId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Set Breakfast',
+          priceMinor: 1000,
+        );
+        final int lowerItemProductId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Beans',
+          priceMinor: 0,
+        );
+        final int higherItemProductId = await insertProduct(
+          db,
+          categoryId: categoryId,
+          name: 'Tomato',
+          priceMinor: 0,
+        );
+        await db
+            .into(db.setItems)
+            .insert(
+              SetItemsCompanion.insert(
+                productId: rootProductId,
+                itemProductId: lowerItemProductId,
+                sortOrder: const Value<int>(1),
+                isRemovable: const Value<bool>(true),
+              ),
+            );
+        await db
+            .into(db.setItems)
+            .insert(
+              SetItemsCompanion.insert(
+                productId: rootProductId,
+                itemProductId: higherItemProductId,
+                sortOrder: const Value<int>(2),
+                isRemovable: const Value<bool>(true),
+              ),
+            );
+
+        final int transactionId = await insertTransaction(
+          db,
+          uuid: 'semantic-failure-paid',
+          shiftId: shiftId,
+          userId: adminId,
+          status: 'paid',
+          totalAmountMinor: 1000,
+          paidAt: DateTime(2026, 7, 3, 12),
+        );
+        final int lineId = await db
+            .into(db.transactionLines)
+            .insert(
+              TransactionLinesCompanion.insert(
+                uuid: 'semantic-failure-line',
+                transactionId: transactionId,
+                productId: rootProductId,
+                productName: 'Set Breakfast',
+                unitPriceMinor: 1000,
+                lineTotalMinor: 1000,
+                pricingMode: const Value<String>('set'),
+              ),
+            );
+        await _insertRawOrderModifier(
+          db,
+          uuid: 'semantic-failure-remove-high',
+          lineId: lineId,
+          action: 'remove',
+          itemName: 'Tomato',
+          itemProductId: higherItemProductId,
+          sortKey: 1,
+        );
+        await _insertRawOrderModifier(
+          db,
+          uuid: 'semantic-failure-remove-low',
+          lineId: lineId,
+          action: 'remove',
+          itemName: 'Beans',
+          itemProductId: lowerItemProductId,
+          sortKey: 2,
+        );
+        await insertPayment(
+          db,
+          uuid: 'semantic-failure-payment',
+          transactionId: transactionId,
+          method: 'cash',
+          amountMinor: 1000,
+          paidAt: DateTime(2026, 7, 3, 12),
+        );
+
+        final ShiftRepository shiftRepository = ShiftRepository(db);
+        final _RecordingAppLogger logger = _RecordingAppLogger();
+        final ReportService reportService = ReportService(
+          shiftRepository: shiftRepository,
+          shiftSessionService: ShiftSessionService(shiftRepository),
+          transactionRepository: TransactionRepository(db),
+          paymentRepository: PaymentRepository(db),
+          breakfastConfigurationRepository: BreakfastConfigurationRepository(
+            db,
+          ),
+          settingsRepository: SettingsRepository(db),
+          reportVisibilityService: const ReportVisibilityService(),
+          logger: logger,
+        );
+
+        final ShiftReport report = await reportService.getShiftReport(shiftId);
+
+        expect(report.paidCount, 1);
+        expect(report.paidTotalMinor, 1000);
+        expect(report.netSalesMinor, 1000);
+        expect(report.openCount, 0);
+        expect(report.semanticSalesAnalytics.isEmpty, isTrue);
+        expect(logger.warnings, hasLength(1));
+        expect(
+          logger.warnings.single.eventType,
+          'semantic_sales_analytics_failed',
+        );
+        expect(
+          logger.warnings.single.metadata['transaction_id'],
+          transactionId,
+        );
+        expect(logger.warnings.single.metadata['line_id'], lineId);
+
+        final ZReportActionResult closeResult = await reportService
+            .runAdminFinalCloseWithCountedCash(
+              user: User(
+                id: adminId,
+                name: 'Admin',
+                pin: null,
+                password: null,
+                role: UserRole.admin,
+                isActive: true,
+                createdAt: DateTime.now(),
+              ),
+              countedCashMinor: 1000,
+            );
+
+        expect(closeResult.finalCloseCompleted, isTrue);
+        expect(closeResult.report.paidTotalMinor, 1000);
+        expect(await shiftRepository.getOpenShift(), isNull);
       },
     );
 
@@ -1109,4 +1369,94 @@ Future<int> _countFinalCloseReconciliations(AppDatabase db, int shiftId) async {
       .getSingle();
 
   return row.read<int>('reconciliation_count');
+}
+
+Future<int> _insertRawOrderModifier(
+  AppDatabase db, {
+  required String uuid,
+  required int lineId,
+  required String action,
+  required String itemName,
+  required int itemProductId,
+  required int sortKey,
+}) {
+  return db
+      .into(db.orderModifiers)
+      .insert(
+        OrderModifiersCompanion.insert(
+          uuid: uuid,
+          transactionLineId: lineId,
+          action: action,
+          itemName: itemName,
+          quantity: const Value<int>(1),
+          itemProductId: Value<int?>(itemProductId),
+          sortKey: Value<int>(sortKey),
+        ),
+      );
+}
+
+class _RecordingAppLogger implements AppLogger {
+  final List<_RecordedWarning> warnings = <_RecordedWarning>[];
+
+  @override
+  void audit({
+    required String eventType,
+    String? message,
+    String? entityId,
+    Map<String, Object?> metadata = const <String, Object?>{},
+  }) {}
+
+  @override
+  Future<void> dispose() async {}
+
+  @override
+  void error({
+    required String eventType,
+    String? message,
+    String? entityId,
+    Map<String, Object?> metadata = const <String, Object?>{},
+    Object? error,
+    StackTrace? stackTrace,
+  }) {}
+
+  @override
+  void info({
+    required String eventType,
+    String? message,
+    String? entityId,
+    Map<String, Object?> metadata = const <String, Object?>{},
+  }) {}
+
+  @override
+  void warn({
+    required String eventType,
+    String? message,
+    String? entityId,
+    Map<String, Object?> metadata = const <String, Object?>{},
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
+    warnings.add(
+      _RecordedWarning(
+        eventType: eventType,
+        entityId: entityId,
+        metadata: metadata,
+        error: error,
+      ),
+    );
+  }
+}
+
+class _RecordedWarning {
+  const _RecordedWarning({
+    required this.eventType,
+    required this.entityId,
+    required this.metadata,
+    required this.error,
+  });
+
+  final String eventType;
+  final String? entityId;
+  final Map<String, Object?> metadata;
+  final Object? error;
 }

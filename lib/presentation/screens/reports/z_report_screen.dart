@@ -4,7 +4,6 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../core/utils/date_formatter.dart';
 import '../../../domain/models/cashier_projected_report.dart';
 import '../../../domain/models/shift.dart';
 import '../../../domain/models/shift_report.dart';
@@ -85,7 +84,7 @@ class _ZReportScreenState extends ConsumerState<ZReportScreen> {
       return;
     }
 
-    final bool? confirmed = await showDialog<bool>(
+    await showDialog<void>(
       context: context,
       builder: (_) => Consumer(
         builder: (BuildContext context, WidgetRef ref, Widget? _) {
@@ -94,7 +93,6 @@ class _ZReportScreenState extends ConsumerState<ZReportScreen> {
               dialogState.cashierReport ?? currentReport;
           return CashierZReportDialog(
             report: dialogReport,
-            canConfirm: !dialogReport.previewTaken,
             canPrint: dialogReport.hasOpenShift,
             isPrintLoading: dialogState.isPrintLoading,
             onPrint: () async {
@@ -117,18 +115,6 @@ class _ZReportScreenState extends ConsumerState<ZReportScreen> {
         },
       ),
     );
-    if (confirmed != true || !mounted) {
-      return;
-    }
-
-    final bool success = await notifier.takeCashierEndOfDayPreview();
-    if (!mounted) {
-      return;
-    }
-    reportsState = ref.read(reportsNotifierProvider);
-    if (!success) {
-      _showMessage(reportsState.errorMessage ?? AppStrings.accessDenied);
-    }
   }
 
   Future<void> _runAdminFinalClose(int expectedCashMinor) async {
@@ -275,6 +261,7 @@ class _ZReportScreenState extends ConsumerState<ZReportScreen> {
               _ReportActionsCard(
                 currentUser: currentUser,
                 backendOpenShift: shiftState.backendOpenShift,
+                selectedShift: selectedShift,
                 isActionLoading: reportsState.isActionLoading,
                 isPrintLoading: reportsState.isPrintLoading,
                 canPrint: reportsState.adminReport != null,
@@ -319,6 +306,8 @@ class _ZReportScreenState extends ConsumerState<ZReportScreen> {
                   padding: EdgeInsets.all(AppSizes.spacingLg),
                   child: Center(child: CircularProgressIndicator()),
                 )
+              else if (reportsState.adminReport != null)
+                _ReportBody(report: reportsState.adminReport!)
               else if (reportsState.errorMessage != null)
                 _InfoCard(
                   color: AppColors.error,
@@ -337,9 +326,7 @@ class _ZReportScreenState extends ConsumerState<ZReportScreen> {
                     AppStrings.noReportData,
                     style: const TextStyle(fontSize: AppSizes.fontSm),
                   ),
-                )
-              else
-                _ReportBody(report: reportsState.adminReport!),
+                ),
             ],
           ],
         ),
@@ -372,6 +359,7 @@ class _ReportActionsCard extends StatelessWidget {
   const _ReportActionsCard({
     required this.currentUser,
     required this.backendOpenShift,
+    required this.selectedShift,
     required this.isActionLoading,
     required this.isPrintLoading,
     required this.canPrint,
@@ -381,6 +369,7 @@ class _ReportActionsCard extends StatelessWidget {
 
   final User? currentUser;
   final Shift? backendOpenShift;
+  final Shift? selectedShift;
   final bool isActionLoading;
   final bool isPrintLoading;
   final bool canPrint;
@@ -390,6 +379,7 @@ class _ReportActionsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isAdmin = currentUser?.role == UserRole.admin;
+    final Shift? displayShift = backendOpenShift ?? selectedShift;
 
     return _InfoCard(
       color: AppColors.surface,
@@ -397,9 +387,9 @@ class _ReportActionsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            backendOpenShift == null
+            displayShift == null
                 ? AppStrings.noBusinessShift
-                : '${AppStrings.currentBusinessShift}: ${AppStrings.openShiftLabel(backendOpenShift!.id)}',
+                : '${AppStrings.currentBusinessShift}: ${AppStrings.openShiftLabel(displayShift.id)}',
             style: const TextStyle(
               fontSize: AppSizes.fontMd,
               fontWeight: FontWeight.w700,
@@ -413,7 +403,7 @@ class _ReportActionsCard extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
-          if (backendOpenShift != null) ...<Widget>[
+          if (canPrint) ...<Widget>[
             const SizedBox(height: AppSizes.spacingMd),
             OutlinedButton(
               onPressed: isPrintLoading || !canPrint
@@ -429,22 +419,23 @@ class _ReportActionsCard extends StatelessWidget {
                     )
                   : Text(AppStrings.printZReportAction),
             ),
+          ],
+          if (backendOpenShift != null && isAdmin) ...<Widget>[
             const SizedBox(height: AppSizes.spacingSm),
-            if (isAdmin)
-              ElevatedButton(
-                onPressed: isActionLoading
-                    ? null
-                    : () async {
-                        await onAdminFinalClose();
-                      },
-                child: isActionLoading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(AppStrings.finalZReportAction),
-              ),
+            ElevatedButton(
+              onPressed: isActionLoading
+                  ? null
+                  : () async {
+                      await onAdminFinalClose();
+                    },
+              child: isActionLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(AppStrings.finalZReportAction),
+            ),
           ],
         ],
       ),
@@ -592,7 +583,8 @@ class _ReportBody extends StatelessWidget {
   static const String _customSalesTitle = 'Custom Sales';
   static const String _customSalesRevenueLabel = 'Custom Sale Revenue';
   static const String _customSalesCountLabel = 'Custom Sale Count';
-  static const String _customSalesAverageValueLabel = 'Custom Sale Average Value';
+  static const String _customSalesAverageValueLabel =
+      'Custom Sale Average Value';
 
   @override
   Widget build(BuildContext context) {
@@ -863,10 +855,7 @@ class _BreakdownRow extends StatelessWidget {
 }
 
 class _MetricValueRow extends StatelessWidget {
-  const _MetricValueRow({
-    required this.label,
-    required this.value,
-  });
+  const _MetricValueRow({required this.label, required this.value});
 
   final String label;
   final String value;

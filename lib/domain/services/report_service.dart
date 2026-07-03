@@ -142,7 +142,7 @@ class ReportService {
       }
     }
 
-    final int grossSalesMinor = cashGrossTotalMinor + cardGrossTotalMinor;
+    final int grossSalesMinor = _sumTransactionTotals(paidTransactions);
     final int netSalesMinor = grossSalesMinor - refundTotalMinor;
     final categoryBreakdown = await _transactionRepository
         .getPaidCategoryTotalsForShift(shiftId);
@@ -691,6 +691,36 @@ class ReportService {
   Future<SemanticSalesAnalytics> _buildSemanticSalesAnalytics(
     List<Transaction> paidTransactions,
   ) async {
+    final _SemanticAnalyticsFailureContext failureContext =
+        _SemanticAnalyticsFailureContext();
+    try {
+      return await _buildSemanticSalesAnalyticsOrThrow(
+        paidTransactions,
+        failureContext,
+      );
+    } catch (error, stackTrace) {
+      _logger.warn(
+        eventType: 'semantic_sales_analytics_failed',
+        entityId:
+            failureContext.lineId?.toString() ??
+            failureContext.transactionId?.toString(),
+        message:
+            'Semantic sales analytics failed while building shift report. Financial report generation will continue without semantic analytics.',
+        metadata: <String, Object?>{
+          'transaction_id': failureContext.transactionId,
+          'line_id': failureContext.lineId,
+        },
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return const SemanticSalesAnalytics.empty();
+    }
+  }
+
+  Future<SemanticSalesAnalytics> _buildSemanticSalesAnalyticsOrThrow(
+    List<Transaction> paidTransactions,
+    _SemanticAnalyticsFailureContext failureContext,
+  ) async {
     final BreakfastConfigurationRepository? configurationRepository =
         _breakfastConfigurationRepository;
     if (paidTransactions.isEmpty) {
@@ -721,11 +751,14 @@ class ReportService {
     bool inferredChoiceGroups = false;
 
     for (final Transaction transaction in paidTransactions) {
+      failureContext.transactionId = transaction.id;
+      failureContext.lineId = null;
       final List<TransactionLine> lines = await _transactionRepository.getLines(
         transaction.id,
       );
 
       for (final TransactionLine line in lines) {
+        failureContext.lineId = line.id;
         final MealCustomizationPersistedSnapshotRecord? mealSnapshot =
             await _transactionRepository.getMealCustomizationSnapshotByLine(
               line.id,
@@ -2054,4 +2087,9 @@ class _AnalyticsWindow {
 
   final DateTime startInclusive;
   final DateTime endExclusive;
+}
+
+class _SemanticAnalyticsFailureContext {
+  int? transactionId;
+  int? lineId;
 }

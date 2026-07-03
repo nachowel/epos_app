@@ -200,22 +200,30 @@ class TransactionRepository {
         .customSelect(
           '''
         SELECT
-          categories.name AS category_name,
-          SUM(transaction_lines.line_total_minor) AS total_minor
+          COALESCE(categories.name, 'Uncategorised') AS category_name,
+          COALESCE(SUM(transaction_lines.line_total_minor), 0) AS total_minor
         FROM transaction_lines
         INNER JOIN transactions
           ON transactions.id = transaction_lines.transaction_id
-        INNER JOIN products
+        LEFT JOIN products
           ON products.id = transaction_lines.product_id
-        INNER JOIN categories
+        LEFT JOIN categories
           ON categories.id = products.category_id
         WHERE transactions.shift_id = ?
           AND transactions.status = 'paid'
-          AND products.is_custom = 0
-        GROUP BY categories.id, categories.name
-        ORDER BY categories.name ASC, categories.id ASC
+          AND (products.id IS NULL OR products.is_custom = 0)
+        GROUP BY COALESCE(categories.id, -1), COALESCE(categories.name, 'Uncategorised')
+        ORDER BY
+          CASE WHEN categories.id IS NULL THEN 1 ELSE 0 END ASC,
+          category_name ASC
       ''',
           variables: <Variable<Object>>[Variable<int>(shiftId)],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _database.transactionLines,
+            _database.transactions,
+            _database.products,
+            _database.categories,
+          },
         )
         .get();
 
@@ -241,7 +249,7 @@ class TransactionRepository {
         FROM transaction_lines
         INNER JOIN transactions
           ON transactions.id = transaction_lines.transaction_id
-        INNER JOIN products
+        LEFT JOIN products
           ON products.id = transaction_lines.product_id
         WHERE transactions.shift_id = ?
           AND transactions.status = 'paid'

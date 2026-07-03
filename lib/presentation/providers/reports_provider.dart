@@ -354,14 +354,17 @@ class ReportsNotifier extends StateNotifier<ReportsState> {
       state = state.copyWith(isPrintLoading: false, errorMessage: null);
       return true;
     } catch (error, stackTrace) {
+      final String errorMessage = ErrorMapper.toUserMessageAndLog(
+        error,
+        logger: _ref.read(appLoggerProvider),
+        eventType: 'z_report_print_failed',
+        stackTrace: stackTrace,
+      );
       state = state.copyWith(
         isPrintLoading: false,
-        errorMessage: ErrorMapper.toUserMessageAndLog(
-          error,
-          logger: _ref.read(appLoggerProvider),
-          eventType: 'z_report_print_failed',
-          stackTrace: stackTrace,
-        ),
+        errorMessage: error is PrinterException
+            ? AppStrings.zReportPrintFailureKeepsReport
+            : errorMessage,
       );
       return false;
     }

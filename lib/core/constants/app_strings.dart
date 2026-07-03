@@ -110,6 +110,8 @@ class AppStrings {
   static String get paymentFailedOrderOpen => _t.paymentFailedOrderOpen;
   static String get printFailed => _t.printFailed;
   static String get printRetryRecommended => _t.printRetryRecommended;
+  static String get zReportPrintFailureKeepsReport =>
+      'Yazıcı bağlantısı kurulamadı. Rapor ekranda kalır; yazıcı bağlandıktan sonra tekrar yazdırabilirsiniz.';
   static String get kitchenPrintSent => _t.kitchenPrintSent;
   static String get receiptPrintSent => _t.receiptPrintSent;
   static String get kitchenPrintPending => _t.kitchenPrintPending;
